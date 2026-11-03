@@ -41,7 +41,7 @@ Yes, thank you. Use the **Sponsor** button on the repository (GitHub Sponsors). 
 
 ## I need different terms
 
-For a commercial license, a redistribution license, paid support or anything else, contact the owner through <https://github.com/moyaver>.
+For a commercial license, a redistribution license, paid support or anything else, email the owner at <mhammadjaber00@outlook.com>.
 
 ## What about the dependencies?
 

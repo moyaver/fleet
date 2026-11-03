@@ -13,7 +13,7 @@ Every contribution needs a signed Contributor License Agreement. The [CLA workfl
   ```
 
   The workflow records your signature on the `cla-signatures` branch and re-runs the check. You sign once.
-- **On company time:** your employer owns that work, so your employer signs the [Corporate CLA](CLA-CORPORATE.md) and lists you in Schedule A. This includes the owner's coworkers. Once the signed copy is in, the owner adds your GitHub login to the `cla-signatures` branch.
+- **On company time:** your employer owns that work, so your employer signs the [Corporate CLA](CLA-CORPORATE.md) and lists you in Schedule A. This includes the owner's coworkers. Email the signed copy to <mhammadjaber00@outlook.com>; the owner then adds your GitHub login to the `cla-signatures` branch.
 
 Every commit in a pull request must be linked to a GitHub account (commit with an email your account knows), otherwise the check can't tell who signed.
 

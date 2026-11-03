@@ -5,14 +5,14 @@
 > - names: "The Apache Software Foundation" / "the Foundation" became the Owner, Mohammad Jaber
 > - project: "any of the products owned or managed by the Foundation" became the Maestro Fleet project
 > - removed the ASF-specific sentence about the Foundation's nonprofit status and bylaws
-> - signing: emailing secretary@apache.org became contacting the Owner
+> - signing: emailing secretary@apache.org became emailing the Owner
 > This adaptation has not been reviewed by a lawyer. It is not legal advice.
 
 Thank you for your interest in Mohammad Jaber (the "Owner"). In order to clarify the intellectual property license granted with Contributions from any person or entity, the Owner must have a Contributor License Agreement (CLA) on file that has been signed by each Contributor, indicating agreement to the license terms below. This license is for your protection as a Contributor as well as the protection of the Owner and its users; it does not change your rights to use your own Contributions for any other purpose.
 
 This version of the Agreement allows an entity (the "Corporation") to submit Contributions to the Owner, to authorize Contributions submitted by its designated employees to the Owner, and to grant copyright and patent licenses thereto.
 
-Please complete this Agreement, attach a signature, and contact the Owner through https://github.com/moyaver to arrange delivery of the signed copy.
+Please complete this Agreement, attach a signature, and email the completed file to mhammadjaber00@outlook.com.
 
 Please read this document carefully before signing and keep a copy for your records.
 

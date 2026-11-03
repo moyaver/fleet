@@ -45,19 +45,18 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/maestro-flee
 - [x] `ci.yml` and `cla.yml`
 - [x] Leptos hello page built by Trunk, embedded and served by `fleet serve` with the CSP
 - [x] mdBook skeleton under `docs/`
-- [x] GitHub settings that a private personal repository allows (Discussions, merge options, topics, labels, milestones)
-- [ ] Settings that need a public repository, see [owner actions](#owner-actions)
+- [x] GitHub settings: Discussions, merge options, topics, labels, milestones, `main` ruleset, private vulnerability reporting, secret scanning
 
 ### Owner actions
 
 Things only the owner can do. Each one has an issue labelled [`owner-action`](https://github.com/moyaver/maestro-fleet/labels/owner-action).
 
-- [ ] **Before product code:** written confirmation from the employer that this is personal IP ([#1](https://github.com/moyaver/maestro-fleet/issues/1), [PLAN §2.5](docs/PLAN.md#25-precondition-employer-ip-check-owner-action-before-m0-code))
+- [x] **Before product code:** written confirmation from the employer that this is personal IP ([#1](https://github.com/moyaver/maestro-fleet/issues/1), [PLAN §2.5](docs/PLAN.md#25-precondition-employer-ip-check-owner-action-before-m0-code))
 - [ ] Decide the final product name before going public ([#5](https://github.com/moyaver/maestro-fleet/issues/5))
 - [ ] Ask a lawyer to review `LICENSE.md`, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/maestro-fleet/issues/6))
-- [ ] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/maestro-fleet/issues/2))
+- [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/maestro-fleet/issues/2))
 - [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/maestro-fleet/issues/3))
-- [ ] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/maestro-fleet/issues/4))
+- [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/maestro-fleet/issues/4))
 
 ---
 
@@ -140,7 +139,7 @@ Maestro Fleet is **source-available, not open source**. It is licensed under the
 - any organization may use and modify it for its own internal operations, for free;
 - redistribution, public forks of modified versions and offering it to third parties are not permitted.
 
-Read the plain-language [Licensing FAQ](LICENSING.md). For other terms, contact the owner.
+Read the plain-language [Licensing FAQ](LICENSING.md). For other terms, email <mhammadjaber00@outlook.com>.
 
 ## Contributing and sponsoring
 
