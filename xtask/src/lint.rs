@@ -361,8 +361,14 @@ mod tests {
         // Browser crates are judged on their wasm graph: native-only tokio is fine.
         let web_host = meta(&["fleet-web"], &[("fleet-web", &["tokio"]), ("tokio", &[])]);
         let web_wasm = meta(&["fleet-web"], &[("fleet-web", &[])]);
-        assert!(dependency_problems(&web_host, &web_wasm).is_empty());
-        assert!(!dependency_problems(&web_wasm, &web_host).is_empty());
+        assert_eq!(
+            dependency_problems(&web_host, &web_wasm),
+            Vec::<String>::new()
+        );
+        assert_ne!(
+            dependency_problems(&web_wasm, &web_host),
+            Vec::<String>::new()
+        );
 
         let dirty = meta(
             &["fleet-protocol", "fleet-core", "fleet-agent", "fleet-store"],

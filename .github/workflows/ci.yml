@@ -28,8 +28,8 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
-          # Keep in sync with TOOLS in xtask/src/main.rs.
-          tool: cargo-nextest@0.9.151,cargo-deny@0.20.2,trunk@0.22.1,mdbook@0.5.4
+          # Latest releases; keep the list in sync with TOOLS in xtask/src/main.rs.
+          tool: cargo-nextest,cargo-deny,trunk,mdbook
       - run: cargo xtask ci
 
   agent-macos:

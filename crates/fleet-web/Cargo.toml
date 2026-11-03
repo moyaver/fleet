@@ -14,4 +14,3 @@ workspace = true
 [dependencies]
 console_error_panic_hook.workspace = true
 leptos.workspace = true
-wasm-bindgen.workspace = true

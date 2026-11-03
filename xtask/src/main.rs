@@ -10,14 +10,14 @@ use std::{
 
 use anyhow::{Context, bail};
 
-/// Tools installed by `setup`, pinned to the versions CI uses (`.github/workflows/ci.yml`).
+/// Tools installed by `setup`, always at their latest release (CI does the same).
 const TOOLS: &[&str] = &[
-    "cargo-nextest@0.9.151",
-    "cargo-deny@0.20.2",
+    "cargo-nextest",
+    "cargo-deny",
     // The binary sits behind the `cli` feature.
-    "cargo-about@0.9.3 --features cli",
-    "trunk@0.22.1",
-    "mdbook@0.5.4",
+    "cargo-about --features cli",
+    "trunk",
+    "mdbook",
 ];
 
 const USAGE: &str = "usage: cargo xtask <setup | ci | lint | web [--release]>";

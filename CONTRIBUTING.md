@@ -25,7 +25,7 @@ You need [rustup](https://rustup.rs). The toolchain version comes from [`rust-to
 cargo xtask setup
 ```
 
-This installs the pinned tools (cargo-nextest, cargo-deny, cargo-about, Trunk, mdBook) and the rustup targets.
+This installs the latest cargo-nextest, cargo-deny, cargo-about, Trunk and mdBook, plus the rustup targets.
 
 | Command | What it does |
 |---|---|
@@ -62,7 +62,7 @@ Significant decisions are recorded as ADRs in [`docs/decisions/`](docs/decisions
 2. Status starts as **Proposed**. It becomes **Accepted** when the owner merges it, and **Superseded** (with a link) when replaced.
 3. Add it to the index in `docs/decisions/README.md`.
 
-You need an ADR to: bump a minor or major version of a core dependency (for example Leptos 0.9, axum 0.9), break an invariant, or change the wire protocol.
+You need an ADR to break an invariant, change the wire protocol, or swap a core framework (for example Leptos for something else). Version bumps don't need one: dependencies track their latest stable releases.
 
 ## 6. Legal text
 

@@ -1,5 +1,4 @@
-# Keeps pinned action SHAs and crate patch releases current. Minor and major crate bumps need an
-# ADR first (PLAN §0.5), so Dependabot only proposes patches for Cargo.
+# Keeps pinned action SHAs and crates on their latest releases, majors included.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -18,8 +17,5 @@ updates:
     commit-message:
       prefix: chore(deps)
     groups:
-      patches:
-        patterns: ["*"]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      minor-and-patch:
+        update-types: ["minor", "patch"]
