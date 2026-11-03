@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+//! The Maestro Fleet dashboard (Leptos CSR). M0 only proves the wasm → embed → axum chain;
+//! screens start in M4 (PLAN §10).
+
+use leptos::prelude::*;
+
+fn main() {
+    console_error_panic_hook::set_once();
+    leptos::mount::mount_to_body(App);
+}
+
+#[component]
+fn App() -> impl IntoView {
+    view! {
+        <main>
+            <h1>"Maestro Fleet"</h1>
+            <p>"Live observability for Maestro tests in CI. This is the M0 hello page."</p>
+        </main>
+    }
+}

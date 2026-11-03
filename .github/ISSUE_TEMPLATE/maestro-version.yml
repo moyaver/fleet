@@ -1,0 +1,25 @@
+name: Maestro version support
+description: A Maestro release changed its output, or a new version needs support.
+labels: [maestro-compat]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Maestro version
+      placeholder: "2.13.0"
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What changed?
+      description: stdout, maestro.log, bundle layout, JUnit, exit codes, flags.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >
+        Captured output, release notes or a source link. Support is claimed only once
+        fixtures exist (fixtures/maestro/<version>/). Remove secrets first.

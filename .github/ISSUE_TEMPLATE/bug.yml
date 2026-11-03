@@ -1,0 +1,37 @@
+name: Bug report
+description: Something doesn't work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Fleet version or commit
+    validations:
+      required: true
+  - type: input
+    id: maestro
+    attributes:
+      label: Maestro version (`maestro --version`)
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Runner OS and arch, CI provider, emulator or device, Postgres and object store.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Remove secrets first. Agent logs, server logs, or `maestro-fleet inspect` output.
+      render: text

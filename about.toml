@@ -1,0 +1,16 @@
+# cargo-about: THIRD_PARTY_LICENSES.html for release artifacts (PLAN §2.6). Keep in sync with deny.toml.
+accepted = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0", # Boost: permissive, OSI-approved; not in the PLAN §2.6 list (xxhash-rust via Leptos)
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Zlib",
+]
+private = { ignore = true }

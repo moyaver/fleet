@@ -1,0 +1,10 @@
+[book]
+title = "Maestro Fleet"
+description = "Live observability for Maestro mobile UI tests in CI."
+authors = ["Mohammad Jaber"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/moyaver/maestro-fleet"
+edit-url-template = "https://github.com/moyaver/maestro-fleet/edit/main/docs/{path}"

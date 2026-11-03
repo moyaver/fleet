@@ -1,0 +1,44 @@
+# cargo-deny: dependency licenses, advisories, bans and sources (PLAN §2.6).
+
+[graph]
+all-features = true
+
+[advisories]
+# Vulnerabilities, unsound and yanked crates are errors; unmaintained crates in the workspace too.
+unmaintained = "workspace"
+yanked = "deny"
+
+[licenses]
+# Permissive licenses only in anything linked into a binary. MPL-2.0 is file-level copyleft and
+# acceptable when used unmodified. GPL, AGPL, LGPL, SSPL and non-commercial licenses are denied by
+# not being listed.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0", # Boost: permissive, OSI-approved; not in the PLAN §2.6 list (xxhash-rust via Leptos)
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Zlib",
+]
+confidence-threshold = 0.93
+# The list is policy, not an inventory: allowed licenses no crate uses yet are fine.
+unused-allowed-license = "allow"
+
+[licenses.private]
+# Workspace crates are publish = false and use LICENSE.md (PolyForm Internal Use, not in SPDX).
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

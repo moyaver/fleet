@@ -1,0 +1,112 @@
+# Contributor License Agreement check (PLAN §2.3).
+#
+# CLA Assistant Lite (contributor-assistant/github-action) was archived, so this is the small
+# replacement the plan calls for. It never checks out pull request code, so pull_request_target is safe.
+#
+# Signatures live on the `cla-signatures` branch as signatures/<github-user-id>.json.
+# Corporate CLA signatories are added there by the owner by hand (see CONTRIBUTING.md).
+name: CLA
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+
+env:
+  SIGN_PHRASE: I have read the CLA Document and I hereby sign the CLA
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      OWNER_ID: ${{ github.repository_owner_id }}
+    steps:
+      - name: Check every commit author has signed
+        run: |
+          missing=""
+          while IFS=$'\t' read -r id who; do
+            if [ "$id" = "unlinked" ]; then
+              missing+="- ${who}: commit email is not linked to a GitHub account"$'\n'
+            elif [ "$id" != "$OWNER_ID" ] && ! gh api "repos/$REPO/contents/signatures/$id.json?ref=cla-signatures" --silent 2>/dev/null; then
+              missing+="- @${who}"$'\n'
+            fi
+          done < <(gh api --paginate "repos/$REPO/pulls/$PR/commits" \
+            --jq '.[] | select(.author.type != "Bot") | [(.author.id // "unlinked" | tostring), (.author.login // .commit.author.name)] | @tsv' | sort -u)
+
+          if [ -z "$missing" ]; then
+            echo "All commit authors have signed the CLA."
+            exit 0
+          fi
+
+          marker="<!-- cla-check -->"
+          if ! gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[].body' | grep -qF "$marker"; then
+            {
+              echo "$marker"
+              echo "Thanks for the pull request! Before it can be merged, every commit author needs to sign the [Contributor License Agreement](https://github.com/$REPO/blob/main/CLA.md)."
+              echo
+              echo "Not signed yet:"
+              echo
+              printf '%s' "$missing"
+              echo
+              echo "To sign, read the CLA and post this exact comment:"
+              echo
+              echo '```'
+              echo "$SIGN_PHRASE"
+              echo '```'
+              echo
+              echo "Contributing on company time? Your employer signs the [Corporate CLA](https://github.com/$REPO/blob/main/CLA-CORPORATE.md) instead. See [CONTRIBUTING.md](https://github.com/$REPO/blob/main/CONTRIBUTING.md)."
+            } > body.md
+            gh pr comment "$PR" -R "$REPO" --body-file body.md
+          fi
+          printf 'CLA not signed by:\n%s' "$missing"
+          exit 1
+
+  sign:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # record the signature on the cla-signatures branch
+      actions: write # re-run the check
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      LOGIN: ${{ github.event.comment.user.login }}
+      USER_ID: ${{ github.event.comment.user.id }}
+      COMMENT_URL: ${{ github.event.comment.html_url }}
+    steps:
+      - name: Record signature
+        run: |
+          path="signatures/$USER_ID.json"
+          if gh api "repos/$REPO/contents/$path?ref=cla-signatures" --silent 2>/dev/null; then
+            echo "$LOGIN has already signed."
+          else
+            cla_sha=$(gh api "repos/$REPO/commits?path=CLA.md&per_page=1" --jq '.[0].sha')
+            jq -n --arg login "$LOGIN" --argjson id "$USER_ID" --arg url "$COMMENT_URL" \
+              --argjson pr "$PR" --arg cla "$cla_sha" --arg at "$(date -u +%FT%TZ)" \
+              '{type: "individual", login: $login, id: $id, signed_at: $at, pull_request: $pr, comment: $url, cla_commit: $cla}' > sig.json
+            gh api -X PUT "repos/$REPO/contents/$path" -f branch=cla-signatures \
+              -f message="chore(cla): $LOGIN signed the individual CLA" -f content="$(base64 -w0 sig.json)" --silent
+            echo "Recorded signature for $LOGIN."
+          fi
+      - name: Re-run the CLA check
+        run: |
+          sha=$(gh pr view "$PR" -R "$REPO" --json headRefOid --jq .headRefOid)
+          run=$(gh run list -R "$REPO" --workflow cla.yml --event pull_request_target --commit "$sha" --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -n "$run" ]; then gh run rerun "$run" -R "$REPO" --failed || true; fi

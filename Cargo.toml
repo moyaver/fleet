@@ -1,0 +1,52 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+# PolyForm Internal Use is not in SPDX, so crates point at the file. Never published: crates.io needs
+# redistribution rights. See LICENSING.md.
+license-file = "LICENSE.md"
+publish = false
+repository = "https://github.com/moyaver/maestro-fleet"
+
+[workspace.lints.rust]
+# The one planned exception is fleet-agent::sys (signals, process groups); see CONTRIBUTING.md.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[workspace.dependencies]
+fleet-protocol = { path = "crates/fleet-protocol" }
+fleet-web-assets = { path = "crates/fleet-web-assets" }
+
+anyhow = "1.0.104"
+axum = "0.8.9"
+base64 = "0.22.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+console_error_panic_hook = "0.1.7"
+# Pinned exactly: see PLAN §5.4. A minor bump needs an ADR.
+leptos = { version = "=0.8.23", features = ["csr"] }
+rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tower = "0.5"
+tower-http = { version = "0.7.1", features = ["set-header"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Pinned exactly so Trunk fetches the matching wasm-bindgen-cli.
+wasm-bindgen = "=0.2.130"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+# Trunk builds fleet-web with `--release`; keep the wasm small. PLAN §5.4.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+panic = "abort"

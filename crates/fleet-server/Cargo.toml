@@ -1,0 +1,31 @@
+[package]
+name = "fleet-server"
+description = "The fleet server: REST and WebSocket APIs, auth, background jobs and the embedded dashboard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "fleet"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+base64.workspace = true
+clap.workspace = true
+fleet-web-assets.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
