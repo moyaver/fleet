@@ -14,7 +14,8 @@ use anyhow::{Context, bail};
 const TOOLS: &[&str] = &[
     "cargo-nextest@0.9.151",
     "cargo-deny@0.20.2",
-    "cargo-about@0.9.3",
+    // The binary sits behind the `cli` feature.
+    "cargo-about@0.9.3 --features cli",
     "trunk@0.22.1",
     "mdbook@0.5.4",
 ];
