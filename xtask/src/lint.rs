@@ -139,7 +139,7 @@ const BINARY_ONLY: &[&str] = &["anyhow", "tracing-subscriber"];
 const UNSAFE_FILE: &str = "crates/fleet-agent/src/sys.rs";
 
 /// External crates `fleet-protocol` may use directly (PLAN §4.2).
-const PROTOCOL_EXTERNAL: &[&str] = &["serde", "serde_json", "uuid", "time", "schemars"];
+const PROTOCOL_EXTERNAL: &[&str] = &["serde", "serde_json", "uuid", "time", "schemars", "utoipa"];
 
 pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
     let mut problems = Vec::new();

@@ -190,7 +190,7 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 
 ### 4.2 Dependency rules (checked by `cargo xtask lint`)
 
-- `fleet-protocol` → only serde, serde_json, uuid, time, schemars (feature). No async runtime, must build for wasm32.
+- `fleet-protocol` → only serde, serde_json, uuid, time, schemars (feature) and utoipa (optional `openapi` feature, enabled only by fleet-server for OpenAPI). No async runtime, must build for wasm32.
 - `fleet-core`, `fleet-maestro` → `fleet-protocol` + pure crates. No tokio, sqlx, reqwest or filesystem I/O.
 - `fleet-agent` → `fleet-protocol`, `fleet-core`, `fleet-maestro`. **Never** `fleet-store`/`fleet-server`.
 - `fleet-web`, `fleet-ui` → `fleet-protocol`, `fleet-core` (wasm-safe subset). No tokio.

@@ -12,8 +12,13 @@ repository.workspace = true
 workspace = true
 
 
+[features]
+# `utoipa::ToSchema` on REST DTOs, for the server's OpenAPI document (not for the dashboard).
+openapi = ["dep:utoipa"]
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 time.workspace = true
+utoipa = { workspace = true, optional = true }
 uuid.workspace = true

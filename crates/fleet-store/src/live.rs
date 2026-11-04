@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Read models for REST snapshots and live deltas (research 03 §5.3; invariant I4).
+//! Queries behind REST snapshots and live deltas; the views are `fleet_protocol::live` (research 03 §5.3; invariant I4).
 //!
 //! A snapshot is one pipeline attempt read in a single `REPEATABLE READ` transaction together
 //! with the attempt's live `version`, so a client that applies deltas with a higher version
@@ -8,261 +8,13 @@
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
-use time::OffsetDateTime;
-use utoipa::ToSchema;
+use fleet_protocol::live::{
+    AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, PlanShardView, PlanView,
+    ProjectView, Snapshot, SuiteView,
+};
 use uuid::Uuid;
 
 use crate::{Result, Store, ingest::EntityRef};
-
-/// A project.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct ProjectView {
-    /// ID.
-    pub id: Uuid,
-    /// URL-safe identifier.
-    pub slug: String,
-    /// Display name.
-    pub name: String,
-}
-
-/// A pipeline attempt (one CI run attempt) and its live version.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct AttemptView {
-    /// ID.
-    pub id: Uuid,
-    /// Project.
-    pub project_id: Uuid,
-    /// CI provider (`github_actions`, `generic`).
-    pub provider: String,
-    /// The CI run's natural key (`<repository>:<run_id>`).
-    pub run_key: String,
-    /// `owner/name`.
-    pub repository: Option<String>,
-    /// Commit.
-    pub commit_sha: Option<String>,
-    /// Git ref.
-    pub git_ref: Option<String>,
-    /// Re-run attempt, from 1.
-    pub attempt: i32,
-    /// Live version: deltas carry the version they produce.
-    pub version: i64,
-    /// Flows planned by Fleet plans linked to this attempt; `None` when no plan is known.
-    pub planned_total: Option<i64>,
-    /// Jobs seen.
-    pub jobs: i64,
-    /// Jobs not closed yet.
-    pub open_jobs: i64,
-    /// First seen.
-    #[serde(with = "time::serde::rfc3339")]
-    pub first_seen_at: OffsetDateTime,
-}
-
-/// A CI job. The outcome is the Maestro result, with its source; `None` until closed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct JobView {
-    /// ID.
-    pub id: Uuid,
-    /// Attempt.
-    pub pipeline_attempt_id: Uuid,
-    /// Stable key within the attempt.
-    pub job_key: String,
-    /// Display name.
-    pub name: Option<String>,
-    /// `starting`, `running`, `finalizing`, `closed`.
-    pub lifecycle: String,
-    /// `completed`, `failed`, `cancelled`, `interrupted`, `unknown`.
-    pub outcome: Option<String>,
-    /// The evidence the outcome rests on.
-    pub outcome_source: Option<String>,
-    /// Times a new agent run reopened it.
-    pub reopened_count: i32,
-    /// Revision, bumped on every change.
-    pub rev: i64,
-}
-
-/// One agent process.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct AgentRunView {
-    /// ID.
-    pub id: Uuid,
-    /// Job.
-    pub job_id: Uuid,
-    /// Worker.
-    pub worker_id: Option<Uuid>,
-    /// Runner name.
-    pub runner_name: Option<String>,
-    /// `active`, `detached`, `finalizing`, `ended`, `abandoned`.
-    pub state: String,
-    /// `trusted`, `pr`, `untrusted`.
-    pub trust_level: String,
-    /// Highest committed `seq`.
-    pub committed_seq: i64,
-    /// Explicitly recorded gaps (I5): journal and telemetry ranges known to be missing.
-    pub gaps: i64,
-    /// Last persisted contact.
-    #[serde(with = "time::serde::rfc3339")]
-    pub last_frame_at: OffsetDateTime,
-    /// It came back after it had been abandoned.
-    pub late_resume: bool,
-    /// The Fleet plan it runs a shard of.
-    pub plan_id: Option<String>,
-    /// That shard.
-    pub plan_shard_id: Option<i32>,
-    /// Maestro's exit code.
-    pub maestro_exit_code: Option<i32>,
-    /// Revision.
-    pub rev: i64,
-    /// `online`, `stale`, `disconnected`, `completed`: set by the server from live contact
-    /// (heartbeats never touch the database).
-    pub liveness: Option<String>,
-}
-
-/// One Maestro invocation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct SuiteView {
-    /// ID.
-    pub id: Uuid,
-    /// Job.
-    pub job_id: Uuid,
-    /// Agent run.
-    pub agent_run_id: Uuid,
-    /// `none`, `split`, `all`.
-    pub shard_mode: String,
-    /// Shards requested.
-    pub shard_count: i32,
-    /// Flows planned; `None` = unknown (progress is indeterminate, never guessed).
-    pub planned_count: Option<i32>,
-    /// Where the plan came from.
-    pub plan_source: Option<String>,
-    /// `starting`, `running`, `reporting`, `closed`.
-    pub lifecycle: String,
-    /// `passed`, `failed`, `interrupted`, `unknown`.
-    pub outcome: Option<String>,
-    /// The evidence the outcome rests on.
-    pub outcome_source: Option<String>,
-    /// `complete`, `partial`, `absent`, `invalid`.
-    pub report_status: Option<String>,
-    /// Maestro's exit code.
-    pub exit_code: Option<i32>,
-    /// Revision.
-    pub rev: i64,
-}
-
-/// A device as seen by one agent run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct DeviceView {
-    /// ID.
-    pub id: Uuid,
-    /// Agent run.
-    pub agent_run_id: Uuid,
-    /// adb serial.
-    pub serial: String,
-    /// `discovered`, `booting`, `ready`, `busy`, `offline`, `released`, `lost`.
-    pub state: String,
-    /// Revision.
-    pub rev: i64,
-}
-
-/// One flow execution: state, provenance and finality together (I4).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct FlowView {
-    /// ID.
-    pub id: Uuid,
-    /// Job.
-    pub job_id: Uuid,
-    /// Suite.
-    pub suite_execution_id: Uuid,
-    /// Agent run.
-    pub agent_run_id: Uuid,
-    /// Device.
-    pub device_session_id: Option<Uuid>,
-    /// 1-based shard.
-    pub shard_number: Option<i32>,
-    /// Order within the shard.
-    pub ordinal: Option<i32>,
-    /// Flow name.
-    pub name: String,
-    /// Flow file.
-    pub path: Option<String>,
-    /// `pending`, `running`, `passed`, `failed`, `skipped`, `interrupted`, `unknown`.
-    pub state: String,
-    /// The winning claim's source.
-    pub outcome_source: Option<String>,
-    /// `provisional`, `verified`, `unverified_final`, `inferred`.
-    pub finality: String,
-    /// Two parsed sources disagreed (a Maestro compatibility alarm).
-    pub has_conflict: bool,
-    /// Why it failed, redacted.
-    pub failure_message: Option<String>,
-    /// Maestro's or the report's duration.
-    pub duration_ms: Option<i64>,
-    /// Steps seen.
-    pub steps: i64,
-    /// Revision.
-    pub rev: i64,
-}
-
-/// One shard of a Fleet plan: planned against actual.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct PlanShardView {
-    /// Shard number.
-    pub shard_id: i32,
-    /// Flow files assigned.
-    pub flows: Vec<String>,
-    /// The planner's estimate.
-    pub estimate_ms: Option<i64>,
-    /// Agent runs that ran it.
-    pub agent_runs: Vec<Uuid>,
-    /// Flow executions those runs reported.
-    pub executed: i64,
-}
-
-/// A Fleet plan (ADR-0013).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct PlanView {
-    /// Plan ID.
-    pub plan_id: String,
-    /// Flows planned across shards.
-    pub planned_total: i32,
-    /// The shards.
-    pub shards: Vec<PlanShardView>,
-}
-
-/// Everything about one attempt, at `attempt.version`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct Snapshot {
-    /// The attempt and its version.
-    pub attempt: AttemptView,
-    /// Jobs.
-    pub jobs: Vec<JobView>,
-    /// Agent runs.
-    pub agent_runs: Vec<AgentRunView>,
-    /// Suites.
-    pub suites: Vec<SuiteView>,
-    /// Devices.
-    pub devices: Vec<DeviceView>,
-    /// Flow executions.
-    pub flows: Vec<FlowView>,
-    /// Linked Fleet plans.
-    pub plans: Vec<PlanView>,
-}
-
-/// One changed entity, as a delta carries it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(tag = "kind", content = "entity", rename_all = "snake_case")]
-pub enum EntityView {
-    /// A job.
-    Job(JobView),
-    /// An agent run.
-    AgentRun(AgentRunView),
-    /// A suite.
-    Suite(SuiteView),
-    /// A flow execution.
-    Flow(FlowView),
-    /// A device.
-    Device(DeviceView),
-}
 
 /// Rows of one attempt, or the rows with these IDs.
 #[derive(Debug, Clone, Copy)]
@@ -437,8 +189,7 @@ async fn jobs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<JobVie
 
 async fn agent_runs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<AgentRunView>> {
     let (attempt, ids) = scope.parts();
-    Ok(sqlx::query_as!(
-        AgentRunView,
+    let rows = sqlx::query!(
         "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,
                 r.trust_level::text AS \"trust_level!\", r.committed_seq,
                 (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",
@@ -452,7 +203,28 @@ async fn agent_runs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<
         ids.as_deref()
     )
     .fetch_all(c)
-    .await?)
+    .await?;
+    // The server fills `liveness` from live contact; the database has none.
+    Ok(rows
+        .into_iter()
+        .map(|r| AgentRunView {
+            id: r.id,
+            job_id: r.job_id,
+            worker_id: r.worker_id,
+            runner_name: r.runner_name,
+            state: r.state,
+            trust_level: r.trust_level,
+            committed_seq: r.committed_seq,
+            gaps: r.gaps,
+            last_frame_at: r.last_frame_at,
+            late_resume: r.late_resume,
+            plan_id: r.plan_id,
+            plan_shard_id: r.plan_shard_id,
+            maestro_exit_code: r.maestro_exit_code,
+            rev: r.rev,
+            liveness: None,
+        })
+        .collect())
 }
 
 async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<SuiteView>> {

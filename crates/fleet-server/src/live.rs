@@ -20,64 +20,17 @@ use std::{
     time::Duration,
 };
 
+use fleet_protocol::live::{EntityView, LiveFrame, Liveness, Snapshot};
 use fleet_store::{
     Store,
     ingest::{Change, RunHandle},
-    live::{EntityView, Snapshot},
 };
-use serde::Serialize;
 use time::OffsetDateTime;
 use tokio::{sync::broadcast, time::Instant};
 use uuid::Uuid;
 
 /// How long a later version waits for an earlier one before it is sent anyway.
 const REORDER_WAIT: Duration = Duration::from_secs(2);
-
-/// What the browser socket receives.
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "op", rename_all = "snake_case")]
-pub(crate) enum LiveFrame {
-    /// Subscribed to a project; deltas follow.
-    Subscribed {
-        /// The project.
-        project_id: Uuid,
-    },
-    /// An attempt's full state at `snapshot.attempt.version`.
-    Snapshot {
-        /// The snapshot.
-        snapshot: Box<Snapshot>,
-    },
-    /// Entities that changed at `version`. Apply only `version == last + 1`; on a gap, resync.
-    Delta {
-        /// Project.
-        project_id: Uuid,
-        /// Attempt.
-        attempt_id: Uuid,
-        /// The attempt's version after this change.
-        version: u64,
-        /// The changed entities, as they are now.
-        entities: Vec<EntityView>,
-    },
-    /// A run's liveness crossed a threshold (display only, not versioned).
-    Liveness {
-        /// Attempt.
-        attempt_id: Uuid,
-        /// Agent run.
-        agent_run_id: Uuid,
-        /// `online`, `stale`, `disconnected`, `completed`.
-        liveness: &'static str,
-    },
-    /// This subscriber fell behind: fetch snapshots again.
-    Resync {
-        /// Why.
-        reason: &'static str,
-    },
-    /// A subscription request was refused.
-    Error {
-        /// Why.
-        message: String,
-    },
-}
 
 #[derive(Debug)]
 struct Order {
@@ -93,7 +46,7 @@ struct RunLive {
     last_seen_wall: OffsetDateTime,
     connected: bool,
     ended: bool,
-    shown: &'static str,
+    shown: Liveness,
 }
 
 /// See the module docs.
@@ -250,7 +203,7 @@ impl Hub {
             last_seen_wall: OffsetDateTime::now_utc(),
             connected: true,
             ended: false,
-            shown: "online",
+            shown: Liveness::Online,
         });
         e.last_seen = Instant::now();
         e.last_seen_wall = OffsetDateTime::now_utc();
@@ -270,15 +223,15 @@ impl Hub {
         }
     }
 
-    fn state_of(&self, r: &RunLive) -> &'static str {
+    fn state_of(&self, r: &RunLive) -> Liveness {
         if r.ended {
-            "completed"
+            Liveness::Completed
         } else if !r.connected {
-            "disconnected"
+            Liveness::Disconnected
         } else if r.last_seen.elapsed() > self.stale_after {
-            "stale"
+            Liveness::Stale
         } else {
-            "online"
+            Liveness::Online
         }
     }
 
@@ -326,15 +279,12 @@ impl Hub {
             .expect("hub lock should not be poisoned: no code panics while holding it");
         for e in entities {
             if let EntityView::AgentRun(r) = e {
-                r.liveness = Some(
-                    match (r.state.as_str(), runs.get(&r.id)) {
-                        ("ended", _) => "completed",
-                        (_, Some(live)) => self.state_of(live),
-                        ("active" | "finalizing", None) => "stale",
-                        _ => "disconnected",
-                    }
-                    .to_owned(),
-                );
+                r.liveness = Some(match (r.state.as_str(), runs.get(&r.id)) {
+                    ("ended", _) => Liveness::Completed,
+                    (_, Some(live)) => self.state_of(live),
+                    ("active" | "finalizing", None) => Liveness::Stale,
+                    _ => Liveness::Disconnected,
+                });
             }
         }
     }

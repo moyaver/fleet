@@ -11,3 +11,10 @@ repository.workspace = true
 [lints]
 workspace = true
 
+
+[dependencies]
+fleet-protocol.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+time.workspace = true

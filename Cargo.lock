@@ -1061,6 +1061,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "utoipa",
  "uuid",
 ]
 
@@ -1123,6 +1124,11 @@ dependencies = [
 [[package]]
 name = "fleet-ui"
 version = "0.0.0"
+dependencies = [
+ "fleet-protocol",
+ "time",
+ "uuid",
+]
 
 [[package]]
 name = "fleet-web"

@@ -22,21 +22,13 @@ use serde::Deserialize;
 use tokio::sync::broadcast::{self, error::RecvError};
 use uuid::Uuid;
 
+use fleet_protocol::live::{LiveFrame, LiveRequest, ResyncReason};
+
 use super::{error, is_viewer};
-use crate::{live::LiveFrame, state::AppState};
+use crate::state::AppState;
 
 /// Largest client message: subscriptions are tiny.
 const MAX_CLIENT_MESSAGE: usize = 16 * 1024;
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "op", rename_all = "snake_case")]
-enum ClientMessage {
-    Subscribe {
-        project: String,
-        #[serde(default)]
-        attempt: Option<Uuid>,
-    },
-}
 
 fn same_origin(state: &AppState, headers: &HeaderMap) -> bool {
     let Some(origin) = headers.get(header::ORIGIN).and_then(|o| o.to_str().ok()) else {
@@ -87,8 +79,8 @@ async fn session(state: AppState, mut socket: WebSocket) {
     let Some(Ok(Message::Text(first))) = socket.recv().await else {
         return;
     };
-    let Ok(ClientMessage::Subscribe { project, attempt }) =
-        serde_json::from_str::<ClientMessage>(first.as_str())
+    let Ok(LiveRequest::Subscribe { project, attempt }) =
+        serde_json::from_str::<LiveRequest>(first.as_str())
     else {
         let _ = send(
             &mut socket,
@@ -147,7 +139,7 @@ async fn session(state: AppState, mut socket: WebSocket) {
             next = next(&mut rx, floor) => {
                 let text = match next {
                     Next::Frame(f) => f,
-                    Next::Resync => serde_json::to_string(&LiveFrame::Resync { reason: "lagged" })
+                    Next::Resync => serde_json::to_string(&LiveFrame::Resync { reason: ResyncReason::Lagged })
                         .unwrap_or_default()
                         .into(),
                     Next::Closed => return,

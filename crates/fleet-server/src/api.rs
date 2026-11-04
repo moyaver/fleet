@@ -14,14 +14,14 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use fleet_protocol::plan::PlanManifest;
-use fleet_store::{
+use fleet_protocol::{
     live::{
-        AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, PlanShardView,
-        PlanView, ProjectView, Snapshot, SuiteView,
+        AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, Liveness,
+        PlanShardView, PlanView, ProjectView, Snapshot, SuiteView,
     },
-    plans::{PlanError, PlanPipeline},
+    plan::PlanManifest,
 };
+use fleet_store::plans::{PlanError, PlanPipeline};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::{OpenApi, ToSchema};
@@ -50,6 +50,7 @@ use crate::{ingest::bearer, state::AppState};
         PlanView,
         PlanShardView,
         EntityView,
+        Liveness,
         PlanUpload,
         PlanStored,
         ApiError
