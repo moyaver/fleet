@@ -16,6 +16,7 @@ workspace = true
 fleet-protocol.workspace = true
 leptos.workspace = true
 uuid.workspace = true
+vte.workspace = true
 
 [dev-dependencies]
 time.workspace = true

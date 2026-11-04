@@ -6,11 +6,15 @@
 //! rendered as text nodes, never as HTML (PLAN §10.1).
 //!
 //! - [`live_store`]: the dashboard's client-side mirror of the live socket, pure Rust.
+//! - [`logview`], [`steps`], [`screenshots`]: log viewer, step tree and screenshot viewer.
 
 pub mod components;
 pub mod live_store;
+pub mod logview;
 pub mod pagination;
 pub mod provenance;
+pub mod screenshots;
+pub mod steps;
 pub mod table;
 pub mod tone;
 pub mod virtual_list;
