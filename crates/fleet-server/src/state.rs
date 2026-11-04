@@ -9,7 +9,9 @@ use std::sync::{
 use fleet_store::{Store, ingest::Change};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
-use crate::{config::Config, ingest::telemetry::TelemetryBuffer, live::Hub, oidc::Jwks};
+use crate::{
+    config::Config, ingest::telemetry::TelemetryBuffer, live::Hub, login::idp::Idp, oidc::Jwks,
+};
 
 /// Cheap to clone; everything lives behind one `Arc`.
 #[derive(Debug, Clone)]
@@ -26,6 +28,8 @@ pub(crate) struct Inner {
     pub(crate) telemetry: TelemetryBuffer,
     pub(crate) hub: Hub,
     pub(crate) jwks: Jwks,
+    /// The browser sign-in identity provider (discovery cache and token calls).
+    pub(crate) idp: Idp,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
 }
@@ -47,6 +51,7 @@ impl AppState {
         Ok(Self(Arc::new(Inner {
             hub,
             jwks: Jwks::new()?,
+            idp: Idp::new()?,
             store,
             config,
             shutdown: CancellationToken::new(),

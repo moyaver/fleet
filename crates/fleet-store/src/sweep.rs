@@ -148,7 +148,7 @@ impl Store {
         Ok(report)
     }
 
-    /// Deletes expired agent tokens and replay records.
+    /// Deletes expired agent tokens, replay records and browser sessions.
     pub async fn cleanup_credentials(&self) -> Result<u64> {
         let tokens = sqlx::query!(
             "DELETE FROM agent_tokens t
@@ -162,7 +162,11 @@ impl Store {
             .execute(self.pool())
             .await?
             .rows_affected();
-        Ok(tokens + jti)
+        let sessions = sqlx::query!("DELETE FROM sessions WHERE expires_at < now()")
+            .execute(self.pool())
+            .await?
+            .rows_affected();
+        Ok(tokens + jti + sessions)
     }
 }
 

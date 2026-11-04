@@ -125,7 +125,7 @@ pub struct Publisher {
 }
 
 /// A 256-bit random secret with a prefix.
-fn random_secret(prefix: &str) -> Result<String> {
+pub(crate) fn random_secret(prefix: &str) -> Result<String> {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes)
         .map_err(|e| Error::Corrupt(format!("the OS random source failed: {e}")))?;
@@ -312,6 +312,8 @@ pub enum TokenSource {
 pub enum AuditActor {
     /// The server itself.
     System,
+    /// A signed-in user.
+    User(Uuid),
     /// An agent, by credential.
     Publisher(Credential),
 }
@@ -320,6 +322,7 @@ impl AuditActor {
     pub(crate) fn parts(self) -> (&'static str, Option<Uuid>) {
         match self {
             Self::System => ("system", None),
+            Self::User(id) => ("user", Some(id)),
             Self::Publisher(Credential::ApiKey(id) | Credential::AgentToken(id)) => {
                 ("publisher", Some(id))
             }

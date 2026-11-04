@@ -17,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     api,
     config::{Config, MigrateMode},
-    health, ingest,
+    health, ingest, login,
     state::AppState,
     sweeps, web,
 };
@@ -60,8 +60,9 @@ impl Server {
     }
 }
 
-/// Starts the server; returns once it listens and is ready.
-pub async fn start(config: Config) -> anyhow::Result<Server> {
+/// Everything `start` does before it listens: migrations, partitions, configured projects and
+/// group mappings, and the live hub rebuilt from Postgres. Tests drive [`router`] on it directly.
+pub(crate) async fn init(config: Config) -> anyhow::Result<AppState> {
     let store = crate::connect(&config)?;
     if config.database.migrate == MigrateMode::Auto {
         store.migrate().await.context("migrating on start")?;
@@ -89,11 +90,11 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
             .await
             .with_context(|| format!("storing the trust policies of {}", p.slug))?;
     }
-
-    let listener = tokio::net::TcpListener::bind(config.listen)
-        .await
-        .with_context(|| format!("binding {}", config.listen))?;
-    let addr = listener.local_addr()?;
+    if let Some(login) = &config.login {
+        sync_group_mappings(&store, login)
+            .await
+            .context("storing the group mappings")?;
+    }
     let state = AppState::new(store, config)?;
     // The live hub restarts from Postgres: versions continue where they were (§7.3).
     let open = state
@@ -102,17 +103,59 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         .await
         .context("restoring live versions")?;
     tracing::info!(open_attempts = open, "live hub restored");
+    Ok(state)
+}
+
+/// Makes the stored identity-provider group → role mappings equal the configured ones.
+async fn sync_group_mappings(
+    store: &fleet_store::Store,
+    login: &crate::config::Login,
+) -> anyhow::Result<()> {
+    let mut rows = Vec::new();
+    for g in &login.group_roles {
+        let project = match &g.project {
+            Some(slug) => Some(
+                store
+                    .project_id(slug)
+                    .await?
+                    .with_context(|| format!("no project {slug}"))?,
+            ),
+            None => None,
+        };
+        rows.push(fleet_store::sessions::GroupMapping {
+            project,
+            group: g.group.clone(),
+            role: g.role,
+        });
+    }
+    store.sync_group_mappings(&login.issuer, &rows).await?;
+    Ok(())
+}
+
+/// Every route, with security headers on the dashboard's static files.
+pub(crate) fn router(state: &AppState) -> Router {
+    Router::new()
+        .merge(health::router())
+        .merge(ingest::router(state))
+        .merge(api::router())
+        .merge(login::router())
+        .with_state(state.clone())
+        .merge(web::router())
+}
+
+/// Starts the server; returns once it listens and is ready.
+pub async fn start(config: Config) -> anyhow::Result<Server> {
+    let state = init(config).await?;
+    let listener = tokio::net::TcpListener::bind(state.config.listen)
+        .await
+        .with_context(|| format!("binding {}", state.config.listen))?;
+    let addr = listener.local_addr()?;
     state
         .tracker
         .spawn(ingest::telemetry::flusher(state.clone()));
     state.tracker.spawn(sweeps::run(state.clone()));
 
-    let router = Router::new()
-        .merge(health::router())
-        .merge(ingest::router(&state))
-        .merge(api::router())
-        .with_state(state.clone())
-        .merge(web::router());
+    let router = router(&state);
     let stop = CancellationToken::new();
     let serving = {
         let (stop, state) = (stop.clone(), state.clone());

@@ -237,7 +237,7 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 | HTTP/WS | `axum` 0.8.9, `tower` 0.5, `tower-http` 0.7 (trace, compression, limits, CORS off, set-header) |
 | DB | `sqlx` 0.9 (postgres, runtime-tokio, tls-rustls with platform/custom CA, uuid, time, json, migrate) |
 | Object storage | `object_store` 0.14 (aws feature, path-style, custom endpoint) + LocalFileSystem |
-| Browser SSO | `openidconnect` 4.1 (auth code + PKCE + nonce), `tower-sessions` 0.15 + **own** Postgres `SessionStore` |
+| Browser SSO | **Own** code flow (auth code + PKCE + nonce) on `reqwest` and the CI-OIDC RS256 verifier, and **own** cookie sessions in Postgres. `openidconnect` 4.1 needs a second `reqwest` (0.12) and pulls the `rsa` crate the verifier avoids; `tower-sessions` has no matching sqlx 0.9 store (research 03 §8.1). |
 | Agent auth | `jsonwebtoken` 11.1 (choose a crypto backend feature) + own JWKS cache (refetch on unknown `kid`) |
 | Validation | `garde` 0.23, `nutype` 0.8 |
 | OpenAPI | `utoipa` 6 + `utoipa-axum` 0.3 + `utoipa-scalar` 0.4 |

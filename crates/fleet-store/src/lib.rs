@@ -4,6 +4,7 @@
 //! - [`Store`]: the connection pool and migrations (`migrations/` at the repository root,
 //!   embedded).
 //! - [`auth`]: projects, API keys and agent tokens. Only SHA-256 hashes of secrets are stored.
+//! - [`sessions`]: browser users, sessions (stored by hash) and identity-provider group → role mappings.
 //! - [`ingest`]: the agent run lifecycle and the ingest transaction: one transaction per batch
 //!   that fences the epoch, skips duplicates, applies claims and entities with ownership checks,
 //!   re-derives outcomes and advances the cursor (research 05 §9.4).
@@ -20,6 +21,7 @@ pub mod auth;
 pub mod ingest;
 pub mod live;
 pub mod plans;
+pub mod sessions;
 pub mod sweep;
 pub mod telemetry;
 #[cfg(feature = "test-util")]

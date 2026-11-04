@@ -63,6 +63,9 @@ pub struct Config {
     pub api: Api,
     /// CI OIDC token exchange (`POST /api/v1/agent/token`).
     pub oidc: Oidc,
+    /// Browser sign-in with the company's identity provider (PLAN §7.5). Unset: no browser
+    /// sessions, and reads need a viewer token.
+    pub login: Option<Login>,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -76,6 +79,7 @@ impl Default for Config {
             liveness: Liveness::default(),
             api: Api::default(),
             oidc: Oidc::default(),
+            login: None,
             projects: Vec::new(),
         }
     }
@@ -257,6 +261,58 @@ pub struct OidcIssuer {
     pub audience: String,
 }
 
+/// Browser sign-in: OIDC authorization code with PKCE and nonce, against one identity provider
+/// (PLAN §7.5). The redirect URI is `<api.public_url>/api/v1/auth/callback`: register it there.
+/// The provider must sign ID tokens with RS256 (Entra ID, Okta, Keycloak and Google do by default).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Login {
+    /// The provider's issuer URL; `/.well-known/openid-configuration` hangs off it.
+    pub issuer: String,
+    /// The client ID registered for Fleet.
+    pub client_id: String,
+    /// The client secret of a confidential client; omit for a public client (PKCE only).
+    #[serde(default)]
+    pub client_secret: Option<Secret>,
+    /// Scopes to request; `openid` is always sent.
+    #[serde(default = "default_scopes")]
+    pub scopes: Vec<String>,
+    /// ID token claims that carry the user's groups, all of them read: `groups` for most
+    /// providers, `roles` for Entra ID app roles.
+    #[serde(default = "default_group_claims")]
+    pub group_claims: Vec<String>,
+    /// How long a session lasts. Roles are resolved at sign-in, so this also bounds how long a
+    /// revoked group membership keeps working.
+    #[serde(default = "default_session_minutes")]
+    pub session_ttl_minutes: u64,
+    /// Which group gets which role. A user with no matching group is denied.
+    #[serde(default)]
+    pub group_roles: Vec<GroupRole>,
+}
+
+fn default_scopes() -> Vec<String> {
+    vec!["profile".into(), "email".into()]
+}
+
+fn default_group_claims() -> Vec<String> {
+    vec!["groups".into(), "roles".into()]
+}
+
+fn default_session_minutes() -> u64 {
+    8 * 60
+}
+
+/// One identity-provider group and the role it grants.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupRole {
+    /// The group claim value (a name, an object ID, or an app role).
+    pub group: String,
+    /// `viewer`, `maintainer` or `admin`.
+    pub role: fleet_core::policy::Role,
+    /// The project slug, or unset for every project (an `admin` here is a global admin).
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
 /// A project created at start-up.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -361,6 +417,25 @@ impl Config {
             i.idle_timeout_ms > i.heartbeat_interval_ms,
             "ingest.idle_timeout_ms must exceed ingest.heartbeat_interval_ms"
         );
+        if let Some(login) = &self.login {
+            anyhow::ensure!(
+                self.api.public_url.is_some(),
+                "login needs api.public_url: the identity provider redirects back to it"
+            );
+            anyhow::ensure!(
+                !login.group_roles.is_empty(),
+                "login.group_roles is empty: nobody could sign in"
+            );
+            for g in &login.group_roles {
+                anyhow::ensure!(
+                    g.project
+                        .as_ref()
+                        .is_none_or(|slug| self.projects.iter().any(|p| &p.slug == slug)),
+                    "login.group_roles: group {} names a project that isn't in `projects`",
+                    g.group
+                );
+            }
+        }
         for p in &self.projects {
             for t in &p.trust_policies {
                 anyhow::ensure!(

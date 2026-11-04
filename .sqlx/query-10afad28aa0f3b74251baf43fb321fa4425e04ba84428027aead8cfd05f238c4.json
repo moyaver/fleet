@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO users (oidc_issuer, oidc_subject, email, display_name, last_login_at)\n             VALUES ($1, $2, $3, $4, now())\n             ON CONFLICT (oidc_issuer, oidc_subject) DO UPDATE SET\n               email = EXCLUDED.email, display_name = EXCLUDED.display_name, last_login_at = now()\n             RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "10afad28aa0f3b74251baf43fb321fa4425e04ba84428027aead8cfd05f238c4"
+}

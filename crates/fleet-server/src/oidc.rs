@@ -105,7 +105,7 @@ impl Jwks {
     }
 
     /// The key for `kid`, refetching once when it is unknown or the cache is old.
-    async fn key(&self, issuer: &str, kid: &str) -> Result<DecodingKey, Refused> {
+    pub(crate) async fn key(&self, issuer: &str, kid: &str) -> Result<DecodingKey, Refused> {
         let mut cache = self.cache.lock().await;
         let usable = cache
             .get(issuer)

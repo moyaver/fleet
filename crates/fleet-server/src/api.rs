@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! REST API (PLAN §7.1 `api/`) and its OpenAPI document (`/api/v1/openapi.json`).
 //!
-//! Reads need a viewer: until browser SSO (M4), a configured viewer token, or anonymous reads
-//! in development. Agent credentials are write-only and are refused here. `POST /api/v1/plans`
-//! takes a publisher credential: the planning CI job stores its plan like an agent publishes.
+//! Reads need a caller with a role (`fleet_core::policy`): a signed-in browser session, a
+//! configured viewer token, or anonymous reads in development. Agent credentials are write-only
+//! and are refused here. `POST /api/v1/plans` takes a publisher credential: the planning CI job
+//! stores its plan like an agent publishes.
 
 pub(crate) mod live_ws;
 
 use axum::{
     Json, Router,
-    extract::{FromRequestParts, Path, Query, State},
-    http::{HeaderMap, StatusCode, request::Parts},
+    extract::{Path, Query, State},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use fleet_core::policy::{Action, Decision, Denied, Principal, Resource, authorize};
 use fleet_protocol::{
     live::{
         AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, Liveness,
@@ -23,11 +25,10 @@ use fleet_protocol::{
 };
 use fleet_store::plans::{PlanError, PlanPipeline};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use utoipa::{OpenApi, ToSchema};
 use uuid::Uuid;
 
-use crate::{ingest::bearer, state::AppState};
+use crate::{ingest::bearer, session::Caller, state::AppState};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -97,47 +98,22 @@ fn internal(e: &dyn std::fmt::Display) -> Response {
     error(StatusCode::INTERNAL_SERVER_ERROR, "internal error")
 }
 
-/// Someone allowed to read run data.
-#[derive(Debug)]
-pub(crate) struct Viewer;
-
-fn digest(s: &str) -> [u8; 32] {
-    Sha256::digest(s.as_bytes()).into()
-}
-
-/// Whether these headers carry a viewer credential (shared with the live socket).
-pub(crate) fn is_viewer(state: &AppState, headers: &HeaderMap) -> bool {
-    if state.config.api.anonymous_read {
-        return true;
+/// What a refusal looks like. Having no role on a project reads as "no such project", so one
+/// team can't probe another's project names; a role that is too low says so.
+fn denied(d: Denied) -> Response {
+    match d {
+        Denied::NoRole => error(StatusCode::NOT_FOUND, "no such project"),
+        Denied::NeedsRole(_) | Denied::WrongResource => {
+            error(StatusCode::FORBIDDEN, "your role does not allow this")
+        }
     }
-    let Some(token) = bearer(headers) else {
-        return false;
-    };
-    // Compare digests: equal length, and no early exit on the secret's bytes.
-    let given = digest(&token);
-    state
-        .config
-        .api
-        .viewer_tokens
-        .iter()
-        .fold(false, |ok, t| ok | (digest(t.expose()) == given))
 }
 
-impl FromRequestParts<AppState> for Viewer {
-    type Rejection = Response;
-
-    fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> impl Future<Output = Result<Self, Response>> + Send {
-        std::future::ready(if is_viewer(state, &parts.headers) {
-            Ok(Self)
-        } else {
-            Err(error(
-                StatusCode::UNAUTHORIZED,
-                "a viewer token is required",
-            ))
-        })
+/// `Ok` when `principal` may do `action` to `resource`.
+fn require(principal: &Principal, action: Action, resource: Resource) -> Result<(), Box<Response>> {
+    match authorize(principal, action, resource) {
+        Decision::Allow => Ok(()),
+        Decision::Deny(d) => Err(Box::new(denied(d))),
     }
 }
 
@@ -152,9 +128,20 @@ async fn project_id(state: &AppState, slug: &str) -> Result<Uuid, Box<Response>>
 /// Every project.
 #[utoipa::path(get, path = "/api/v1/projects", responses(
     (status = 200, body = [ProjectView]), (status = 401, body = ApiError)))]
-async fn projects(State(state): State<AppState>, _: Viewer) -> Response {
+async fn projects(State(state): State<AppState>, Caller(principal): Caller) -> Response {
+    if let Err(r) = require(&principal, Action::ListProjects, Resource::Global) {
+        return *r;
+    }
     match state.store.projects().await {
-        Ok(p) => Json(p).into_response(),
+        Ok(p) => Json(
+            p.into_iter()
+                .filter(|p| {
+                    authorize(&principal, Action::ReadRuns, Resource::Project(p.id))
+                        == Decision::Allow
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
         Err(e) => internal(&e),
     }
 }
@@ -171,7 +158,7 @@ struct Limit {
     responses((status = 200, body = [AttemptView]), (status = 404, body = ApiError)))]
 async fn attempts(
     State(state): State<AppState>,
-    _: Viewer,
+    Caller(principal): Caller,
     Path(project): Path<String>,
     Query(q): Query<Limit>,
 ) -> Response {
@@ -179,6 +166,9 @@ async fn attempts(
         Ok(p) => p,
         Err(r) => return *r,
     };
+    if let Err(r) = require(&principal, Action::ReadRuns, Resource::Project(project)) {
+        return *r;
+    }
     match state
         .store
         .attempts(project, q.limit.unwrap_or(50).clamp(1, 500))
@@ -196,13 +186,16 @@ async fn attempts(
     responses((status = 200, body = Snapshot), (status = 404, body = ApiError)))]
 async fn snapshot(
     State(state): State<AppState>,
-    _: Viewer,
+    Caller(principal): Caller,
     Path((project, attempt)): Path<(String, Uuid)>,
 ) -> Response {
     let project = match project_id(&state, &project).await {
         Ok(p) => p,
         Err(r) => return *r,
     };
+    if let Err(r) = require(&principal, Action::ReadRuns, Resource::Project(project)) {
+        return *r;
+    }
     match state.store.snapshot(project, attempt).await {
         Ok(Some(mut s)) => {
             state.hub.overlay_snapshot(&mut s);

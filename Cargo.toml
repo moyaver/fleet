@@ -65,6 +65,8 @@ anyhow = "1.0.104"
 assert_cmd = "2.2.2"
 # Tests only: signs fake CI OIDC tokens with a key generated per test run.
 aws-lc-rs = "1.19.0"
+# Tests only: drives the server's router in-process (PLAN §5.3).
+axum-test = { version = "21.1.0", default-features = false, features = ["ws"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "tracing", "ws"] }
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
@@ -117,9 +119,12 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # OpenAPI 3.1 from the REST types (PLAN §5.3). No UI: it would ship JavaScript (I9).
 utoipa = { version = "6.0.0", default-features = false, features = ["macros", "uuid", "time"] }
+# Builds the IdP redirect and the token request body (browser sign-in).
 url = "2.5.8"
 uuid = { version = "1.29.0", features = ["serde"] }
 webpki-roots = "1.0.11"
+# Tests only: the fake OIDC provider for browser sign-in.
+wiremock = "0.6.5"
 
 [profile.release]
 lto = true

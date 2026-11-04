@@ -15,39 +15,24 @@ use axum::{
         State,
         ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
     },
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
 };
+use fleet_core::policy::{Action, Principal, Resource};
 use serde::Deserialize;
 use tokio::sync::broadcast::{self, error::RecvError};
 use uuid::Uuid;
 
 use fleet_protocol::live::{LiveFrame, LiveRequest, ResyncReason};
 
-use super::{error, is_viewer};
-use crate::state::AppState;
+use super::{error, require};
+use crate::{
+    session::{principal, same_origin},
+    state::AppState,
+};
 
 /// Largest client message: subscriptions are tiny.
 const MAX_CLIENT_MESSAGE: usize = 16 * 1024;
-
-fn same_origin(state: &AppState, headers: &HeaderMap) -> bool {
-    let Some(origin) = headers.get(header::ORIGIN).and_then(|o| o.to_str().ok()) else {
-        // Not a browser: there is no ambient credential to hijack.
-        return true;
-    };
-    let origin = origin.trim_end_matches('/');
-    match &state.config.api.public_url {
-        Some(public) => origin.eq_ignore_ascii_case(public.trim_end_matches('/')),
-        None => headers
-            .get(header::HOST)
-            .and_then(|h| h.to_str().ok())
-            .is_some_and(|host| {
-                origin
-                    .split_once("://")
-                    .is_some_and(|(_, rest)| rest.eq_ignore_ascii_case(host))
-            }),
-    }
-}
 
 pub(crate) async fn upgrade(
     State(state): State<AppState>,
@@ -60,12 +45,13 @@ pub(crate) async fn upgrade(
             "cross-origin live sockets are refused",
         );
     }
-    if !is_viewer(&state, &headers) {
-        return error(StatusCode::UNAUTHORIZED, "a viewer token is required");
-    }
+    let principal = match principal(&state, &Method::GET, &headers).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
     let tracker = state.tracker.clone();
     ws.max_message_size(MAX_CLIENT_MESSAGE)
-        .on_upgrade(move |socket| tracker.track_future(session(state, socket)))
+        .on_upgrade(move |socket| tracker.track_future(session(state, principal, socket)))
         .into_response()
 }
 
@@ -74,7 +60,7 @@ async fn send(socket: &mut WebSocket, frame: &LiveFrame) -> bool {
     socket.send(Message::Text(text.into())).await.is_ok()
 }
 
-async fn session(state: AppState, mut socket: WebSocket) {
+async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
     // The first message must be a subscription.
     let Some(Ok(Message::Text(first))) = socket.recv().await else {
         return;
@@ -101,6 +87,17 @@ async fn session(state: AppState, mut socket: WebSocket) {
         .await;
         return;
     };
+    // A project the caller has no role on answers like one that doesn't exist.
+    if require(&principal, Action::ReadRuns, Resource::Project(project_id)).is_err() {
+        let _ = send(
+            &mut socket,
+            &LiveFrame::Error {
+                message: format!("no such project {project}"),
+            },
+        )
+        .await;
+        return;
+    }
     // Subscribe before the snapshot: a delta committed in between is buffered, not lost.
     let mut rx = state.hub.subscribe(project_id);
     let mut floor = None;

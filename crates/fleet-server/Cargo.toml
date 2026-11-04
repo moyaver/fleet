@@ -40,15 +40,18 @@ tokio-util.workspace = true
 tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+url.workspace = true
 utoipa.workspace = true
 uuid = { workspace = true, features = ["v7"] }
 
 [dev-dependencies]
 aws-lc-rs.workspace = true
+axum-test.workspace = true
 fleet-store = { workspace = true, features = ["test-util"] }
 futures-util.workspace = true
 tokio-tungstenite.workspace = true
 tower.workspace = true
+wiremock.workspace = true
 
 [package.metadata.dist]
 # Not released by cargo-dist: the agent is (M2); the server ships as a container (M3).
