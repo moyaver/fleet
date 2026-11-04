@@ -18,3 +18,4 @@ and should be confirmed by Phase 0 results or by the team.
 | [0010](0010-licensing.md) | Source-available licensing (PolyForm Internal Use), CLA, donations | Superseded by 0012 |
 | [0011](0011-name-and-runner-scope.md) | Name "Fleet"; generic core, Maestro first | Accepted |
 | [0012](0012-agpl-license.md) | Open source under AGPL-3.0-only; CLA kept for a commercial license | Accepted |
+| [0013](0013-fleet-planner.md) | Fleet Planner: static, duration-aware CI sharding | Accepted |

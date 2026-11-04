@@ -31,6 +31,7 @@ This document is the single source of truth for building the project. It is writ
 | D5 | Postgres 18 only; S3-compatible storage via `object_store`; Garage as the reference store; filesystem backend built in | ADR-0006, ADR-0007 |
 | D6 | GitHub Actions OIDC for publishers; fork PRs run offline | ADR-0008 |
 | D7 | No Node.js, npm or hand-written JavaScript anywhere in the product or its build | §3 invariant I9 |
+| D8 | **Fleet Planner**: static, duration-aware sharding across CI jobs (LPT on Fleet history); no dynamic work queue in v1 | ADR-0013 |
 
 **Defaults for the decisions still open** (the owner may override them):
 
