@@ -10,7 +10,7 @@ rust-version = "1.99"
 # redistribution rights. See LICENSING.md.
 license-file = "LICENSE.md"
 publish = false
-repository = "https://github.com/moyaver/maestro-fleet"
+repository = "https://github.com/moyaver/fleet"
 
 [workspace.lints.rust]
 # The one planned exception is fleet-agent::sys (signals, process groups); see CONTRIBUTING.md.

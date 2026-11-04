@@ -33,5 +33,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Remove secrets first. Agent logs, server logs, or `maestro-fleet inspect` output.
+      description: Remove secrets first. Agent logs, server logs, or `fleet-agent inspect` output.
       render: text

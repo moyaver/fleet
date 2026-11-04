@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
-//! `fleet`: the Maestro Fleet server. M0 serves only the embedded dashboard. See PLAN §7.
+//! `fleet`: the Fleet server. M0 serves only the embedded dashboard. See PLAN §7.
 
 mod web;
 
@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "fleet", version, about = "Maestro Fleet server")]
+#[command(name = "fleet", version, about = "Fleet server")]
 struct Cli {
     #[command(subcommand)]
     command: Command,

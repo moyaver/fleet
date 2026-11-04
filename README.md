@@ -1,9 +1,9 @@
-# Maestro Fleet
+# Fleet
 
-[![CI](https://github.com/moyaver/maestro-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/moyaver/maestro-fleet/actions/workflows/ci.yml)
+[![CI](https://github.com/moyaver/fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/moyaver/fleet/actions/workflows/ci.yml)
 [![License: PolyForm Internal Use 1.0.0](https://img.shields.io/badge/license-PolyForm%20Internal%20Use%201.0.0-blue)](LICENSING.md)
 
-Self-hosted, live observability for [Maestro](https://github.com/mobile-dev-inc/maestro) mobile UI tests running in CI.
+Self-hosted, live observability for mobile UI tests running in CI, starting with [Maestro](https://github.com/mobile-dev-inc/maestro).
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
 > [!NOTE]
@@ -12,25 +12,26 @@ It shows what is running and on which device, how far each run has got, how the 
 
 Everything is **Rust**: the agent, the server and the dashboard. There's no Node.js, npm or hand-written JavaScript anywhere.
 
-> "Maestro Fleet" is a working name. This project is not affiliated with mobile.dev, the makers of Maestro.
+> Fleet supports Maestro first; the core is runner-agnostic so other test runners can follow ([ADR-0011](docs/decisions/0011-name-and-runner-scope.md)).
+> It is an independent project, not affiliated with mobile.dev, the makers of Maestro.
 
 ---
 
 ## Roadmap
 
 Each milestone has exit criteria in [PLAN §12](docs/PLAN.md#12-milestones). A milestone starts only when the previous one's criteria pass or the owner waives them.
-Issues are grouped by [GitHub milestone](https://github.com/moyaver/maestro-fleet/milestones).
+Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milestones).
 
 | | Milestone | Scope | Exit criteria | Estimate |
 |---|---|---|---|---|
-| ✅ | [**M0** Bootstrap](https://github.com/moyaver/maestro-fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
-| ⏭️ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/maestro-fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
-| ⬜ | [**M2** Agent](https://github.com/moyaver/maestro-fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
-| ⬜ | [**M3** Server core](https://github.com/moyaver/maestro-fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
-| ⬜ | [**M4** Dashboard core](https://github.com/moyaver/maestro-fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
-| ⬜ | [**M5** Evidence and history](https://github.com/moyaver/maestro-fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
-| ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/maestro-fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
-| ⬜ | [**M7+** Optional](https://github.com/moyaver/maestro-fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
+| ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
+| ⏭️ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
+| ⬜ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
+| ⬜ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
+| ⬜ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
+| ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
+| ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
+| ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
 
 ✅ done · 🚧 in progress · ⏭️ next · ⬜ not started
 
@@ -49,14 +50,14 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/maestro-flee
 
 ### Owner actions
 
-Things only the owner can do. Each one has an issue labelled [`owner-action`](https://github.com/moyaver/maestro-fleet/labels/owner-action).
+Things only the owner can do. Each one has an issue labelled [`owner-action`](https://github.com/moyaver/fleet/labels/owner-action).
 
-- [x] **Before product code:** written confirmation from the employer that this is personal IP ([#1](https://github.com/moyaver/maestro-fleet/issues/1), [PLAN §2.5](docs/PLAN.md#25-precondition-employer-ip-check-owner-action-before-m0-code))
-- [ ] Decide the final product name before going public ([#5](https://github.com/moyaver/maestro-fleet/issues/5))
-- [ ] Ask a lawyer to review `LICENSE.md`, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/maestro-fleet/issues/6))
-- [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/maestro-fleet/issues/2))
-- [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/maestro-fleet/issues/3))
-- [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/maestro-fleet/issues/4))
+- [x] **Before product code:** written confirmation from the employer that this is personal IP ([#1](https://github.com/moyaver/fleet/issues/1), [PLAN §2.5](docs/PLAN.md#25-precondition-employer-ip-check-owner-action-before-m0-code))
+- [x] Decide the final product name: **Fleet** ([#5](https://github.com/moyaver/fleet/issues/5), [ADR-0011](docs/decisions/0011-name-and-runner-scope.md))
+- [ ] Ask a lawyer to review `LICENSE.md`, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/fleet/issues/6))
+- [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/fleet/issues/2))
+- [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/fleet/issues/3))
+- [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/fleet/issues/4))
 
 ---
 
@@ -65,7 +66,7 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 ```
  CI runner                                        Fleet server                     Browser
 ┌──────────────────────────────────────┐        ┌───────────────────────┐        ┌────────────┐
-│ maestro-fleet run -- maestro test …  │        │ fleet serve           │        │ dashboard  │
+│ fleet-agent run -- maestro test …    │        │ fleet serve           │        │ dashboard  │
 │  ├─ supervisor: runs Maestro,        │  WSS   │  ├─ ingest (journal + │  WSS   │ (Leptos,   │
 │  │  passes output and exit through   │ ─────► │  │  telemetry)        │ ─────► │  embedded) │
 │  └─ observer: maestro.log, stdout,   │ OIDC   │  ├─ live hub          │        └────────────┘
@@ -90,7 +91,7 @@ crates/
   fleet-protocol/    wire types, REST DTOs, JSON Schema; no async runtime, wasm-safe
   fleet-core/        pure domain: state machines, claim lattice, reconciliation, redaction, policy
   fleet-maestro/     Maestro version profiles and parsers (fixture-driven)
-  fleet-agent/       `maestro-fleet` CI agent
+  fleet-agent/       `fleet-agent` CI agent
   fleet-store/       PostgreSQL repositories and migrations (sqlx)
   fleet-blob/        S3-compatible and filesystem blob storage
   fleet-server/      `fleet` server: REST, WebSockets, auth, jobs, embedded dashboard
@@ -129,12 +130,12 @@ Then open <http://127.0.0.1:8080>. See [CONTRIBUTING.md](CONTRIBUTING.md) for th
 | [Implementation plan](docs/PLAN.md) | The single source of truth: decisions, invariants, stack, milestones |
 | [Research synthesis](research/00-synthesis.md) | Conclusions of research reports 01–07 on one page |
 | [Spec v1.0](docs/spec-v1.0.md) | The original product and architecture specification |
-| [Architecture decisions](docs/decisions/README.md) | ADRs 0001–0010 |
+| [Architecture decisions](docs/decisions/README.md) | ADRs 0001–0011 |
 | [Book](docs/src/SUMMARY.md) | User, runner and operator guides (`mdbook serve docs`), filled in from M2 |
 
 ## License
 
-Maestro Fleet is **source-available, not open source**. It is licensed under the [PolyForm Internal Use License 1.0.0](LICENSE.md):
+Fleet is **source-available, not open source**. It is licensed under the [PolyForm Internal Use License 1.0.0](LICENSE.md):
 
 - any organization may use and modify it for its own internal operations, for free;
 - redistribution, public forks of modified versions and offering it to third parties are not permitted.

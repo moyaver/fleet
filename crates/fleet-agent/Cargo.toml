@@ -1,6 +1,6 @@
 [package]
 name = "fleet-agent"
-description = "The maestro-fleet CI agent: supervises Maestro and streams what it observes."
+description = "The fleet-agent CI agent: supervises Maestro and streams what it observes."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,5 +12,5 @@ repository.workspace = true
 workspace = true
 
 [[bin]]
-name = "maestro-fleet"
+name = "fleet-agent"
 path = "src/main.rs"

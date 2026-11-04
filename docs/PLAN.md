@@ -36,7 +36,7 @@ This document is the single source of truth for building the project. It is writ
 
 | # | Question | Default |
 |---|---|---|
-| O1 | Project name. "Maestro" is mobile.dev's product name; a name that starts with it can look official | Keep the working name `maestro-fleet` until the owner picks one (candidate: **Baton**, "live observability for Maestro tests"). Every name lives in one place (§4.1) so renaming is cheap. |
+| O1 | Project name. "Maestro" is mobile.dev's product name; a name that starts with it can look official | **Decided: Fleet** ([ADR-0011](decisions/0011-name-and-runner-scope.md)). Agent binary `fleet-agent`, repository `moyaver/fleet`; Maestro first, runner-agnostic core. Older names in this plan, the spec and the research map as listed in the ADR. |
 | O2 | Fork-PR relay (`workflow_run` publishing with an `untrusted` label) | Not in v1. Offline mode only. |
 | O3 | Upstream `--events` NDJSON reporter PR to Maestro | Propose it after Phase 0 (M1). The agent keeps working without it. |
 

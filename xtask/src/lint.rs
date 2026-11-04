@@ -38,7 +38,8 @@ const PROVIDER_PREFIXES: &[&str] = &[
     "k8s-",
 ];
 
-/// PLAN §4.2. `internal` lists the workspace crates a crate may depend on (`None` = any);
+/// PLAN §4.2 and ADR-0011 (Maestro knowledge stays in fleet-maestro, used only by the agent).
+/// `internal` lists the workspace crates a crate may depend on (`None` = any);
 /// `banned` lists crates that must not appear anywhere in its normal dependency tree when built
 /// for `on`.
 struct Rule {
@@ -106,9 +107,16 @@ const RULES: &[Rule] = &[
         on: On::Wasm,
     },
     Rule {
+        krate: "fleet-store",
+        internal: None,
+        forbidden_internal: &["fleet-maestro", "fleet-agent", "fleet-server"],
+        banned: &[],
+        on: On::Host,
+    },
+    Rule {
         krate: "fleet-server",
         internal: None,
-        forbidden_internal: &["fleet-agent", "fleet-web"],
+        forbidden_internal: &["fleet-agent", "fleet-web", "fleet-maestro"],
         banned: &[],
         on: On::Host,
     },

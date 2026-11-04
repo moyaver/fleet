@@ -1,6 +1,6 @@
-# Contributing to Maestro Fleet
+# Contributing to Fleet
 
-Thanks for helping. Maestro Fleet is **source-available**, not open source; read [LICENSING.md](LICENSING.md) before you start.
+Thanks for helping. Fleet is **source-available**, not open source; read [LICENSING.md](LICENSING.md) before you start.
 
 ## 1. Sign the CLA
 
