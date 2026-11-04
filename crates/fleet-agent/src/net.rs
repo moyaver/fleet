@@ -263,8 +263,8 @@ impl OidcRequest {
     }
 }
 
-/// The token-exchange URL next to the agent WebSocket URL.
-pub(crate) fn token_url(ws_url: &str) -> String {
+/// The server's `http(s)://` base URL, from the agent WebSocket URL.
+pub(crate) fn http_base(ws_url: &str) -> String {
     let http = if let Some(rest) = ws_url.strip_prefix("wss://") {
         format!("https://{rest}")
     } else if let Some(rest) = ws_url.strip_prefix("ws://") {
@@ -273,9 +273,14 @@ pub(crate) fn token_url(ws_url: &str) -> String {
         ws_url.to_owned()
     };
     match http.find("/api/") {
-        Some(i) => format!("{}/api/v1/agent/token", http.get(..i).unwrap_or_default()),
-        None => format!("{}/api/v1/agent/token", http.trim_end_matches('/')),
+        Some(i) => http.get(..i).unwrap_or_default().to_owned(),
+        None => http.trim_end_matches('/').to_owned(),
     }
+}
+
+/// The token-exchange URL next to the agent WebSocket URL.
+pub(crate) fn token_url(ws_url: &str) -> String {
+    format!("{}/api/v1/agent/token", http_base(ws_url))
 }
 
 /// Gets the job's OIDC token and exchanges it for an agent token. Uses the same TLS roots; the

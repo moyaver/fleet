@@ -20,7 +20,12 @@ use std::{
 
 use fleet_core::redact::Redactor;
 use fleet_maestro::{ReportState, stdout::strip_ansi};
-use fleet_protocol::{event::EvidenceSources, frame::Telemetry, journal::ClockSample};
+use fleet_protocol::{
+    artifact::ArtifactClass,
+    event::{ArtifactRejected, ArtifactUploaded, EventBody, EvidenceSources},
+    frame::Telemetry,
+    journal::ClockSample,
+};
 use time::OffsetDateTime;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -31,6 +36,7 @@ use crate::{
     outbox::{Budget, Outbox},
     session::{Observation, Session},
     transport::{self, Shared},
+    upload::{self, Outcome, Source, Uploader},
     watch::{BundleScanner, LogTailer},
 };
 
@@ -135,6 +141,10 @@ struct Live {
     tseq: u64,
     dropped_bytes: u64,
     devices: mpsc::Receiver<Vec<(String, fleet_protocol::event::AdbState)>>,
+    /// Uploads artifacts (PLAN §6.6); `None` offline or with `FLEET_UPLOAD_ARTIFACTS=off`.
+    uploader: Option<Uploader>,
+    /// Maestro's debug output directory: where the files to upload are.
+    debug: Option<PathBuf>,
 }
 
 async fn observe() -> io::Result<()> {
@@ -214,6 +224,7 @@ async fn observe() -> io::Result<()> {
             _ = poll.tick() => {
                 if let Some(l) = live.as_mut() {
                     watch(l, false, &clock);
+                    pump_uploads(l, &clock);
                     flush(l);
                 }
             }
@@ -276,9 +287,24 @@ fn start(
     let journal = run_dir
         .and_then(|d| File::create(d.join("journal.jsonl")).ok())
         .map(BufWriter::new);
+    let mut uploader = None;
     let (telemetry, transport) = match server_url() {
         Some(url) => {
             let (tx, rx) = mpsc::channel(64);
+            uploader = uploads_enabled().then(|| {
+                Uploader::new(upload::Config {
+                    base: crate::net::http_base(&url),
+                    credential: Arc::clone(&shared.credential),
+                    agent_run_id,
+                    rate: std::env::var("FLEET_UPLOAD_RATE")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .filter(|r| *r > 0)
+                        .unwrap_or(upload::DEFAULT_RATE),
+                    retry_delay: Duration::from_secs(1),
+                    tls: crate::net::tls(std::env::var("FLEET_CA_FILE").ok().as_deref()),
+                })
+            });
             let cfg = transport::Config::from_env(
                 url,
                 agent_run_id,
@@ -301,6 +327,8 @@ fn start(
     tokio::spawn(crate::adb::track(crate::adb::server_addr(), devices_tx));
     let debug = debug_dir.map(PathBuf::from);
     Live {
+        uploader: uploader.flatten(),
+        debug: debug.clone(),
         session,
         tailer: debug
             .as_ref()
@@ -323,6 +351,158 @@ fn start(
         tseq: 0,
         dropped_bytes: 0,
         devices,
+    }
+}
+
+/// Artifact uploads are on unless `FLEET_UPLOAD_ARTIFACTS` says `0`, `false`, `no` or `off`.
+fn uploads_enabled() -> bool {
+    !std::env::var("FLEET_UPLOAD_ARTIFACTS").is_ok_and(|v| {
+        ["0", "false", "no", "off"].contains(&v.trim().to_ascii_lowercase().as_str())
+    })
+}
+
+/// Queues the files the session found worth uploading, and journals the uploads that finished.
+/// Never blocks and never fails: an upload problem is a journal entry and a log line (I2).
+fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
+    let candidates = l.session.take_uploads();
+    let Some(up) = l.uploader.as_ref() else {
+        return;
+    };
+    for c in candidates {
+        let Some(file) = l.debug.as_ref().map(|d| d.join(&c.rel)) else {
+            continue;
+        };
+        let label = l.session.label(&c.rel);
+        let (content_type, source) = match c.class {
+            ArtifactClass::FailureScreenshot => {
+                let ext = file
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(str::to_ascii_lowercase);
+                let ct = match ext.as_deref() {
+                    Some("png") => "image/png",
+                    Some("jpg" | "jpeg") => "image/jpeg",
+                    Some("webp") => "image/webp",
+                    _ => continue,
+                };
+                (ct, Source::File(file))
+            }
+            // The flow's commands carry resolved `inputText`: redacted like a log.
+            _ => (
+                "application/json",
+                Source::Text(file, Arc::new(l.session.redactor().clone())),
+            ),
+        };
+        up.submit(upload::Item {
+            class: c.class,
+            path: label,
+            content_type,
+            flow: c.flow,
+            source,
+        });
+    }
+    journal_uploads(l, clock);
+}
+
+/// Records finished uploads as `artifact.uploaded` / `artifact.rejected`.
+fn journal_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
+    let Some(up) = l.uploader.as_ref() else {
+        return;
+    };
+    for done in up.take_done() {
+        record(&mut l.session, clock(), done);
+    }
+}
+
+fn record(session: &mut Session, at: ClockSample, done: upload::Done) {
+    let class = done.class.as_str().to_owned();
+    let path = done.path;
+    let body = match done.outcome {
+        Outcome::Uploaded { artifact_id, size } => EventBody::ArtifactUploaded(ArtifactUploaded {
+            class,
+            path,
+            artifact_id,
+            size,
+        }),
+        Outcome::Rejected(reason) => {
+            if reason == upload::NOT_REDACTABLE {
+                session.warn(
+                    at,
+                    "artifact_not_uploaded",
+                    &format!("{path} was not uploaded: it cannot be redacted reliably"),
+                );
+            }
+            EventBody::ArtifactRejected(ArtifactRejected {
+                class,
+                path,
+                reason,
+            })
+        }
+        Outcome::Failed(why) => {
+            tracing::warn!(%path, %why, "artifact upload failed; the run is unaffected");
+            EventBody::ArtifactRejected(ArtifactRejected {
+                class,
+                path,
+                reason: "upload_failed".into(),
+            })
+        }
+    };
+    session.artifact_result(at, done.flow, &body);
+}
+
+/// The run is over: queue the report and the log, wait up to `budget` for every upload, journal
+/// them.
+async fn finish_uploads(
+    l: &mut Live,
+    report: Option<&[u8]>,
+    budget: Duration,
+    clock: &impl Fn() -> ClockSample,
+) {
+    pump_uploads(l, clock);
+    let Some(up) = l.uploader.as_ref() else {
+        return;
+    };
+    if let Some(bytes) = report {
+        match upload::prepare_text(bytes, l.session.redactor()) {
+            Ok(text) => up.submit(upload::Item {
+                class: ArtifactClass::Junit,
+                path: l
+                    .report
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .map_or_else(|| "report.xml".into(), |n| n.to_string_lossy().into_owned()),
+                content_type: "application/xml",
+                flow: None,
+                source: Source::Bytes(text.into()),
+            }),
+            Err(reason) => record(
+                &mut l.session,
+                clock(),
+                upload::Done {
+                    class: ArtifactClass::Junit,
+                    path: "report.xml".into(),
+                    flow: None,
+                    outcome: Outcome::Rejected(reason.into()),
+                },
+            ),
+        }
+    }
+    if let Some(log) = l.debug.as_ref().map(|d| d.join("maestro.log"))
+        && log.is_file()
+        && let Some(up) = l.uploader.as_ref()
+    {
+        up.submit(upload::Item {
+            class: ArtifactClass::MaestroLog,
+            path: "maestro.log".into(),
+            content_type: "text/plain",
+            flow: None,
+            source: Source::Text(log, Arc::new(l.session.redactor().clone())),
+        });
+    }
+    if let Some(up) = l.uploader.as_ref() {
+        for done in up.finish(budget).await {
+            record(&mut l.session, clock(), done);
+        }
     }
 }
 
@@ -415,6 +595,17 @@ async fn finalize(
     output_bytes_dropped: u64,
     clock: impl Fn() -> ClockSample,
 ) {
+    // Everything after Maestro exits (uploads, then the transport's flush) shares one budget, so
+    // an unreachable server can't stretch the end of the job (I2).
+    let started = Instant::now();
+    let flush_budget = std::env::var("FLEET_FLUSH_TIMEOUT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .map_or(Duration::from_secs(20), Duration::from_secs);
+    let upload_budget = std::env::var("FLEET_UPLOAD_TIMEOUT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .map_or(flush_budget / 2, Duration::from_secs);
     // Let Maestro's last writes land, then take a final look.
     tokio::time::sleep(POLL).await;
     watch(&mut l, true, &clock);
@@ -434,6 +625,7 @@ async fn finalize(
         }
         Some((_, ReportRead::Missing)) | None => None,
     };
+    finish_uploads(&mut l, report.as_deref(), upload_budget, &clock).await;
     l.session.observe(
         clock(),
         Observation::Exited {
@@ -464,10 +656,10 @@ async fn finalize(
     l.shared.finishing.store(true, Ordering::SeqCst);
     l.shared.wake.notify_one();
     if let Some(handle) = l.transport.take() {
-        let budget = std::env::var("FLEET_FLUSH_TIMEOUT")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .map_or(Duration::from_secs(20), Duration::from_secs);
+        // What is left of the shared budget, but never less than a few seconds.
+        let budget = flush_budget
+            .saturating_sub(started.elapsed())
+            .max(Duration::from_secs(3));
         match tokio::time::timeout(budget, handle).await {
             Ok(Ok(end)) => tracing::info!(?end, "transport finished"),
             Ok(Err(e)) => tracing::warn!(error = %e, "transport task failed"),

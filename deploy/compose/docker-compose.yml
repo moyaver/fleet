@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Fleet reference deployment (research 06 §9.6): Caddy → Fleet → Postgres 18, plus Garage as the
-# S3-compatible object store (artifacts arrive in M5; it runs now so the stack is complete).
+# S3-compatible object store (artifacts are relayed through Fleet into it).
 # Quick start: deploy/compose/README.md.
 name: fleet
 
@@ -14,6 +14,7 @@ services:
     ports: ["80:80", "443:443"]
     environment:
       FLEET_DOMAIN: ${FLEET_DOMAIN:-localhost}
+      FLEET_USERCONTENT_DOMAIN: ${FLEET_USERCONTENT_DOMAIN:-usercontent.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -34,10 +35,21 @@ services:
       FLEET_DATABASE__MIGRATE: auto           # "manual" for IT-controlled upgrades (fleet migrate)
       FLEET_API__VIEWER_TOKENS_FILE: /run/secrets/viewer_token
       FLEET_API__PUBLIC_URL: https://${FLEET_DOMAIN:-localhost}
+      # Uploaded files are served from a second site (invariant I7); see the Caddyfile.
+      FLEET_USERCONTENT__URL: https://${FLEET_USERCONTENT_DOMAIN:-usercontent.localhost}
+      FLEET_USERCONTENT__SIGNING_KEY_FILE: /run/secrets/usercontent_key
+      # Agents upload through Fleet into Garage, which stays internal.
+      FLEET_STORAGE__BACKEND: s3
+      FLEET_STORAGE__S3__ENDPOINT: http://garage:3900
+      FLEET_STORAGE__S3__BUCKET: fleet-artifacts
+      FLEET_STORAGE__S3__ACCESS_KEY_ID: ${GARAGE_ACCESS_KEY:?set GARAGE_ACCESS_KEY in .env}
+      FLEET_STORAGE__S3__SECRET_ACCESS_KEY: ${GARAGE_SECRET_KEY:?set GARAGE_SECRET_KEY in .env}
+      FLEET_ARTIFACTS__SPOOL_DIR: /var/lib/fleet/spool
       FLEET_LOG: info
     volumes:
       - ./fleet.toml:/etc/fleet/fleet.toml:ro
-    secrets: [database_url, viewer_token]
+      - fleet_spool:/var/lib/fleet/spool
+    secrets: [database_url, viewer_token, usercontent_key]
     depends_on:
       postgres: { condition: service_healthy }
     stop_grace_period: 30s                     # the WebSocket drain needs more than Docker's 10 s
@@ -76,6 +88,7 @@ services:
     expose: ["3900"]                           # S3 API, internal only
 
 volumes:
+  fleet_spool: {}
   caddy_data: {}
   pg_data: {}
   garage_meta: {}
@@ -85,3 +98,4 @@ secrets:
   database_url: { file: ./secrets/database_url }
   postgres_password: { file: ./secrets/postgres_password }
   viewer_token: { file: ./secrets/viewer_token }
+  usercontent_key: { file: ./secrets/usercontent_key }

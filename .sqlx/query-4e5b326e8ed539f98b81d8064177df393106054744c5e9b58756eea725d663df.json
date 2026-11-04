@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts SET state = 'uploading', received_at = NULL\n              WHERE id = $1 AND project_id = $2 AND credential_id = $3 AND state = 'declared'\n                AND grant_expires_at > now()\n              RETURNING size_bytes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "size_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "size_bytes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4e5b326e8ed539f98b81d8064177df393106054744c5e9b58756eea725d663df"
+}

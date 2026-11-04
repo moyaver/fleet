@@ -129,12 +129,17 @@ impl Rig {
     /// Publishes what `run` has queued (and `telemetry`) in one HTTPS batch, like an agent
     /// behind a proxy that blocks `WebSocket`s.
     pub(super) async fn publish(&self, run: &mut Agent, telemetry: Vec<Telemetry>) {
+        self.publish_as(&self.key, run, telemetry).await;
+    }
+
+    /// [`publish`](Self::publish) with another publisher's key (another project's).
+    pub(super) async fn publish_as(&self, key: &str, run: &mut Agent, telemetry: Vec<Telemetry>) {
         let hello = run.hello();
         let events = std::mem::take(&mut run.queued);
         let res = self
             .app
             .post("/api/v1/agent/batch")
-            .authorization_bearer(&self.key)
+            .authorization_bearer(key)
             .json(&BatchRequest {
                 hello,
                 events,

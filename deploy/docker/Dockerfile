@@ -25,11 +25,16 @@ COPY . .
 RUN cd crates/fleet-web && trunk build --release --locked
 # No database at build time: queries are checked against the committed .sqlx data.
 ENV SQLX_OFFLINE=true
-RUN cargo build --release --locked -p fleet-server --bin fleet
+RUN cargo build --release --locked -p fleet-server --bin fleet \
+ && mkdir -p /out/spool /out/blobs
 
 FROM gcr.io/distroless/cc-debian13:nonroot
 COPY --from=builder /src/target/release/fleet /usr/local/bin/fleet
 COPY LICENSE /usr/share/doc/fleet/LICENSE
+# The upload spool (and the blob directory of a `local_fs` install), writable by `nonroot`; mount
+# volumes over them.
+COPY --from=builder --chown=nonroot:nonroot /out/spool /var/lib/fleet/spool
+COPY --from=builder --chown=nonroot:nonroot /out/blobs /var/lib/fleet/blobs
 ENV FLEET_LISTEN=0.0.0.0:8080
 EXPOSE 8080
 USER nonroot

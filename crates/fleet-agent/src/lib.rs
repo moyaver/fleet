@@ -17,4 +17,5 @@ mod prepare;
 mod session;
 mod supervisor;
 mod transport;
+mod upload;
 mod watch;

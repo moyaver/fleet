@@ -1188,6 +1188,7 @@ dependencies = [
  "rustls-native-certs",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "signal-hook",
  "sysinfo",
  "time",
@@ -1197,6 +1198,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "webpki-roots 1.0.11",
+ "wiremock",
 ]
 
 [[package]]
@@ -1333,6 +1335,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "wiremock",
+ "zip",
 ]
 
 [[package]]

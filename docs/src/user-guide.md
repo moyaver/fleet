@@ -43,6 +43,13 @@ Without the report, Fleet still follows the run from Maestro's session log, flow
 | `FLEET_GRACE` | Seconds between the first INT/TERM and killing Maestro's process group (default 15). |
 | `FLEET_FINALIZE_TIMEOUT` | Seconds the agent may spend finishing after Maestro exits (default 60). |
 | `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20). |
+| `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
+| `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. Uploads and the final flush share the `FLEET_FLUSH_TIMEOUT` budget. |
+| `FLEET_UPLOAD_RATE` | Upload rate cap in bytes per second, shared by all uploads (default 4 MiB/s). |
+
+### What the agent uploads
+
+At most two files at a time, hashed while they stream. Uploading never changes Maestro's result or output: a refused, failed or timed-out upload is recorded in the run's journal (`artifact.rejected`) and nothing else. **Text is redacted before it leaves the runner**: `commands.json`, the JUnit report and `maestro.log` go through the same redaction as the console (`-e` values, `MAESTRO_*` values, secret-named variables, known token shapes). A text that is not valid UTF-8, contains NUL bytes or is over 16 MiB cannot be redacted reliably, so it is **not uploaded**, and the run's journal says so (`artifact_not_uploaded`). Screenshots are binary: they are never redacted, only access-controlled on the server.
 
 `FLEET_REPOSITORY`, `FLEET_RUN_ID`, `FLEET_RUN_ATTEMPT`, `FLEET_SHA`, `FLEET_REF` and `FLEET_RUNNER` describe the CI run on systems other than GitHub Actions.
 

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts a SET retention_class = 'failure_evidence'\n          WHERE a.id = $1 AND a.retention_class = 'success_evidence' AND EXISTS\n                (SELECT 1 FROM flow_executions f\n                  WHERE f.id = a.flow_execution_id AND f.state = 'failed')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5105d2fe96a113f4fbc90e2e52db4d3857e62dd0fd386e4c4770622274377afd"
+}

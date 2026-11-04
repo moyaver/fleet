@@ -566,7 +566,8 @@ pub struct PreviousExecutionView {
     pub duration_ms: Option<i64>,
 }
 
-/// An artifact related to a flow. Artifacts arrive with M5; until then the list is empty.
+/// An artifact related to a flow: the short form on [`FlowDetailView`]. The full form, with a
+/// link to open it, is [`ArtifactView`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ArtifactRefView {
@@ -576,6 +577,66 @@ pub struct ArtifactRefView {
     pub class: String,
     /// File name.
     pub name: String,
+}
+
+/// A short-lived signed link to an artifact on the usercontent origin. Mint a new one when it
+/// lapses: ask for the list again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ArtifactLinkView {
+    /// The absolute URL on the usercontent origin.
+    pub url: String,
+    /// When it stops working.
+    #[serde(with = "time::serde::rfc3339")]
+    pub expires_at: OffsetDateTime,
+}
+
+/// One artifact of a flow, as listed for the dashboard.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ArtifactView {
+    /// ID.
+    pub id: Uuid,
+    /// The flow it is evidence for; `None` for a file of the whole run (the JUnit report, the
+    /// Maestro log), which is listed with every flow of the run.
+    pub flow_execution_id: Option<Uuid>,
+    /// The class: `failure_screenshot`, `commands`, `junit`, `maestro_log` or `html_report`.
+    pub class: String,
+    /// File name.
+    pub name: String,
+    /// The path relative to the run's output directory (redacted by the agent).
+    pub path: String,
+    /// What the verified content is (for example `image/png`); for a refused artifact, what the
+    /// uploader declared.
+    pub content_type: String,
+    /// Size in bytes.
+    pub size_bytes: i64,
+    /// SHA-256, lowercase hex.
+    pub sha256: String,
+    /// `available`, or `rejected` (verification refused it).
+    pub state: String,
+    /// Why it was refused: an artifact `RejectReason` code.
+    pub reject_reason: Option<String>,
+    /// The retention class (`failure_evidence`, `success_evidence`, `report`, `debug_log`, …).
+    pub retention_class: String,
+    /// When the upload was requested.
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    /// How to open it. `None` for a refused artifact, and when the server has no usercontent
+    /// origin configured (artifacts are stored but cannot be opened).
+    pub link: Option<ArtifactLinkView>,
+}
+
+/// `GET /api/v1/projects/{project}/flows/{id}/artifacts`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ArtifactListView {
+    /// The flow's artifacts, oldest first.
+    pub artifacts: Vec<ArtifactView>,
+    /// The usercontent origin the links point at (for example
+    /// `https://fleet-usercontent.example.net`): the one origin the dashboard may embed and
+    /// fetch artifacts from. `None` when not configured.
+    pub usercontent_url: Option<String>,
 }
 
 /// Screen D: everything about one flow execution.
@@ -608,7 +669,7 @@ pub struct FlowDetailView {
     pub failure: Option<FailureView>,
     /// Up to 10 earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousExecutionView>,
-    /// Related artifacts (M5).
+    /// Related artifacts that are available; [`ArtifactListView`] has their links.
     pub artifacts: Vec<ArtifactRefView>,
 }
 

@@ -15,7 +15,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    api,
+    api, artifacts,
     config::{Config, MigrateMode},
     health, ingest, login,
     state::AppState,
@@ -30,6 +30,8 @@ pub struct Server {
     state: AppState,
     stop: CancellationToken,
     serving: JoinHandle<std::io::Result<()>>,
+    /// The usercontent origin's own listener, when `usercontent.listen` is set.
+    usercontent: Option<(SocketAddr, JoinHandle<std::io::Result<()>>)>,
 }
 
 impl Server {
@@ -39,10 +41,21 @@ impl Server {
         self.addr
     }
 
+    /// Where the usercontent origin listens when it has a listener of its own.
+    #[must_use]
+    pub fn usercontent_addr(&self) -> Option<SocketAddr> {
+        self.usercontent.as_ref().map(|(addr, _)| *addr)
+    }
+
     /// Shuts down gracefully and waits for every socket and background task.
     pub async fn stop(self) -> anyhow::Result<()> {
         self.stop.cancel();
         self.serving.await.context("joining the HTTP server")??;
+        if let Some((_, serving)) = self.usercontent {
+            serving
+                .await
+                .context("joining the usercontent listener")??;
+        }
         self.state.tracker.close();
         let grace = Duration::from_millis(self.state.config.ingest.shutdown_grace_ms);
         if tokio::time::timeout(grace, self.state.tracker.wait())
@@ -103,6 +116,13 @@ pub(crate) async fn init(config: Config) -> anyhow::Result<AppState> {
         .await
         .context("restoring live versions")?;
     tracing::info!(open_attempts = open, "live hub restored");
+    // Say early that the blob store can't be opened; the first upload retries.
+    if let Err(error) = state.blobs().await {
+        tracing::warn!(
+            error = format!("{error:#}"),
+            "the artifact blob store is not available"
+        );
+    }
     Ok(state)
 }
 
@@ -134,13 +154,21 @@ async fn sync_group_mappings(
 
 /// Every route, with security headers on the dashboard's static files.
 pub(crate) fn router(state: &AppState) -> Router {
-    Router::new()
+    let app = Router::new()
         .merge(health::router())
         .merge(ingest::router(state))
+        .merge(artifacts::router())
         .merge(api::router())
         .merge(login::router())
         .with_state(state.clone())
-        .merge(web::router())
+        .merge(web::router());
+    // The usercontent host, when it shares this listener, gets artifacts and nothing else.
+    match state.config.usercontent.hosts() {
+        hosts if !hosts.is_empty() => {
+            artifacts::usercontent::dispatch(app, artifacts::usercontent::router(state), hosts)
+        }
+        _ => app,
+    }
 }
 
 /// Starts the server; returns once it listens and is ready.
@@ -170,6 +198,26 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
                 .await
         })
     };
+    let usercontent = match state.config.usercontent.listen {
+        Some(listen) => {
+            let listener = tokio::net::TcpListener::bind(listen)
+                .await
+                .with_context(|| format!("binding the usercontent origin to {listen}"))?;
+            let bound = listener.local_addr()?;
+            let router = artifacts::usercontent::router(&state);
+            let stop = stop.clone();
+            tracing::info!(listen = %bound, "usercontent origin listening");
+            Some((
+                bound,
+                tokio::spawn(async move {
+                    axum::serve(listener, router)
+                        .with_graceful_shutdown(async move { stop.cancelled().await })
+                        .await
+                }),
+            ))
+        }
+        None => None,
+    };
     state.set_ready(true);
     tracing::info!(listen = %addr, "server listening");
     Ok(Server {
@@ -177,6 +225,7 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         state,
         stop,
         serving,
+        usercontent,
     })
 }
 

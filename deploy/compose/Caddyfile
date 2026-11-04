@@ -9,3 +9,11 @@
 		flush_interval -1
 	}
 }
+
+# Uploaded files (Maestro HTML reports, screenshots) are served from a second site, never the
+# dashboard's (invariant I7). Use another registrable domain, and set FLEET_USERCONTENT_DOMAIN in
+# .env. Fleet routes by Host: it serves only signed /u/… links here, sandboxed, with no cookies.
+{$FLEET_USERCONTENT_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy fleet:8080
+}

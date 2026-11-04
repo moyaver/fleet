@@ -36,6 +36,14 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `storage.backend` | `local_fs` | Where artifacts live: `local_fs` or `s3`; see [Artifact storage](#artifact-storage) |
 | `storage.path` | `/var/lib/fleet/blobs` | Blob directory for `local_fs` |
 | `storage.s3.*` | — | Endpoint, region, bucket and credentials for `s3` |
+| `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification (local disk; one server instance per spool) |
+| `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
+| `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
+| `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class |
+| `usercontent.url` | — | The usercontent origin; see [Usercontent domain](#usercontent-domain) |
+| `usercontent.signing_key` | — | HMAC key for signed links, at least 32 bytes (`FLEET_USERCONTENT__SIGNING_KEY_FILE`) |
+| `usercontent.link_ttl_seconds` | `300` | How long a signed link works |
+| `usercontent.listen` | — | Also serve the usercontent origin on its own address |
 | `oidc.issuers` | GitHub, audience `fleet` | CI OIDC issuers accepted by `POST /api/v1/agent/token` |
 | `projects[].trust_policies[]` | — | Who may publish with an OIDC token (repository and owner IDs, trusted refs, PR policy) |
 
@@ -70,7 +78,7 @@ role = "admin"
 
 ## Artifact storage
 
-Screenshots, JUnit reports, logs, HTML reports and debug bundles are stored as **content-addressed blobs**: a blob's key is its project and the SHA-256 of its bytes. Uploading the same bytes twice to one project stores them once, and one project can never read or delete another project's blobs. A blob is only stored if its size and SHA-256 match what was declared; a mismatch stores nothing. The backend is chosen once, with `storage.backend`. (The upload endpoints that use the store arrive with the artifact broker; the settings are already validated at start-up.)
+Screenshots, JUnit reports, logs, HTML reports and debug bundles are stored as **content-addressed blobs**: a blob's key is its project and the SHA-256 of its bytes. Uploading the same bytes twice to one project stores them once, and one project can never read or delete another project's blobs. A blob is only stored if its size and SHA-256 match what was declared; a mismatch stores nothing. The backend is chosen once, with `storage.backend`. Agents upload through the server (relayed: the store never needs to be reachable from runners or browsers); see [Artifact uploads](#artifact-uploads). The blob store is opened on first use, and the server logs a warning at start-up if it can't be opened.
 
 ### Filesystem (`local_fs`)
 
@@ -114,6 +122,40 @@ An artifact is accepted only if its declared size and SHA-256 match, it is not l
 | bundle | zip, or `tar.zst` |
 
 Zip and `tar.zst` archives are also read through (never unpacked to disk) and refused if they have more than 5,000 entries, expand to more than 1 GiB in total, expand more than 100:1 (judged per file in a zip, over the whole stream for `tar.zst`, above 1 MiB), contain an absolute path, `..`, a backslash, a drive letter, control characters, a symlink, hardlink, device or fifo, contain another archive, or have bytes after their end. Sizes in archive headers are ignored: only bytes actually produced by decompression count. A refused artifact is refused with its reason and nothing is kept.
+
+## Artifact uploads
+
+Agents upload four kinds of evidence: failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log` (HTML reports are accepted by the server and served, but the agent does not upload them yet). The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
+
+Retention is recorded per artifact (`success_evidence` 7 days, `failure_evidence` 90 days, `report` 1 year, `debug_log` 30 days; screenshots and commands of an already failed flow start as `failure_evidence`). Enforcement and blob garbage collection arrive with the retention job.
+
+The spool is local: with several server instances, send a given upload's `PUT` and `complete` to the same instance (or share the spool directory).
+
+## Usercontent domain
+
+Maestro HTML reports and raw artifacts are files from CI jobs, so Fleet treats them as hostile: it never serves them from the dashboard's origin. They are served only from a **second hostname**, `usercontent.url`, and only through **signed links** that the dashboard's API hands out after checking the caller may read artifacts (`GET /api/v1/projects/{project}/flows/{id}/artifacts`).
+
+Use a different *registrable domain* from the dashboard (`fleet.example.com` and `fleet-usercontent.example.net`, not `usercontent.fleet.example.com`), so no cookie, `document.domain` trick or same-site request can reach the dashboard from an uploaded file. Fleet refuses a configuration where both are the same host. Get a certificate for it and point both names at the proxy:
+
+```toml
+[api]
+public_url = "https://fleet.example.com"
+
+[usercontent]
+url = "https://fleet-usercontent.example.net"
+# signing_key: set FLEET_USERCONTENT__SIGNING_KEY_FILE (openssl rand -base64 48)
+link_ttl_seconds = 300
+```
+
+What the origin guarantees, on every response:
+
+- A link names one artifact of one project until one moment (`/u/<project>/<artifact>/<expires>/<signature>/<file name>`; the signature is an HMAC-SHA256 under your key). A changed, expired or foreign link gets 403, 410 or 404. Rotating the key invalidates every link.
+- `Content-Security-Policy: sandbox; default-src 'none'; …`: HTML reports get an opaque origin and no scripts. `X-Content-Type-Options: nosniff`, and the `Content-Type` is what the verified bytes are, not what the uploader said.
+- Images and (sandboxed) HTML are `Content-Disposition: inline`; everything else is `attachment`.
+- No cookie is read or set, and nothing but `/u/…` links is served: the API, the dashboard and the agent routes answer 404 on this host.
+- `Cross-Origin-Resource-Policy: cross-origin` (the dashboard embeds screenshots; the link is the access control), and `Access-Control-Allow-Origin` and `frame-ancestors` allow only `api.public_url`.
+
+Without `usercontent.url` artifacts are stored but cannot be opened. Fleet routes by the `Host` header on its main listener, so a proxy that sends both hostnames to `fleet:8080` is enough ([`deploy/compose/Caddyfile`](https://github.com/moyaver/fleet/blob/main/deploy/compose/Caddyfile)); `usercontent.listen` serves the origin on a separate port instead.
 
 ## Shutdown and upgrades
 

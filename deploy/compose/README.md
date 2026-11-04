@@ -11,6 +11,7 @@ mkdir -p secrets
 openssl rand -hex 24 > secrets/postgres_password
 printf 'postgres://fleet:%s@postgres:5432/fleet' "$(cat secrets/postgres_password)" > secrets/database_url
 openssl rand -hex 32 > secrets/viewer_token
+openssl rand -base64 48 > secrets/usercontent_key   # signs links to uploaded files
 docker compose up -d --build
 docker compose ps               # fleet turns healthy once migrations ran and Postgres answers
 ```
@@ -25,6 +26,8 @@ Fleet migrates on start (`FLEET_DATABASE__MIGRATE=auto`). For change-controlled 
   ```bash
   docker compose run --rm fleet api-key create --project mobile-app --name ci
   ```
+
+Uploaded files (Maestro HTML reports, screenshots, logs) are served from a second hostname, `FLEET_USERCONTENT_DOMAIN`, which must resolve to the same proxy and have its own certificate; in production use a different registrable domain from `FLEET_DOMAIN`. See the [operator guide](../../docs/src/operator-guide.md#usercontent-domain).
 
 Point agents at `FLEET_SERVER=https://<FLEET_DOMAIN>`. Until browser sign-in arrives (M4), the REST API and live socket take the viewer token in `secrets/viewer_token` as a bearer token.
 

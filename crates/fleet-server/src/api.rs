@@ -22,18 +22,20 @@ use axum::{
 };
 use fleet_core::policy::{Action, Decision, Denied, Principal, Resource, authorize};
 use fleet_protocol::{
+    artifact::{RejectReason, UploadGrant, UploadRequest, UploadResult},
     live::{
         AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, Liveness,
         PlanShardView, PlanView, ProjectView, Snapshot, SuiteView,
     },
     plan::PlanManifest,
     rest::{
-        ActiveAttemptView, ArtifactRefView, BarView, ClaimView, DeviceDetailView,
-        DeviceProfileView, DeviceSessionView, FailureView, FlowCounts, FlowDetailView, JobCounts,
-        LaneView, LatestReadings, MetricAggregate, MetricPoint, MetricReading, MetricResolution,
-        MetricScope, MetricSubject, MetricSubjectKind, MetricUnit, MetricsView, OverviewView,
-        PreviousExecutionView, RecentAttemptView, SeriesView, StepView, TimelineView, WorkerCounts,
-        WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
+        ActiveAttemptView, ArtifactLinkView, ArtifactListView, ArtifactRefView, ArtifactView,
+        BarView, ClaimView, DeviceDetailView, DeviceProfileView, DeviceSessionView, FailureView,
+        FlowCounts, FlowDetailView, JobCounts, LaneView, LatestReadings, MetricAggregate,
+        MetricPoint, MetricReading, MetricResolution, MetricScope, MetricSubject,
+        MetricSubjectKind, MetricUnit, MetricsView, OverviewView, PreviousExecutionView,
+        RecentAttemptView, SeriesView, StepView, TimelineView, WorkerCounts, WorkerRunPage,
+        WorkerRunView, WorkerSummaryView, WorkerView,
     },
 };
 use fleet_store::plans::{PlanError, PlanPipeline};
@@ -63,7 +65,11 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         screens::device,
         metrics::worker_metrics,
         metrics::device_metrics,
-        screens::flow
+        screens::flow,
+        crate::artifacts::list::flow_artifacts,
+        crate::artifacts::upload::request,
+        crate::artifacts::upload::content,
+        crate::artifacts::upload::complete
     ),
     components(schemas(
         ProjectView,
@@ -111,6 +117,13 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         FailureView,
         PreviousExecutionView,
         ArtifactRefView,
+        ArtifactView,
+        ArtifactLinkView,
+        ArtifactListView,
+        UploadRequest,
+        UploadGrant,
+        UploadResult,
+        RejectReason,
         PlanUpload,
         PlanStored,
         ApiError
@@ -159,6 +172,10 @@ pub(crate) fn router() -> Router<AppState> {
             "/api/v1/projects/{project}/flows/{execution_id}",
             get(screens::flow),
         )
+        .route(
+            "/api/v1/projects/{project}/flows/{execution_id}/artifacts",
+            get(crate::artifacts::list::flow_artifacts),
+        )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))
 }
@@ -201,14 +218,18 @@ fn denied(d: Denied) -> Response {
 }
 
 /// `Ok` when `principal` may do `action` to `resource`.
-fn require(principal: &Principal, action: Action, resource: Resource) -> Result<(), Box<Response>> {
+pub(crate) fn require(
+    principal: &Principal,
+    action: Action,
+    resource: Resource,
+) -> Result<(), Box<Response>> {
     match authorize(principal, action, resource) {
         Decision::Allow => Ok(()),
         Decision::Deny(d) => Err(Box::new(denied(d))),
     }
 }
 
-async fn project_id(state: &AppState, slug: &str) -> Result<Uuid, Box<Response>> {
+pub(crate) async fn project_id(state: &AppState, slug: &str) -> Result<Uuid, Box<Response>> {
     match state.store.project_id(slug).await {
         Ok(Some(id)) => Ok(id),
         Ok(None) => Err(Box::new(error(StatusCode::NOT_FOUND, "no such project"))),

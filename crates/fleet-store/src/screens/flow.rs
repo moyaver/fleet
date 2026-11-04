@@ -3,7 +3,9 @@
 
 use fleet_protocol::{
     live::FlowView,
-    rest::{ClaimView, FailureView, FlowDetailView, PreviousExecutionView, StepView},
+    rest::{
+        ArtifactRefView, ClaimView, FailureView, FlowDetailView, PreviousExecutionView, StepView,
+    },
 };
 use uuid::Uuid;
 
@@ -87,6 +89,16 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
+        let artifacts = sqlx::query_as!(
+            ArtifactRefView,
+            "SELECT id, class, name FROM artifacts
+              WHERE flow_execution_id = $1 AND project_id = $2 AND state = 'available'
+              ORDER BY created_at, id",
+            flow_id,
+            project_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
         tx.commit().await?;
         let failure = failure_of(&flow, &steps);
         Ok(Some(FlowDetailView {
@@ -102,7 +114,7 @@ impl Store {
             steps,
             failure,
             previous,
-            artifacts: Vec::new(),
+            artifacts,
         }))
     }
 }

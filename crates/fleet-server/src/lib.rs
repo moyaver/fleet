@@ -7,6 +7,8 @@
 //!   the commit (research 05 §3.5).
 //! - `live` and `api`: the live hub (versioned, ordered deltas; rebuilt from Postgres), the
 //!   browser socket `/api/v1/live`, REST snapshots and `/api/v1/openapi.json`.
+//! - `artifacts`: the artifact broker (upload protocol, verification, blob store) and the
+//!   usercontent origin that alone serves artifact bytes.
 //! - `sweeps`: liveness, and the leader's sweeps (advisory lock).
 //! - `app`: the router, graceful shutdown (`goaway`, close 1012) and start-up.
 //!
@@ -16,6 +18,7 @@ pub mod config;
 
 mod api;
 mod app;
+mod artifacts;
 mod health;
 mod ingest;
 mod live;

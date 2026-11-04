@@ -72,6 +72,10 @@ pub struct Config {
     pub login: Option<Login>,
     /// Where artifacts are stored (PLAN §7.6, ADR-0007).
     pub storage: Storage,
+    /// What agents may upload, and how much (PLAN §6.6, §7.6).
+    pub artifacts: Artifacts,
+    /// The second origin that serves artifact bytes (PLAN §7.6, invariant I7).
+    pub usercontent: Usercontent,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -87,6 +91,8 @@ impl Default for Config {
             oidc: Oidc::default(),
             login: None,
             storage: Storage::default(),
+            artifacts: Artifacts::default(),
+            usercontent: Usercontent::default(),
             projects: Vec::new(),
         }
     }
@@ -121,6 +127,181 @@ impl Default for Storage {
             path: PathBuf::from("/var/lib/fleet/blobs"),
             s3: S3Settings::default(),
         }
+    }
+}
+
+/// Artifact upload policy (PLAN §6.6; research 06 T11, T12).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Artifacts {
+    /// Where uploaded bytes wait between the `PUT` and verification. A local disk with room for
+    /// the largest upload times the uploads in flight; created on first use.
+    pub spool_dir: PathBuf,
+    /// How long an upload grant lasts. Grants are single-use and short-lived.
+    pub grant_ttl_seconds: u64,
+    /// Most bytes one agent run may store.
+    pub max_run_bytes: u64,
+    /// Most files one agent run may store.
+    pub max_run_files: u32,
+    /// Size limits per class, in bytes.
+    pub max_bytes: ClassLimits,
+}
+
+impl Default for Artifacts {
+    fn default() -> Self {
+        Self {
+            spool_dir: PathBuf::from("/var/lib/fleet/spool"),
+            grant_ttl_seconds: 600,
+            max_run_bytes: 2 * 1024 * 1024 * 1024,
+            max_run_files: 2_000,
+            max_bytes: ClassLimits::default(),
+        }
+    }
+}
+
+/// The largest accepted file of each class, in bytes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClassLimits {
+    /// `failure_screenshot`.
+    pub failure_screenshot: u64,
+    /// `commands`.
+    pub commands: u64,
+    /// `junit`.
+    pub junit: u64,
+    /// `maestro_log`.
+    pub maestro_log: u64,
+    /// `html_report`.
+    pub html_report: u64,
+}
+
+impl Default for ClassLimits {
+    fn default() -> Self {
+        const MIB: u64 = 1024 * 1024;
+        Self {
+            failure_screenshot: 20 * MIB,
+            commands: 16 * MIB,
+            junit: 32 * MIB,
+            maestro_log: 64 * MIB,
+            html_report: 128 * MIB,
+        }
+    }
+}
+
+impl ClassLimits {
+    /// The limit for `class`.
+    #[must_use]
+    pub fn of(&self, class: fleet_protocol::artifact::ArtifactClass) -> u64 {
+        use fleet_protocol::artifact::ArtifactClass as C;
+        match class {
+            C::FailureScreenshot => self.failure_screenshot,
+            C::Commands => self.commands,
+            C::Junit => self.junit,
+            C::MaestroLog => self.maestro_log,
+            C::HtmlReport => self.html_report,
+        }
+    }
+}
+
+/// The usercontent origin (PLAN §7.6, research 06 §6.2). Uploaded files, above all Maestro's HTML
+/// reports, are hostile input: they are served only from here, a different site from the
+/// dashboard, never with cookies, always sandboxed, and only through short-lived signed links.
+/// Unset: artifacts are stored but cannot be opened.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Usercontent {
+    /// The origin's public URL (`https://fleet-usercontent.example.net`): a different host from
+    /// `api.public_url`, and ideally a different registrable domain. Requests whose `Host` is this
+    /// one get artifacts and nothing else; every other `Host` never gets artifact bytes.
+    pub url: Option<String>,
+    /// Also listen here, for an origin published on its own port. Optional: a proxy that routes
+    /// both hostnames to `listen` (the Compose file does) needs no second listener.
+    pub listen: Option<SocketAddr>,
+    /// The HMAC key that signs links, at least 32 bytes. Set it with
+    /// `FLEET_USERCONTENT__SIGNING_KEY_FILE`. Changing it invalidates every link at once.
+    pub signing_key: Option<Secret>,
+    /// How long a link works. Research 06 T15: at most 5 minutes.
+    pub link_ttl_seconds: u64,
+}
+
+impl Default for Usercontent {
+    fn default() -> Self {
+        Self {
+            url: None,
+            listen: None,
+            signing_key: None,
+            link_ttl_seconds: 300,
+        }
+    }
+}
+
+/// Shortest accepted signing key: 256 bits, the size of the HMAC-SHA256 output.
+const MIN_SIGNING_KEY_BYTES: usize = 32;
+
+/// `host[:port]` of a URL, lowercase, with the scheme's default port made explicit.
+fn authority(url: &url::Url) -> Option<String> {
+    Some(format!(
+        "{}:{}",
+        url.host_str()?.to_ascii_lowercase(),
+        url.port_or_known_default()?
+    ))
+}
+
+impl Usercontent {
+    /// The `Host` header values that mean this origin: `host:port`, and the bare host when the
+    /// port is the scheme's default. Empty when not configured.
+    pub(crate) fn hosts(&self) -> Vec<String> {
+        let Some(url) = self.url.as_deref().and_then(|u| url::Url::parse(u).ok()) else {
+            return Vec::new();
+        };
+        let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+            return Vec::new();
+        };
+        let host = host.to_ascii_lowercase();
+        let mut hosts = vec![format!("{host}:{port}")];
+        if url.port().is_none() {
+            hosts.push(host);
+        }
+        hosts
+    }
+
+    fn validate(&self, public_url: Option<&str>) -> anyhow::Result<()> {
+        let Some(raw) = &self.url else {
+            anyhow::ensure!(
+                self.listen.is_none() && self.signing_key.is_none(),
+                "usercontent.listen and usercontent.signing_key are set but usercontent.url is not"
+            );
+            return Ok(());
+        };
+        let url = url::Url::parse(raw)
+            .with_context(|| format!("usercontent.url {raw:?} is not a URL"))?;
+        anyhow::ensure!(
+            matches!(url.scheme(), "http" | "https") && url.path() == "/",
+            "usercontent.url must be an http:// or https:// origin without a path"
+        );
+        let own = authority(&url).context("usercontent.url has no host")?;
+        let app = public_url
+            .context("usercontent.url needs api.public_url: it names the one origin allowed to embed and fetch artifacts")?;
+        let app = url::Url::parse(app)
+            .ok()
+            .and_then(|u| authority(&u))
+            .context("api.public_url is not a URL")?;
+        anyhow::ensure!(
+            own != app,
+            "usercontent.url must be a different host from api.public_url: user content must \
+             never share an origin with the dashboard (invariant I7)"
+        );
+        let key = self.signing_key.as_ref().map_or(0, |k| k.expose().len());
+        anyhow::ensure!(
+            key >= MIN_SIGNING_KEY_BYTES,
+            "usercontent.signing_key must be at least {MIN_SIGNING_KEY_BYTES} bytes \
+             (set FLEET_USERCONTENT__SIGNING_KEY_FILE; `openssl rand -base64 48` makes one)"
+        );
+        anyhow::ensure!(
+            (1..=3600).contains(&self.link_ttl_seconds),
+            "usercontent.link_ttl_seconds must be between 1 and 3600"
+        );
+        Ok(())
     }
 }
 
@@ -568,6 +749,7 @@ impl Config {
             }
         }
         self.storage.validate()?;
+        self.usercontent.validate(self.api.public_url.as_deref())?;
         for p in &self.projects {
             for t in &p.trust_policies {
                 anyhow::ensure!(
@@ -823,6 +1005,66 @@ mod tests {
             ]),
         );
         assert!(format!("{:#}", bad_scheme.unwrap_err()).contains("http"));
+    }
+
+    #[test]
+    fn the_usercontent_origin_needs_its_own_host_and_a_strong_key_from_a_file() {
+        let dir = std::env::temp_dir().join(format!("fleet-uc-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let key = dir.join("key");
+        std::fs::write(&key, format!("{}\n", "k".repeat(40))).unwrap();
+        let key = key.to_str().unwrap();
+        let ok = [
+            ("FLEET_API__PUBLIC_URL", "https://fleet.example.com"),
+            (
+                "FLEET_USERCONTENT__URL",
+                "https://fleet-usercontent.example.net",
+            ),
+            ("FLEET_USERCONTENT__SIGNING_KEY_FILE", key),
+        ];
+        let c = Config::load(None, &env(&ok)).unwrap();
+        assert_eq!(
+            c.usercontent.signing_key.as_ref().map(Secret::expose),
+            Some("k".repeat(40).as_str()),
+            "read from the file, newline trimmed"
+        );
+        assert_eq!(
+            c.usercontent.link_ttl_seconds, 300,
+            "research 06 T15: at most 5 minutes"
+        );
+        assert_eq!(
+            c.usercontent.hosts(),
+            [
+                "fleet-usercontent.example.net:443",
+                "fleet-usercontent.example.net"
+            ],
+            "a Host header may omit the scheme's default port"
+        );
+        assert!(!c.redacted().unwrap().contains(&"k".repeat(40)));
+
+        let with = |url: &'static str| {
+            let mut v = ok.to_vec();
+            v.retain(|(k, _)| *k != "FLEET_USERCONTENT__URL");
+            v.push(("FLEET_USERCONTENT__URL", url));
+            Config::load(None, &env(&v))
+        };
+        let same = with("https://fleet.example.com").unwrap_err();
+        assert!(format!("{same:#}").contains("different host"), "{same:#}");
+        let same_with_port = with("https://FLEET.example.com:443").unwrap_err();
+        assert!(format!("{same_with_port:#}").contains("different host"));
+        let no_key = Config::load(None, &env(&ok[..2])).unwrap_err();
+        assert!(format!("{no_key:#}").contains("signing_key"), "{no_key:#}");
+        let short = Config::load(
+            None,
+            &env(&[ok[0], ok[1], ("FLEET_USERCONTENT__SIGNING_KEY", "short")]),
+        )
+        .unwrap_err();
+        assert!(format!("{short:#}").contains("at least 32"), "{short:#}");
+        let no_app = Config::load(None, &env(&ok[1..])).unwrap_err();
+        assert!(
+            format!("{no_app:#}").contains("api.public_url"),
+            "{no_app:#}"
+        );
     }
 
     #[tokio::test]

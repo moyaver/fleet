@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts a SET expires_at = a.available_at + rc.ttl\n           FROM retention_classes rc\n          WHERE a.id = $1 AND rc.project_id = a.project_id AND rc.class = a.retention_class",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60d76578bf26d6ce60e9aafa644bd2c51d8e04650be81561949866609d007d45"
+}

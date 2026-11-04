@@ -4,6 +4,7 @@
 //!
 //! This crate must stay free of async runtimes and build for `wasm32-unknown-unknown` (PLAN §4.2).
 //!
+//! - [`artifact`]: the artifact upload protocol (HTTPS, never the socket).
 //! - [`frame`]: what travels over the agent WebSocket (`fleet.v1+json`).
 //! - [`journal`]: the envelope every journal event shares, with its provenance.
 //! - [`event`]: the typed bodies the agent emits.
@@ -12,6 +13,7 @@
 //!   device detail, metric series, flow investigation).
 //! - [`plan`]: Fleet Planner manifests (ADR-0013).
 
+pub mod artifact;
 pub mod brand;
 pub mod event;
 pub mod frame;

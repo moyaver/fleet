@@ -1,0 +1,695 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Artifact rows and their upload state machine (PLAN §7.6; research 05 §12.1).
+//!
+//! ```text
+//! request_upload ──► declared ──claim_content──► uploading ──content_received──► (spooled)
+//!        │              ▲  └──── grant lapses ──── │  abort_content (stream failed) ─┘
+//!        │              └────────── re-request ────┘
+//!        ├──► available (the project already has these bytes for this class: `Exists`)
+//!        └──► rejected  (remembered: the same bytes are refused the same way)
+//! (spooled) ──mark_available──► available       (spooled) ──mark_rejected──► rejected
+//! ```
+//!
+//! This module holds the rows and the rules that need the database (idempotency, per-run quotas,
+//! per-project deduplication, single-use grants). Verifying bytes and writing the blob store is
+//! the server's job; it reports back with [`Store::mark_available`] or [`Store::mark_rejected`].
+//! Digests cross this API as lowercase hex.
+
+use std::time::Duration;
+
+use fleet_protocol::artifact::ArtifactClass;
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+use crate::{Result, Store, auth::Credential};
+
+/// The retention class an artifact starts in, before its flow's outcome is known (research 05
+/// §12.3). Evidence of a failed flow is promoted to `failure_evidence` when it finalizes (or at
+/// once, if the flow had already failed when the file arrived).
+#[must_use]
+pub fn default_retention(class: ArtifactClass) -> &'static str {
+    match class {
+        ArtifactClass::Junit | ArtifactClass::HtmlReport => "report",
+        ArtifactClass::MaestroLog => "debug_log",
+        ArtifactClass::FailureScreenshot | ArtifactClass::Commands => "success_evidence",
+    }
+}
+
+impl Credential {
+    /// The ID of the API key or agent token.
+    #[must_use]
+    pub fn id(self) -> Uuid {
+        match self {
+            Self::ApiKey(id) | Self::AgentToken(id) => id,
+        }
+    }
+}
+
+/// What an agent asks to upload.
+#[derive(Debug, Clone)]
+pub struct UploadAsk<'a> {
+    /// The caller's project.
+    pub project_id: Uuid,
+    /// The caller's credential: the grant is bound to it.
+    pub credential: Credential,
+    /// The run that produced the file.
+    pub agent_run_id: Uuid,
+    /// The flow it is evidence for.
+    pub flow_execution_id: Option<Uuid>,
+    /// Its class.
+    pub class: ArtifactClass,
+    /// A sanitised label relative to the output directory.
+    pub path: &'a str,
+    /// The label's last segment.
+    pub name: &'a str,
+    /// The declared `Content-Type`.
+    pub content_type: &'a str,
+    /// Size in bytes.
+    pub size: u64,
+    /// SHA-256, 64 lowercase hex digits.
+    pub sha256: &'a str,
+}
+
+/// What one run may store (research 06 T12).
+#[derive(Debug, Clone, Copy)]
+pub struct Quota {
+    /// Bytes across all of the run's artifacts.
+    pub max_bytes: u64,
+    /// Number of artifacts.
+    pub max_files: u32,
+}
+
+/// The answer to [`Store::request_upload`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Requested {
+    /// Send the bytes before `expires_at`.
+    Grant {
+        /// The artifact.
+        artifact_id: Uuid,
+        /// When the grant lapses.
+        expires_at: OffsetDateTime,
+    },
+    /// Nothing to send: the artifact is available.
+    Exists {
+        /// The artifact.
+        artifact_id: Uuid,
+    },
+    /// These bytes were refused before; they are refused again.
+    Rejected {
+        /// The artifact row that records it.
+        artifact_id: Uuid,
+        /// The refusal's code.
+        reason: String,
+    },
+    /// The run doesn't exist in the caller's project (yet).
+    UnknownRun,
+    /// The flow doesn't exist in the run (yet).
+    UnknownFlow,
+    /// The run is over its quota.
+    OverQuota,
+}
+
+/// The result of claiming a grant for its bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Claim {
+    /// Go ahead and receive exactly `size` bytes.
+    Claimed {
+        /// The declared size.
+        size: u64,
+    },
+    /// No such artifact for this caller.
+    NotFound,
+    /// The grant lapsed.
+    Expired,
+    /// The bytes were already received (the grant is single-use), or the artifact is final.
+    AlreadyUsed,
+}
+
+/// What `complete` finds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pending {
+    /// Bytes are in the spool: verify and store them.
+    Ready(PendingArtifact),
+    /// Already finished with this outcome (a repeated `complete`).
+    Done(Finished),
+    /// No such artifact for this caller.
+    NotFound,
+    /// The bytes haven't (all) arrived.
+    NotReceived,
+}
+
+/// The facts verification needs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingArtifact {
+    /// The artifact.
+    pub id: Uuid,
+    /// Its class.
+    pub class: ArtifactClass,
+    /// The declared size.
+    pub size: u64,
+    /// The declared SHA-256.
+    pub sha256: String,
+}
+
+/// A finished artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Finished {
+    /// Verified and stored.
+    Available,
+    /// Refused, with the code.
+    Rejected(String),
+}
+
+/// An artifact as the dashboard lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactRow {
+    /// ID.
+    pub id: Uuid,
+    /// The flow it is evidence for; `None` for a file of the whole run (report, log).
+    pub flow_execution_id: Option<Uuid>,
+    /// Class (the wire name).
+    pub class: String,
+    /// Last path segment.
+    pub name: String,
+    /// Path label.
+    pub path: String,
+    /// The verified content type; for a rejected artifact, the declared one.
+    pub content_type: String,
+    /// Size in bytes.
+    pub size_bytes: i64,
+    /// SHA-256, lowercase hex.
+    pub sha256: String,
+    /// `available` or `rejected`.
+    pub state: String,
+    /// Why it was refused.
+    pub reject_reason: Option<String>,
+    /// Its retention class.
+    pub retention_class: String,
+    /// When the request arrived.
+    pub created_at: OffsetDateTime,
+}
+
+/// What the usercontent origin needs to serve an artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Servable {
+    /// SHA-256, lowercase hex: with the project, the blob's key.
+    pub sha256: String,
+    /// Size in bytes.
+    pub size_bytes: i64,
+    /// Class.
+    pub class: ArtifactClass,
+    /// The verified content type.
+    pub content_type: String,
+    /// File name for `Content-Disposition`.
+    pub name: String,
+}
+
+fn secs(d: Duration) -> f64 {
+    d.as_secs_f64()
+}
+
+impl Store {
+    /// Records an upload request and decides what the agent does next. Idempotent on
+    /// `(agent_run_id, class, sha256)`; see the module docs for the cases.
+    pub async fn request_upload(
+        &self,
+        ask: &UploadAsk<'_>,
+        grant_ttl: Duration,
+        quota: Quota,
+    ) -> Result<Requested> {
+        let mut tx = self.pool().begin().await?;
+        // One request per run at a time: the quota check and the insert must not interleave.
+        sqlx::query!(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+            ask.agent_run_id.to_string()
+        )
+        .execute(&mut *tx)
+        .await?;
+        let scope = match scope_of(&mut tx, ask).await? {
+            Ok(scope) => scope,
+            Err(refused) => return Ok(refused),
+        };
+        let existing = sqlx::query!(
+            "SELECT id, state, reject_reason FROM artifacts
+              WHERE agent_run_id = $1 AND class = $2 AND sha256 = decode($3, 'hex')",
+            ask.agent_run_id,
+            ask.class.as_str(),
+            ask.sha256
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let outcome = match existing {
+            Some(row) => match row.state.as_str() {
+                "available" => Requested::Exists {
+                    artifact_id: row.id,
+                },
+                "rejected" => Requested::Rejected {
+                    artifact_id: row.id,
+                    reason: row.reject_reason.unwrap_or_default(),
+                },
+                // A retry after a crash, a lapsed grant or a failed transfer: start over.
+                _ => regrant(&mut tx, ask, row.id, grant_ttl).await?,
+            },
+            None => declare(&mut tx, ask, scope, grant_ttl, quota).await?,
+        };
+        tx.commit().await?;
+        Ok(outcome)
+    }
+
+    /// Claims a grant for its bytes: only the credential it was issued to, once, before it
+    /// lapses. Follow with [`content_received`](Self::content_received), or
+    /// [`abort_content`](Self::abort_content) if the transfer failed.
+    pub async fn claim_content(
+        &self,
+        project_id: Uuid,
+        credential: Credential,
+        artifact_id: Uuid,
+    ) -> Result<Claim> {
+        let claimed = sqlx::query_scalar!(
+            "UPDATE artifacts SET state = 'uploading', received_at = NULL
+              WHERE id = $1 AND project_id = $2 AND credential_id = $3 AND state = 'declared'
+                AND grant_expires_at > now()
+              RETURNING size_bytes",
+            artifact_id,
+            project_id,
+            credential.id()
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        if let Some(size) = claimed {
+            return Ok(Claim::Claimed {
+                size: u64::try_from(size).unwrap_or(0),
+            });
+        }
+        let row = sqlx::query!(
+            "SELECT state FROM artifacts
+              WHERE id = $1 AND project_id = $2 AND credential_id = $3",
+            artifact_id,
+            project_id,
+            credential.id()
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        Ok(match row {
+            None => Claim::NotFound,
+            Some(r) if r.state == "declared" => Claim::Expired,
+            Some(_) => Claim::AlreadyUsed,
+        })
+    }
+
+    /// The claimed bytes arrived whole and sit in the spool.
+    pub async fn content_received(&self, artifact_id: Uuid) -> Result<()> {
+        sqlx::query!(
+            "UPDATE artifacts SET received_at = now() WHERE id = $1 AND state = 'uploading'",
+            artifact_id
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// The transfer failed: the grant is usable again until it lapses.
+    pub async fn abort_content(&self, artifact_id: Uuid) -> Result<()> {
+        sqlx::query!(
+            "UPDATE artifacts SET state = 'declared'
+              WHERE id = $1 AND state = 'uploading' AND received_at IS NULL",
+            artifact_id
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// What `complete` should do for this artifact.
+    pub async fn pending_complete(
+        &self,
+        project_id: Uuid,
+        credential: Credential,
+        artifact_id: Uuid,
+    ) -> Result<Pending> {
+        let Some(r) = sqlx::query!(
+            "SELECT state, class, size_bytes, encode(sha256, 'hex') AS \"sha256!\", reject_reason,
+                    received_at IS NOT NULL AS \"received!\"
+               FROM artifacts
+              WHERE id = $1 AND project_id = $2 AND credential_id = $3",
+            artifact_id,
+            project_id,
+            credential.id()
+        )
+        .fetch_optional(self.pool())
+        .await?
+        else {
+            return Ok(Pending::NotFound);
+        };
+        Ok(match (r.state.as_str(), r.received) {
+            ("available", _) => Pending::Done(Finished::Available),
+            ("rejected", _) => {
+                Pending::Done(Finished::Rejected(r.reject_reason.unwrap_or_default()))
+            }
+            ("uploading", true) => match ArtifactClass::parse(&r.class) {
+                Some(class) => Pending::Ready(PendingArtifact {
+                    id: artifact_id,
+                    class,
+                    size: u64::try_from(r.size_bytes).unwrap_or(0),
+                    sha256: r.sha256,
+                }),
+                None => {
+                    return Err(crate::Error::Corrupt(format!(
+                        "artifact {artifact_id} has class {:?}",
+                        r.class
+                    )));
+                }
+            },
+            _ => Pending::NotReceived,
+        })
+    }
+
+    /// The bytes are verified and in the blob store: record the blob, make the artifact
+    /// available and set its retention. Idempotent.
+    pub async fn mark_available(
+        &self,
+        project_id: Uuid,
+        artifact_id: Uuid,
+        served_type: &str,
+    ) -> Result<()> {
+        let mut tx = self.pool().begin().await?;
+        let updated = sqlx::query_scalar!(
+            "UPDATE artifacts a
+                SET state = 'available', served_type = $3, available_at = now(),
+                    grant_expires_at = NULL
+              WHERE a.id = $1 AND a.project_id = $2 AND a.state = 'uploading'
+              RETURNING a.id",
+            artifact_id,
+            project_id,
+            served_type
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if updated.is_some() {
+            sqlx::query!(
+                "INSERT INTO blobs (project_id, sha256, size_bytes)
+                 SELECT project_id, sha256, size_bytes FROM artifacts WHERE id = $1
+                 ON CONFLICT (project_id, sha256) DO UPDATE
+                   SET unreferenced_since = NULL, verified_at = now(), state = 'present'",
+                artifact_id
+            )
+            .execute(&mut *tx)
+            .await?;
+            set_retention(&mut tx, artifact_id).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Verification refused the bytes: record why. Nothing else is kept.
+    pub async fn mark_rejected(&self, artifact_id: Uuid, reason: &str) -> Result<()> {
+        sqlx::query!(
+            "UPDATE artifacts SET state = 'rejected', reject_reason = $2, grant_expires_at = NULL
+              WHERE id = $1 AND state IN ('declared', 'uploading')",
+            artifact_id,
+            reason
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    /// A flow's artifacts, oldest first: the available ones and the refused ones, including the
+    /// files of the flow's whole agent run (report, log). `None` when the flow doesn't exist in
+    /// the project.
+    pub async fn flow_artifacts(
+        &self,
+        project_id: Uuid,
+        flow_execution_id: Uuid,
+    ) -> Result<Option<Vec<ArtifactRow>>> {
+        let exists = sqlx::query_scalar!(
+            "SELECT true AS \"found!\" FROM flow_executions WHERE id = $1 AND project_id = $2",
+            flow_execution_id,
+            project_id
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        if exists.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(
+            sqlx::query!(
+                "SELECT id, flow_execution_id, class, name, path,
+                    coalesce(served_type, content_type) AS \"content_type!\",
+                    size_bytes, encode(sha256, 'hex') AS \"sha256!\", state, reject_reason,
+                    retention_class, created_at
+               FROM artifacts
+              WHERE project_id = $1
+                AND (flow_execution_id = $2
+                     OR (flow_execution_id IS NULL AND agent_run_id =
+                         (SELECT agent_run_id FROM flow_executions WHERE id = $2)))
+                AND state IN ('available', 'rejected')
+              ORDER BY created_at, id",
+                project_id,
+                flow_execution_id
+            )
+            .fetch_all(self.pool())
+            .await?
+            .into_iter()
+            .map(|r| ArtifactRow {
+                id: r.id,
+                flow_execution_id: r.flow_execution_id,
+                class: r.class,
+                name: r.name,
+                path: r.path,
+                content_type: r.content_type,
+                size_bytes: r.size_bytes,
+                sha256: r.sha256,
+                state: r.state,
+                reject_reason: r.reject_reason,
+                retention_class: r.retention_class,
+                created_at: r.created_at,
+            })
+            .collect(),
+        ))
+    }
+
+    /// An available artifact of `project_id`, for the usercontent origin.
+    pub async fn servable(&self, project_id: Uuid, artifact_id: Uuid) -> Result<Option<Servable>> {
+        let Some(r) = sqlx::query!(
+            "SELECT class, name, served_type AS \"served_type!\", size_bytes,
+                    encode(sha256, 'hex') AS \"sha256!\"
+               FROM artifacts
+              WHERE id = $1 AND project_id = $2 AND state = 'available'",
+            artifact_id,
+            project_id
+        )
+        .fetch_optional(self.pool())
+        .await?
+        else {
+            return Ok(None);
+        };
+        let class = ArtifactClass::parse(&r.class).ok_or_else(|| {
+            crate::Error::Corrupt(format!("artifact {artifact_id} has class {:?}", r.class))
+        })?;
+        Ok(Some(Servable {
+            sha256: r.sha256,
+            size_bytes: r.size_bytes,
+            class,
+            content_type: r.served_type,
+            name: r.name,
+        }))
+    }
+
+    /// Spool files to keep: artifacts whose grant is open or whose bytes await `complete`.
+    pub async fn open_uploads(&self) -> Result<Vec<Uuid>> {
+        Ok(sqlx::query_scalar!(
+            "SELECT id FROM artifacts
+              WHERE state = 'uploading'
+                 OR (state = 'declared' AND grant_expires_at > now())"
+        )
+        .fetch_all(self.pool())
+        .await?)
+    }
+}
+
+/// Fixes an available artifact's retention: evidence of a flow that has already failed starts
+/// as `failure_evidence` (later failures are promoted at finalization), and `expires_at` follows
+/// the class's TTL.
+async fn set_retention(tx: &mut sqlx::PgConnection, artifact_id: Uuid) -> Result<()> {
+    sqlx::query!(
+        "UPDATE artifacts a SET retention_class = 'failure_evidence'
+          WHERE a.id = $1 AND a.retention_class = 'success_evidence' AND EXISTS
+                (SELECT 1 FROM flow_executions f
+                  WHERE f.id = a.flow_execution_id AND f.state = 'failed')",
+        artifact_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE artifacts a SET expires_at = a.available_at + rc.ttl
+           FROM retention_classes rc
+          WHERE a.id = $1 AND rc.project_id = a.project_id AND rc.class = a.retention_class",
+        artifact_id
+    )
+    .execute(tx)
+    .await?;
+    Ok(())
+}
+
+/// The run's job and the flow's suite, or the answer that refuses the request.
+struct Scope {
+    job_id: Uuid,
+    suite_execution_id: Option<Uuid>,
+}
+
+async fn scope_of(
+    tx: &mut sqlx::PgConnection,
+    ask: &UploadAsk<'_>,
+) -> Result<std::result::Result<Scope, Requested>> {
+    let Some(run) = sqlx::query!(
+        "SELECT job_id FROM agent_runs WHERE id = $1 AND project_id = $2",
+        ask.agent_run_id,
+        ask.project_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(Err(Requested::UnknownRun));
+    };
+    let suite_execution_id = match ask.flow_execution_id {
+        Some(flow) => {
+            let found = sqlx::query_scalar!(
+                "SELECT suite_execution_id FROM flow_executions
+                  WHERE id = $1 AND agent_run_id = $2",
+                flow,
+                ask.agent_run_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            match found {
+                Some(suite) => Some(suite),
+                None => return Ok(Err(Requested::UnknownFlow)),
+            }
+        }
+        None => None,
+    };
+    Ok(Ok(Scope {
+        job_id: run.job_id,
+        suite_execution_id,
+    }))
+}
+
+/// Gives an unfinished artifact a fresh grant for the asking credential.
+async fn regrant(
+    tx: &mut sqlx::PgConnection,
+    ask: &UploadAsk<'_>,
+    artifact_id: Uuid,
+    grant_ttl: Duration,
+) -> Result<Requested> {
+    let expires_at = sqlx::query_scalar!(
+        "UPDATE artifacts
+            SET state = 'declared', received_at = NULL, credential_id = $2,
+                grant_expires_at = now() + make_interval(secs => $3)
+          WHERE id = $1 RETURNING grant_expires_at AS \"at!\"",
+        artifact_id,
+        ask.credential.id(),
+        secs(grant_ttl)
+    )
+    .fetch_one(tx)
+    .await?;
+    Ok(Requested::Grant {
+        artifact_id,
+        expires_at,
+    })
+}
+
+/// A request for a file this run hasn't asked about: check the quota, then either reuse the
+/// project's verified copy (deduplication) or declare it and grant an upload.
+async fn declare(
+    tx: &mut sqlx::PgConnection,
+    ask: &UploadAsk<'_>,
+    scope: Scope,
+    grant_ttl: Duration,
+    quota: Quota,
+) -> Result<Requested> {
+    let class = ask.class.as_str();
+    let used = sqlx::query!(
+        "SELECT count(*) AS \"files!\", coalesce(sum(size_bytes), 0)::bigint AS \"bytes!\"
+           FROM artifacts
+          WHERE agent_run_id = $1 AND state IN ('declared', 'uploading', 'available')",
+        ask.agent_run_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    let over_files = used.files >= i64::from(quota.max_files);
+    let over_bytes = u64::try_from(used.bytes)
+        .unwrap_or(u64::MAX)
+        .saturating_add(ask.size)
+        > quota.max_bytes;
+    if over_files || over_bytes {
+        return Ok(Requested::OverQuota);
+    }
+
+    // The project already holds these bytes under this class (verified for it): no upload.
+    let known = sqlx::query!(
+        "SELECT a.served_type AS \"served_type!\"
+           FROM artifacts a
+           JOIN blobs b ON b.project_id = a.project_id AND b.sha256 = a.sha256
+          WHERE a.project_id = $1 AND a.class = $2 AND a.sha256 = decode($3, 'hex')
+            AND a.state = 'available' AND b.state = 'present'
+          LIMIT 1",
+        ask.project_id,
+        class,
+        ask.sha256
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (state, served) = match &known {
+        Some(k) => ("available", Some(k.served_type.as_str())),
+        None => ("declared", None),
+    };
+    let inserted = sqlx::query!(
+        "INSERT INTO artifacts
+             (project_id, agent_run_id, job_id, suite_execution_id, flow_execution_id, class,
+              content_type, served_type, size_bytes, sha256, path, name, retention_class,
+              state, credential_id, grant_expires_at, available_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, decode($10, 'hex'), $11, $12, $13, $14, $15,
+                 CASE WHEN $14 = 'declared' THEN now() + make_interval(secs => $16) END,
+                 CASE WHEN $14 = 'available' THEN now() END)
+         RETURNING id, grant_expires_at",
+        ask.project_id,
+        ask.agent_run_id,
+        scope.job_id,
+        scope.suite_execution_id,
+        ask.flow_execution_id,
+        class,
+        ask.content_type,
+        served,
+        i64::try_from(ask.size).unwrap_or(i64::MAX),
+        ask.sha256,
+        ask.path,
+        ask.name,
+        default_retention(ask.class),
+        state,
+        ask.credential.id(),
+        secs(grant_ttl)
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if known.is_none() {
+        return Ok(Requested::Grant {
+            artifact_id: inserted.id,
+            expires_at: inserted
+                .grant_expires_at
+                .unwrap_or_else(OffsetDateTime::now_utc),
+        });
+    }
+    sqlx::query!(
+        "UPDATE blobs SET unreferenced_since = NULL
+          WHERE project_id = $1 AND sha256 = decode($2, 'hex')",
+        ask.project_id,
+        ask.sha256
+    )
+    .execute(&mut *tx)
+    .await?;
+    set_retention(tx, inserted.id).await?;
+    Ok(Requested::Exists {
+        artifact_id: inserted.id,
+    })
+}

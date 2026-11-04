@@ -6,6 +6,7 @@
 //! lattice in `fleet-core` decides (invariant I3).
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// A flow outcome as claimed by one source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -321,6 +322,34 @@ pub struct ArtifactRegistered {
     pub path: String,
 }
 
+/// `artifact.uploaded`: the server verified and stored a file (the agent journals the server's
+/// answer to `upload_complete`, or to an `exists` grant).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactUploaded {
+    /// The artifact class (see [`crate::artifact::ArtifactClass`]).
+    pub class: String,
+    /// Path relative to the run's output directory, as in `artifact.registered`.
+    pub path: String,
+    /// The server's artifact id.
+    pub artifact_id: Uuid,
+    /// Size in bytes.
+    pub size: u64,
+}
+
+/// `artifact.rejected`: a file was not uploaded, and why. The agent journals it when the server
+/// refuses the file, and when the agent itself decides not to send it (for example a log it
+/// cannot redact reliably: invariant I6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactRejected {
+    /// The artifact class.
+    pub class: String,
+    /// Path relative to the run's output directory.
+    pub path: String,
+    /// A stable code: a [`crate::artifact::RejectReason`] code from the server, or an agent code
+    /// such as `not_redactable`.
+    pub reason: String,
+}
+
 /// `plan.assigned`: this run executes one shard of a Fleet plan (ADR-0013).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlanAssigned {
@@ -428,6 +457,12 @@ pub enum EventBody {
     /// See [`ArtifactRegistered`].
     #[serde(rename = "artifact.registered")]
     ArtifactRegistered(ArtifactRegistered),
+    /// See [`ArtifactUploaded`].
+    #[serde(rename = "artifact.uploaded")]
+    ArtifactUploaded(ArtifactUploaded),
+    /// See [`ArtifactRejected`].
+    #[serde(rename = "artifact.rejected")]
+    ArtifactRejected(ArtifactRejected),
     /// See [`RunSignal`].
     #[serde(rename = "run.signal")]
     RunSignal(RunSignal),
@@ -467,6 +502,8 @@ const VERSIONS: &[(&str, u16)] = &[
     ("report.parsed", 1),
     ("process.exited", 1),
     ("artifact.registered", 1),
+    ("artifact.uploaded", 1),
+    ("artifact.rejected", 1),
     ("run.signal", 1),
     ("run.finalizing", 1),
     ("run.ended", 1),
@@ -596,6 +633,17 @@ mod tests {
                 code: None,
                 signal: Some(15),
                 class: ExitClass::Interrupted,
+            }),
+            EventBody::ArtifactUploaded(ArtifactUploaded {
+                class: "junit".into(),
+                path: "report.xml".into(),
+                artifact_id: Uuid::nil(),
+                size: 1024,
+            }),
+            EventBody::ArtifactRejected(ArtifactRejected {
+                class: "maestro_log".into(),
+                path: "maestro.log".into(),
+                reason: "not_redactable".into(),
             }),
             EventBody::RunSignal(RunSignal { signal: 2 }),
             EventBody::RunFinalizing,

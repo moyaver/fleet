@@ -13,6 +13,7 @@ use fleet_core::{
 };
 use fleet_maestro::{ReportState, bundle, junit, log, stdout};
 use fleet_protocol::{
+    artifact::ArtifactClass,
     event::{
         AgentWarning, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo, FlowEnded,
         FlowOutcome, FlowRef, FlowReported, FlowStarted, ProcessExited, ReportParsed, ReportStatus,
@@ -107,6 +108,17 @@ pub(crate) struct Session {
     pub(crate) unrecognized_stdout: u32,
     devices: std::collections::BTreeMap<String, fleet_protocol::event::AdbState>,
     out: Vec<EventEnvelope>,
+    /// Files worth uploading that the observer hasn't taken yet.
+    uploads: Vec<Candidate>,
+}
+
+/// A file the observer may upload (PLAN §6.6): what it is and which flow it is evidence for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Candidate {
+    pub(crate) class: ArtifactClass,
+    /// Path relative to the debug output directory.
+    pub(crate) rel: String,
+    pub(crate) flow: Option<Uuid>,
 }
 
 impl std::fmt::Debug for Session {
@@ -142,6 +154,7 @@ impl Session {
             unrecognized_stdout: 0,
             devices: std::collections::BTreeMap::new(),
             out: Vec::new(),
+            uploads: Vec::new(),
         };
         let argv_redacted = argv
             .iter()
@@ -176,6 +189,35 @@ impl Session {
     /// Events produced so far, removed from the session.
     pub(crate) fn drain(&mut self) -> Vec<EventEnvelope> {
         std::mem::take(&mut self.out)
+    }
+
+    /// Files that appeared and are worth uploading, removed from the session.
+    pub(crate) fn take_uploads(&mut self) -> Vec<Candidate> {
+        std::mem::take(&mut self.uploads)
+    }
+
+    /// The redactor every outgoing text goes through.
+    pub(crate) fn redactor(&self) -> &Redactor {
+        &self.redactor
+    }
+
+    /// A path label as it leaves the host: redacted (I6).
+    pub(crate) fn label(&self, rel: &str) -> String {
+        self.redactor.redact(rel).into_owned()
+    }
+
+    /// Journals how an upload ended (`artifact.uploaded` or `artifact.rejected`) against the flow
+    /// it belongs to.
+    pub(crate) fn artifact_result(
+        &mut self,
+        at: ClockSample,
+        flow: Option<Uuid>,
+        body: &EventBody,
+    ) {
+        let subject = flow
+            .and_then(|id| self.flows.iter().position(|f| f.id == id))
+            .map_or_else(Subject::default, |idx| self.flow_subject_at(idx));
+        self.emit(at, subject, SourceKind::AgentObserved, None, body);
     }
 
     /// Feeds one observation.
@@ -441,6 +483,12 @@ impl Session {
                     return;
                 };
                 self.on_commands(at, rel, idx, bytes);
+                let flow = self.flows.get(idx).map(|f| f.id);
+                self.uploads.push(Candidate {
+                    class: ArtifactClass::Commands,
+                    rel: rel.to_owned(),
+                    flow,
+                });
             }
             bundle::Entry::Manifest { flow_dir } => {
                 let (name, shard) = bundle::split_shard_suffix(&flow_dir);
@@ -473,6 +521,14 @@ impl Session {
                 };
                 if let Some(idx) = self.find_flow(shard.unwrap_or(1), name) {
                     let subject = self.flow_subject_at(idx);
+                    if class == "failure_screenshot" {
+                        let flow = self.flows.get(idx).map(|f| f.id);
+                        self.uploads.push(Candidate {
+                            class: ArtifactClass::FailureScreenshot,
+                            rel: rel.to_owned(),
+                            flow,
+                        });
+                    }
                     self.emit(
                         at,
                         subject,

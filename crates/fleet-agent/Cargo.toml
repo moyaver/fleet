@@ -25,15 +25,16 @@ fleet-maestro.workspace = true
 fleet-protocol.workspace = true
 futures-util.workspace = true
 nix.workspace = true
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
 rustls.workspace = true
 rustls-native-certs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 signal-hook.workspace = true
 sysinfo.workspace = true
 time.workspace = true
-tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "net", "io-util"] }
+tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "net", "io-util", "fs"] }
 tokio-tungstenite.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -48,6 +49,7 @@ predicates.workspace = true
 proptest.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 tokio-tungstenite.workspace = true
+wiremock.workspace = true
 
 [package.metadata.dist]
 # publish = false hides crates from dist; the agent is the one binary it releases.

@@ -6,11 +6,13 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use fleet_blob::BlobStore;
 use fleet_store::{Store, ingest::Change};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
-    config::Config, ingest::telemetry::TelemetryBuffer, live::Hub, login::idp::Idp, oidc::Jwks,
+    artifacts::links::Signer, config::Config, ingest::telemetry::TelemetryBuffer, live::Hub,
+    login::idp::Idp, oidc::Jwks,
 };
 
 /// Cheap to clone; everything lives behind one `Arc`.
@@ -30,6 +32,10 @@ pub(crate) struct Inner {
     pub(crate) jwks: Jwks,
     /// The browser sign-in identity provider (discovery cache and token calls).
     pub(crate) idp: Idp,
+    /// Signs and checks usercontent links; `None` without `usercontent.url`.
+    pub(crate) signer: Option<Signer>,
+    /// The artifact blob store, opened on first use (see [`AppState::blobs`]).
+    blobs: tokio::sync::OnceCell<Arc<dyn BlobStore>>,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
 }
@@ -52,6 +58,8 @@ impl AppState {
             hub,
             jwks: Jwks::new()?,
             idp: Idp::new()?,
+            signer: Signer::from_config(&config.usercontent),
+            blobs: tokio::sync::OnceCell::new(),
             store,
             config,
             shutdown: CancellationToken::new(),
@@ -59,6 +67,14 @@ impl AppState {
             telemetry: TelemetryBuffer::default(),
             ready: AtomicBool::new(false),
         })))
+    }
+
+    /// The artifact blob store. Opened on first use and then kept; a failure to open it (an
+    /// unwritable directory, a bad S3 setting) is returned each time until it works.
+    pub(crate) async fn blobs(&self) -> anyhow::Result<&Arc<dyn BlobStore>> {
+        self.blobs
+            .get_or_try_init(|| async { self.config.storage.open() })
+            .await
     }
 
     pub(crate) fn is_ready(&self) -> bool {

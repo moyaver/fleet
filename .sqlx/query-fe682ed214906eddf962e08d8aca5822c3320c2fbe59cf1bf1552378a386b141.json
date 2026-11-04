@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"files!\", coalesce(sum(size_bytes), 0)::bigint AS \"bytes!\"\n           FROM artifacts\n          WHERE agent_run_id = $1 AND state IN ('declared', 'uploading', 'available')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "files!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "bytes!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "fe682ed214906eddf962e08d8aca5822c3320c2fbe59cf1bf1552378a386b141"
+}

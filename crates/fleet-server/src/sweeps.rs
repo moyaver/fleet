@@ -32,6 +32,7 @@ pub(crate) async fn run(state: AppState) {
             continue;
         }
         next_sweep = Instant::now() + sweep_every;
+        crate::artifacts::purge_spool(&state).await;
         sweep(&state, &mut leader).await;
         if leader.is_some() && Instant::now() >= next_hourly {
             next_hourly = Instant::now() + Duration::from_secs(3600);

@@ -79,6 +79,9 @@ pub(crate) struct Shared {
     pub(crate) wake: Notify,
     /// The run is over: flush what's left, then say `bye`.
     pub(crate) finishing: std::sync::atomic::AtomicBool,
+    /// The bearer credential in use (`FLEET_TOKEN`, or the token the OIDC exchange returned),
+    /// for the artifact uploader, which speaks as the same agent.
+    pub(crate) credential: Arc<Mutex<Option<String>>>,
 }
 
 /// How the transport ended.
@@ -106,6 +109,7 @@ pub(crate) async fn run(
 ) -> End {
     let mut attempt: u32 = 0;
     let mut cfg = cfg;
+    share(&shared, cfg.token.as_ref());
     loop {
         if cfg.token.is_none()
             && let Some(req) = &cfg.oidc
@@ -114,6 +118,7 @@ pub(crate) async fn run(
                 Ok(t) => {
                     tracing::info!("exchanged the job's OIDC token for an agent token");
                     cfg.token = Some(t);
+                    share(&shared, cfg.token.as_ref());
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, attempt, "OIDC token exchange failed");
@@ -129,6 +134,13 @@ pub(crate) async fn run(
         }
         attempt = attempt.saturating_add(1);
         tokio::time::sleep(backoff(attempt)).await;
+    }
+}
+
+/// Publishes the credential in use to the uploader.
+fn share(shared: &Shared, token: Option<&String>) {
+    if let (Some(t), Ok(mut slot)) = (token, shared.credential.lock()) {
+        *slot = Some(t.clone());
     }
 }
 

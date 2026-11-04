@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE blobs SET unreferenced_since = NULL\n          WHERE project_id = $1 AND sha256 = decode($2, 'hex')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "73624c9dbc9d94cc2f7735edff472a69e55fd95ade85b4969d404468c3f98ec8"
+}

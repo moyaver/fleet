@@ -20,7 +20,7 @@ while IFS= read -r line; do
   printf '%s\n' "$line" >> "$DEBUG/maestro.log"
 done < "$FIX/run/debug/maestro.log"
 for d in "$FIX"/run/debug/*/; do
-  [ -d "$d" ] && cp -R "$d" "$DEBUG/"
+  [ -d "$d" ] && cp -R "${d%/}" "$DEBUG/"
 done
 sleep "${FLEET_FAKE_LINGER:-0.6}"
 cat "$FIX/stdout.bin"

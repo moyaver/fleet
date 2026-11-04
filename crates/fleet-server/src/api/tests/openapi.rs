@@ -22,6 +22,7 @@ async fn every_screen_route_is_documented_with_its_response_schema() {
         ("devices/{device}", "DeviceDetailView"),
         ("devices/{device}/metrics", "MetricsView"),
         ("flows/{execution_id}", "FlowDetailView"),
+        ("flows/{execution_id}/artifacts", "ArtifactListView"),
     ] {
         let full = format!("{base}/{path}");
         let get = &doc["paths"][&full]["get"];

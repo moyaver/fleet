@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts a\n                SET state = 'available', served_type = $3, available_at = now(),\n                    grant_expires_at = NULL\n              WHERE a.id = $1 AND a.project_id = $2 AND a.state = 'uploading'\n              RETURNING a.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f8aef05138fdbe4cc5d0c7ca4227f3ff74467855210c4f6ccf7251ec09a9166c"
+}

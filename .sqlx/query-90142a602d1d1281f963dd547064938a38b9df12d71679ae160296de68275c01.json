@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO blobs (project_id, sha256, size_bytes)\n                 SELECT project_id, sha256, size_bytes FROM artifacts WHERE id = $1\n                 ON CONFLICT (project_id, sha256) DO UPDATE\n                   SET unreferenced_since = NULL, verified_at = now(), state = 'present'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "90142a602d1d1281f963dd547064938a38b9df12d71679ae160296de68275c01"
+}

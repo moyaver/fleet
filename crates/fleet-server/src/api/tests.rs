@@ -5,6 +5,7 @@
 //! values come from the spec and from worked literal examples.
 
 mod access;
+mod artifacts;
 mod fleet;
 mod flows;
 mod metrics;
@@ -12,4 +13,5 @@ mod openapi;
 mod overview;
 mod rig;
 mod timeline;
+mod usercontent;
 mod workers;

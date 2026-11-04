@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts SET state = 'rejected', reject_reason = $2, grant_expires_at = NULL\n              WHERE id = $1 AND state IN ('declared', 'uploading')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e165cee9df58b62746431187af718a945de2a549490449639d31a1bf44e5f302"
+}

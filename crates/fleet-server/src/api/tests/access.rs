@@ -43,6 +43,7 @@ async fn routes(rig: &Rig) -> Routes {
             format!("devices/{device}"),
             format!("devices/{device}/metrics"),
             format!("flows/{flow}"),
+            format!("flows/{flow}/artifacts"),
         ],
     }
 }

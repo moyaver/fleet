@@ -3,6 +3,8 @@
 //!
 //! - [`Store`]: the connection pool and migrations (`migrations/` at the repository root,
 //!   embedded).
+//! - [`artifacts`]: artifact rows and the upload state machine (idempotency, quotas, dedup,
+//!   single-use grants).
 //! - [`auth`]: projects, API keys and agent tokens. Only SHA-256 hashes of secrets are stored.
 //! - [`sessions`]: browser users, sessions (stored by hash) and identity-provider group → role mappings.
 //! - [`ingest`]: the agent run lifecycle and the ingest transaction: one transaction per batch
@@ -19,6 +21,7 @@
 //! constraint refuses a passed claim from an inferred source) and I5 (gaps are recorded in
 //! `ingest_gaps`, never silent). No `sqlx` type crosses this crate's API.
 
+pub mod artifacts;
 pub mod auth;
 pub mod ingest;
 pub mod live;

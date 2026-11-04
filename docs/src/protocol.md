@@ -8,6 +8,18 @@ The agent ↔ server wire protocol ([ADR-0005](https://github.com/moyaver/fleet/
 - **HTTPS batch** `POST /api/v1/agent/batch` for networks that block WebSockets: `{hello, events, telemetry}` in, `{frames}` out (the frames a socket would have carried).
 - **Credentials** `POST /api/v1/agent/token`: `{id_token}` (a CI OIDC token) or an API key as the bearer, out comes a short-lived agent token.
 
+## Artifact uploads
+
+Artifact bytes travel over HTTPS, never the WebSocket (`fleet_protocol::artifact` defines the types). Every call carries the agent's bearer credential.
+
+1. `POST /api/v1/agent/artifacts` with `{agent_run_id, flow_execution_id?, class, path, content_type, size, sha256}` answers with a tagged `disposition`: `upload` (a grant: `url`, `complete_url`, `expires_at`, `size`; HTTP 201), `exists` (the project already holds these bytes for this class: nothing to send) or `rejected` (`reason`, `message`). The request is **idempotent on `(agent_run_id, class, sha256)`**: asking again returns the same artifact, or a fresh grant if the earlier one lapsed or the transfer failed. HTTP 409 (`unknown_run`, `unknown_flow`) means the run or flow has not reached the server yet: retry shortly.
+2. `PUT <url>` with exactly `size` bytes and a `Content-Length`. The grant is bound to the credential that asked, is short-lived (`artifacts.grant_ttl_seconds`) and accepts the bytes **once**: a second `PUT` is 409, a lapsed grant 410, too many bytes 413. A failed transfer leaves the grant usable. Bytes are spooled, not stored.
+3. `POST <complete_url>` verifies size, SHA-256, magic bytes for the class and archive safety, then writes the content-addressed blob. It answers `{status: available}` or `{status: rejected, reason}`; nothing of a rejected upload is kept, and asking again is refused the same way.
+
+Classes (the allowlist): `failure_screenshot` (PNG, JPEG, WebP), `commands` (text), `junit` (XML), `maestro_log` (text), `html_report` (HTML, or a zip). Anything else is `rejected` with `class_not_allowed`. Reasons: `class_not_allowed`, `content_type_not_allowed`, `too_large`, `run_quota_exceeded`, `size_mismatch`, `digest_mismatch`, `type_not_allowed`, `not_text`, `unsafe_archive`.
+
+The agent journals the outcome in its own event stream: `artifact.uploaded` (`class`, `path`, `artifact_id`, `size`) or `artifact.rejected` (`class`, `path`, `reason`: a server reason, `upload_failed`, or `not_redactable` for a text the agent will not send because it cannot redact it reliably). The server's artifact table is what the dashboard reads.
+
 ## Session
 
 1. `hello` (agent run ID, resume state, CI context) → `welcome` (`epoch`, `committed_through`, limits) or `reject` (`fatal` means stop for good; telemetry turns off, Maestro is unaffected).

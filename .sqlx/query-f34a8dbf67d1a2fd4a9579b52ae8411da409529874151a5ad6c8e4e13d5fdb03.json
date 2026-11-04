@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts SET state = 'declared'\n              WHERE id = $1 AND state = 'uploading' AND received_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f34a8dbf67d1a2fd4a9579b52ae8411da409529874151a5ad6c8e4e13d5fdb03"
+}

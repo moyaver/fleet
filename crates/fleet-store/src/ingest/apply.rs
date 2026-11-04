@@ -147,6 +147,8 @@ impl<'a> Ctx<'a> {
             EventBody::JournalGap(b) => self.journal_gap(tx, &b).await,
             // Kept in the journal; projected by later milestones (artifacts: M5).
             EventBody::ArtifactRegistered(_)
+            | EventBody::ArtifactUploaded(_)
+            | EventBody::ArtifactRejected(_)
             | EventBody::AgentWarning(_)
             | EventBody::ParserUnrecognized(_) => Ok(Effect::Applied),
         }
