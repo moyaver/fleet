@@ -926,6 +926,7 @@ dependencies = [
  "insta",
  "nix",
  "predicates",
+ "proptest",
  "reqwest",
  "rustls",
  "rustls-native-certs",

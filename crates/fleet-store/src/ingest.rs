@@ -6,7 +6,8 @@
 //! [`Store::apply_batch`] handles one `events` frame in one transaction:
 //!
 //! 1. lock the run row and fence the epoch;
-//! 2. skip duplicates (`seq ≤ committed_seq`) and require `committed_seq + 1` next;
+//! 2. skip duplicates (`seq ≤ committed_seq`) and require `committed_seq + 1` next, or a
+//!    `journal.gap` that covers the hole exactly;
 //! 3. apply each event in `seq` order with ownership checks on every agent-generated ID;
 //! 4. re-derive flow outcomes from their claims (fleet-core's lattice), then suites and the job;
 //! 5. write the raw journal, bump revisions and the attempt's live version;
@@ -24,6 +25,7 @@ pub(crate) mod tests;
 use std::collections::BTreeSet;
 
 use fleet_protocol::{
+    event::EventBody,
     frame::{CiProvider, ErrorCode, Hello, ResumeOutcome},
     journal::EventEnvelope,
 };
@@ -455,16 +457,17 @@ impl Store {
                 change: None,
             });
         };
-        if first.seq != prev + 1 {
+        if !extends(first, prev) {
             return Err(ApplyError::SeqGap { expected: prev + 1 });
         }
-        // The contiguous prefix; anything after a hole waits for a resend.
+        // The contiguous prefix; anything after a hole waits for a resend. A `journal.gap`
+        // that covers a hole exactly keeps the prefix going.
         let mut through = prev;
         let contiguous: Vec<&EventEnvelope> = fresh
             .iter()
             .copied()
             .take_while(|e| {
-                let next = e.seq == through + 1;
+                let next = extends(e, through);
                 if next {
                     through = e.seq;
                 }
@@ -526,6 +529,20 @@ impl Store {
             change,
         })
     }
+}
+
+/// Whether `e` continues a journal committed through `through`: it is the next `seq`, or it is a
+/// `journal.gap` sequenced at its own `to_seq` whose `from_seq` is the next `seq`, so it stands in
+/// for the events the agent dropped (the hole `from_seq..to_seq`, its own slot last). Anything
+/// else after a hole is a sequence gap and waits for a resend.
+fn extends(e: &EventEnvelope, through: u64) -> bool {
+    e.seq == through + 1
+        || (e.kind == "journal.gap"
+            && matches!(
+                e.decode(),
+                Ok(Some(EventBody::JournalGap(g)))
+                    if g.to_seq == e.seq && g.from_seq == through + 1 && g.from_seq <= g.to_seq
+            ))
 }
 
 /// Constraint, foreign-key and bad-data errors: the event is at fault, not the database.

@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Agent: the outbox kept every unacked event in memory, so a long run with no server (offline mode) or an unreachable one grew without bound (I10). The spool file is now the source of truth, read back into a small send window; when the 64 MiB spool (or the window, with no spool) is exhausted the agent stops storing event bodies and sequences a `journal.gap` instead (I5), and the spool starts over once everything in it is acked. `fleet-agent flush` streams the spool instead of loading it.
 - Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
 - `fleet-loadgen`: `wss://` servers panicked for want of a rustls crypto provider; it now installs ring, as the agent does.
 - Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).

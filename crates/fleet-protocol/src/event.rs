@@ -322,11 +322,15 @@ pub struct AgentWarning {
 }
 
 /// `journal.gap`: events the agent had to drop, so the loss is explicit (invariant I5).
+///
+/// The agent sequences the marker in the hole it reports: its own `seq` is `to_seq`, so
+/// `from_seq..=to_seq` covers the dropped events and the marker's own slot, and the journal
+/// stays contiguous for the server (ADR-0005, amendment 2026-11-04).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JournalGap {
     /// First missing sequence number.
     pub from_seq: u64,
-    /// Last missing sequence number.
+    /// Last missing sequence number; the marker's own `seq` when it covers a hole.
     pub to_seq: u64,
     /// Why.
     pub reason: String,

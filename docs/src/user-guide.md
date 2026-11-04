@@ -52,7 +52,7 @@ Every outcome Fleet shows says where it came from. While a run is live, outcomes
 
 ## Offline mode and `inspect`
 
-Without `FLEET_SERVER`, everything still happens locally: the run directory gets `journal.jsonl` (every event) and `spool.bin`. To see what Fleet makes of any saved run:
+Without `FLEET_SERVER`, everything still happens locally: the run directory gets `journal.jsonl` (every event) and `spool.bin` (capped at 64 MiB; if a run overflows it, the spool ends in a `journal.gap` saying which events it does not hold). To see what Fleet makes of any saved run:
 
 ```bash
 fleet-agent inspect "$FLEET_RUN_DIR/artifacts"

@@ -5,12 +5,12 @@ use std::time::Duration;
 
 use fleet_protocol::{
     PROTOCOL_VERSION,
-    event::{EventBody, RunSignal},
+    event::{EventBody, JournalGap, RunSignal},
     frame::{
         BatchRequest, BatchResponse, ClientFrame, ErrorCode, GoawayReason, ResumeOutcome, Sample,
         ServerFrame, Telemetry,
     },
-    journal::{ClockSample, SourceKind, Subject},
+    journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
 };
 use time::OffsetDateTime;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
@@ -228,6 +228,53 @@ async fn gaps_ask_for_a_resend_without_closing() {
         agent.seq,
         "the same socket carries on"
     );
+}
+
+fn gap_marker(seq: u64, from: u64, to: u64) -> EventEnvelope {
+    EventEnvelope::new(
+        seq,
+        ClockSample {
+            wall: OffsetDateTime::now_utc(),
+            mono_ms: 0,
+        },
+        Subject::default(),
+        Provenance::new(SourceKind::AgentObserved),
+        &EventBody::JournalGap(JournalGap {
+            from_seq: from,
+            to_seq: to,
+            reason: "spool_full".into(),
+        }),
+    )
+}
+
+#[tokio::test]
+async fn a_journal_gap_sequenced_in_its_hole_moves_the_cursor_past_it() {
+    let h = Harness::start().await;
+    let mut agent = Agent::new("8", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", true), ("logout", true)]);
+    assert!(events.len() > 8);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    // The agent dropped events 4..=6: it keeps their numbers and sequences the marker at 6.
+    let mut batch = events[..3].to_vec();
+    batch.push(gap_marker(6, 4, 6));
+    batch.extend_from_slice(&events[6..]);
+    assert_eq!(c.events(batch).await, (agent.seq, 0));
+    // A marker that does not start right after the cursor is a plain sequence gap.
+    let next = agent.seq + 1;
+    c.send(&ClientFrame::Events {
+        events: vec![gap_marker(next + 4, next + 1, next + 4)],
+    })
+    .await;
+    assert!(matches!(
+        c.frame().await,
+        ServerFrame::Error {
+            code: ErrorCode::SeqGap,
+            fatal: false,
+            expected_seq: Some(e),
+            ..
+        } if e == next
+    ));
 }
 
 #[tokio::test]

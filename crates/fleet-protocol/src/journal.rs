@@ -125,7 +125,8 @@ pub struct StepRef {
 /// One journal event as it travels and is stored.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventEnvelope {
-    /// Gap-free sequence number within the agent run, from 1.
+    /// Sequence number within the agent run, from 1. Gap-free except for a hole the agent
+    /// reports with a `journal.gap` sequenced at the hole's last `seq`.
     pub seq: u64,
     /// Event type, for example `flow.ended`.
     #[serde(rename = "type")]

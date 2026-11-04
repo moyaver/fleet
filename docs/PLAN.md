@@ -345,7 +345,7 @@ Every parser is version-profiled (`≥2.7` bundle layout; `<2.7` best-effort). U
 - Implements ADR-0005: hello/welcome, journal and telemetry streams, cumulative acks, server-authoritative resume.
 - Ping every 15 s; dead after 45 s. Reconnect with full-jitter backoff (backon), capped at 30 s.
 - HTTPS batch-POST fallback (`/api/v1/agent/batch`) after N failed WS upgrades.
-- **Outbox:** in-memory priority queues with byte budgets. The journal spools to disk (64 MiB default); telemetry is a 2 MiB ring that coalesces 5 s samples into 1 min and then drops.
+- **Outbox:** the journal spools to disk (64 MiB default) and is the source of truth; a small in-memory send window (1024 events / 2 MiB) is read back from it, so memory does not grow with the backlog (I10). When the spool or the window is full the agent stops storing event bodies and sequences one `journal.gap` per dropped run (I5); `journal.gap` and `run.ended` have a reserve and always fit. Telemetry: telemetry is a 2 MiB ring that coalesces 5 s samples into 1 min and then drops.
 - **Uploads:** allowlisted artifact classes; at most 2 concurrent uploads, rate-capped; sha256 while streaming; `upload_request` → grant → PUT → `upload_complete`.
 
 ### 6.7 CI adapters (`fleet-agent::ci`)

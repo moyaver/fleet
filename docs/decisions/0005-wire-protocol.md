@@ -15,3 +15,6 @@
 
 ## Consequences
 Exactly-once *effect* in the database; duplicates and reordering are harmless. An "agent session" no longer needs to equal a job.
+
+## Amendment (2026-11-04)
+`seq` is gap-free except for holes covered by a `journal.gap` marker. When the agent cannot store events (spool or send window exhausted, I10) it keeps their `seq` numbers, leaves them out, and sequences one `journal.gap{from_seq, to_seq}` at `seq == to_seq`, the last dropped slot. `from_seq..=to_seq` covers the dropped events and the marker's own slot. The server accepts such a marker when `from_seq == committed_seq + 1` and `to_seq == seq`, and advances `committed_seq` to `to_seq`; any other event that skips ahead is still a `seq_gap`. There is one `seq` space everywhere (session, spool, wire, server), so `ingest_gaps` and the stored events use the same numbers.

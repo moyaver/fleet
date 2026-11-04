@@ -18,3 +18,5 @@ The agent ↔ server wire protocol ([ADR-0005](https://github.com/moyaver/fleet/
 6. On shutdown the server sends `goaway` and closes with 1012; the agent reconnects after the given delay.
 
 Gaps are never silent: lost prefixes and `journal.gap` events are stored as gaps and shown as missing evidence.
+
+The agent's outbox is bounded (a 64 MiB spool, a small in-memory window). If it runs out of room it stops storing event bodies but keeps their `seq` numbers: the dropped events leave a hole, and the next event it stores (or the end of the run) is preceded by a `journal.gap` sequenced in that hole, at `seq == to_seq`. Its `from_seq..=to_seq` cover the dropped events and the marker's own slot. The server accepts such a marker when `from_seq` is the next `seq` it expects and advances past the hole; any other skip is still a `seq_gap`. So `seq` is gap-free except for holes a `journal.gap` covers, and the numbers in a gap are the same ones the agent's `journal.jsonl` and the stored events carry.

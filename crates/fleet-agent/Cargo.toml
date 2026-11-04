@@ -45,6 +45,7 @@ assert_cmd.workspace = true
 futures-util.workspace = true
 insta.workspace = true
 predicates.workspace = true
+proptest.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 tokio-tungstenite.workspace = true
 

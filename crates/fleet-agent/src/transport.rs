@@ -218,7 +218,7 @@ async fn connection(
     loop {
         // Send what the window allows.
         let batch = {
-            let o = shared.outbox.lock().map_err(|_| "outbox lock")?;
+            let mut o = shared.outbox.lock().map_err(|_| "outbox lock")?;
             let inflight = sent.saturating_sub(o.acked_through());
             let room =
                 usize::try_from(u64::from(limits.max_inflight_events).saturating_sub(inflight))
@@ -321,7 +321,7 @@ fn hello_frame(
     let resume = {
         let o = shared.outbox.lock().map_err(|_| "outbox lock")?;
         ResumeState {
-            next_seq: o.last_seq() + 1,
+            next_seq: o.next_seq(),
             oldest_unacked_seq: o.oldest_unacked(),
         }
     };

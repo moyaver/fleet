@@ -28,7 +28,7 @@ use uuid::Uuid;
 use crate::{
     ipc::{Control, Frame, Stream},
     metrics::Sampler,
-    outbox::{Outbox, SPOOL_LIMIT},
+    outbox::{Budget, Outbox},
     session::{Observation, Session},
     transport::{self, Shared},
     watch::{BundleScanner, LogTailer},
@@ -263,7 +263,7 @@ fn start(
     );
     let session = Session::new(argv, redactor, Box::new(Uuid::now_v7), at);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
-        Outbox::with_spool(&d.join("spool.bin"), agent_run_id, SPOOL_LIMIT)
+        Outbox::with_spool(&d.join("spool.bin"), agent_run_id, Budget::default())
     });
     let shared = Arc::new(Shared {
         outbox: std::sync::Mutex::new(outbox),
@@ -404,6 +404,16 @@ async fn finalize(
     l.session
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
     flush(&mut l);
+    if let Ok(mut o) = l.shared.outbox.lock() {
+        // Nothing more is coming: a gap for dropped events is sequenced now, before the flush.
+        o.seal();
+        if o.dropped() > 0 {
+            tracing::warn!(
+                dropped = o.dropped(),
+                "events were dropped because the outbox was full; a journal.gap records them"
+            );
+        }
+    }
     l.shared.finishing.store(true, Ordering::SeqCst);
     l.shared.wake.notify_one();
     if let Some(handle) = l.transport.take() {

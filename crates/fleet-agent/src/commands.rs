@@ -3,7 +3,6 @@
 //! exists to find them before a real run.
 
 use std::{
-    fs::File,
     net::{SocketAddr, TcpStream, ToSocketAddrs},
     path::Path,
     process::Command,
@@ -16,18 +15,17 @@ use fleet_protocol::journal::ClockSample;
 use time::OffsetDateTime;
 
 use crate::{
-    outbox::{Outbox, read_spool},
+    outbox::Outbox,
     transport::{self, End, Shared},
 };
 
 /// Sends a spool left by a run whose agent died (`if: always()` post-step).
 pub(crate) fn flush(spool: &Path, timeout: Duration) -> anyhow::Result<String> {
-    let (agent_run_id, events) =
-        read_spool(File::open(spool).with_context(|| format!("opening {}", spool.display()))?)?;
+    // The outbox reads the spool back as it sends: memory stays bounded however large it is.
+    let (agent_run_id, outbox) =
+        Outbox::replay(spool).with_context(|| format!("opening {}", spool.display()))?;
     let url = crate::observer::server_url().context("FLEET_SERVER is not set")?;
-    let count = events.len();
-    let mut outbox = Outbox::default();
-    outbox.push(events);
+    let count = outbox.last_seq() - outbox.acked_through();
     let shared = Arc::new(Shared {
         outbox: std::sync::Mutex::new(outbox),
         ..Shared::default()

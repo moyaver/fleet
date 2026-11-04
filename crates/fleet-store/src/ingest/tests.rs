@@ -7,9 +7,9 @@
 use fleet_protocol::{
     PROTOCOL_VERSION,
     event::{
-        EventBody, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed,
-        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, SuiteStarted,
+        ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted,
+        JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
+        RunEnded, RunStarted, ShardAssigned, ShardMode, SuiteStarted,
     },
     frame::{AgentInfo, CiContext, ProtocolRange, ResumeState},
     journal::{ClockSample, Provenance, SourceKind, Subject},
@@ -401,6 +401,119 @@ async fn duplicates_are_acked_without_effect_and_gaps_are_refused(pool: PgPool) 
         (late.seq, Some(skipped.seq))
     );
     let _ = tail;
+}
+
+/// A `journal.gap` as the agent sequences it: at `to`, the last seq it stands in for.
+fn gap_event(seq: u64, from: u64, to: u64) -> EventEnvelope {
+    EventEnvelope::new(
+        seq,
+        now(),
+        Subject::default(),
+        Provenance::new(SourceKind::AgentObserved),
+        &EventBody::JournalGap(JournalGap {
+            from_seq: from,
+            to_seq: to,
+            reason: "spool_full".into(),
+        }),
+    )
+}
+
+fn ev(a: &mut Agent) -> EventEnvelope {
+    a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    )
+}
+
+async fn gap_rows(store: &Store, run: Uuid) -> Vec<(i64, i64)> {
+    sqlx::query_as(
+        "SELECT from_seq, to_seq FROM ingest_gaps WHERE agent_run_id = $1 ORDER BY from_seq",
+    )
+    .bind(run)
+    .fetch_all(store.pool())
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_journal_gap_that_covers_a_hole_keeps_the_prefix_contiguous(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("110", "e2e");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let before: Vec<_> = (0..3).map(|_| ev(&mut a)).collect();
+    // Events 4, 5 and 6 were dropped; the marker takes the last of those slots (6).
+    a.seq = 5;
+    let marker = gap_event(a.seq + 1, 4, 6);
+    a.seq = 6;
+    let after = ev(&mut a);
+    assert_eq!(after.seq, 7);
+    // One batch with the gap in the middle.
+    let mut batch = before.clone();
+    batch.extend([marker.clone(), after.clone()]);
+    let applied = store.apply_batch(&h, &batch).await.unwrap();
+    assert_eq!((applied.through, applied.expected), (7, None));
+    assert_eq!(gap_rows(&store, a.id).await, [(4, 6)]);
+    // The marker is a duplicate once committed.
+    let again = store.apply_batch(&h, &[marker]).await.unwrap();
+    assert_eq!((again.through, again.duplicates), (7, 1));
+    // A gap in a batch of its own, then the event after it.
+    a.seq = 10;
+    let next = ev(&mut a);
+    let applied = store
+        .apply_batch(&h, &[gap_event(10, 8, 10)])
+        .await
+        .unwrap();
+    assert_eq!(applied.through, 10);
+    let applied = store.apply_batch(&h, &[next]).await.unwrap();
+    assert_eq!(applied.through, 11);
+    assert_eq!(gap_rows(&store, a.id).await, [(4, 6), (8, 10)]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_journal_gap_that_does_not_fit_its_hole_is_a_sequence_gap(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("111", "e2e");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let mut events: Vec<_> = (0..3)
+        .map(|_| {
+            a.event(
+                Subject::default(),
+                SourceKind::AgentObserved,
+                &EventBody::RunFinalizing,
+            )
+        })
+        .collect();
+    let third = events.pop().unwrap();
+    store.apply_batch(&h, &events).await.unwrap(); // committed through 2
+    for bad in [
+        gap_event(5, 4, 5), // starts after committed + 1: events 3 is missing
+        gap_event(6, 3, 5), // sequenced at 6, not at its own to_seq
+        gap_event(5, 6, 5), // backwards
+    ] {
+        let out = store.apply_batch(&h, &[bad]).await;
+        assert!(
+            matches!(out, Err(ApplyError::SeqGap { expected: 3 })),
+            "{out:?}"
+        );
+    }
+    assert_eq!(gap_rows(&store, a.id).await.len(), 0);
+    // A batch where the bad gap follows good events applies the prefix and asks for the rest.
+    let applied = store
+        .apply_batch(&h, &[third, gap_event(9, 7, 9)])
+        .await
+        .unwrap();
+    assert_eq!((applied.through, applied.expected), (3, Some(4)));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
