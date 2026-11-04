@@ -97,6 +97,28 @@ pub enum ServerFrame {
     },
 }
 
+/// The HTTPS batch fallback (`POST /api/v1/agent/batch`) for networks that block web sockets:
+/// one `hello`, then what a socket would have carried. Each request is a connection of its own.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BatchRequest {
+    /// Opens or resumes the run, exactly as on the socket.
+    pub hello: Hello,
+    /// Journal events, contiguous in `seq`.
+    #[serde(default)]
+    pub events: Vec<EventEnvelope>,
+    /// Metric batches.
+    #[serde(default)]
+    pub telemetry: Vec<Telemetry>,
+}
+
+/// The frames the server would have sent on a socket, in order (`welcome`, `event_rejected`,
+/// `ack`, `telemetry_ack`, `error`, or a lone `reject`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BatchResponse {
+    /// The frames.
+    pub frames: Vec<ServerFrame>,
+}
+
 /// A batch of metric samples.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Telemetry {

@@ -60,11 +60,13 @@ fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
 assert_cmd = "2.2.2"
-axum = "0.8.9"
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "tracing", "ws"] }
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 console_error_panic_hook = "0.1.7"
 crc32fast = "1.5.4"
+# figment: configuration from TOML, `FLEET_*` and `*_FILE` (research 03 §11).
+figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 getrandom = "0.4.3"
 insta = { version = "1.49.0", features = ["json"] }
@@ -88,6 +90,7 @@ time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
 # Members add the features they need: features unify across the graph.
 tokio = "1.54.1"
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
+tokio-util = { version = "0.7.20", features = ["rt"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["set-header"] }
 tracing = "0.1.44"
