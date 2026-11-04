@@ -49,7 +49,10 @@ jobs:
 
   agent-macos:
     name: agent (macOS arm64)
-    runs-on: macos-latest
+    # The owner's Apple Silicon machine runs trusted code only: pushes and PRs from branches of
+    # this repository. Fork PRs (untrusted code) stay on GitHub-hosted macOS.
+    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "fleet-mac"]') || 'macos-latest' }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,5 +60,7 @@ jobs:
       - name: Install toolchain (rust-toolchain.toml)
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        # A self-hosted runner keeps its target directory between runs.
+        if: runner.environment == 'github-hosted'
       - run: cargo test --locked -p fleet-agent -p fleet-maestro -p fleet-core -p fleet-protocol
       - run: cargo build --locked --release -p fleet-agent
