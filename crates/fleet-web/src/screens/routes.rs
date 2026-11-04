@@ -33,7 +33,12 @@ use crate::{
     remote::{Remote, remote},
     screens::{
         device::view::DevicePage,
-        flow::view::FlowPageView,
+        flow::{
+            evidence::{Evidence, Load, LogSource, TextFile, renew_in_ms},
+            evidence_view::EvidenceFeed,
+            model::evidence_steps,
+            view::FlowPageView,
+        },
         metrics::{RangePreset, RangeSelection, query_string_at},
         parts::Fetched,
         timeline::TimelineScope,
@@ -282,6 +287,7 @@ fn FlowBody(project: String, id: Uuid) -> impl IntoView {
     };
     let follower = StoredValue::new_local(flow.clone());
     let live_project = project.clone();
+    let feed = evidence_feed(&project, id, &flow);
     view! {
         {move || {
             attempt
@@ -295,8 +301,117 @@ fn FlowBody(project: String, id: Uuid) -> impl IntoView {
             project=project
             now_ms=ticking_now()
             utc_offset_minutes=utc_offset_minutes()
+            evidence=feed
         />
     }
+}
+
+/// Fetches a flow's evidence: the artifact list (again when the flow's state or its set of
+/// artifacts changes, and a minute before its signed links lapse) and, from the usercontent
+/// origin, the Maestro log and `commands.json` (once per file, not once per link).
+fn evidence_feed(
+    project: &str,
+    id: Uuid,
+    flow: &Remote<fleet_protocol::rest::FlowDetailView>,
+) -> EvidenceFeed {
+    let artifacts = {
+        let project = project.to_owned();
+        remote(1000, move || {
+            let project = project.clone();
+            async move { api::flow_artifacts(&project, id).await }
+        })
+    };
+    let flow_data = flow.data;
+    let flow_changed = Memo::new(move |_| {
+        flow_data.with(|f| {
+            f.as_ref().map(|f| {
+                (
+                    f.flow.state.clone(),
+                    f.artifacts.iter().map(|a| a.id).collect::<Vec<_>>(),
+                )
+            })
+        })
+    });
+    {
+        let again = artifacts.clone();
+        Effect::new(move |previous: Option<()>| {
+            flow_changed.track();
+            // The first run is the fetch `remote` already started.
+            if previous.is_some() {
+                again.request();
+            }
+        });
+    }
+    // Fresh links before the current ones lapse.
+    {
+        let (again, data) = (artifacts.clone(), artifacts.data);
+        Effect::new(move |timer: Option<Option<TimeoutHandle>>| {
+            if let Some(Some(handle)) = timer {
+                handle.clear();
+            }
+            let wait = data.with(|l| l.as_ref().and_then(|l| renew_in_ms(l, now_ms())))?;
+            let again = again.clone();
+            set_timeout_with_handle(
+                move || again.request(),
+                Duration::from_millis(u64::try_from(wait).unwrap_or(1000)),
+            )
+            .ok()
+        });
+    }
+    let (list, list_error) = (artifacts.data, artifacts.error);
+    let evidence = Memo::new(move |_| {
+        let Some(list) = list.get() else {
+            return match list_error.get() {
+                Some(error) => Evidence::Unavailable(error.to_string()),
+                None => Evidence::Loading,
+            };
+        };
+        let Some(detail) = flow_data.get() else {
+            return Evidence::Loading;
+        };
+        let (steps, failed) = evidence_steps(&detail);
+        Evidence::build(&list, id, failed.as_ref(), &steps)
+    });
+    let log = text_file(Memo::new(move |_| match evidence.get() {
+        Evidence::Files(f) => match f.log {
+            Some(LogSource::Show(file)) => Some(file),
+            _ => None,
+        },
+        _ => None,
+    }));
+    let commands = text_file(Memo::new(move |_| match evidence.get() {
+        Evidence::Files(f) => f.commands,
+        _ => None,
+    }));
+    EvidenceFeed {
+        evidence,
+        log,
+        commands,
+        selected_step: RwSignal::new(None),
+    }
+}
+
+/// Fetches `file` when it first appears and again only when it is a different artifact; a renewed
+/// link to the same file does not reload it.
+fn text_file(file: Memo<Option<TextFile>>) -> RwSignal<Load<String>> {
+    let text = RwSignal::new(Load::Loading);
+    let which = Memo::new(move |_| file.with(|f| f.as_ref().map(|f| f.id)));
+    Effect::new(move |_| {
+        if which.get().is_none() {
+            return;
+        }
+        let Some(url) = file.with_untracked(|f| f.as_ref().map(|f| f.url.clone())) else {
+            return;
+        };
+        text.set(Load::Loading);
+        spawn_local(async move {
+            text.set(match api::fetch_text(&url).await {
+                Ok(body) => Load::Ready(body),
+                Err(error) => Load::Failed(error.to_string()),
+            });
+        });
+    });
+    text
 }
 
 /// Keeps a socket on the attempt open while the flow page is, and refetches on every change.

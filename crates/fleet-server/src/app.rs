@@ -161,7 +161,9 @@ pub(crate) fn router(state: &AppState) -> Router {
         .merge(api::router())
         .merge(login::router())
         .with_state(state.clone())
-        .merge(web::router());
+        .merge(web::router(
+            web::usercontent_origin(&state.config).as_deref(),
+        ));
     // The usercontent host, when it shares this listener, gets artifacts and nothing else.
     match state.config.usercontent.hosts() {
         hosts if !hosts.is_empty() => {

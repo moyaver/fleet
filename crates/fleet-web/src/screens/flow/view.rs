@@ -20,9 +20,12 @@ use crate::{
     screens::{
         common::Ctx,
         device::model::DeviceSessionRow,
-        flow::model::{
-            ArtifactsSection, CiSection, ClaimRow, ClaimsSection, Failure, FailureDetails,
-            FlowHeader, FlowPage, PreviousRow, StepRef, StepsSection,
+        flow::{
+            evidence_view::{EvidenceCard, EvidenceFeed},
+            model::{
+                CiSection, ClaimRow, ClaimsSection, Failure, FailureDetails, FlowHeader, FlowPage,
+                PreviousRow, StepRef, StepsSection,
+            },
         },
         parts::{FactList, Fetched, Notice, Outcome, PillView, loaded},
     },
@@ -42,10 +45,10 @@ pub fn FlowPageView(
     /// The viewer's offset from UTC in minutes.
     #[prop(default = 0)]
     utc_offset_minutes: i32,
-    /// Called with a step's id when the user activates it in the tree.
-    #[prop(optional, into)]
-    on_select_step: Option<Callback<String>>,
+    /// What the route fetched for the evidence card; picking a step in the tree moves its log.
+    evidence: EvidenceFeed,
 ) -> impl IntoView {
+    let on_select_step = Callback::new(move |id: String| evidence.selected_step.set(Some(id)));
     let ctx = Memo::new(move |_| Ctx {
         project: project.clone(),
         now_ms: now_ms.get(),
@@ -70,14 +73,14 @@ pub fn FlowPageView(
                            view! {
                                <HeaderView header=header />
                                <FailureCard failure=page.failure />
-                               <StepsCard steps=page.steps on_select=on_select_step />
+                               <StepsCard steps=page.steps on_select=Some(on_select_step) />
                                <ClaimsCard claims=page.claims />
                                <div class="grid gap-4 lg:grid-cols-2">
                                    <DeviceCard device=page.device />
                                    <CiCard ci=page.ci />
                                </div>
                                <PreviousCard previous=page.previous />
-                               <ArtifactsCard artifacts=page.artifacts />
+                               <EvidenceCard feed=evidence flow />
                            }
                                .into_any()
                        },
@@ -318,29 +321,4 @@ fn PreviousCard(
         .into_any()
     };
     view! { <Card title="Previous executions">{body}</Card> }
-}
-
-/// Screenshots, logs and reports.
-#[component]
-fn ArtifactsCard(
-    /// What there is.
-    artifacts: ArtifactsSection,
-) -> impl IntoView {
-    let body = match artifacts {
-        ArtifactsSection::NotAvailable(text) => view! {
-            <p class="font-medium">"Screenshots, logs and reports"</p>
-            <p class="text-muted" data-testid="artifacts-empty">{text}</p>
-        }
-        .into_any(),
-        ArtifactsSection::Listed(items) => view! {
-            <ul class="space-y-1 text-sm">
-                {items
-                    .into_iter()
-                    .map(|a| view! { <li>{format!("{}: {}", a.class, a.name)}</li> })
-                    .collect_view()}
-            </ul>
-        }
-        .into_any(),
-    };
-    view! { <Card title="Evidence">{body}</Card> }
 }

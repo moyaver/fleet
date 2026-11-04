@@ -51,14 +51,19 @@ pub fn StepTreeView(
             <For each=rows key=|r: &Row| (r.id.clone(), r.expanded, r.focused) let(row)>
                 {
                     let id = row.id.clone();
-                    view! {
+                    // The tree's level, position and size are not typed attributes in the view
+                    // macro (and `attr:` would name the attribute `attr:aria-level`), so they are
+                    // set by name.
+                    let (level, position, size) = (
+                        row.level.to_string(),
+                        row.pos_in_set.to_string(),
+                        row.set_size.to_string(),
+                    );
+                    let item = view! {
                         <li
                             class="flex items-center gap-2 px-2 py-1 focus:outline-2 focus:outline-focus"
                             role="treeitem"
-                            attr:aria-level=row.level.to_string()
-                            attr:aria-posinset=row.pos_in_set.to_string()
-                            attr:aria-setsize=row.set_size.to_string()
-                            attr:aria-expanded=row.expanded.map(|e| e.to_string())
+                            aria-expanded=row.expanded.map(|e| e.to_string())
                             tabindex=if row.focused { "0" } else { "-1" }
                             data-status=status_label(row.status)
                             on:click=move |_| {
@@ -78,7 +83,10 @@ pub fn StepTreeView(
                             {row.duration.map(|d| view! { <span class="text-xs text-muted">{d}</span> })}
                             <ProvenanceBadge provenance=provenance_of(row.source) />
                         </li>
-                    }
+                    };
+                    item.attr("aria-level", level)
+                        .attr("aria-posinset", position)
+                        .attr("aria-setsize", size)
                 }
             </For>
         </ul>

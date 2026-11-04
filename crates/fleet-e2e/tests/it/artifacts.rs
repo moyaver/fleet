@@ -15,12 +15,12 @@ const USERCONTENT: &str = "fleet-usercontent.example.net";
 /// Appears in the fixture's log, `commands.json` and JUnit report: the test plants it as a secret.
 const PLANTED: &str = "Fleet never shows this";
 
-fn temp(name: &str) -> PathBuf {
+pub(crate) fn temp(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("fleet-e2e-{name}-{}", uuid::Uuid::now_v7()))
 }
 
 /// GET with a chosen `Host`: the status, the lowercased head and the body.
-async fn get_as(addr: SocketAddr, host: &str, path: &str) -> (u16, String, Vec<u8>) {
+pub(crate) async fn get_as(addr: SocketAddr, host: &str, path: &str) -> (u16, String, Vec<u8>) {
     let mut sock = tokio::net::TcpStream::connect(addr).await.unwrap();
     let req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
     sock.write_all(req.as_bytes()).await.unwrap();

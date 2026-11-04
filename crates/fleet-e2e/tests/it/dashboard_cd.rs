@@ -208,11 +208,15 @@ async fn a_failed_flows_page_shows_the_failure_and_every_claim_with_its_provenan
         &format!("{} >= 2", count_of("[role=treeitem]")),
     )
     .await;
-    // Artifacts arrive with M5: the page says so instead of showing nothing.
-    assert_eq!(
-        page.texts(&q("artifacts-empty")).await,
-        ["Not available until evidence upload ships"]
+    // The loadgen agents upload no evidence: the page says so instead of showing nothing.
+    let empty = page.texts(&q("evidence-empty")).await;
+    assert!(
+        empty
+            .iter()
+            .all(|t| t.starts_with("No evidence was uploaded for this flow")),
+        "an honest empty state, got {empty:?}"
     );
+    assert_eq!(empty.len(), 1);
 
     assert!(page.never_reloaded().await);
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());

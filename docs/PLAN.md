@@ -479,7 +479,7 @@ Upload is relayed through the server by default; presigned direct upload is opti
 - **Provenance everywhere:** `fleet-ui::Provenance` badge and tooltip: observed, provisional, final, derived, inferred, stale, missing. Stale data greys out after a freshness threshold.
 - **Security:**
   - The SPA holds no tokens; it uses the session cookie only.
-  - Strict CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: <usercontent>; connect-src 'self'; frame-ancestors 'none'`.
+  - Strict CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: <usercontent>; connect-src 'self' <usercontent>; frame-ancestors 'none'`.
   - All user text is rendered as text nodes.
 
 ### 10.2 `fleet-ui` component backlog (build in this order)

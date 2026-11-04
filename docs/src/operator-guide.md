@@ -199,7 +199,9 @@ What the origin guarantees, on every response:
 - No cookie is read or set, and nothing but `/u/…` links is served: the API, the dashboard and the agent routes answer 404 on this host.
 - `Cross-Origin-Resource-Policy: cross-origin` (the dashboard embeds screenshots; the link is the access control), and `Access-Control-Allow-Origin` and `frame-ancestors` allow only `api.public_url`.
 
-Without `usercontent.url` artifacts are stored but cannot be opened. Fleet routes by the `Host` header on its main listener, so a proxy that sends both hostnames to `fleet:8080` is enough ([`deploy/compose/Caddyfile`](https://github.com/moyaver/fleet/blob/main/deploy/compose/Caddyfile)); `usercontent.listen` serves the origin on a separate port instead.
+The dashboard's own policy names this origin, and only this one, in `img-src` (screenshots) and `connect-src` (the log viewer fetches `maestro.log` and `commands.json` as text); it is added from `usercontent.url`, and no other directive (scripts, styles, frames) allows it. A browser that reports a CSP violation on the flow page usually means `usercontent.url` does not match the address people reach it at.
+
+Without `usercontent.url` artifacts are stored but cannot be opened (the flow page says so). Fleet routes by the `Host` header on its main listener, so a proxy that sends both hostnames to `fleet:8080` is enough ([`deploy/compose/Caddyfile`](https://github.com/moyaver/fleet/blob/main/deploy/compose/Caddyfile)); `usercontent.listen` serves the origin on a separate port instead.
 
 ## Shutdown and upgrades
 

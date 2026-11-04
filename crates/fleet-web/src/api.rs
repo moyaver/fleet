@@ -5,8 +5,8 @@
 use fleet_protocol::{
     live::{AttemptView, ProjectView},
     rest::{
-        DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView, TimelineView,
-        WorkerRunPage, WorkerView,
+        ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
+        TimelineView, WorkerRunPage, WorkerView,
         history::{CompareView, FlowStatsView, HistoryPage},
     },
 };
@@ -172,6 +172,15 @@ pub async fn flow(project: &str, execution: Uuid) -> Result<FlowDetailView, ApiE
     .await
 }
 
+/// A flow's artifacts, each with a short-lived signed link on the usercontent origin.
+pub async fn flow_artifacts(project: &str, execution: Uuid) -> Result<ArtifactListView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/flows/{execution}/artifacts",
+        segment(project)
+    ))
+    .await
+}
+
 /// A project's latest pipeline attempts, newest first (the compare page's pickers).
 pub async fn attempts(project: &str, limit: u32) -> Result<Vec<AttemptView>, ApiError> {
     get(&format!(
@@ -179,6 +188,28 @@ pub async fn attempts(project: &str, limit: u32) -> Result<Vec<AttemptView>, Api
         segment(project)
     ))
     .await
+}
+
+/// Reads a text artifact (the Maestro log, `commands.json`) from the usercontent origin through
+/// its signed link. The request is cross-origin and carries no cookie: the link is the credential,
+/// and the dashboard's CSP (`connect-src`) allows exactly that one origin.
+pub async fn fetch_text(link: &str) -> Result<String, ApiError> {
+    let response = Request::get(link)
+        .send()
+        .await
+        .map_err(|e| ApiError::Network(e.to_string()))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| ApiError::Network(e.to_string()))?;
+    match status {
+        410 => Err(ApiError::Status {
+            status,
+            message: "the link has expired".to_owned(),
+        }),
+        _ => classify(status, &body).map_or(Ok(body), Err),
+    }
 }
 
 /// Screen E: a page of the project's history; `query` is the history query string without `?`

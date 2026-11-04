@@ -3,7 +3,7 @@
 //!
 //! Every claim about the outcome is listed with its source (invariant I4), the winner marked and
 //! disagreements highlighted. Steps are flat, because the journal doesn't carry nesting or
-//! retries yet (issue #68). Artifacts arrive with M5; until then the page says so.
+//! retries yet (issue #68). Evidence (screenshots, logs, reports) is [`super::evidence`].
 
 use fleet_protocol::{
     event::StepStatus,
@@ -14,7 +14,6 @@ use fleet_ui::{
     provenance::Provenance,
     steps::tree::{StepExec, StepTree},
 };
-use uuid::Uuid;
 
 use crate::{
     clock::unix_ms,
@@ -22,6 +21,7 @@ use crate::{
     screens::{
         common::{Ctx, Fact, finality_note, parse_source, source_label},
         device::model::DeviceSessionRow,
+        flow::evidence::StepKey,
     },
     status::{Pill, flow_provenance, flow_state_pill, source_provenance},
 };
@@ -150,26 +150,6 @@ pub struct PreviousRow {
     pub pipeline_href: String,
 }
 
-/// An artifact of the flow.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ArtifactItem {
-    /// The artifact.
-    pub id: Uuid,
-    /// Screenshot, log, report, …
-    pub class: String,
-    /// File name.
-    pub name: String,
-}
-
-/// Screenshots, logs and reports.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ArtifactsSection {
-    /// There are none yet, and why.
-    NotAvailable(&'static str),
-    /// The artifacts.
-    Listed(Vec<ArtifactItem>),
-}
-
 /// Screen D, laid out.
 #[derive(Debug, Clone)]
 pub struct FlowPage {
@@ -187,8 +167,6 @@ pub struct FlowPage {
     pub steps: StepsSection,
     /// Earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousRow>,
-    /// Related artifacts.
-    pub artifacts: ArtifactsSection,
 }
 
 fn step_status(status: &str) -> StepStatus {
@@ -216,6 +194,33 @@ fn step_ref(steps: &[StepView], index: i32) -> StepRef {
             .find(|s| s.index == index)
             .map_or_else(|| format!("Step {index}"), step_label),
     }
+}
+
+/// The steps and the failed step as [`evidence`](super::evidence) needs them: by id, with
+/// Maestro's description only when the server has one.
+#[must_use]
+pub fn evidence_steps(view: &FlowDetailView) -> (Vec<StepKey>, Option<StepKey>) {
+    let steps: Vec<StepKey> = view
+        .steps
+        .iter()
+        .map(|s| StepKey {
+            id: s.index.to_string(),
+            label: s.label.clone(),
+        })
+        .collect();
+    let failed = view
+        .failure
+        .as_ref()
+        .and_then(|f| f.failed_step_index)
+        .map(|i| {
+            let id = i.to_string();
+            steps
+                .iter()
+                .find(|s| s.id == id)
+                .cloned()
+                .unwrap_or(StepKey { id, label: None })
+        });
+    (steps, failed)
 }
 
 fn provider(p: &str) -> &str {
@@ -260,20 +265,6 @@ impl FlowPage {
                     pipeline_href: pipeline_href(&ctx.project, p.pipeline_attempt_id),
                 })
                 .collect(),
-            artifacts: if view.artifacts.is_empty() {
-                ArtifactsSection::NotAvailable("Not available until evidence upload ships")
-            } else {
-                ArtifactsSection::Listed(
-                    view.artifacts
-                        .iter()
-                        .map(|a| ArtifactItem {
-                            id: a.id,
-                            class: a.class.clone(),
-                            name: a.name.clone(),
-                        })
-                        .collect(),
-                )
-            },
         }
     }
 }
@@ -770,22 +761,35 @@ mod tests {
     }
 
     #[test]
-    fn artifacts_say_they_are_not_available_until_evidence_upload_ships() {
+    fn evidence_knows_the_steps_and_which_one_failed() {
+        let (steps, failed) = evidence_steps(&view());
+        let shown: Vec<_> = steps
+            .iter()
+            .map(|s| (s.id.as_str(), s.label.as_deref()))
+            .collect();
         assert_eq!(
-            page().artifacts,
-            ArtifactsSection::NotAvailable("Not available until evidence upload ships")
+            shown,
+            [
+                ("0", Some("Launch app")),
+                ("1", Some("Tap on \"Pay\"")),
+                ("2", Some("Assert visible \"Done\"")),
+            ]
+        );
+        assert_eq!(
+            failed,
+            Some(StepKey {
+                id: "2".to_owned(),
+                label: Some("Assert visible \"Done\"".to_owned())
+            })
         );
         let mut v = view();
-        v.artifacts = serde_json::from_value(serde_json::json!([
-          {"id": "00000000-0000-0000-0000-0000000000aa", "class": "screenshot", "name": "fail.png"}
-        ]))
-        .unwrap();
-        let ArtifactsSection::Listed(items) = FlowPage::build(&v, &ctx()).artifacts else {
-            panic!("an artifact exists");
-        };
+        v.failure = None;
+        v.steps[0].label = None;
+        let (steps, failed) = evidence_steps(&v);
+        assert_eq!(failed, None, "no failure, no failed step");
         assert_eq!(
-            (items[0].class.as_str(), items[0].name.as_str()),
-            ("screenshot", "fail.png")
+            steps[0].label, None,
+            "a step with no description stays without one: \"Step 0\" is not in any log"
         );
     }
 }

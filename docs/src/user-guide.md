@@ -57,6 +57,22 @@ At most two files at a time, hashed while they stream. Uploading never changes M
 
 Every outcome Fleet shows says where it came from. While a run is live, outcomes come from Maestro's log and console (**provisional**). When Maestro writes its report, the report decides (**verified**). An outcome Fleet had to infer, such as a flow cut short by a signal, says **inferred** and is never shown as passed.
 
+## Investigating a failure
+
+A failed flow's page (open it from the pipeline page, from the pipeline's list of failures, or from a flow's earlier executions) is built to answer "why did this fail?" without the CI logs, and without the runner: once the run has ended, everything below is read from Fleet's own database and blob store, and nothing contacts the machine that ran Maestro.
+
+- **Failure** names Maestro's message, the step that failed and the last step that succeeded. **Steps** lists every step with its result, duration and provenance.
+- **Evidence** is what the agent uploaded for the flow:
+  - **Failure screenshot**: the screenshot Maestro took at the failing step, with zoom (`+`, `-`, `0`) and a strip when there are several.
+  - **Maestro log**: Maestro's session log for the whole run (redacted on the runner), opened at the failing step of *this* flow. Pick another step in the step tree and the log moves to where that step started; **Jump to the failing step** brings it back. The log has search (Enter and Shift+Enter step through the matches). The log is shown as Maestro wrote it (`MFLT1|time|thread|level|logger|message`); a log with no step markers for this flow is still shown, just without jumps. A log over 8 MiB is offered as a download instead.
+  - **Command timings**: one row per command from `commands.json`, in order, with its result and duration; commands nested inside `runFlow` are indented.
+  - **Maestro HTML report**, when one was uploaded, opens in a new tab. **Files** lists the other uploads (`commands.json`, the JUnit report, the log) to save.
+- **Where the files come from.** Screenshots, logs and reports are served from the **usercontent domain** (`usercontent.url`, see the [operator guide](operator-guide.md#usercontent-domain)), never from the dashboard's own address, because a report is a file from a CI job: opened there it gets no cookie, no access to the dashboard and no scripts (`Content-Security-Policy: sandbox`). The dashboard asks for a short-lived signed link for each file; the page renews them before they lapse (5 minutes by default), and a link copied out of the page stops working after that. If you leave a page open for a long time and a download answers "this link has expired", reload the page.
+- **When there is no evidence** the page says why instead of showing an empty box:
+  - *No evidence was uploaded for this flow*: the run came from a fork pull request, the agent had no Fleet credential or `FLEET_UPLOAD_ARTIFACTS=off`, or the flow left nothing to upload (screenshots are only taken when a flow fails).
+  - *The evidence is stored, but this server has no usercontent origin configured*: ask your operator to set `usercontent.url`.
+  - *Refused uploads* lists a file the server verified and refused (too large, not the declared type, an unsafe archive, …) with the reason. Nothing else about a refused file is kept.
+
 ## History and compare
 
 **History** (`/history?project=<slug>`) lists finished flow executions, newest first, within a window of at most 90 days (30 by default). Filter by flow (text in its path or name), branch, outcome and time; the filters live in the address, so a reload or a shared link shows the same table. Every row carries its provenance, its failure fingerprint (failures with the same fingerprint are the same failure) and the first digits of its condition fingerprint (runs with the same one ran under comparable conditions). A flow is marked **Flaky (confirmed)** when it passed and failed on one commit under one condition, and **Suspected flaky** when its latest default-branch runs flip often; both name the runs behind the verdict as links. An inferred outcome never counts as a pass. *Stats* on a row opens the flow's panel: counts of settled passes and failures, the median and 90th-percentile duration of its passes, a duration chart and its recent failures grouped by fingerprint.

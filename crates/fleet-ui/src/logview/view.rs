@@ -58,6 +58,7 @@ fn lines_view(
                     id=format!("L{}", i + 1)
                     class="flex whitespace-pre leading-5 text-fg"
                     class:bg-tone-warning-bg=selected
+                    aria-current=move || selected().then_some("true")
                     style:height=format!("{ROW_PX}px")
                 >
                     <a class="w-14 shrink-0 select-none pr-3 text-right text-muted" href=anchor(i)>
