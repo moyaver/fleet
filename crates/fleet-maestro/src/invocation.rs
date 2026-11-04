@@ -2,8 +2,13 @@
 //! Reading and adjusting the user's `maestro …` command line (PLAN §6.3, research 08 §7).
 //!
 //! The agent never removes a user flag. In `auto` mode it adds only what it needs when the user
-//! didn't set it: one flattened debug output directory and a JUnit report, plus environment
-//! variables that make the log machine-readable and keep Maestro quiet.
+//! didn't set it: one flattened debug output directory, plus environment variables that make the
+//! log machine-readable and keep Maestro quiet. It also adds a JUnit report, but only where that
+//! cannot change Maestro's execution mode (see [`ReportInjection`]).
+//!
+//! `--format` is not a passive flag: Maestro's `TestCommand` runs its multi-flow path whenever a
+//! report format is asked for, and that path rejects `-c`/`--continuous`. So a single flow, or a
+//! continuous run, is never given `--format` (issue #28).
 
 use std::path::Path;
 
@@ -34,6 +39,51 @@ pub struct Invocation {
     pub shards: u32,
     /// Flow files or directories given after `test` (not flags, not flag values).
     pub positionals: Vec<String>,
+    /// `-c`/`--continuous` (also inside a short-flag cluster such as `-ch`).
+    pub continuous: bool,
+}
+
+/// What a flow path on the command line is on disk (the caller looks; this crate does no I/O).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathKind {
+    /// A single flow file.
+    File,
+    /// A directory of flows.
+    Dir,
+    /// Doesn't exist, or can't be told.
+    Unknown,
+}
+
+/// Whether the agent added `--format junit --output …`, and if not, why not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportInjection {
+    /// Added: Maestro runs its multi-flow path for this command anyway.
+    Injected,
+    /// Not added: a single flow, where `--format` would switch Maestro to its multi-flow path.
+    SkippedSingleFlow,
+    /// Not added: `-c`/`--continuous`, which the multi-flow path rejects.
+    SkippedContinuous,
+    /// Not added: flow paths couldn't be classified (missing or unreadable), so the mode is unknown.
+    SkippedUnclassified,
+    /// Not added: the user chose a `--format` already.
+    UserProvided,
+    /// Not added: rewrite mode is off, or there is no `test` subcommand.
+    Disabled,
+}
+
+impl ReportInjection {
+    /// A short stable label, for logs.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Injected => "injected",
+            Self::SkippedSingleFlow => "skipped_single_flow",
+            Self::SkippedContinuous => "skipped_continuous",
+            Self::SkippedUnclassified => "skipped_unclassified",
+            Self::UserProvided => "user_provided",
+            Self::Disabled => "disabled",
+        }
+    }
 }
 
 /// Options of `maestro` and `maestro test` that take a value (so the value isn't a flow path).
@@ -109,6 +159,8 @@ pub fn parse(argv: &[String]) -> Invocation {
                 inv.positionals.extend(argv.iter().skip(i + 1).cloned());
                 break;
             }
+            "-c" | "--continuous" => inv.continuous = true,
+            _ if is_short_cluster(name) => inv.continuous |= name.contains('c'),
             _ if inv.test_index.is_some() && !arg.starts_with('-') => {
                 inv.positionals.push(arg.clone());
             }
@@ -121,6 +173,11 @@ pub fn parse(argv: &[String]) -> Invocation {
         };
     }
     inv
+}
+
+/// `-ch`-style clusters of Maestro's two short boolean flags (`-c`, `-h`).
+fn is_short_cluster(name: &str) -> bool {
+    name.len() > 2 && name.starts_with('-') && name.chars().skip(1).all(|c| c == 'c' || c == 'h')
 }
 
 /// The command line and environment the agent actually runs.
@@ -136,14 +193,51 @@ pub struct Prepared {
     pub debug_dir: Option<String>,
     /// Where the JUnit report will be.
     pub report: Option<String>,
+    /// Whether the JUnit report was added, and if not, why.
+    pub report_injection: ReportInjection,
+}
+
+/// Decides whether `--format` can be added without changing Maestro's execution mode.
+///
+/// Maestro takes its multi-flow path for more than one flow file or a directory, and for
+/// `--shard-all` (replication). `flows` is every flow path the run will get, `classify` says
+/// what each is. Anything unknown means no injection.
+fn report_decision(
+    inv: &Invocation,
+    flows: &[String],
+    classify: &impl Fn(&str) -> PathKind,
+) -> ReportInjection {
+    if inv.format.is_some() {
+        return ReportInjection::UserProvided;
+    }
+    if inv.continuous {
+        return ReportInjection::SkippedContinuous;
+    }
+    let kinds: Vec<PathKind> = flows.iter().map(|f| classify(f)).collect();
+    if kinds.is_empty() || kinds.contains(&PathKind::Unknown) {
+        return ReportInjection::SkippedUnclassified;
+    }
+    // UNVERIFIED against Maestro's source: `--shard-all N` (N > 1) replicates even one flow,
+    // which the issue says takes the multi-flow path.
+    let replicating = inv.shard_mode == Some(ShardMode::All) && inv.shards > 1;
+    if kinds.len() > 1 || kinds.contains(&PathKind::Dir) || replicating {
+        ReportInjection::Injected
+    } else {
+        ReportInjection::SkippedSingleFlow
+    }
 }
 
 /// Adds the agent's flags and environment (`rewrite` = `--fleet-rewrite=auto`).
+///
+/// `extra_flows` are flow paths the agent will append later (a planner shard); `classify` tells
+/// files from directories.
 #[must_use]
 pub fn prepare(
     argv: &[String],
     run_dir: &Path,
     rewrite: bool,
+    extra_flows: &[String],
+    classify: impl Fn(&str) -> PathKind,
     user_env: impl Fn(&str) -> bool,
 ) -> Prepared {
     let inv = parse(argv);
@@ -158,6 +252,10 @@ pub fn prepare(
             .as_deref()
             .is_some_and(|f| f.eq_ignore_ascii_case("junit"))
     });
+    let mut injection = ReportInjection::Disabled;
+    if inv.format.is_some() && rewrite && inv.test_index.is_some() {
+        injection = ReportInjection::UserProvided;
+    }
     if rewrite && let Some(t) = inv.test_index {
         if inv.debug_output.is_none() && inv.test_output_dir.is_none() {
             let dir = run_dir.join("artifacts").to_string_lossy().into_owned();
@@ -168,7 +266,9 @@ pub fn prepare(
             ]);
             debug_dir = Some(dir);
         }
-        if inv.format.is_none() {
+        let flows: Vec<String> = inv.positionals.iter().chain(extra_flows).cloned().collect();
+        injection = report_decision(&inv, &flows, &classify);
+        if injection == ReportInjection::Injected {
             let file = run_dir.join("report.xml").to_string_lossy().into_owned();
             added.extend([
                 "--format".to_owned(),
@@ -198,6 +298,7 @@ pub fn prepare(
         added_flags: added,
         debug_dir,
         report,
+        report_injection: injection,
     }
 }
 
@@ -209,6 +310,89 @@ mod tests {
         s.split_whitespace().map(String::from).collect()
     }
 
+    /// Names ending in `/` are directories, `.yaml` are files, the rest don't exist.
+    fn dirs(p: &str) -> PathKind {
+        if p.ends_with('/') {
+            PathKind::Dir
+        } else if p.contains(".yaml") {
+            PathKind::File
+        } else {
+            PathKind::Unknown
+        }
+    }
+
+    fn inject(cmd: &str, extra: &[String]) -> (ReportInjection, Vec<String>) {
+        let p = prepare(&argv(cmd), Path::new("/run"), true, extra, dirs, |_| false);
+        (p.report_injection, p.argv)
+    }
+
+    #[test]
+    fn a_single_flow_keeps_maestros_mode() {
+        let (why, out) = inject("maestro test login.yaml", &[]);
+        assert_eq!(why, ReportInjection::SkippedSingleFlow);
+        assert!(
+            !out.iter().any(|a| a == "--format" || a == "--output"),
+            "{out:?}"
+        );
+        let (why, _) = inject("maestro --device A test login.yaml", &[]);
+        assert_eq!(why, ReportInjection::SkippedSingleFlow);
+    }
+
+    #[test]
+    fn continuous_never_gets_a_format() {
+        for cmd in [
+            "maestro test -c login.yaml",
+            "maestro test --continuous login.yaml",
+            "maestro test -ch login.yaml",
+            "maestro -c test flows/",
+            "maestro test flows/ --continuous",
+        ] {
+            let (why, out) = inject(cmd, &[]);
+            assert_eq!(why, ReportInjection::SkippedContinuous, "{cmd}");
+            assert!(!out.iter().any(|a| a == "--format"), "{cmd}");
+        }
+        // `-c` as an option's value isn't the flag.
+        let (why, _) = inject("maestro test -e K -c flows/", &[]);
+        assert_eq!(why, ReportInjection::SkippedContinuous);
+        let (why, _) = inject("maestro test --config -c flows/", &[]);
+        assert_eq!(why, ReportInjection::Injected);
+    }
+
+    #[test]
+    fn suites_get_a_report() {
+        let (why, out) = inject("maestro test flows/", &[]);
+        assert_eq!(why, ReportInjection::Injected);
+        assert!(out.iter().any(|a| a == "--format"));
+        let (why, _) = inject("maestro test a.yaml b.yaml", &[]);
+        assert_eq!(why, ReportInjection::Injected);
+        let (why, _) = inject("maestro test --shard-all 2 a.yaml", &[]);
+        assert_eq!(why, ReportInjection::Injected);
+        let (why, _) = inject("maestro test", &["a.yaml".into(), "b.yaml".into()]);
+        assert_eq!(why, ReportInjection::Injected, "planner flows count");
+        let (why, _) = inject("maestro test", &["a.yaml".into()]);
+        assert_eq!(why, ReportInjection::SkippedSingleFlow);
+    }
+
+    #[test]
+    fn unknown_paths_and_user_formats_are_left_alone() {
+        let (why, _) = inject("maestro test missing", &[]);
+        assert_eq!(why, ReportInjection::SkippedUnclassified);
+        let (why, _) = inject("maestro test a.yaml missing", &[]);
+        assert_eq!(why, ReportInjection::SkippedUnclassified);
+        let (why, out) = inject("maestro test --format html flows/", &[]);
+        assert_eq!(why, ReportInjection::UserProvided);
+        assert!(!out.iter().any(|a| a == "--output"));
+        let p = prepare(
+            &argv("maestro test flows/"),
+            Path::new("/r"),
+            false,
+            &[],
+            dirs,
+            |_| false,
+        );
+        assert_eq!(p.report_injection, ReportInjection::Disabled);
+    }
+
     #[test]
     fn reads_flags_values_and_shards() {
         let i = parse(&argv(
@@ -218,6 +402,8 @@ mod tests {
         assert_eq!(i.devices, ["A", "B"]);
         assert_eq!((i.shard_mode, i.shards), (Some(ShardMode::Split), 2));
         assert_eq!(i.output.as_deref(), Some("r.xml"));
+        assert_eq!(i.positionals, ["flows/"]);
+        assert!(!i.continuous);
     }
 
     #[test]
@@ -243,7 +429,9 @@ mod tests {
     #[test]
     fn adds_only_what_is_missing() {
         let run = Path::new("/run");
-        let p = prepare(&argv("maestro test flows/"), run, true, |_| false);
+        let p = prepare(&argv("maestro test flows/"), run, true, &[], dirs, |_| {
+            false
+        });
         assert_eq!(
             p.argv,
             argv(
@@ -261,14 +449,18 @@ mod tests {
         );
 
         let user = argv("maestro test --format html --test-output-dir out flows/");
-        let p = prepare(&user, run, true, |k| k == "MAESTRO_CLI_NO_ANALYTICS");
+        let p = prepare(&user, run, true, &[], dirs, |k| {
+            k == "MAESTRO_CLI_NO_ANALYTICS"
+        });
         assert_eq!(p.argv, user, "the user chose both; nothing is added");
         assert!(
             !p.env.iter().any(|(k, _)| k == "MAESTRO_CLI_NO_ANALYTICS"),
             "user env wins"
         );
 
-        let p = prepare(&argv("maestro test flows/"), run, false, |_| false);
+        let p = prepare(&argv("maestro test flows/"), run, false, &[], dirs, |_| {
+            false
+        });
         assert_eq!(p.argv, argv("maestro test flows/"), "rewrite off");
     }
 }

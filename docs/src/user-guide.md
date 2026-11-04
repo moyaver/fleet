@@ -13,10 +13,24 @@ The agent never changes what CI sees: Maestro's output is passed through byte fo
 What the agent adds to `maestro test`, only when you haven't set it yourself (turn off with `--fleet-rewrite=off`):
 
 - `--flatten-debug-output --debug-output <run dir>/artifacts`, so the session log and flow bundles land in one place it can follow;
-- `--format junit --output <run dir>/report.xml`, the final report it reconciles against;
+- `--format junit --output <run dir>/report.xml`, the final report it reconciles against, but only when that can't change how Maestro runs (see below);
 - `MAESTRO_CLI_LOG_PATTERN_FILE`, a machine-readable log line, plus `MAESTRO_CLI_NO_ANALYTICS=1` and `MAESTRO_DISABLE_UPDATE_CHECK=true`.
 
 It never removes a flag.
+
+**Why the JUnit report is conditional.** In Maestro, `--format` isn't just reporting: asking for a report makes `maestro test` take its multi-flow path, the one it uses for several flows, and that path rejects `-c`/`--continuous`. Fleet must not change how your command runs, so it adds the report only when Maestro would take that path anyway:
+
+| Command | Report added? |
+|---|---|
+| `maestro test flows/` (a directory) | yes |
+| `maestro test a.yaml b.yaml` (several flows), or a planner shard of several flows | yes |
+| `maestro test --shard-all N …` with N > 1 | yes |
+| `maestro test login.yaml` (one flow) | no |
+| any command with `-c` or `--continuous` | no |
+| any command with your own `--format` | no (yours is used) |
+| a flow path that doesn't exist or can't be read | no |
+
+Without the report, Fleet still follows the run from Maestro's session log, flow bundles and exit status; it just has no JUnit to reconcile against. Exit status 1 still counts as test failures when Fleet saw a flow fail in Maestro's output or flow bundles; if it saw none, the exit is classified as unknown (`other`) rather than as a Maestro error, which is reserved for a report that was expected and is missing. The agent logs its decision once, at info level (`junit report decision`).
 
 ## Configuration
 

@@ -2,7 +2,8 @@
 //! What the supervisor runs: the user's command, adjusted (PLAN §6.3).
 //!
 //! Only a `maestro … test …` command is adjusted, and only by adding: a flattened debug output
-//! directory and a JUnit report when the user didn't choose them, the machine log pattern, and a
+//! directory when the user didn't choose one, a JUnit report only where that can't change Maestro's
+//! execution mode (several flows or a directory, not `-c`), the machine log pattern, and a
 //! planner shard's flows. Anything that fails here fails open: the command runs as given.
 
 use std::{
@@ -11,6 +12,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use fleet_maestro::invocation::PathKind;
 use fleet_protocol::{event::PlanAssigned, plan::PlanManifest};
 
 /// The command and where its outputs will be.
@@ -94,11 +96,25 @@ pub(crate) fn prepare(
     }
     let run_dir = Some(run_dir.map_or_else(default_run_dir, Path::to_path_buf))
         .filter(|d| std::fs::create_dir_all(d).is_ok());
+    let extra: Vec<String> = plan.as_ref().map(|p| p.flows.clone()).unwrap_or_default();
     let p = match &run_dir {
-        Some(dir) => fleet_maestro::invocation::prepare(&argv, dir, rewrite, &user_env),
+        Some(dir) => {
+            fleet_maestro::invocation::prepare(&argv, dir, rewrite, &extra, classify, &user_env)
+        }
         // No place for outputs: keep the user's flags, still make the log machine-readable.
-        None => fleet_maestro::invocation::prepare(&argv, Path::new("."), false, &user_env),
+        None => fleet_maestro::invocation::prepare(
+            &argv,
+            Path::new("."),
+            false,
+            &extra,
+            classify,
+            &user_env,
+        ),
     };
+    tracing::info!(
+        report = p.report_injection.as_str(),
+        "junit report decision"
+    );
     let argv = with_plan_flows(
         p.argv.into_iter().map(OsString::from).collect(),
         plan.as_ref(),
@@ -111,6 +127,15 @@ pub(crate) fn prepare(
         run_dir,
         plan,
     })
+}
+
+/// Looks at the disk: file, directory, or unknown (missing, unreadable).
+fn classify(path: &str) -> PathKind {
+    match std::fs::metadata(path) {
+        Ok(m) if m.is_dir() => PathKind::Dir,
+        Ok(m) if m.is_file() => PathKind::File,
+        _ => PathKind::Unknown,
+    }
 }
 
 fn with_plan_flows(mut argv: Vec<OsString>, plan: Option<&PlanAssigned>) -> Vec<OsString> {
@@ -161,15 +186,33 @@ mod tests {
     #[test]
     fn only_maestro_test_is_adjusted() {
         let dir = std::env::temp_dir().join(format!("fleet-prep-{}", std::process::id()));
-        let p = prepare(
-            &os("/opt/bin/maestro test flows/"),
-            true,
-            Some(&dir),
-            None,
-            |_| false,
-        )
-        .unwrap();
+        let flows = dir.join("flows");
+        std::fs::create_dir_all(&flows).unwrap();
+        let cmd = vec![
+            OsString::from("/opt/bin/maestro"),
+            OsString::from("test"),
+            flows.clone().into_os_string(),
+        ];
+        let p = prepare(&cmd, true, Some(&dir), None, |_| false).unwrap();
         assert!(p.argv.iter().any(|a| a == "--flatten-debug-output"));
+        assert!(
+            p.argv.iter().any(|a| a == "--format"),
+            "a directory is a suite"
+        );
+        let single = flows.join("one.yaml");
+        std::fs::write(&single, "appId: x\n---\n").unwrap();
+        let cmd = vec![
+            OsString::from("/opt/bin/maestro"),
+            OsString::from("test"),
+            single.into_os_string(),
+        ];
+        let p = prepare(&cmd, true, Some(&dir), None, |_| false).unwrap();
+        assert!(p.argv.iter().any(|a| a == "--flatten-debug-output"));
+        assert!(
+            !p.argv.iter().any(|a| a == "--format"),
+            "one flow keeps its mode"
+        );
+        assert_eq!(p.report, None);
         assert!(
             p.env
                 .iter()

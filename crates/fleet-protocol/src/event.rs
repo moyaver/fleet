@@ -73,9 +73,10 @@ pub enum ShardMode {
 pub enum ExitClass {
     /// Exit 0.
     Passed,
-    /// Exit 1 with a report: test failures.
+    /// Exit 1 with a report, or with a flow seen to fail (stdout, bundle or log): test failures.
     TestFailures,
-    /// Exit 1 without a report: Maestro or infrastructure error.
+    /// Exit 1 with no failed flow seen and an expected report missing: Maestro or infrastructure
+    /// error. With no report requested, exit 1 is `Other` instead.
     MaestroError,
     /// Exit 2: bad usage.
     UsageError,

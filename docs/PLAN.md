@@ -311,7 +311,7 @@ CI shell ──waits on──► P1 supervisor (std only) ──spawn──► C
   - `MAESTRO_CLI_LOG_PATTERN_FILE` set to the machine pattern `MFLT1|%d{UNIX_MILLIS}|%t|%level|%logger|%enc{%msg}{CRLF}%n` (validated in Phase 0).
 - **Rewrite mode** (`--fleet-rewrite=auto|off`, default `auto`):
   - If neither `--debug-output` nor `--test-output-dir` is given, add `--flatten-debug-output --debug-output $RUN/artifacts`.
-  - If no `--format` is given, add `--format junit --output $RUN/report.xml`.
+  - If no `--format` is given, add `--format junit --output $RUN/report.xml` only when that can't change Maestro's execution mode (`--format` selects its multi-flow path, which rejects `-c`): several flows, a directory, or `--shard-all N` with N > 1, and neither `-c` nor `--continuous`. A single flow, a continuous run, or a path that can't be classified gets no report, and the reason is logged.
   - Never remove user flags. Log every injected flag.
 - **Warn** when several devices are connected but no `--device` is given. Maestro would silently pick the first.
 

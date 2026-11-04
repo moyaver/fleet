@@ -11,7 +11,7 @@ use fleet_core::{
     reconcile::{self, FlowKey},
     redact::Redactor,
 };
-use fleet_maestro::{bundle, junit, log, stdout};
+use fleet_maestro::{ReportState, bundle, junit, log, stdout};
 use fleet_protocol::{
     event::{
         AgentWarning, ArtifactRegistered, EventBody, FailureInfo, FlowEnded, FlowOutcome, FlowRef,
@@ -44,8 +44,8 @@ pub(crate) enum Observation {
     Exited {
         code: Option<i32>,
         signal: Option<i32>,
-        /// Whether Maestro wrote its report (exit 1 with a report = test failures).
-        report_present: bool,
+        /// Whether a report was expected and written.
+        report: ReportState,
     },
     /// The final report, or `None` when there is none.
     Report(Option<Vec<u8>>),
@@ -194,8 +194,8 @@ impl Session {
             Observation::Exited {
                 code,
                 signal,
-                report_present,
-            } => self.on_exit(at, code, signal, report_present),
+                report,
+            } => self.on_exit(at, code, signal, report),
             Observation::Report(bytes) => self.on_report(at, bytes.as_deref()),
             Observation::Devices(list) => self.on_devices(at, list),
             Observation::Plan(plan) => {
@@ -550,9 +550,15 @@ impl Session {
         at: ClockSample,
         code: Option<i32>,
         signal: Option<i32>,
-        report_present: bool,
+        report: ReportState,
     ) {
-        let class = fleet_maestro::exit_class(code, signal, report_present);
+        // Failures seen directly (stdout, bundle, log), not through the report.
+        let flow_failed_observed = self.flows.iter().any(|f| {
+            f.claims
+                .iter()
+                .any(|c| c.outcome() == FlowOutcome::Failed && c.source() != SourceKind::JunitFinal)
+        });
+        let class = fleet_maestro::exit_class(code, signal, report, flow_failed_observed);
         self.emit(
             at,
             self.suite_subject(),

@@ -19,7 +19,7 @@ use std::{
 };
 
 use fleet_core::redact::Redactor;
-use fleet_maestro::stdout::strip_ansi;
+use fleet_maestro::{ReportState, stdout::strip_ansi};
 use fleet_protocol::{frame::Telemetry, journal::ClockSample};
 use time::OffsetDateTime;
 use tokio::sync::mpsc;
@@ -392,7 +392,11 @@ async fn finalize(
         Observation::Exited {
             code,
             signal,
-            report_present: report.is_some(),
+            report: match (&report, &l.report) {
+                (Some(_), _) => ReportState::Present,
+                (None, Some(_)) => ReportState::Absent,
+                (None, None) => ReportState::NotRequested,
+            },
         },
     );
     l.session.observe(clock(), Observation::Report(report));

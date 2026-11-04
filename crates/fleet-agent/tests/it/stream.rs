@@ -197,6 +197,20 @@ fn run_agent(
     env: &[(&str, &str)],
 ) -> (Output, Duration, PathBuf) {
     let bin_dir = fake_maestro_dir();
+    // A directory of flows: a suite, which is where the agent may ask for a JUnit report.
+    let flows = bin_dir.join("flows");
+    std::fs::create_dir_all(&flows).unwrap();
+    run_agent_on(fixture_name, server, extra_args, &[flows.as_os_str()], env)
+}
+
+fn run_agent_on(
+    fixture_name: &str,
+    server: Option<&str>,
+    extra_args: &[&str],
+    flow_args: &[&std::ffi::OsStr],
+    env: &[(&str, &str)],
+) -> (Output, Duration, PathBuf) {
+    let bin_dir = fake_maestro_dir();
     let run_dir = bin_dir.join("run");
     let _ = std::fs::remove_dir_all(&run_dir);
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"));
@@ -213,7 +227,7 @@ fn run_agent(
         .arg(bin_dir.join("maestro"))
         .args(["test"])
         .args(extra_args)
-        .arg("flows/")
+        .args(flow_args)
         .env("FLEET_FAKE_FIXTURE", fixture(fixture_name))
         .env("FLEET_FLUSH_TIMEOUT", "8")
         .stdin(Stdio::null());
@@ -350,4 +364,97 @@ fn no_server_black_hole_or_refusal_never_changes_the_result() {
             "{name}: the spool keeps the events"
         );
     }
+}
+
+/// Reads the argv the fake Maestro recorded.
+fn received_argv(path: &Path) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn a_single_flow_or_continuous_run_reaches_maestro_without_a_format() {
+    // Issue #28: `--format` switches Maestro to its multi-flow path, so for one flow (or `-c`)
+    // the argv Maestro receives must not carry it, and the run is otherwise unchanged.
+    let bin_dir = fake_maestro_dir();
+    let flow = bin_dir.join("login.yaml");
+    std::fs::write(&flow, "appId: x\n---\n- launchApp\n").unwrap();
+    for (name, extra) in [("single", &[][..]), ("continuous", &["-c"][..])] {
+        let log = bin_dir.join(format!("argv-{name}.txt"));
+        let (out, _, _) = run_agent_on(
+            "single-flow-no-format",
+            None,
+            extra,
+            &[flow.as_os_str()],
+            &[("FLEET_FAKE_ARGV_LOG", log.to_str().unwrap())],
+        );
+        let argv = received_argv(&log);
+        assert!(
+            !argv.iter().any(|a| a == "--format" || a == "--output"),
+            "{name}: {argv:?}"
+        );
+        assert!(
+            argv.iter().any(|a| a == "--flatten-debug-output"),
+            "{name}: {argv:?}"
+        );
+        assert_eq!(argv.last().map(String::as_str), flow.to_str(), "{name}");
+        assert_eq!(
+            out.stdout,
+            std::fs::read(fixture("single-flow-no-format/stdout.bin")).unwrap(),
+            "{name}: I1"
+        );
+    }
+}
+
+#[test]
+fn a_suite_run_reaches_maestro_with_a_junit_report() {
+    let bin_dir = fake_maestro_dir();
+    let log = bin_dir.join("argv-suite.txt");
+    let (_, _, run_dir) = run_agent(
+        "suite",
+        None,
+        &[],
+        &[("FLEET_FAKE_ARGV_LOG", log.to_str().unwrap())],
+    );
+    let argv = received_argv(&log);
+    let pos = argv.iter().position(|a| a == "--format").unwrap();
+    assert_eq!(argv.get(pos + 1).map(String::as_str), Some("junit"));
+    assert_eq!(
+        argv.get(pos + 3).map(Path::new),
+        Some(run_dir.join("report.xml").as_path())
+    );
+}
+
+#[test]
+fn a_failing_single_flow_is_test_failures_without_a_report() {
+    // No JUnit is asked for on a single flow, so exit 1 must still read as failed tests, from the
+    // failure seen on stdout and in the bundle, not as an infrastructure error.
+    let bin_dir = fake_maestro_dir();
+    let flow = bin_dir.join("fail.yaml");
+    std::fs::write(&flow, "appId: x\n---\n- launchApp\n").unwrap();
+    let srv = server(Mode::Normal);
+    let (out, _, _) = run_agent_on(
+        "fail",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[flow.as_os_str()],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let s = srv.state.lock().unwrap();
+    let exited = s
+        .committed
+        .values()
+        .find(|e| e["type"] == "process.exited")
+        .expect("process.exited");
+    assert_eq!(exited["data"]["class"], "test_failures", "{exited}");
+    assert!(
+        !s.committed
+            .values()
+            .any(|e| e["type"] == "report.parsed" && e["data"]["status"] != "absent"),
+        "no report was read"
+    );
 }

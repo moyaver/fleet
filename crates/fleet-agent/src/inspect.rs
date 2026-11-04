@@ -13,7 +13,7 @@ use std::{
 
 use anyhow::Context;
 use fleet_core::{claims::FlowState, redact::Redactor};
-use fleet_maestro::log;
+use fleet_maestro::{ReportState, log};
 use fleet_protocol::journal::{ClockSample, EventEnvelope};
 use serde::Serialize;
 use serde_json::Value;
@@ -237,7 +237,11 @@ impl Replay {
             Observation::Exited {
                 code,
                 signal,
-                report_present: report.is_some(),
+                report: match (&report, report_path(&argv, dir)) {
+                    (Some(_), _) => ReportState::Present,
+                    (None, Some(_)) => ReportState::Absent,
+                    (None, None) => ReportState::NotRequested,
+                },
             },
         ));
         timeline.push((end, Observation::Report(report)));

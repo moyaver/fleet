@@ -160,6 +160,8 @@ pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
         dir.join("maestro"),
     )
     .unwrap();
+    // A real directory: a suite, so the agent adds the JUnit report (a missing path would not).
+    std::fs::create_dir_all(dir.join("flows")).unwrap();
     let mut cmd = Command::new(agent_bin());
     cmd.env_clear();
     for keep in ["PATH", "HOME", "TMPDIR"] {
@@ -171,7 +173,8 @@ pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
         .arg(dir.join("run"))
         .arg("--")
         .arg(dir.join("maestro"))
-        .args(["test", "flows/"])
+        .arg("test")
+        .arg(dir.join("flows"))
         .env("FLEET_FAKE_FIXTURE", fixture(fixture_name))
         .env("FLEET_FAKE_LINGER", "0.2")
         .env("FLEET_FLUSH_TIMEOUT", "15")

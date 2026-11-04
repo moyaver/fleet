@@ -22,14 +22,37 @@ use fleet_protocol::event::ExitClass;
 /// The Maestro version profile these parsers implement, for provenance (`maestro-log@2.12`).
 pub const PROFILE: &str = "2.12";
 
+/// Whether a JUnit report was expected from the run, and whether it showed up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportState {
+    /// The report was written.
+    Present,
+    /// A report was expected (the agent added it, or the user asked for JUnit) but isn't there.
+    Absent,
+    /// No report was requested: Maestro ran as the user wrote it (for example one flow, or `-c`).
+    NotRequested,
+}
+
 /// Classifies how Maestro ended (research 08 §7).
+///
+/// Exit 1 is `TestFailures` when the report is present or a flow was seen to fail by direct
+/// observation (`flow_failed_observed`: stdout, bundle or log, not the report). Without either, it
+/// is `MaestroError` if a report was expected and is missing, else `Other`: with no report asked
+/// for, Fleet can't tell a failing test from an infrastructure error.
 #[must_use]
-pub fn exit_class(code: Option<i32>, signal: Option<i32>, report_present: bool) -> ExitClass {
+pub fn exit_class(
+    code: Option<i32>,
+    signal: Option<i32>,
+    report: ReportState,
+    flow_failed_observed: bool,
+) -> ExitClass {
     match (code, signal) {
         (_, Some(_)) | (Some(130 | 143 | 137), _) => ExitClass::Interrupted,
         (Some(0), _) => ExitClass::Passed,
-        (Some(1), _) if report_present => ExitClass::TestFailures,
-        (Some(1), _) => ExitClass::MaestroError,
+        (Some(1), _) if report == ReportState::Present || flow_failed_observed => {
+            ExitClass::TestFailures
+        }
+        (Some(1), _) if report == ReportState::Absent => ExitClass::MaestroError,
         (Some(2), _) => ExitClass::UsageError,
         _ => ExitClass::Other,
     }
@@ -41,11 +64,49 @@ mod tests {
 
     #[test]
     fn exit_classes() {
-        assert_eq!(exit_class(Some(0), None, true), ExitClass::Passed);
-        assert_eq!(exit_class(Some(1), None, true), ExitClass::TestFailures);
-        assert_eq!(exit_class(Some(1), None, false), ExitClass::MaestroError);
-        assert_eq!(exit_class(Some(2), None, false), ExitClass::UsageError);
-        assert_eq!(exit_class(Some(143), None, false), ExitClass::Interrupted);
-        assert_eq!(exit_class(None, Some(9), false), ExitClass::Interrupted);
+        use ReportState::{Absent, NotRequested, Present};
+        assert_eq!(exit_class(Some(0), None, Present, false), ExitClass::Passed);
+        assert_eq!(
+            exit_class(Some(0), None, NotRequested, false),
+            ExitClass::Passed
+        );
+        // Exit 1: the report or an observed failure says test failures.
+        assert_eq!(
+            exit_class(Some(1), None, Present, false),
+            ExitClass::TestFailures
+        );
+        assert_eq!(
+            exit_class(Some(1), None, Present, true),
+            ExitClass::TestFailures
+        );
+        assert_eq!(
+            exit_class(Some(1), None, Absent, true),
+            ExitClass::TestFailures
+        );
+        assert_eq!(
+            exit_class(Some(1), None, NotRequested, true),
+            ExitClass::TestFailures
+        );
+        // No failure seen: a missing expected report is an error, no report by choice is unknown.
+        assert_eq!(
+            exit_class(Some(1), None, Absent, false),
+            ExitClass::MaestroError
+        );
+        assert_eq!(
+            exit_class(Some(1), None, NotRequested, false),
+            ExitClass::Other
+        );
+        assert_eq!(
+            exit_class(Some(2), None, Absent, false),
+            ExitClass::UsageError
+        );
+        assert_eq!(
+            exit_class(Some(143), None, Absent, false),
+            ExitClass::Interrupted
+        );
+        assert_eq!(
+            exit_class(None, Some(9), Absent, true),
+            ExitClass::Interrupted
+        );
     }
 }
