@@ -6,8 +6,10 @@
 
 mod access;
 mod artifacts;
+mod compare;
 mod fleet;
 mod flows;
+mod history;
 mod metrics;
 mod openapi;
 mod overview;

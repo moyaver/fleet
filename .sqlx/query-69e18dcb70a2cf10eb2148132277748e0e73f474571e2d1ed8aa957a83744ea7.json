@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS flow_id, at AS \"at!\", duration_ms AS \"duration_ms!\", state AS \"state!\"\n               FROM (SELECT f.id, coalesce(f.ended_at, f.started_at) AS at, f.duration_ms, f.state\n                       FROM flow_executions f\n                       LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n                      WHERE f.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2\n                        AND f.state IN ('passed', 'failed')\n                        AND f.finality IN ('verified', 'unverified_final')\n                        AND f.duration_ms IS NOT NULL\n                        AND coalesce(f.ended_at, f.started_at) >= $3\n                        AND coalesce(f.ended_at, f.started_at) < $4\n                      ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC\n                      LIMIT $5) latest\n              ORDER BY at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "duration_ms!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "duration_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true,
+      false
+    ]
+  },
+  "hash": "69e18dcb70a2cf10eb2148132277748e0e73f474571e2d1ed8aa957a83744ea7"
+}

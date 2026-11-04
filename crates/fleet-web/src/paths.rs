@@ -2,6 +2,7 @@
 //! The dashboard's URLs: where pages live (PLAN §10.1), where the API and the live socket are,
 //! and the sign-in redirect. Pure string work, so it is tested natively.
 
+use fleet_ui::filter_bar::{FilterField, FilterKind, FilterSpec};
 use uuid::Uuid;
 
 /// The REST path prefix of the server.
@@ -31,6 +32,18 @@ pub fn flow_href(project: &str, execution: Uuid) -> String {
     format!("/flows/{execution}?project={}", escape(project))
 }
 
+/// The history page of a project (screen E): `/history?project=<slug>`.
+#[must_use]
+pub fn history_href(project: &str) -> String {
+    format!("/history?project={}", escape(project))
+}
+
+/// The compare page of a project (screen F), with the two attempts to compare.
+#[must_use]
+pub fn compare_href(project: &str, a: Uuid, b: Uuid) -> String {
+    format!("/compare?project={}&a={a}&b={b}", escape(project))
+}
+
 /// The server's sign-in route, asking to come back to `return_to` (a path and query on this site).
 #[must_use]
 pub fn login_url(return_to: &str) -> String {
@@ -55,6 +68,22 @@ pub fn ci_run_url(provider: &str, repository: Option<&str>, run_key: &str) -> Op
     let (_, run_id) = run_key.rsplit_once(':')?;
     let well_formed = !run_id.is_empty() && run_id.bytes().all(|b| b.is_ascii_digit());
     well_formed.then(|| format!("https://github.com/{repository}/actions/runs/{run_id}"))
+}
+
+/// The value of parameter `key` in a URL query string (with or without `?`), decoded.
+#[must_use]
+pub fn query_param(query: &str, key: &str) -> Option<String> {
+    let spec = FilterSpec::new(vec![FilterField::new(key, FilterKind::Text)]);
+    spec.decode(query).get(&spec, key).map(str::to_owned)
+}
+
+/// `query` with parameter `key` set to `value`, or removed for `None`; other parameters stay.
+#[must_use]
+pub fn with_query_param(query: &str, key: &str, value: Option<&str>) -> String {
+    let spec = FilterSpec::new(vec![FilterField::new(key, FilterKind::Text)]);
+    let mut state = spec.decode(query);
+    state.set(&spec, key, value.unwrap_or_default());
+    spec.encode(&state)
 }
 
 /// Percent-encodes everything but the RFC 3986 unreserved characters, so the result is safe in
@@ -96,6 +125,29 @@ mod tests {
             flow_href("app", ID),
             "/flows/01900000-0000-7000-8000-000000000001?project=app"
         );
+    }
+
+    #[test]
+    fn the_history_and_compare_pages_are_scoped_by_project_in_the_query() {
+        assert_eq!(history_href("a b"), "/history?project=a%20b");
+        assert_eq!(
+            compare_href("app", ID, ID),
+            "/compare?project=app&a=01900000-0000-7000-8000-000000000001&b=01900000-0000-7000-8000-000000000001"
+        );
+    }
+
+    #[test]
+    fn a_query_parameter_is_read_set_and_removed_and_the_others_stay() {
+        let q = "project=shop&flow=login%20x";
+        assert_eq!(query_param(q, "flow").as_deref(), Some("login x"));
+        assert_eq!(query_param(q, "a"), None);
+        let with = with_query_param(q, "a", Some("1/2"));
+        assert_eq!(query_param(&with, "a").as_deref(), Some("1/2"));
+        assert_eq!(query_param(&with, "project").as_deref(), Some("shop"));
+        assert_eq!(query_param(&with, "flow").as_deref(), Some("login x"));
+        let without = with_query_param(&with, "a", None);
+        assert_eq!(query_param(&without, "a"), None);
+        assert_eq!(query_param(&without, "project").as_deref(), Some("shop"));
     }
 
     #[test]

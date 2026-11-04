@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The OpenAPI document lists every route of screens A–D with the DTO it returns.
+//! The OpenAPI document lists every route of screens A–F with the DTO it returns.
 
 use serde_json::Value;
 
@@ -23,6 +23,9 @@ async fn every_screen_route_is_documented_with_its_response_schema() {
         ("devices/{device}/metrics", "MetricsView"),
         ("flows/{execution_id}", "FlowDetailView"),
         ("flows/{execution_id}/artifacts", "ArtifactListView"),
+        ("history", "HistoryPage"),
+        ("flows/{name}/stats", "FlowStatsView"),
+        ("compare", "CompareView"),
     ] {
         let full = format!("{base}/{path}");
         let get = &doc["paths"][&full]["get"];
@@ -54,6 +57,10 @@ async fn every_screen_route_is_documented_with_its_response_schema() {
         ("FlowDetailView", "claims"),
         ("WorkerSummaryView", "latest"),
         ("OverviewView", "worker_counts"),
+        ("HistoryEntryView", "failure_fingerprint"),
+        ("HistoryPage", "flows"),
+        ("FlowStatsView", "recent_failures"),
+        ("CompareRowView", "explanations"),
     ] {
         assert!(
             schemas[schema]["properties"][property].is_object(),

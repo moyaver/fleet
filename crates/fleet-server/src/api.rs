@@ -6,6 +6,8 @@
 //! and are refused here. `POST /api/v1/plans` takes a publisher credential: the planning CI job
 //! stores its plan like an agent publishes.
 
+mod compare;
+mod history;
 pub(crate) mod live_ws;
 mod metrics;
 mod screens;
@@ -36,6 +38,12 @@ use fleet_protocol::{
         MetricSubjectKind, MetricUnit, MetricsView, OverviewView, PreviousExecutionView,
         RecentAttemptView, SeriesView, StepView, TimelineView, WorkerCounts, WorkerRunPage,
         WorkerRunView, WorkerSummaryView, WorkerView,
+        history::{
+            ChangeKind, CompareFlowView, CompareRowView, CompareSideView, CompareView,
+            DimChangeView, DurationPoint, DurationSummary, EvidenceView, Explanation,
+            FailureGroupView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
+            HistoryEntryView, HistoryPage, OutcomeCounts, Side,
+        },
     },
 };
 use fleet_store::plans::{PlanError, PlanPipeline};
@@ -69,7 +77,10 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         crate::artifacts::list::flow_artifacts,
         crate::artifacts::upload::request,
         crate::artifacts::upload::content,
-        crate::artifacts::upload::complete
+        crate::artifacts::upload::complete,
+        history::history,
+        history::flow_stats,
+        compare::compare
     ),
     components(schemas(
         ProjectView,
@@ -124,6 +135,25 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         UploadGrant,
         UploadResult,
         RejectReason,
+        HistoryPage,
+        HistoryEntryView,
+        FlowStatsView,
+        CompareView,
+        CompareSideView,
+        CompareRowView,
+        CompareFlowView,
+        ChangeKind,
+        Explanation,
+        EvidenceView,
+        DimChangeView,
+        Side,
+        OutcomeCounts,
+        DurationSummary,
+        DurationPoint,
+        FailureGroupView,
+        FlowFlakinessView,
+        FlakyEvidenceView,
+        Flakiness,
         PlanUpload,
         PlanStored,
         ApiError
@@ -175,6 +205,12 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/projects/{project}/flows/{execution_id}/artifacts",
             get(crate::artifacts::list::flow_artifacts),
+        )
+        .route("/api/v1/projects/{project}/history", get(history::history))
+        .route("/api/v1/projects/{project}/compare", get(compare::compare))
+        .route(
+            "/api/v1/projects/{project}/flows/{name}/stats",
+            get(history::flow_stats),
         )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))

@@ -10,6 +10,10 @@
 //! - `job_keys`: agents share job keys (overlapping job names in one pipeline attempt);
 //! - `storm`: every agent drops its connection at its half-way point and reconnects at once;
 //! - `duplicates`: batches are resent and shuffled (the server sorts and skips duplicates);
+//! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
+//!   and comparisons group by;
+//! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
+//!   the index (see [`fails`]), so two runs can pass or fail the same flow;
 //! - a server restart needs nothing special: agents reconnect until `deadline`.
 //!
 //! [`run`] returns what each agent knows, so a test can compare it with the server's state.
@@ -67,6 +71,14 @@ pub struct Options {
     pub pace: Duration,
     /// Give up on an agent after this long.
     pub deadline: Duration,
+    /// The commit the CI run tests; `None` when the CI didn't say.
+    pub commit: Option<String>,
+    /// The git ref of the CI run; `None` when the CI didn't say.
+    pub git_ref: Option<String>,
+    /// The CPU architecture the agents report (a fact of the condition fingerprint).
+    pub arch: String,
+    /// The index of the first agent: agent `first_agent + n` follows [`fails`] as that agent.
+    pub first_agent: usize,
 }
 
 impl Default for Options {
@@ -84,6 +96,10 @@ impl Default for Options {
             duplicates: false,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
+            commit: None,
+            git_ref: None,
+            arch: "x86_64".into(),
+            first_agent: 0,
         }
     }
 }
@@ -391,7 +407,7 @@ fn hello(
         agent: AgentInfo {
             version: "loadgen".into(),
             os: "linux".into(),
-            arch: "x86_64".into(),
+            arch: opts.arch.clone(),
         },
         agent_run_id: id,
         previous_agent_run_id: None,
@@ -402,8 +418,8 @@ fn hello(
             run_attempt: Some(1),
             job_key: job_key.into(),
             job_name: Some(job_key.into()),
-            sha: None,
-            git_ref: None,
+            sha: opts.commit.clone(),
+            git_ref: opts.git_ref.clone(),
             runner: Some(format!("runner-{id}")),
         },
         resume: ResumeState {
@@ -428,7 +444,7 @@ async fn agent(
     let t0 = Instant::now();
     let id = Uuid::now_v7();
     let job_key = format!("job-{}", i % opts.job_keys.max(1));
-    let s = script(i, opts, t0);
+    let s = script(opts.first_agent + i, opts, t0);
     let total = u64::try_from(s.events.len()).unwrap_or(u64::MAX);
     let mut report = AgentReport {
         agent_run_id: id,

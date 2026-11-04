@@ -3,10 +3,11 @@
 //! (PLAN §10.1). The session cookie travels with every request and the SPA holds no token.
 
 use fleet_protocol::{
-    live::ProjectView,
+    live::{AttemptView, ProjectView},
     rest::{
         DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView, TimelineView,
         WorkerRunPage, WorkerView,
+        history::{CompareView, FlowStatsView, HistoryPage},
     },
 };
 use gloo_net::http::Request;
@@ -166,6 +167,45 @@ pub async fn device_metrics(
 pub async fn flow(project: &str, execution: Uuid) -> Result<FlowDetailView, ApiError> {
     get(&format!(
         "{API}/projects/{}/flows/{execution}",
+        segment(project)
+    ))
+    .await
+}
+
+/// A project's latest pipeline attempts, newest first (the compare page's pickers).
+pub async fn attempts(project: &str, limit: u32) -> Result<Vec<AttemptView>, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/attempts?limit={limit}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen E: a page of the project's history; `query` is the history query string without `?`
+/// (see [`crate::screens::history::model::HistoryQuery::rest_query`]).
+pub async fn history(project: &str, query: &str) -> Result<HistoryPage, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/history?{query}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen E's panel for the flow `flow` (its identity as the history lists it); `query` holds the
+/// optional `from` and `to`.
+pub async fn flow_stats(project: &str, flow: &str, query: &str) -> Result<FlowStatsView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/flows/{}/stats?{query}",
+        segment(project),
+        crate::paths::escape(flow)
+    ))
+    .await
+}
+
+/// Screen F: attempt `a` against attempt `b`.
+pub async fn compare(project: &str, a: Uuid, b: Uuid) -> Result<CompareView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/compare?a={a}&b={b}",
         segment(project)
     ))
     .await

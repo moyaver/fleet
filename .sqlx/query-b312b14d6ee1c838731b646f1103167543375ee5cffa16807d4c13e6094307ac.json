@@ -1,0 +1,75 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ff.fingerprint, min(ff.step_kind) AS \"step_kind!\", min(ff.message) AS \"message!\",\n                    count(*) AS \"count!\",\n                    min(coalesce(f.ended_at, f.started_at)) AS \"first_at!\",\n                    max(coalesce(f.ended_at, f.started_at)) AS \"last_at!\",\n                    (array_agg(f.id ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC))[1:$5]\n                        AS \"flow_ids!\"\n               FROM failure_fingerprints ff\n               JOIN flow_executions f ON f.id = ff.flow_execution_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n              WHERE ff.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2\n                AND coalesce(f.ended_at, f.started_at) >= $3\n                AND coalesce(f.ended_at, f.started_at) < $4\n              GROUP BY ff.fingerprint\n              ORDER BY max(coalesce(f.ended_at, f.started_at)) DESC, ff.fingerprint\n              LIMIT $6",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fingerprint",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_fingerprints",
+            "name": "fingerprint"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "step_kind!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "message!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "first_at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "flow_ids!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b312b14d6ee1c838731b646f1103167543375ee5cffa16807d4c13e6094307ac"
+}

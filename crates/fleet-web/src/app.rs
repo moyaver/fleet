@@ -28,6 +28,8 @@ use crate::{
     api::{self, ApiError},
     paths::login_url,
     screens::{
+        compare::route::CompareRoute,
+        history::route::HistoryRoute,
         overview::Overview,
         pipeline::PipelineDetail,
         routes::{DeviceRoute, FlowRoute, WorkerRoute},
@@ -67,6 +69,8 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/workers/:id") view=WorkerRoute />
                     <Route path=path!("/devices/:id") view=DeviceRoute />
                     <Route path=path!("/flows/:execution_id") view=FlowRoute />
+                    <Route path=path!("/history") view=HistoryRoute />
+                    <Route path=path!("/compare") view=CompareRoute />
                 </Routes>
             </Layout>
         </Router>
@@ -106,6 +110,22 @@ fn Header() -> impl IntoView {
                                 attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
                             >
                                 "Overview"
+                            </A>
+                        </li>
+                        <li>
+                            <A
+                                href="/history"
+                                attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
+                            >
+                                "History"
+                            </A>
+                        </li>
+                        <li>
+                            <A
+                                href="/compare"
+                                attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
+                            >
+                                "Compare"
                             </A>
                         </li>
                     </ul>

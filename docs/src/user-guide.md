@@ -57,6 +57,14 @@ At most two files at a time, hashed while they stream. Uploading never changes M
 
 Every outcome Fleet shows says where it came from. While a run is live, outcomes come from Maestro's log and console (**provisional**). When Maestro writes its report, the report decides (**verified**). An outcome Fleet had to infer, such as a flow cut short by a signal, says **inferred** and is never shown as passed.
 
+## History and compare
+
+**History** (`/history?project=<slug>`) lists finished flow executions, newest first, within a window of at most 90 days (30 by default). Filter by flow (text in its path or name), branch, outcome and time; the filters live in the address, so a reload or a shared link shows the same table. Every row carries its provenance, its failure fingerprint (failures with the same fingerprint are the same failure) and the first digits of its condition fingerprint (runs with the same one ran under comparable conditions). A flow is marked **Flaky (confirmed)** when it passed and failed on one commit under one condition, and **Suspected flaky** when its latest default-branch runs flip often; both name the runs behind the verdict as links. An inferred outcome never counts as a pass. *Stats* on a row opens the flow's panel: counts of settled passes and failures, the median and 90th-percentile duration of its passes, a duration chart and its recent failures grouped by fingerprint.
+
+**Compare** (`/compare?project=<slug>&a=<attempt>&b=<attempt>`) sets two attempts side by side: newly failing, recovered, changed, only in A, only in B and unchanged flows. A difference is explained only from what the evidence says: the conditions differ (and in which facts), the two failed differently, the flow is missing on one side, or one outcome rests on weaker evidence (provisional, inferred). A duration change is shown, never called a regression, and carries a note when the conditions differ. When the evidence says nothing differs, the row has no explanation.
+
+The data comes from `GET /api/v1/projects/{project}/history`, `…/flows/{name}/stats` and `…/compare?a=&b=`; see `/api/v1/openapi.json`.
+
 ## Offline mode and `inspect`
 
 Without `FLEET_SERVER`, everything still happens locally: the run directory gets `journal.jsonl` (every event) and `spool.bin` (capped at 64 MiB; if a run overflows it, the spool ends in a `journal.gap` saying which events it does not hold). To see what Fleet makes of any saved run:

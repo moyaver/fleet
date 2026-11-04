@@ -231,6 +231,12 @@ pub struct ConditionFacts {
 pub struct ConditionFingerprint([u8; 32]);
 
 impl ConditionFingerprint {
+    /// The fingerprint of a stored digest.
+    #[must_use]
+    pub const fn from_bytes(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+
     /// The raw digest.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8; 32] {

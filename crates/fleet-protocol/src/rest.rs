@@ -7,6 +7,10 @@
 //! JSON is `snake_case`. Nothing here is invented: a value the agent didn't report is `None` or
 //! `available: false` with a reason, never zero (acceptance criteria 4 and 5), and every outcome
 //! carries the source it rests on.
+//!
+//! Screens E and F (history and compare) read the models in [`history`].
+
+pub mod history;
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;

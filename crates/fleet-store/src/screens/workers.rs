@@ -22,6 +22,16 @@ pub struct RunCursor {
 }
 
 impl RunCursor {
+    /// A cursor after the entry at `at` with `id`.
+    pub(super) const fn new(at: OffsetDateTime, id: Uuid) -> Self {
+        Self { started_at: at, id }
+    }
+
+    /// The time and ID the cursor stands after.
+    pub(super) const fn parts(&self) -> (OffsetDateTime, Uuid) {
+        (self.started_at, self.id)
+    }
+
     /// The token a client sends back for the next page.
     #[must_use]
     pub fn encode(&self) -> String {

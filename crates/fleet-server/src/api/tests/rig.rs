@@ -270,6 +270,10 @@ pub(super) struct Agent {
     ci_run: String,
     job_key: String,
     runner: String,
+    sha: Option<String>,
+    git_ref: Option<String>,
+    arch: String,
+    flow_ms: u64,
 }
 
 /// The entities of one flow, as events name them.
@@ -287,7 +291,30 @@ impl Agent {
             ci_run: ci_run.into(),
             job_key: job_key.into(),
             runner: runner.into(),
+            sha: None,
+            git_ref: None,
+            arch: "x86_64".into(),
+            flow_ms: 1500,
         }
+    }
+
+    /// The commit and ref the CI run tests.
+    pub(super) fn on_commit(mut self, sha: &str, git_ref: &str) -> Self {
+        self.sha = Some(sha.into());
+        self.git_ref = Some(git_ref.into());
+        self
+    }
+
+    /// The CPU architecture of the runner (a fact of the condition fingerprint).
+    pub(super) fn on_arch(mut self, arch: &str) -> Self {
+        self.arch = arch.into();
+        self
+    }
+
+    /// How long the flows reported from now on take (Maestro reports the same figure live and in
+    /// the final report).
+    pub(super) fn set_flow_time(&mut self, ms: u64) {
+        self.flow_ms = ms;
     }
 
     fn hello(&self) -> Hello {
@@ -299,7 +326,7 @@ impl Agent {
             agent: AgentInfo {
                 version: "0.0.0".into(),
                 os: "linux".into(),
-                arch: "x86_64".into(),
+                arch: self.arch.clone(),
             },
             agent_run_id: self.id,
             previous_agent_run_id: None,
@@ -310,8 +337,8 @@ impl Agent {
                 run_attempt: Some(1),
                 job_key: self.job_key.clone(),
                 job_name: Some(self.job_key.clone()),
-                sha: None,
-                git_ref: None,
+                sha: self.sha.clone(),
+                git_ref: self.git_ref.clone(),
                 runner: Some(self.runner.clone()),
             },
             resume: ResumeState {
@@ -509,7 +536,7 @@ impl Agent {
                     id: Some(name.into()),
                     name: name.into(),
                     file: Some(format!("flows/{name}.yaml")),
-                    time_ms: Some(1500),
+                    time_ms: Some(self.flow_ms),
                     timestamp_local: None,
                     status: Some(
                         if outcome == FlowOutcome::Passed {
@@ -537,7 +564,7 @@ impl Agent {
             SourceKind::LiveConsole,
             &EventBody::FlowEnded(FlowEnded {
                 outcome,
-                duration_ms: Some(1500),
+                duration_ms: Some(self.flow_ms),
                 failure: failure.map(|m| FailureInfo { message: m.into() }),
                 flow: None,
             }),

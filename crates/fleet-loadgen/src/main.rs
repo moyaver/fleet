@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
         duplicates: c.duplicates,
         pace: Duration::from_millis(c.pace_ms),
         deadline: Duration::from_secs(300),
+        ..fleet_loadgen::Options::default()
     })
     .await?;
     let events: u64 = report.agents.iter().map(|a| a.events).sum();

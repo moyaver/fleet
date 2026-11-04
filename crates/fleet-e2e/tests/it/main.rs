@@ -9,6 +9,7 @@ mod artifacts;
 mod browser;
 mod dashboard_ab;
 mod dashboard_cd;
+mod dashboard_ef;
 mod fixtures;
 mod network;
 mod scenarios;

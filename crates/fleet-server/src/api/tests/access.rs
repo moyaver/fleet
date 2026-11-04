@@ -34,7 +34,7 @@ async fn routes(rig: &Rig) -> Routes {
     let device = snapshot["devices"][0]["id"].as_str().unwrap();
     let worker = snapshot["agent_runs"][0]["worker_id"].as_str().unwrap();
     Routes {
-        project: vec!["overview".into()],
+        project: vec!["overview".into(), "history".into()],
         objects: vec![
             format!("attempts/{attempt}/timeline"),
             format!("workers/{worker}"),
@@ -44,6 +44,8 @@ async fn routes(rig: &Rig) -> Routes {
             format!("devices/{device}/metrics"),
             format!("flows/{flow}"),
             format!("flows/{flow}/artifacts"),
+            "flows/login/stats".into(), // a live flow: known by its name,
+            format!("compare?a={attempt}&b={attempt}"),
         ],
     }
 }

@@ -1,0 +1,137 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (coalesce(d.repo_path, f.flow_name))\n                coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.id, f.flow_name, f.state,\n                f.outcome_source::text AS outcome_source, f.finality::text AS \"finality!\",\n                f.duration_ms, f.failure_message,\n                encode(c.fingerprint, 'hex') AS condition_fingerprint, c.dims AS \"dims?\",\n                ff.fingerprint AS \"failure_fingerprint?\",\n                count(*) OVER (PARTITION BY coalesce(d.repo_path, f.flow_name)) AS \"executions!\"\n           FROM flow_executions f\n           LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n           LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n           LEFT JOIN failure_fingerprints ff ON ff.flow_execution_id = f.id\n          WHERE f.project_id = $1 AND f.pipeline_attempt_id = $2\n          ORDER BY coalesce(d.repo_path, f.flow_name), f.started_at DESC NULLS LAST, f.id DESC\n          LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "flow_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "outcome_source",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "finality!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "duration_ms",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "duration_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "failure_message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "failure_message"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "condition_fingerprint",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "dims?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "condition_fingerprints",
+            "name": "dims"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "failure_fingerprint?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_fingerprints",
+            "name": "fingerprint"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "executions!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      null,
+      null,
+      true,
+      true,
+      null,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "ce4c0776731d2f79a1d2edee2307e7995713be7a49b58b02a1b81875e97d337f"
+}
