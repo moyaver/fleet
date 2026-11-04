@@ -1255,6 +1255,7 @@ dependencies = [
  "clap",
  "figment",
  "fleet-core",
+ "fleet-loadgen",
  "fleet-protocol",
  "fleet-store",
  "fleet-web-assets",

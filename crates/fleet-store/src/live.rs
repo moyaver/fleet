@@ -18,7 +18,7 @@ use crate::{Result, Store, ingest::EntityRef};
 
 /// Rows of one attempt, or the rows with these IDs.
 #[derive(Debug, Clone, Copy)]
-enum Scope<'a> {
+pub(crate) enum Scope<'a> {
     Attempt(Uuid),
     Ids(&'a [Uuid]),
 }
@@ -55,7 +55,7 @@ impl Store {
         sqlx::query!("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .execute(&mut *tx)
             .await?;
-        let Some(attempt) = attempts(&mut *tx, Some(project_id), Some(attempt_id), 1)
+        let Some(attempt) = attempts(&mut *tx, Some(project_id), Some(&[attempt_id]), 1)
             .await?
             .into_iter()
             .next()
@@ -144,10 +144,10 @@ impl Store {
     }
 }
 
-async fn attempts<'e, E: sqlx::PgExecutor<'e>>(
+pub(crate) async fn attempts<'e, E: sqlx::PgExecutor<'e>>(
     e: E,
     project: Option<Uuid>,
-    attempt: Option<Uuid>,
+    ids: Option<&[Uuid]>,
     limit: i64,
 ) -> Result<Vec<AttemptView>> {
     Ok(sqlx::query_as!(
@@ -160,18 +160,18 @@ async fn attempts<'e, E: sqlx::PgExecutor<'e>>(
                 (SELECT count(*) FROM jobs j
                   WHERE j.pipeline_attempt_id = a.id AND j.lifecycle <> 'closed') AS \"open_jobs!\"
            FROM pipeline_attempts a JOIN pipeline_runs r ON r.id = a.pipeline_run_id
-          WHERE ($1::uuid IS NULL OR a.project_id = $1) AND ($2::uuid IS NULL OR a.id = $2)
+          WHERE ($1::uuid IS NULL OR a.project_id = $1) AND ($2::uuid[] IS NULL OR a.id = ANY($2))
           ORDER BY a.first_seen_at DESC
           LIMIT $3",
         project,
-        attempt,
+        ids,
         limit
     )
     .fetch_all(e)
     .await?)
 }
 
-async fn jobs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<JobView>> {
+pub(crate) async fn jobs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<JobView>> {
     let (attempt, ids) = scope.parts();
     Ok(sqlx::query_as!(
         JobView,
@@ -187,7 +187,10 @@ async fn jobs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<JobVie
     .await?)
 }
 
-async fn agent_runs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<AgentRunView>> {
+pub(crate) async fn agent_runs(
+    c: &mut sqlx::PgConnection,
+    scope: Scope<'_>,
+) -> Result<Vec<AgentRunView>> {
     let (attempt, ids) = scope.parts();
     let rows = sqlx::query!(
         "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,
@@ -227,7 +230,7 @@ async fn agent_runs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<
         .collect())
 }
 
-async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<SuiteView>> {
+pub(crate) async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<SuiteView>> {
     let (attempt, ids) = scope.parts();
     Ok(sqlx::query_as!(
         SuiteView,
@@ -244,7 +247,10 @@ async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<Suit
     .await?)
 }
 
-async fn devices(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<DeviceView>> {
+pub(crate) async fn devices(
+    c: &mut sqlx::PgConnection,
+    scope: Scope<'_>,
+) -> Result<Vec<DeviceView>> {
     let (attempt, ids) = scope.parts();
     Ok(sqlx::query_as!(
         DeviceView,
@@ -260,7 +266,7 @@ async fn devices(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<Dev
     .await?)
 }
 
-async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<FlowView>> {
+pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<FlowView>> {
     let (attempt, ids) = scope.parts();
     Ok(sqlx::query_as!(
         FlowView,

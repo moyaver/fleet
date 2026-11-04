@@ -11,6 +11,8 @@
 //! - [`telemetry`]: buffered metric samples, written in one statement per flush.
 //! - [`live`]: read models for REST snapshots and live deltas, with a consistent `version`.
 //! - [`plans`]: immutable Fleet Planner manifests and planned totals (ADR-0013).
+//! - [`screens`]: the queries behind the dashboard's screens A–D (overview, timeline, worker and
+//!   device detail, flow investigation).
 //! - [`sweep`]: leader-only liveness sweeps (detach silent runs, abandon expired ones).
 //!
 //! Invariants upheld here: I3 (only the claim lattice decides a flow's outcome, and a `CHECK`
@@ -21,6 +23,7 @@ pub mod auth;
 pub mod ingest;
 pub mod live;
 pub mod plans;
+pub mod screens;
 pub mod sessions;
 pub mod sweep;
 pub mod telemetry;

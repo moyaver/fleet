@@ -279,14 +279,27 @@ impl Hub {
             .expect("hub lock should not be poisoned: no code panics while holding it");
         for e in entities {
             if let EntityView::AgentRun(r) = e {
-                r.liveness = Some(match (r.state.as_str(), runs.get(&r.id)) {
-                    ("ended", _) => Liveness::Completed,
-                    (_, Some(live)) => self.state_of(live),
-                    ("active" | "finalizing", None) => Liveness::Stale,
-                    _ => Liveness::Disconnected,
-                });
+                r.liveness = Some(self.run_liveness_in(&runs, r.id, &r.state));
             }
         }
+    }
+
+    fn run_liveness_in(&self, runs: &HashMap<Uuid, RunLive>, id: Uuid, state: &str) -> Liveness {
+        match (state, runs.get(&id)) {
+            ("ended", _) => Liveness::Completed,
+            (_, Some(live)) => self.state_of(live),
+            ("active" | "finalizing", None) => Liveness::Stale,
+            _ => Liveness::Disconnected,
+        }
+    }
+
+    /// One run's display liveness, as [`Self::overlay`] would set it.
+    pub(crate) fn run_liveness(&self, id: Uuid, state: &str) -> Liveness {
+        let runs = self
+            .runs
+            .lock()
+            .expect("hub lock should not be poisoned: no code panics while holding it");
+        self.run_liveness_in(&runs, id, state)
     }
 
     /// The same overlay for a snapshot.

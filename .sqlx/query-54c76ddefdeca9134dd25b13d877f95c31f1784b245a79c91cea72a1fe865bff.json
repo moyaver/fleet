@@ -1,0 +1,151 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.id AS flow_id, f.device_session_id AS lane_id, f.flow_name AS name,\n                    f.shard_number, f.ordinal, f.state, f.outcome_source::text AS outcome_source,\n                    f.finality::text AS \"finality!\", f.has_conflict,\n                    f.started_at AS \"started_at!\", f.ended_at, f.duration_ms\n               FROM flow_executions f\n              WHERE f.pipeline_attempt_id = $1 AND f.project_id = $2 AND f.started_at IS NOT NULL\n              ORDER BY f.started_at, f.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "lane_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "device_session_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "shard_number",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "shard_number"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ordinal",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "outcome_source",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "finality!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "has_conflict",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "has_conflict"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "started_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "ended_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "ended_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "duration_ms",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "duration_ms"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      null,
+      null,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "54c76ddefdeca9134dd25b13d877f95c31f1784b245a79c91cea72a1fe865bff"
+}

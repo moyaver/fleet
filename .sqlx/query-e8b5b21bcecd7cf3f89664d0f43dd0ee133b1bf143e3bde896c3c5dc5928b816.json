@@ -1,0 +1,242 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.id, d.agent_run_id, d.serial, d.state, d.rev, r.worker_id, w.runner_name,\n                j.pipeline_attempt_id, j.id AS job_id, j.job_key, d.first_seen_at, d.last_seen_at,\n                p.platform AS \"platform?\", p.kind AS \"kind?\", p.model, p.avd_or_runtime,\n                p.os_version, p.api_level::int AS api_level, p.abi\n           FROM device_sessions d\n           JOIN agent_runs r ON r.id = d.agent_run_id\n           JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n           LEFT JOIN device_profiles p ON p.id = d.profile_id\n          WHERE d.project_id = $1\n            AND ($2::uuid IS NULL OR r.worker_id = $2)\n            AND ($3::uuid IS NULL OR d.id = $3)\n          ORDER BY d.first_seen_at DESC, d.id DESC\n          LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "serial",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "serial"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "rev",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "rev"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "worker_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "worker_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "runner_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "runner_name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "pipeline_attempt_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "pipeline_attempt_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "job_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "job_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "job_key"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "first_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "last_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "last_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "platform?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "kind?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "model",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "avd_or_runtime",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "avd_or_runtime"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "os_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "os_version"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "api_level",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 18,
+        "name": "abi",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "abi"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      true
+    ]
+  },
+  "hash": "e8b5b21bcecd7cf3f89664d0f43dd0ee133b1bf143e3bde896c3c5dc5928b816"
+}

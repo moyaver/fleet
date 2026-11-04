@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM flow_executions\n              WHERE device_session_id = $1 AND project_id = $2\n              ORDER BY (state = 'running') DESC, started_at DESC NULLS LAST, id DESC\n              LIMIT 100",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1421298e8431ef51eaefd3281bfa2660c899ac90859fed1ebfa5f060c3c89ae9"
+}

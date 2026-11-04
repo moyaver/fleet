@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT st.step_index, st.label, st.status, st.source::text AS \"source!\",\n                st.started_at, st.ended_at\n           FROM step_executions st\n           JOIN flow_executions f ON f.id = st.flow_execution_id\n           JOIN agent_runs r ON r.id = f.agent_run_id\n          WHERE st.flow_execution_id = $1 AND st.run_day = r.run_day\n          ORDER BY st.step_index",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "step_index",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "step_index"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "source!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "ended_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "ended_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      null,
+      true,
+      true
+    ]
+  },
+  "hash": "29c459bcbeaebd7aab697899dd15e1a63351ae484b58f3fc3a88bbb34292b04c"
+}

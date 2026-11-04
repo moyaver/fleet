@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT a.id, a.project_id, r.provider, r.provider_run_key AS run_key, r.repository,\n                r.commit_sha, r.git_ref, a.attempt, a.version, a.first_seen_at,\n                (SELECT sum(p.planned_total)::bigint FROM plans p\n                  WHERE p.project_id = a.project_id AND p.pipeline_attempt_id = a.id) AS planned_total,\n                (SELECT count(*) FROM jobs j WHERE j.pipeline_attempt_id = a.id) AS \"jobs!\",\n                (SELECT count(*) FROM jobs j\n                  WHERE j.pipeline_attempt_id = a.id AND j.lifecycle <> 'closed') AS \"open_jobs!\"\n           FROM pipeline_attempts a JOIN pipeline_runs r ON r.id = a.pipeline_run_id\n          WHERE ($1::uuid IS NULL OR a.project_id = $1) AND ($2::uuid IS NULL OR a.id = $2)\n          ORDER BY a.first_seen_at DESC\n          LIMIT $3",
+  "query": "SELECT a.id, a.project_id, r.provider, r.provider_run_key AS run_key, r.repository,\n                r.commit_sha, r.git_ref, a.attempt, a.version, a.first_seen_at,\n                (SELECT sum(p.planned_total)::bigint FROM plans p\n                  WHERE p.project_id = a.project_id AND p.pipeline_attempt_id = a.id) AS planned_total,\n                (SELECT count(*) FROM jobs j WHERE j.pipeline_attempt_id = a.id) AS \"jobs!\",\n                (SELECT count(*) FROM jobs j\n                  WHERE j.pipeline_attempt_id = a.id AND j.lifecycle <> 'closed') AS \"open_jobs!\"\n           FROM pipeline_attempts a JOIN pipeline_runs r ON r.id = a.pipeline_run_id\n          WHERE ($1::uuid IS NULL OR a.project_id = $1) AND ($2::uuid[] IS NULL OR a.id = ANY($2))\n          ORDER BY a.first_seen_at DESC\n          LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -135,7 +135,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid",
+        "UuidArray",
         "Int8"
       ]
     },
@@ -155,5 +155,5 @@
       null
     ]
   },
-  "hash": "48f0c6128dd57804cd02ccb041466823ca84b2afe9f7b7c9cf598bd662379dee"
+  "hash": "5830c67ddcd50d0f994f3dfeaf655bb997b802f85d1722f8ea61d7c36e67f74d"
 }

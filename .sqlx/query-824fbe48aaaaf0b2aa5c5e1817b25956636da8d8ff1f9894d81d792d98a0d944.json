@@ -1,0 +1,125 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,\n                    device_session_id, flow_name, flow_path, started_at, ended_at\n               FROM flow_executions WHERE id = $1 AND project_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pipeline_attempt_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "pipeline_attempt_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "job_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "job_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "suite_execution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "suite_execution_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "device_session_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "device_session_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "flow_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "flow_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_path"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "ended_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "ended_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "824fbe48aaaaf0b2aa5c5e1817b25956636da8d8ff1f9894d81d792d98a0d944"
+}

@@ -1,0 +1,549 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Screen C's metric series for workers and devices (acceptance criteria 4 and 5).
+//!
+//! Every metric has a fixed label, unit and scope. Nothing is invented: a metric the agent never
+//! reports (thermal state) is an unavailable series with a reason, a sample without a reading is
+//! an unavailable point, and a range without samples says so. Long series are cut to the
+//! requested number of points with Largest-Triangle-Three-Buckets, which keeps the first and last
+//! reading and the shape in between; each run of missing readings becomes one unavailable point
+//! where it begins.
+
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use fleet_core::downsample::lttb;
+use fleet_protocol::rest::{
+    LatestReadings, MetricAggregate, MetricPoint, MetricReading, MetricResolution, MetricScope,
+    MetricSubject, MetricSubjectKind, MetricUnit, MetricsView, SeriesView,
+};
+use fleet_store::screens::{DeviceRow, HostRow};
+use serde::Deserialize;
+use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
+use uuid::Uuid;
+
+use super::{ApiError, error, internal, read_project};
+use crate::{session::Caller, state::AppState};
+
+const REASON_NOT_REPORTED: &str = "the agent does not report this metric yet";
+const REASON_NO_SAMPLES: &str = "no samples in this range";
+const REASON_NO_VALUE: &str = "the agent reported no value";
+const REASON_ALL_MISSING: &str = "the agent reported no value in this range";
+const REASON_NOT_AGGREGATED: &str = "not kept in aggregates; use a range of 24 hours or less";
+
+/// Raw samples cover ranges up to this long.
+const RAW_UP_TO: Duration = Duration::hours(24);
+/// One-minute aggregates cover ranges up to this long; hourly ones beyond.
+const MINUTES_UP_TO: Duration = Duration::days(30);
+/// Fewest and most points a response may be asked to carry.
+const POINTS: std::ops::RangeInclusive<usize> = 4..=5000;
+const DEFAULT_POINTS: usize = 300;
+
+/// One metric of the catalog. `col` is `None` for a metric the agent doesn't report yet;
+/// `rolled` is how the aggregate tables keep it (`None`: they don't).
+struct Def<C> {
+    id: &'static str,
+    label: &'static str,
+    unit: MetricUnit,
+    scope: MetricScope,
+    col: Option<C>,
+    rolled: Option<MetricAggregate>,
+}
+
+#[derive(Clone, Copy)]
+enum HostCol {
+    CpuPct,
+    MemUsed,
+    MemTotal,
+    MaestroCpu,
+    MaestroRss,
+    AgentCpu,
+    AgentRss,
+}
+
+#[derive(Clone, Copy)]
+enum DeviceCol {
+    EmuCpu,
+    EmuRss,
+    GuestCpu,
+    GuestMemAvailable,
+}
+
+const fn def<C>(
+    id: &'static str,
+    label: &'static str,
+    unit: MetricUnit,
+    scope: MetricScope,
+    col: Option<C>,
+    rolled: Option<MetricAggregate>,
+) -> Def<C> {
+    Def {
+        id,
+        label,
+        unit,
+        scope,
+        col,
+        rolled,
+    }
+}
+
+use MetricAggregate::{Avg, Max};
+use MetricScope::{Agent, Device, Emulator, Guest, Host, Maestro};
+use MetricUnit::{Bytes, Celsius, Percent};
+
+const HOST: [Def<HostCol>; 8] = [
+    def(
+        "host_cpu_pct",
+        "Host CPU",
+        Percent,
+        Host,
+        Some(HostCol::CpuPct),
+        Some(Avg),
+    ),
+    def(
+        "host_mem_used_bytes",
+        "Host memory used",
+        Bytes,
+        Host,
+        Some(HostCol::MemUsed),
+        Some(Avg),
+    ),
+    def(
+        "host_mem_total_bytes",
+        "Host memory total",
+        Bytes,
+        Host,
+        Some(HostCol::MemTotal),
+        None,
+    ),
+    def(
+        "maestro_cpu_pct",
+        "Maestro CPU",
+        Percent,
+        Maestro,
+        Some(HostCol::MaestroCpu),
+        Some(Avg),
+    ),
+    def(
+        "maestro_rss_bytes",
+        "Maestro memory",
+        Bytes,
+        Maestro,
+        Some(HostCol::MaestroRss),
+        Some(Max),
+    ),
+    def(
+        "agent_cpu_pct",
+        "Agent CPU",
+        Percent,
+        Agent,
+        Some(HostCol::AgentCpu),
+        None,
+    ),
+    def(
+        "agent_rss_bytes",
+        "Agent memory",
+        Bytes,
+        Agent,
+        Some(HostCol::AgentRss),
+        None,
+    ),
+    def(
+        "host_thermal_c",
+        "Host temperature",
+        Celsius,
+        Host,
+        None,
+        None,
+    ),
+];
+
+const DEVICE: [Def<DeviceCol>; 5] = [
+    def(
+        "emu_cpu_pct",
+        "Emulator CPU",
+        Percent,
+        Emulator,
+        Some(DeviceCol::EmuCpu),
+        Some(Avg),
+    ),
+    def(
+        "emu_rss_bytes",
+        "Emulator memory",
+        Bytes,
+        Emulator,
+        Some(DeviceCol::EmuRss),
+        Some(Max),
+    ),
+    def(
+        "guest_cpu_pct",
+        "Guest CPU",
+        Percent,
+        Guest,
+        Some(DeviceCol::GuestCpu),
+        None,
+    ),
+    def(
+        "guest_mem_available_bytes",
+        "Guest memory available",
+        Bytes,
+        Guest,
+        Some(DeviceCol::GuestMemAvailable),
+        None,
+    ),
+    def(
+        "device_thermal_c",
+        "Device temperature",
+        Celsius,
+        Device,
+        None,
+        None,
+    ),
+];
+
+fn host_value(c: HostCol, r: &HostRow) -> Option<f64> {
+    match c {
+        HostCol::CpuPct => r.host_cpu_pct,
+        HostCol::MemUsed => r.host_mem_used_bytes,
+        HostCol::MemTotal => r.host_mem_total_bytes,
+        HostCol::MaestroCpu => r.maestro_cpu_pct,
+        HostCol::MaestroRss => r.maestro_rss_bytes,
+        HostCol::AgentCpu => r.agent_cpu_pct,
+        HostCol::AgentRss => r.agent_rss_bytes,
+    }
+}
+
+fn device_value(c: DeviceCol, r: &DeviceRow) -> Option<f64> {
+    match c {
+        DeviceCol::EmuCpu => r.emu_cpu_pct,
+        DeviceCol::EmuRss => r.emu_rss_bytes,
+        DeviceCol::GuestCpu => r.guest_cpu_pct,
+        DeviceCol::GuestMemAvailable => r.guest_mem_available_bytes,
+    }
+}
+
+/// What a request asks for, validated.
+struct Request {
+    from: OffsetDateTime,
+    to: OffsetDateTime,
+    resolution: MetricResolution,
+    points: usize,
+    metrics: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct MetricsQuery {
+    from: Option<String>,
+    to: Option<String>,
+    metrics: Option<String>,
+    points: Option<usize>,
+}
+
+fn time_param(name: &str, value: &str) -> Result<OffsetDateTime, String> {
+    OffsetDateTime::parse(value, &Rfc3339)
+        .map_err(|_| format!("{name} must be an RFC 3339 time, such as 2026-01-31T12:00:00Z"))
+}
+
+/// Checks the query against the metrics `known` for the subject. Defaults: the last hour, 300
+/// points, every metric.
+fn parse(q: &MetricsQuery, known: &[&'static str]) -> Result<Request, String> {
+    let to = match &q.to {
+        Some(t) => time_param("to", t)?,
+        None => OffsetDateTime::now_utc(),
+    };
+    let from = match &q.from {
+        Some(t) => time_param("from", t)?,
+        None => to - Duration::hours(1),
+    };
+    if from >= to {
+        return Err("from must be before to".into());
+    }
+    let points = q.points.unwrap_or(DEFAULT_POINTS);
+    if !POINTS.contains(&points) {
+        return Err(format!(
+            "points must be between {} and {}",
+            POINTS.start(),
+            POINTS.end()
+        ));
+    }
+    let mut metrics: Vec<String> = Vec::new();
+    for name in q.metrics.as_deref().unwrap_or_default().split(',') {
+        let name = name.trim();
+        if name.is_empty() || metrics.iter().any(|m| m == name) {
+            continue;
+        }
+        if !known.contains(&name) {
+            return Err(format!(
+                "unknown metric {name}; known metrics: {}",
+                known.join(", ")
+            ));
+        }
+        metrics.push(name.to_owned());
+    }
+    if metrics.is_empty() {
+        metrics = known.iter().map(|m| (*m).to_owned()).collect();
+    }
+    let range = to - from;
+    let resolution = if range <= RAW_UP_TO {
+        MetricResolution::Raw
+    } else if range <= MINUTES_UP_TO {
+        MetricResolution::OneMinute
+    } else {
+        MetricResolution::OneHour
+    };
+    Ok(Request {
+        from,
+        to,
+        resolution,
+        points,
+        metrics,
+    })
+}
+
+/// Every host metric of one sample: its value, or why there is none.
+pub(super) fn latest_readings(row: &HostRow) -> LatestReadings {
+    LatestReadings {
+        at: row.at,
+        readings: HOST
+            .iter()
+            .map(|d| {
+                let value = d.col.and_then(|c| host_value(c, row));
+                MetricReading {
+                    metric: d.id.to_owned(),
+                    label: d.label.to_owned(),
+                    unit: d.unit,
+                    scope: d.scope,
+                    value,
+                    available: value.is_some(),
+                    reason: match (value, d.col) {
+                        (Some(_), _) => None,
+                        (None, Some(_)) => Some(REASON_NO_VALUE.to_owned()),
+                        (None, None) => Some(REASON_NOT_REPORTED.to_owned()),
+                    },
+                }
+            })
+            .collect(),
+    }
+}
+
+fn unix_ms(t: OffsetDateTime) -> i64 {
+    i64::try_from(t.unix_timestamp_nanos() / 1_000_000).unwrap_or(i64::MAX)
+}
+
+const WORKER_PARAMS: &str = "Metrics to return, comma-separated (default: all)";
+
+/// Screen C: a worker's host and process metrics over a range.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/workers/{worker}/metrics",
+    params(("project" = String, Path, description = "Project slug"),
+           ("worker" = Uuid, Path, description = "Worker ID"),
+           ("from" = Option<String>, Query, description = "Start, RFC 3339 (default: an hour before `to`)"),
+           ("to" = Option<String>, Query, description = "End, RFC 3339 (default: now)"),
+           ("metrics" = Option<String>, Query, description = WORKER_PARAMS),
+           ("points" = Option<usize>, Query, description = "At most this many points per series (4–5000, default 300)")),
+    responses((status = 200, body = MetricsView), (status = 400, body = ApiError),
+              (status = 404, body = ApiError)))]
+pub(super) async fn worker_metrics(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path((project, worker)): Path<(String, Uuid)>,
+    Query(q): Query<MetricsQuery>,
+) -> Response {
+    let project = match read_project(&state, &principal, &project).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let known: Vec<&'static str> = HOST.iter().map(|d| d.id).collect();
+    let req = match parse(&q, &known) {
+        Ok(r) => r,
+        Err(message) => return error(StatusCode::BAD_REQUEST, message),
+    };
+    let samples = match state
+        .store
+        .host_samples(project, worker, (req.from, req.to), req.resolution)
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "no such worker"),
+        Err(e) => return internal(&e),
+    };
+    let series = req
+        .metrics
+        .iter()
+        .filter_map(|id| HOST.iter().find(|d| d.id == id))
+        .map(|d| {
+            let readings: Vec<(i64, Option<f64>)> = samples
+                .rows
+                .iter()
+                .map(|r| (unix_ms(r.at), d.col.and_then(|c| host_value(c, r))))
+                .collect();
+            series(d, &readings, &req)
+        })
+        .collect();
+    Json(MetricsView {
+        subject: MetricSubject {
+            kind: MetricSubjectKind::Worker,
+            id: worker,
+        },
+        from: req.from,
+        to: req.to,
+        resolution: req.resolution,
+        truncated: samples.truncated,
+        series,
+    })
+    .into_response()
+}
+
+/// Screen C: a device session's emulator and guest metrics over a range.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/devices/{device}/metrics",
+    params(("project" = String, Path, description = "Project slug"),
+           ("device" = Uuid, Path, description = "Device session ID"),
+           ("from" = Option<String>, Query, description = "Start, RFC 3339 (default: an hour before `to`)"),
+           ("to" = Option<String>, Query, description = "End, RFC 3339 (default: now)"),
+           ("metrics" = Option<String>, Query, description = WORKER_PARAMS),
+           ("points" = Option<usize>, Query, description = "At most this many points per series (4–5000, default 300)")),
+    responses((status = 200, body = MetricsView), (status = 400, body = ApiError),
+              (status = 404, body = ApiError)))]
+pub(super) async fn device_metrics(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path((project, device)): Path<(String, Uuid)>,
+    Query(q): Query<MetricsQuery>,
+) -> Response {
+    let project = match read_project(&state, &principal, &project).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let known: Vec<&'static str> = DEVICE.iter().map(|d| d.id).collect();
+    let req = match parse(&q, &known) {
+        Ok(r) => r,
+        Err(message) => return error(StatusCode::BAD_REQUEST, message),
+    };
+    let samples = match state
+        .store
+        .device_samples(project, device, (req.from, req.to), req.resolution)
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "no such device"),
+        Err(e) => return internal(&e),
+    };
+    let series = req
+        .metrics
+        .iter()
+        .filter_map(|id| DEVICE.iter().find(|d| d.id == id))
+        .map(|d| {
+            let readings: Vec<(i64, Option<f64>)> = samples
+                .rows
+                .iter()
+                .map(|r| (unix_ms(r.at), d.col.and_then(|c| device_value(c, r))))
+                .collect();
+            series(d, &readings, &req)
+        })
+        .collect();
+    Json(MetricsView {
+        subject: MetricSubject {
+            kind: MetricSubjectKind::Device,
+            id: device,
+        },
+        from: req.from,
+        to: req.to,
+        resolution: req.resolution,
+        truncated: samples.truncated,
+        series,
+    })
+    .into_response()
+}
+
+/// One metric's series from its readings (`None` where a sample had no value).
+fn series<C>(d: &Def<C>, readings: &[(i64, Option<f64>)], req: &Request) -> SeriesView {
+    let raw = req.resolution == MetricResolution::Raw;
+    let mut view = SeriesView {
+        metric: d.id.to_owned(),
+        label: d.label.to_owned(),
+        unit: d.unit,
+        scope: d.scope,
+        aggregate: if raw { None } else { d.rolled },
+        available: false,
+        reason: None,
+        points: Vec::new(),
+    };
+    if d.col.is_none() {
+        view.reason = Some(REASON_NOT_REPORTED.into());
+    } else if !raw && d.rolled.is_none() {
+        view.reason = Some(REASON_NOT_AGGREGATED.into());
+    } else if readings.is_empty() {
+        view.reason = Some(REASON_NO_SAMPLES.into());
+    } else {
+        view.available = readings.iter().any(|(_, v)| v.is_some());
+        if !view.available {
+            view.reason = Some(REASON_ALL_MISSING.into());
+        }
+        view.points = downsample(readings, req.points);
+    }
+    view
+}
+
+fn point(&(at_ms, value): &(i64, Option<f64>)) -> MetricPoint {
+    MetricPoint {
+        at_ms,
+        value,
+        available: value.is_some(),
+        reason: value.is_none().then(|| REASON_NO_VALUE.to_owned()),
+    }
+}
+
+/// At most `budget` points: the readings themselves when they fit, else a selection of them.
+/// Values are only ever picked, never averaged or filled in.
+fn downsample(readings: &[(i64, Option<f64>)], budget: usize) -> Vec<MetricPoint> {
+    if readings.len() <= budget {
+        return readings.iter().map(point).collect();
+    }
+    let gap_starts: Vec<usize> = readings
+        .iter()
+        .enumerate()
+        .filter(|(i, (_, v))| {
+            v.is_none()
+                && i.checked_sub(1)
+                    .and_then(|p| readings.get(p))
+                    .is_none_or(|(_, prev)| prev.is_some())
+        })
+        .map(|(i, _)| i)
+        .collect();
+    let have: Vec<usize> = readings
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, v))| v.is_some())
+        .map(|(i, _)| i)
+        .collect();
+    // Never more markers than half the budget, spread evenly when there are more gaps.
+    let gap_budget = gap_starts.len().min(budget / 2);
+    let mut kept: Vec<usize> = (0..gap_budget)
+        .filter_map(|k| gap_starts.get(k * gap_starts.len() / gap_budget).copied())
+        .collect();
+    let xy: Vec<(f64, f64)> = have
+        .iter()
+        .filter_map(|i| readings.get(*i))
+        .map(|(at, v)| (at_as_f64(*at), v.unwrap_or_default()))
+        .collect();
+    kept.extend(
+        lttb(&xy, budget - gap_budget)
+            .into_iter()
+            .filter_map(|i| have.get(i).copied()),
+    );
+    kept.sort_unstable();
+    kept.dedup();
+    kept.iter()
+        .filter_map(|i| readings.get(*i))
+        .map(point)
+        .collect()
+}
+
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "unix milliseconds are far below 2^52"
+)]
+fn at_as_f64(at_ms: i64) -> f64 {
+    at_ms as f64
+}

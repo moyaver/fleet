@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pipeline_attempt_id AS \"attempt!\",\n                count(*) FILTER (WHERE state = 'pending') AS \"pending!\",\n                count(*) FILTER (WHERE state = 'running') AS \"running!\",\n                count(*) FILTER (WHERE state = 'passed') AS \"passed!\",\n                count(*) FILTER (WHERE state = 'failed') AS \"failed!\",\n                count(*) FILTER (WHERE state = 'skipped') AS \"skipped!\",\n                count(*) FILTER (WHERE state = 'interrupted') AS \"interrupted!\",\n                count(*) FILTER (WHERE state = 'unknown') AS \"unknown!\"\n           FROM flow_executions WHERE pipeline_attempt_id = ANY($1) GROUP BY pipeline_attempt_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attempt!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "pipeline_attempt_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "pending!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "running!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "passed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "failed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "skipped!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "interrupted!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "unknown!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "cdd0fefb240ce0c61e586e2485bbd9d28377592efbc8eff51ba543aa3a4f517e"
+}

@@ -47,6 +47,7 @@ uuid = { workspace = true, features = ["v7"] }
 [dev-dependencies]
 aws-lc-rs.workspace = true
 axum-test.workspace = true
+fleet-loadgen.workspace = true
 fleet-store = { workspace = true, features = ["test-util"] }
 futures-util.workspace = true
 tokio-tungstenite.workspace = true

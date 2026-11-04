@@ -7,6 +7,11 @@
 //! stores its plan like an agent publishes.
 
 pub(crate) mod live_ws;
+mod metrics;
+mod screens;
+
+#[cfg(test)]
+mod tests;
 
 use axum::{
     Json, Router,
@@ -22,6 +27,14 @@ use fleet_protocol::{
         PlanShardView, PlanView, ProjectView, Snapshot, SuiteView,
     },
     plan::PlanManifest,
+    rest::{
+        ActiveAttemptView, ArtifactRefView, BarView, ClaimView, DeviceDetailView,
+        DeviceProfileView, DeviceSessionView, FailureView, FlowCounts, FlowDetailView, JobCounts,
+        LaneView, LatestReadings, MetricAggregate, MetricPoint, MetricReading, MetricResolution,
+        MetricScope, MetricSubject, MetricSubjectKind, MetricUnit, MetricsView, OverviewView,
+        PreviousExecutionView, RecentAttemptView, SeriesView, StepView, TimelineView, WorkerCounts,
+        WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
+    },
 };
 use fleet_store::plans::{PlanError, PlanPipeline};
 use serde::{Deserialize, Serialize};
@@ -38,7 +51,20 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
                        protocol `fleet.v1+json` (`/api/v1/agent/ws`); this document covers REST.",
         license(name = "AGPL-3.0-only", identifier = "AGPL-3.0-only")
     ),
-    paths(projects, attempts, snapshot, store_plan),
+    paths(
+        projects,
+        attempts,
+        snapshot,
+        store_plan,
+        screens::overview,
+        screens::timeline,
+        screens::worker,
+        screens::worker_runs,
+        screens::device,
+        metrics::worker_metrics,
+        metrics::device_metrics,
+        screens::flow
+    ),
     components(schemas(
         ProjectView,
         AttemptView,
@@ -52,6 +78,39 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         PlanShardView,
         EntityView,
         Liveness,
+        OverviewView,
+        ActiveAttemptView,
+        RecentAttemptView,
+        JobCounts,
+        FlowCounts,
+        WorkerCounts,
+        WorkerSummaryView,
+        LatestReadings,
+        MetricReading,
+        TimelineView,
+        LaneView,
+        BarView,
+        WorkerView,
+        WorkerRunView,
+        WorkerRunPage,
+        DeviceSessionView,
+        DeviceProfileView,
+        DeviceDetailView,
+        MetricsView,
+        MetricSubject,
+        MetricSubjectKind,
+        SeriesView,
+        MetricPoint,
+        MetricUnit,
+        MetricScope,
+        MetricResolution,
+        MetricAggregate,
+        FlowDetailView,
+        ClaimView,
+        StepView,
+        FailureView,
+        PreviousExecutionView,
+        ArtifactRefView,
         PlanUpload,
         PlanStored,
         ApiError
@@ -67,6 +126,38 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/projects/{project}/attempts/{attempt}",
             get(snapshot),
+        )
+        .route(
+            "/api/v1/projects/{project}/overview",
+            get(screens::overview),
+        )
+        .route(
+            "/api/v1/projects/{project}/attempts/{attempt}/timeline",
+            get(screens::timeline),
+        )
+        .route(
+            "/api/v1/projects/{project}/workers/{worker}",
+            get(screens::worker),
+        )
+        .route(
+            "/api/v1/projects/{project}/workers/{worker}/runs",
+            get(screens::worker_runs),
+        )
+        .route(
+            "/api/v1/projects/{project}/devices/{device}",
+            get(screens::device),
+        )
+        .route(
+            "/api/v1/projects/{project}/workers/{worker}/metrics",
+            get(metrics::worker_metrics),
+        )
+        .route(
+            "/api/v1/projects/{project}/devices/{device}/metrics",
+            get(metrics::device_metrics),
+        )
+        .route(
+            "/api/v1/projects/{project}/flows/{execution_id}",
+            get(screens::flow),
         )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))
@@ -123,6 +214,18 @@ async fn project_id(state: &AppState, slug: &str) -> Result<Uuid, Box<Response>>
         Ok(None) => Err(Box::new(error(StatusCode::NOT_FOUND, "no such project"))),
         Err(e) => Err(Box::new(internal(&e))),
     }
+}
+
+/// The project a caller may read, by slug. A project that doesn't exist and one the caller has no
+/// role on are the same answer: 404.
+async fn read_project(
+    state: &AppState,
+    principal: &Principal,
+    slug: &str,
+) -> Result<Uuid, Box<Response>> {
+    let project = project_id(state, slug).await?;
+    require(principal, Action::ReadRuns, Resource::Project(project))?;
+    Ok(project)
 }
 
 /// Every project.

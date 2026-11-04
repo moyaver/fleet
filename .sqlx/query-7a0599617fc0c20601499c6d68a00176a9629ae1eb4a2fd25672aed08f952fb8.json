@@ -1,0 +1,104 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT w.id, w.runner_name, w.os, w.arch, w.first_seen_at, w.last_seen_at,\n                coalesce(array_agg(r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_ids!\",\n                coalesce(array_agg(r.state) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_states!\"\n           FROM workers w\n           LEFT JOIN agent_runs r ON r.worker_id = w.id AND r.state <> 'ended'\n                                 AND r.last_frame_at > now() - interval '24 hours'\n          WHERE w.project_id = $1\n            AND CASE WHEN $2::uuid IS NULL THEN w.last_seen_at > now() - interval '24 hours'\n                     ELSE w.id = $2 END\n          GROUP BY w.id\n          ORDER BY w.last_seen_at DESC, w.id\n          LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "runner_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "runner_name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "os",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "os"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "arch",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "arch"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "first_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "last_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "last_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "run_ids!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "run_states!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "7a0599617fc0c20601499c6d68a00176a9629ae1eb4a2fd25672aed08f952fb8"
+}

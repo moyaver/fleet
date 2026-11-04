@@ -1,0 +1,60 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,\n                            emu_rss_max::float8 AS emu_rss_bytes,\n                            NULL::float8 AS guest_cpu_pct,\n                            NULL::float8 AS guest_mem_available_bytes\n                       FROM device_rollup_1h\n                      WHERE project_id = $1 AND device_session_id = $2\n                        AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1h",
+            "name": "bucket"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "emu_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "emu_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "guest_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "guest_mem_available_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "4316b3e557b5211ebc414ddda11d58939ce701740b1520f6c899bcbc83e78496"
+}

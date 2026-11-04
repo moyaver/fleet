@@ -8,6 +8,8 @@
 //! - [`journal`]: the envelope every journal event shares, with its provenance.
 //! - [`event`]: the typed bodies the agent emits.
 //! - [`live`]: the browser's live socket: snapshots, deltas and their read models.
+//! - [`rest`]: REST read models of the dashboard's screens A–D (overview, timeline, worker and
+//!   device detail, metric series, flow investigation).
 //! - [`plan`]: Fleet Planner manifests (ADR-0013).
 
 pub mod brand;
@@ -16,6 +18,7 @@ pub mod frame;
 pub mod journal;
 pub mod live;
 pub mod plan;
+pub mod rest;
 
 /// The protocol version this build speaks.
 pub const PROTOCOL_VERSION: u16 = 1;
