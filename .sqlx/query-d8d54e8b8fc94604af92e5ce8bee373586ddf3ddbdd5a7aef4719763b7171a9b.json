@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT watermark FROM rollup_watermarks WHERE name = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "watermark",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "rollup_watermarks",
+            "name": "watermark"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d8d54e8b8fc94604af92e5ce8bee373586ddf3ddbdd5a7aef4719763b7171a9b"
+}

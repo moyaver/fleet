@@ -25,6 +25,7 @@ use fleet_protocol::artifact::{
 use fleet_store::artifacts::{
     Claim, Finished, Pending, PendingArtifact, Quota, Requested, UploadAsk,
 };
+use fleet_store::gc::BlobReservation;
 use futures_util::StreamExt as _;
 use tokio::io::AsyncWriteExt as _;
 use tokio_util::io::ReaderStream;
@@ -531,6 +532,16 @@ async fn finish(state: &AppState, project: Uuid, p: &PendingArtifact) -> Result<
     match verified {
         Ok(v) => {
             let blobs = state.blobs().await.map_err(|e| failed(&format!("{e:#}")))?;
+            // Protect the blob from the garbage collector before writing it; a blob being
+            // deleted right now is refused until it is gone (the agent retries `complete`).
+            let reserved = state
+                .store
+                .reserve_blob(project, &p.sha256, v.size)
+                .await
+                .map_err(|e| failed(&e))?;
+            if reserved == BlobReservation::BeingDeleted {
+                return Err(failed(&"the blob is being garbage collected: retry"));
+            }
             let body = tokio::fs::File::open(&path).await.map_err(|e| failed(&e))?;
             let stream: ByteStream<'_> = ReaderStream::new(body).boxed();
             blobs

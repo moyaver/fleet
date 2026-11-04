@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT retention_class, expires_at AS \"expires_at!\", available_at AS \"available_at!\",\n                        state\n                   FROM artifacts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "retention_class",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "retention_class"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "expires_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "available_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "available_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "20dc22b7905ed49f6d196bde4173a8f2edc59ce53ae6f86d3f1b52c7ca8b04f0"
+}

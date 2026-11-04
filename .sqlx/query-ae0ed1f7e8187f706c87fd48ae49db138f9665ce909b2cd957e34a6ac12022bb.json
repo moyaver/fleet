@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM rollup_dirty WHERE source = $1 AND bucket >= $2 AND bucket < $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ae0ed1f7e8187f706c87fd48ae49db138f9665ce909b2cd957e34a6ac12022bb"
+}

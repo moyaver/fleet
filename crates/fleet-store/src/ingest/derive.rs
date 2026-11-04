@@ -98,7 +98,7 @@ pub(crate) async fn flows(tx: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Uui
         finality.push(finality_name(r.finality).to_owned());
         conflict.push(r.conflict);
     }
-    sqlx::query_scalar!(
+    let changed = sqlx::query_scalar!(
         "UPDATE flow_executions f
             SET state = u.state, outcome_source = u.source, finality = u.finality,
                 has_conflict = u.conflict, rev = f.rev + 1
@@ -115,7 +115,10 @@ pub(crate) async fn flows(tx: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Uui
         &conflict
     )
     .fetch_all(&mut *tx)
-    .await
+    .await?;
+    // Failed flows' evidence is kept longer (research 05 §12.3), decided in the same transaction.
+    crate::artifacts::promote_failed_evidence(tx, &changed).await?;
+    Ok(changed)
 }
 
 fn suite_name(o: SuiteOutcome) -> &'static str {

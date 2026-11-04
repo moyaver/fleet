@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO audit_events (at, actor_kind, action) VALUES ($1, 'system', 'x')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62bf8713edc06cba2ca06b081d65341ae6f9957bdcd71618e20aba80da78f7fb"
+}

@@ -390,7 +390,7 @@ impl Store {
                 "INSERT INTO blobs (project_id, sha256, size_bytes)
                  SELECT project_id, sha256, size_bytes FROM artifacts WHERE id = $1
                  ON CONFLICT (project_id, sha256) DO UPDATE
-                   SET unreferenced_since = NULL, verified_at = now(), state = 'present'",
+                   SET unreferenced_since = NULL, verified_at = now()",
                 artifact_id
             )
             .execute(&mut *tx)
@@ -509,14 +509,19 @@ impl Store {
 }
 
 /// Fixes an available artifact's retention: evidence of a flow that has already failed starts
-/// as `failure_evidence` (later failures are promoted at finalization), and `expires_at` follows
-/// the class's TTL.
+/// as `failure_evidence`, and so does the run's `maestro.log` once any of its flows failed (later
+/// failures are promoted when the flow finalizes, [`promote_failed_evidence`]); `expires_at`
+/// follows the class's TTL.
 async fn set_retention(tx: &mut sqlx::PgConnection, artifact_id: Uuid) -> Result<()> {
     sqlx::query!(
         "UPDATE artifacts a SET retention_class = 'failure_evidence'
-          WHERE a.id = $1 AND a.retention_class = 'success_evidence' AND EXISTS
-                (SELECT 1 FROM flow_executions f
-                  WHERE f.id = a.flow_execution_id AND f.state = 'failed')",
+          WHERE a.id = $1
+            AND ((a.retention_class = 'success_evidence'
+                  AND EXISTS (SELECT 1 FROM flow_executions f
+                               WHERE f.id = a.flow_execution_id AND f.state = 'failed'))
+              OR (a.retention_class = 'debug_log'
+                  AND EXISTS (SELECT 1 FROM flow_executions f
+                               WHERE f.agent_run_id = a.agent_run_id AND f.state = 'failed')))",
         artifact_id
     )
     .execute(&mut *tx)
@@ -526,6 +531,34 @@ async fn set_retention(tx: &mut sqlx::PgConnection, artifact_id: Uuid) -> Result
            FROM retention_classes rc
           WHERE a.id = $1 AND rc.project_id = a.project_id AND rc.class = a.retention_class",
         artifact_id
+    )
+    .execute(tx)
+    .await?;
+    Ok(())
+}
+
+/// Promotes the evidence of flows that finalized as `failed` (research 05 §12.3), in the same
+/// transaction that set their state: their screenshots and commands, and the run's Maestro log,
+/// move from the short default retention to `failure_evidence`. A promotion never shortens an
+/// artifact's life.
+pub(crate) async fn promote_failed_evidence(
+    tx: &mut sqlx::PgConnection,
+    flows: &[Uuid],
+) -> Result<(), sqlx::Error> {
+    if flows.is_empty() {
+        return Ok(());
+    }
+    sqlx::query!(
+        "UPDATE artifacts a
+            SET retention_class = 'failure_evidence',
+                expires_at = CASE WHEN rc.ttl IS NULL OR a.expires_at IS NULL THEN NULL
+                                  ELSE greatest(a.expires_at, a.available_at + rc.ttl) END
+           FROM flow_executions f, retention_classes rc
+          WHERE f.id = ANY($1) AND f.state = 'failed' AND a.state = 'available'
+            AND rc.project_id = a.project_id AND rc.class = 'failure_evidence'
+            AND ((a.flow_execution_id = f.id AND a.retention_class = 'success_evidence')
+              OR (a.agent_run_id = f.agent_run_id AND a.retention_class = 'debug_log'))",
+        flows
     )
     .execute(tx)
     .await?;

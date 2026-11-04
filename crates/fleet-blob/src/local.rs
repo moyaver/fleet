@@ -193,6 +193,38 @@ impl BlobStore for LocalFs {
             .map_err(io_err("deleting the blob"))
     }
 
+    async fn sweep_stale_uploads(&self, older_than: OffsetDateTime) -> Result<u64, BlobError> {
+        let tmp = self.root.join(TMP_DIR);
+        let cutoff = std::time::SystemTime::from(older_than);
+        tokio::task::spawn_blocking(move || {
+            let mut removed = 0;
+            for file in read_dir(&tmp)? {
+                // Gone, or finished (renamed away), since the directory was read: not an error.
+                let Some(meta) = not_found_as_none(std::fs::metadata(&file))
+                    .map_err(io_err("reading a temp file"))?
+                else {
+                    continue;
+                };
+                let stale = meta.is_file()
+                    && meta
+                        .modified()
+                        .map_err(io_err("reading a temp file's modification time"))?
+                        < cutoff;
+                if stale
+                    && not_found_as_none(std::fs::remove_file(&file))
+                        .map_err(io_err("removing a stale temp file"))?
+                        .is_some()
+                {
+                    tracing::info!(path = %file.display(), "removed a stale upload temp file");
+                    removed += 1;
+                }
+            }
+            Ok(removed)
+        })
+        .await
+        .map_err(|e| BlobError::backend("sweeping temp files", e))?
+    }
+
     fn list(&self, scope: Scope) -> BoxStream<'_, Result<BlobInfo, BlobError>> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
         let root = self.root.clone();

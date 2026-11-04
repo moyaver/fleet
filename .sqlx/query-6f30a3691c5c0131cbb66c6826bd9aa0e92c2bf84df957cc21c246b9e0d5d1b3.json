@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bucket, n, emu_cpu_pct_avg, emu_cpu_pct_max, emu_rss_max\n               FROM device_rollup_1m WHERE device_session_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bucket",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1m",
+            "name": "bucket"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "n",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1m",
+            "name": "n"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "emu_cpu_pct_avg",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1m",
+            "name": "emu_cpu_pct_avg"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "emu_cpu_pct_max",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1m",
+            "name": "emu_cpu_pct_max"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "emu_rss_max",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1m",
+            "name": "emu_rss_max"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6f30a3691c5c0131cbb66c6826bd9aa0e92c2bf84df957cc21c246b9e0d5d1b3"
+}

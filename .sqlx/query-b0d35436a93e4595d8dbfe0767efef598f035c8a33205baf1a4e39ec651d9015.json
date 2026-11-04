@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO audit_events (at, actor_kind, action) VALUES (now() - interval '5 years', 'system', 'x')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "b0d35436a93e4595d8dbfe0767efef598f035c8a33205baf1a4e39ec651d9015"
+}

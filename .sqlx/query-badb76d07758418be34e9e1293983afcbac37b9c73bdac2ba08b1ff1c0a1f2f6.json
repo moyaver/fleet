@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq,\n                                           host_cpu_pct, host_mem_used_bytes, maestro_cpu_pct)\n                 VALUES ($1, $2, $3, $4, $5, $6, 4294967296, $7)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Float4",
+        "Float4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "badb76d07758418be34e9e1293983afcbac37b9c73bdac2ba08b1ff1c0a1f2f6"
+}

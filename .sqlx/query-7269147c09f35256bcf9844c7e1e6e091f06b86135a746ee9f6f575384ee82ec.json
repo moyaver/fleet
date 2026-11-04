@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bucket, n FROM device_rollup_1h WHERE device_session_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bucket",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1h",
+            "name": "bucket"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "n",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "device_rollup_1h",
+            "name": "n"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7269147c09f35256bcf9844c7e1e6e091f06b86135a746ee9f6f575384ee82ec"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM blobs\n              WHERE project_id = $1 AND sha256 = decode($2, 'hex') AND state = 'deleting'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ccfc45910a165b6c34da1b38fba3cb211c7f9e509445b313d5b56e787649d74"
+}

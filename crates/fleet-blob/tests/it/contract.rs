@@ -46,6 +46,7 @@ pub(crate) async fn run<S: BlobStore + ?Sized>(store: &S) {
     projects_are_isolated(store).await;
     listing_finds_a_projects_blobs_for_gc(store).await;
     a_large_blob_streams_through(store).await;
+    sweeping_stale_uploads_never_touches_blobs(store).await;
 }
 
 async fn put_then_get_round_trips<S: BlobStore + ?Sized>(store: &S) {
@@ -291,4 +292,23 @@ async fn a_large_blob_streams_through<S: BlobStore + ?Sized>(store: &S) {
     let middle = store.get(&key, Some(9_000_000..9_000_010)).await.unwrap();
     let got: Vec<u8> = middle.body.map(|c| c.unwrap().to_vec()).concat().await;
     assert_eq!(got, whole[9_000_000..9_000_010]);
+}
+
+/// Housekeeping of unfinished uploads is part of every backend's contract, and no cutoff, however
+/// late, may take a stored blob with it.
+async fn sweeping_stale_uploads_never_touches_blobs<S: BlobStore + ?Sized>(store: &S) {
+    let (project, data) = (project(), b"survives the sweep".as_slice());
+    let key = key_of(project, data);
+    store
+        .put(&key, data.len() as u64, body(data))
+        .await
+        .unwrap();
+
+    let far_future = OffsetDateTime::now_utc() + time::Duration::days(3650);
+    store
+        .sweep_stale_uploads(far_future)
+        .await
+        .expect("sweeping should succeed");
+
+    assert_eq!(read_all(store, &key).await, data);
 }

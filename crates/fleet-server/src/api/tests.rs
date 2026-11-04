@@ -11,6 +11,7 @@ mod flows;
 mod metrics;
 mod openapi;
 mod overview;
+mod retention;
 mod rig;
 mod timeline;
 mod usercontent;

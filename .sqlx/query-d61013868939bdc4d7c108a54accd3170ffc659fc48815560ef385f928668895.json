@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE blobs b SET unreferenced_since = $1\n                   FROM (SELECT DISTINCT project_id, sha256\n                           FROM unnest($2::uuid[], $3::text[]) AS u(project_id, sha256)) k\n                  WHERE b.project_id = k.project_id AND b.sha256 = decode(k.sha256, 'hex')\n                    AND b.state = 'present'\n                    AND NOT EXISTS (SELECT 1 FROM artifacts a\n                                     WHERE a.project_id = b.project_id AND a.sha256 = b.sha256\n                                       AND a.state IN ('declared', 'uploading', 'available'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "UuidArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d61013868939bdc4d7c108a54accd3170ffc659fc48815560ef385f928668895"
+}

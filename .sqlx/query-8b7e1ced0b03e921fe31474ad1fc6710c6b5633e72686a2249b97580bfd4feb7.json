@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM device_rollup_1h WHERE bucket < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8b7e1ced0b03e921fe31474ad1fc6710c6b5633e72686a2249b97580bfd4feb7"
+}

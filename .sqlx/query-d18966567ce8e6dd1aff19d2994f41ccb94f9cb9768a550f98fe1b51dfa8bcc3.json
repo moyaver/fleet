@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT n FROM host_rollup_1h ORDER BY bucket",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "host_rollup_1h",
+            "name": "n"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d18966567ce8e6dd1aff19d2994f41ccb94f9cb9768a550f98fe1b51dfa8bcc3"
+}

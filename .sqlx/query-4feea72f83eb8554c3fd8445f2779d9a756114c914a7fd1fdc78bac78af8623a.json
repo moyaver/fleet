@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts SET state = 'expired'\n                  WHERE id IN (SELECT id FROM artifacts\n                                WHERE state IN ('declared', 'uploading')\n                                  AND grant_expires_at < $1::timestamptz - make_interval(secs => $2)\n                                LIMIT $3)\n              RETURNING project_id, encode(sha256, 'hex') AS \"sha256!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "artifacts",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sha256!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Float8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "4feea72f83eb8554c3fd8445f2779d9a756114c914a7fd1fdc78bac78af8623a"
+}

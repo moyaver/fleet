@@ -23,9 +23,13 @@
 
 pub mod artifacts;
 pub mod auth;
+pub mod gc;
 pub mod ingest;
 pub mod live;
+mod partitions;
 pub mod plans;
+pub mod retention;
+pub mod rollup;
 pub mod screens;
 pub mod sessions;
 pub mod sweep;

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts a\n            SET retention_class = 'failure_evidence',\n                expires_at = CASE WHEN rc.ttl IS NULL OR a.expires_at IS NULL THEN NULL\n                                  ELSE greatest(a.expires_at, a.available_at + rc.ttl) END\n           FROM flow_executions f, retention_classes rc\n          WHERE f.id = ANY($1) AND f.state = 'failed' AND a.state = 'available'\n            AND rc.project_id = a.project_id AND rc.class = 'failure_evidence'\n            AND ((a.flow_execution_id = f.id AND a.retention_class = 'success_evidence')\n              OR (a.agent_run_id = f.agent_run_id AND a.retention_class = 'debug_log'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "37e9782ae781abaf54c6b3161107c50bb3dac200e902d8de27c11675cd4e63ab"
+}

@@ -24,6 +24,7 @@ mod ingest;
 mod live;
 mod login;
 mod oidc;
+mod retention;
 mod session;
 mod state;
 mod sweeps;

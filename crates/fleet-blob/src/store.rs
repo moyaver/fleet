@@ -92,6 +92,15 @@ pub trait BlobStore: Send + Sync + std::fmt::Debug {
     /// Removes the blob. Removing a missing blob is not an error (retention and GC retry).
     async fn delete(&self, key: &BlobKey) -> Result<(), BlobError>;
 
+    /// Removes unfinished uploads last touched before `older_than` (temp files a crash left
+    /// behind) and returns how many it removed. Never touches a stored blob. A backend whose
+    /// unfinished uploads expire on their own (an object store's multipart lifecycle rule) does
+    /// nothing, which is the default.
+    async fn sweep_stale_uploads(&self, older_than: OffsetDateTime) -> Result<u64, BlobError> {
+        let _ = older_than;
+        Ok(0)
+    }
+
     /// Lists blobs for garbage collection, in no particular order. Objects that are not Fleet
     /// blobs (temp files, foreign keys in a shared bucket) are skipped.
     fn list(&self, scope: Scope) -> BoxStream<'_, Result<BlobInfo, BlobError>>;

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO device_rollup_1m (bucket, device_session_id, agent_run_id, project_id,\n                        n, emu_cpu_pct_avg, emu_cpu_pct_max, emu_rss_max)\n                 SELECT date_bin('1 minute', ts, TIMESTAMPTZ '2000-01-01'), device_session_id,\n                        (array_agg(agent_run_id ORDER BY ts DESC))[1],\n                        (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,\n                        avg(emu_cpu_pct)::real, max(emu_cpu_pct), max(emu_rss_bytes)\n                   FROM device_samples\n                  WHERE ts >= $1 AND ts < $2 AND ($3::uuid IS NULL OR device_session_id = $3)\n                  GROUP BY 1, device_session_id\n                 ON CONFLICT (device_session_id, bucket) DO UPDATE SET\n                        agent_run_id = excluded.agent_run_id, project_id = excluded.project_id,\n                        n = excluded.n, emu_cpu_pct_avg = excluded.emu_cpu_pct_avg,\n                        emu_cpu_pct_max = excluded.emu_cpu_pct_max,\n                        emu_rss_max = excluded.emu_rss_max",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "553b4b079bc7df4d626903fefe3602bb79ede44b1ae2ebeb3d1dbc406effd49f"
+}

@@ -99,3 +99,40 @@ async fn listing_skips_files_that_are_not_blobs() {
         .await;
     assert_eq!(listed, vec![key]);
 }
+
+#[tokio::test]
+async fn leftover_temp_files_are_swept_once_they_are_old_enough_and_blobs_are_not() {
+    let dir = TempDir::new();
+    let root = dir.0.join("blobs");
+    let store = LocalFs::new(&root).unwrap();
+    let key = contract::key_of(contract::project(), b"real");
+    store.put(&key, 4, contract::body(b"real")).await.unwrap();
+    // What a crash mid-upload leaves: one file from two days ago, one from a minute ago (an
+    // upload that may still be running).
+    let tmp = root.join(".tmp");
+    std::fs::create_dir_all(&tmp).unwrap();
+    let now = std::time::SystemTime::now();
+    for (name, age) in [("crashed", 2 * 86_400), ("running", 60)] {
+        let file = std::fs::File::create(tmp.join(name)).unwrap();
+        file.set_modified(now - std::time::Duration::from_secs(age))
+            .unwrap();
+    }
+
+    let cutoff = time::OffsetDateTime::now_utc() - time::Duration::hours(24);
+    let removed = store.sweep_stale_uploads(cutoff).await.unwrap();
+
+    assert_eq!(removed, 1);
+    let mut left: Vec<_> = std::fs::read_dir(&tmp)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["running"]);
+    assert!(
+        store.head(&key).await.unwrap().is_some(),
+        "blobs are not temp files"
+    );
+    // Nothing to do on a store that never saw an upload.
+    let empty = LocalFs::new(dir.0.join("empty")).unwrap();
+    assert_eq!(empty.sweep_stale_uploads(cutoff).await.unwrap(), 0);
+}

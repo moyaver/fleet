@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO rollup_watermarks (name, watermark) VALUES ($1, $2)\n         ON CONFLICT (name) DO UPDATE SET watermark = excluded.watermark",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ea8a70bb979ed89fde3ed70a09b5123512346e1961bd0878f2cb40ba03a016f"
+}

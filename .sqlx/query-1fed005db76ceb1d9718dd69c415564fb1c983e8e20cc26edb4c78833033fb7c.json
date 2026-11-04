@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO blobs (project_id, sha256, size_bytes)\n             VALUES ($1, decode($2, 'hex'), $3)\n             ON CONFLICT (project_id, sha256) DO UPDATE SET unreferenced_since = NULL\n               WHERE blobs.state = 'present'\n             RETURNING state",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "blobs",
+            "name": "state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1fed005db76ceb1d9718dd69c415564fb1c983e8e20cc26edb4c78833033fb7c"
+}

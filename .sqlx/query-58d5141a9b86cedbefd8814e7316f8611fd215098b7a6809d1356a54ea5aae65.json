@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM host_rollup_1h WHERE bucket < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "58d5141a9b86cedbefd8814e7316f8611fd215098b7a6809d1356a54ea5aae65"
+}

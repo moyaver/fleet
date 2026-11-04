@@ -457,6 +457,7 @@ Upload is relayed through the server by default; presigned direct upload is opti
 | `0006_run_evidence` | `agent_runs.evidence` (jsonb: the run's evidence sources, from `run.started`) |
 | `0007_analytics` | `condition_fingerprints`, `failure_fingerprints`, flaky views |
 | `0008_artifacts` | `blobs` (project, sha256), `artifacts`, `retention_classes`, `jobs_queue` |
+| `0009_rollups` | `rollup_watermarks`, `rollup_dirty` and the late-sample triggers that feed the rollup job |
 
 **Retention:** 7 d raw 5 s samples; 90 d at 1 min; 1 y for hourly and daily aggregates. The raw journal is kept 14 d. All of it is configurable.
 

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM audit_events WHERE at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d62c9ce5c317a61a142fdd47a252455ed8afb7a3ecb3d32bc48e117f2b11e218"
+}

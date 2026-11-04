@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO host_samples (ts, agent_run_id, project_id, tseq, host_cpu_pct)\n             VALUES ($1, $2, $3, 1, 42)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8873d4ef305254d62e5737dc8ed8b315b1b4227d0aaf98c1e70c25e5294f8369"
+}

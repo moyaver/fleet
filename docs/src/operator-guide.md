@@ -40,6 +40,14 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
 | `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class |
+| `retention.raw_samples_days` | `7` | Raw 5 s telemetry samples; see [Retention](#retention) (0 keeps for ever, like every `retention.*_days`) |
+| `retention.rollup_1m_days`, `retention.rollup_1h_days` | `90`, `365` | One-minute and one-hour rollups |
+| `retention.journal_days`, `retention.steps_days` | `14`, `14` | The raw agent journal and step executions |
+| `retention.audit_days` | `365` | The audit log |
+| `retention.blob_grace_hours` | `24` | How long a blob no artifact refers to is kept before it is deleted |
+| `retention.expired_artifact_days` | `30` | How long an expired artifact's row stays as a tombstone for history |
+| `retention.stale_upload_hours` | `24` | Temp files of crashed uploads older than this are removed (local store) |
+| `retention.rollup_interval_seconds`, `retention.gc_interval_minutes` | `60`, `10` | How often rollups run, and artifacts expire and blobs are collected |
 | `usercontent.url` | — | The usercontent origin; see [Usercontent domain](#usercontent-domain) |
 | `usercontent.signing_key` | — | HMAC key for signed links, at least 32 bytes (`FLEET_USERCONTENT__SIGNING_KEY_FILE`) |
 | `usercontent.link_ttl_seconds` | `300` | How long a signed link works |
@@ -127,9 +135,45 @@ Zip and `tar.zst` archives are also read through (never unpacked to disk) and re
 
 Agents upload four kinds of evidence: failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log` (HTML reports are accepted by the server and served, but the agent does not upload them yet). The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
 
-Retention is recorded per artifact (`success_evidence` 7 days, `failure_evidence` 90 days, `report` 1 year, `debug_log` 30 days; screenshots and commands of an already failed flow start as `failure_evidence`). Enforcement and blob garbage collection arrive with the retention job.
+Retention is recorded per artifact and enforced by the retention jobs (see [Retention](#retention)).
 
 The spool is local: with several server instances, send a given upload's `PUT` and `complete` to the same instance (or share the spool directory).
+
+## Retention
+
+Fleet keeps what you need to debug last week's failure and see this year's trend, and lets the rest go. One server instance at a time, the **leader** (a Postgres advisory lock; the others stand by), runs the jobs below, safely beside ingest. Every job is idempotent, logs what it did at `info` (`telemetry rolled up`, `artifacts expired`, `blobs deleted`, `expired data dropped`) and at `warn` when it fails, and is retried at its next turn.
+
+| Data | Kept | How it goes |
+|---|---|---|
+| Raw telemetry samples (5 s) | 7 days (`retention.raw_samples_days`) | The daily partition is detached and dropped once its whole UTC day is old enough |
+| One-minute rollups | 90 days | Rows older than that are deleted |
+| One-hour rollups | 1 year | Rows older than that are deleted |
+| Raw agent journal, step executions | 14 days | Daily partitions are dropped. The flow outcomes, fingerprints and history stay |
+| Audit log | 1 year (`retention.audit_days`) | Rows older than that are deleted |
+| Artifacts | by retention class, below | Marked `expired`, so they leave the flow's list at once; the row stays as a tombstone for `retention.expired_artifact_days`, then is deleted |
+| Artifact bytes (blobs) | until nothing refers to them, plus `retention.blob_grace_hours` | The object is deleted from the blob store |
+
+**Rollups** summarise raw samples into one-minute and one-hour buckets (`n`, average and maximum). A minute is rolled up two minutes after it ends, so batches in flight settle. Samples that arrive after their minute was rolled up (an agent replaying its spool after a reconnect) re-roll just the buckets they touch. A bucket's value is the average of the readings that exist: a metric an agent never reported stays *unavailable* in the rollups and in the API, never zero. The dashboard serves ranges of up to 24 hours from raw samples, up to 30 days from one-minute rollups and longer ones from one-hour rollups, so history outlives the raw data.
+
+**Raw partitions are never dropped before they are rolled up.** If the rollup job is behind (or was down) when a partition expires, the partition is kept, a `keeping an expired partition` warning is logged, and it is dropped by a later pass.
+
+**Artifact classes.** Each artifact gets a retention class when it arrives, and the class decides when it expires. The defaults (seeded per project in the `retention_classes` table; an admin screen arrives in M6, until then change them with SQL) are:
+
+| Class | Default | Applies to |
+|---|---|---|
+| `success_evidence` | 7 days | Screenshots and commands of a flow that has not failed |
+| `failure_evidence` | 90 days | The same, once the flow fails (promoted when the flow finalizes, or at upload if it had already failed), and the run's Maestro log when any of its flows failed |
+| `report` | 1 year | JUnit reports and HTML reports |
+| `debug_log` | 30 days | Maestro logs of runs without a failed flow |
+| `video`, `bundle` | 14 days | Reserved |
+
+A `NULL` TTL keeps a class for ever. A changed TTL applies to artifacts uploaded afterwards. Promotion never shortens an artifact's life. An artifact with `legal_hold` set is never expired. Upload requests nobody completed within a day of their grant lapsing are expired too.
+
+**Blobs are deleted only when nothing refers to them.** Bytes are stored once per project, however many artifacts (of any run or class) name them, so an expired artifact's blob is deleted only after the *last* artifact using it has expired, and then only after the grace period. Before deleting, the collector checks again that no artifact (not even a pending upload of the same bytes) refers to the blob, and an upload that arrives while a blob is being deleted waits for the deletion to finish instead of racing it. A delete that fails (the blob store is down) is retried by the next round.
+
+**Leftover files.** On the local filesystem backend, a crash during an upload can leave a temp file in `<storage.path>/.tmp`. Files there older than `retention.stale_upload_hours` are removed. For S3, unfinished multipart uploads are cleaned by the bucket's lifecycle rule (`AbortIncompleteMultipartUpload`); Fleet does not touch them.
+
+Retention applies to what `fleet` reads from the database; backups made before a deletion still contain the data.
 
 ## Usercontent domain
 

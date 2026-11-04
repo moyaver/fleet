@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE blobs b SET state = 'deleting'\n              WHERE (b.project_id, b.sha256) IN (\n                      SELECT c.project_id, c.sha256 FROM blobs c\n                       WHERE c.state = 'deleting'\n                          OR (c.state = 'present'\n                              AND c.unreferenced_since < $1::timestamptz - make_interval(secs => $2)\n                              AND NOT EXISTS (SELECT 1 FROM artifacts a\n                                               WHERE a.project_id = c.project_id\n                                                 AND a.sha256 = c.sha256\n                                                 AND a.state IN ('declared', 'uploading',\n                                                                 'available')))\n                       ORDER BY c.unreferenced_since NULLS FIRST\n                       LIMIT $3\n                         FOR UPDATE SKIP LOCKED)\n          RETURNING b.project_id, encode(b.sha256, 'hex') AS \"sha256!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "blobs",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sha256!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Float8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "c8f437da89543b496abce94443a121643d09f9df2647f6ddea3b5979292ad442"
+}

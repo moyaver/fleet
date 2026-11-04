@@ -76,6 +76,8 @@ pub struct Config {
     pub artifacts: Artifacts,
     /// The second origin that serves artifact bytes (PLAN §7.6, invariant I7).
     pub usercontent: Usercontent,
+    /// How long telemetry, the journal, the audit log and artifact blobs are kept (PLAN §9).
+    pub retention: Retention,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -93,6 +95,7 @@ impl Default for Config {
             storage: Storage::default(),
             artifacts: Artifacts::default(),
             usercontent: Usercontent::default(),
+            retention: Retention::default(),
             projects: Vec::new(),
         }
     }
@@ -127,6 +130,83 @@ impl Default for Storage {
             path: PathBuf::from("/var/lib/fleet/blobs"),
             s3: S3Settings::default(),
         }
+    }
+}
+
+/// How long data is kept, and how often the leader's retention jobs run (PLAN §7.7, §9).
+///
+/// Durations are whole days; **0 keeps the data for ever**. Artifact retention classes are
+/// per project (`retention_classes`, seeded with the research 05 §12.3 defaults); an admin screen
+/// for them arrives in M6.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Retention {
+    /// Raw 5 s telemetry samples.
+    pub raw_samples_days: u32,
+    /// One-minute rollups.
+    pub rollup_1m_days: u32,
+    /// One-hour rollups.
+    pub rollup_1h_days: u32,
+    /// The raw agent journal.
+    pub journal_days: u32,
+    /// Step executions.
+    pub steps_days: u32,
+    /// The audit log.
+    pub audit_days: u32,
+    /// How long a blob no artifact refers to is kept before its object is deleted.
+    pub blob_grace_hours: u32,
+    /// How long an expired artifact's row is kept as a tombstone for history.
+    pub expired_artifact_days: u32,
+    /// Temp files of crashed uploads older than this are removed from a local blob store.
+    pub stale_upload_hours: u32,
+    /// How often telemetry is rolled up.
+    pub rollup_interval_seconds: u64,
+    /// How often artifacts expire and blobs are collected.
+    pub gc_interval_minutes: u64,
+}
+
+impl Default for Retention {
+    fn default() -> Self {
+        Self {
+            raw_samples_days: 7,
+            rollup_1m_days: 90,
+            rollup_1h_days: 365,
+            journal_days: 14,
+            steps_days: 14,
+            audit_days: 365,
+            blob_grace_hours: 24,
+            expired_artifact_days: 30,
+            stale_upload_hours: 24,
+            rollup_interval_seconds: 60,
+            gc_interval_minutes: 10,
+        }
+    }
+}
+
+fn days(d: u32) -> Option<std::time::Duration> {
+    (d > 0).then(|| std::time::Duration::from_secs(u64::from(d) * 86_400))
+}
+
+impl Retention {
+    /// The store's view: `None` keeps for ever.
+    #[must_use]
+    pub fn policy(&self) -> fleet_store::retention::Retention {
+        fleet_store::retention::Retention {
+            raw_samples: days(self.raw_samples_days),
+            rollup_1m: days(self.rollup_1m_days),
+            rollup_1h: days(self.rollup_1h_days),
+            journal: days(self.journal_days),
+            steps: days(self.steps_days),
+            audit: days(self.audit_days),
+        }
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.rollup_interval_seconds > 0 && self.gc_interval_minutes > 0,
+            "retention.rollup_interval_seconds and retention.gc_interval_minutes must be above 0"
+        );
+        Ok(())
     }
 }
 
@@ -749,6 +829,7 @@ impl Config {
             }
         }
         self.storage.validate()?;
+        self.retention.validate()?;
         self.usercontent.validate(self.api.public_url.as_deref())?;
         for p in &self.projects {
             for t in &p.trust_policies {
@@ -924,6 +1005,39 @@ mod tests {
             &env(&[("FLEET_PROJECTS", "[{slug=\"Bad Slug\",name=\"x\"}]")]),
         );
         assert!(bad_slug.is_err());
+    }
+
+    #[test]
+    fn retention_defaults_follow_the_plan_and_zero_keeps_for_ever() {
+        use std::time::Duration;
+        let days = |d: u64| Some(Duration::from_secs(d * 86_400));
+
+        // PLAN §9: 7 d of raw samples, 90 d of minutes, 1 y of hours; the journal 14 d.
+        let defaults = Config::load(None, &[]).unwrap().retention.policy();
+        assert_eq!(defaults.raw_samples, days(7));
+        assert_eq!(defaults.rollup_1m, days(90));
+        assert_eq!(defaults.rollup_1h, days(365));
+        assert_eq!((defaults.journal, defaults.steps), (days(14), days(14)));
+
+        // Everything is configurable; 0 means keep.
+        let tuned = Config::load(
+            None,
+            &env(&[
+                ("FLEET_RETENTION__RAW_SAMPLES_DAYS", "3"),
+                ("FLEET_RETENTION__ROLLUP_1H_DAYS", "0"),
+            ]),
+        )
+        .unwrap()
+        .retention
+        .policy();
+        assert_eq!(tuned.raw_samples, days(3));
+        assert_eq!(tuned.rollup_1h, None);
+
+        let err = Config::load(
+            None,
+            &env(&[("FLEET_RETENTION__ROLLUP_INTERVAL_SECONDS", "0")]),
+        );
+        assert!(err.is_err(), "a job that never runs is a mistake");
     }
 
     #[test]

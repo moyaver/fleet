@@ -5,7 +5,9 @@
 //! deltas that waited too long for a predecessor. Every `liveness.sweep_interval_ms`: persist
 //! its connected runs' last contact; the leader (a Postgres advisory lock, so one instance at a
 //! time) then detaches silent runs and abandons runs whose resume grace expired. Hourly, the
-//! leader creates partitions ahead and drops expired credentials.
+//! leader creates partitions ahead, drops expired credentials and expired time-based data; it
+//! also starts the retention jobs (rollups, artifact expiry and blob collection) on their own
+//! schedules, beside this loop ([`crate::retention`]).
 
 use std::time::Duration;
 
@@ -21,6 +23,7 @@ pub(crate) async fn run(state: AppState) {
     let mut next_sweep = Instant::now() + sweep_every;
     let mut next_hourly = Instant::now();
     let mut leader: Option<Leader> = None;
+    let mut retention = crate::retention::Schedule::new(&state.config.retention);
     loop {
         tokio::select! {
             _ = second.tick() => {}
@@ -34,6 +37,9 @@ pub(crate) async fn run(state: AppState) {
         next_sweep = Instant::now() + sweep_every;
         crate::artifacts::purge_spool(&state).await;
         sweep(&state, &mut leader).await;
+        if leader.is_some() {
+            retention.tick(&state);
+        }
         if leader.is_some() && Instant::now() >= next_hourly {
             next_hourly = Instant::now() + Duration::from_secs(3600);
             if let Err(e) = state.store.ensure_partitions(1, 7).await {

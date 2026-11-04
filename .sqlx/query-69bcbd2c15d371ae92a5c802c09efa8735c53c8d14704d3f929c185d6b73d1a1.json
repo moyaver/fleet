@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE artifacts SET legal_hold = true WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "69bcbd2c15d371ae92a5c802c09efa8735c53c8d14704d3f929c185d6b73d1a1"
+}
