@@ -16,10 +16,10 @@ use tokio::task::JoinHandle;
 use crate::{browser::Browser, support::Stack};
 
 /// How long any one condition may take to become true.
-const PATIENCE: Duration = Duration::from_secs(60);
+pub(crate) const PATIENCE: Duration = Duration::from_secs(60);
 
 /// A stack with anonymous reads, which is how a browser without a login reads in development.
-async fn stack(tweak: impl FnOnce(&mut fleet_server::config::Config)) -> Stack {
+pub(crate) async fn stack(tweak: impl FnOnce(&mut fleet_server::config::Config)) -> Stack {
     Stack::start(|c| {
         c.api.anonymous_read = true;
         tweak(c);
@@ -28,7 +28,7 @@ async fn stack(tweak: impl FnOnce(&mut fleet_server::config::Config)) -> Stack {
 }
 
 /// One simulated run, stretched over time so the page can be watched while it changes.
-fn run_options(stack: &Stack, run_id: &str) -> Options {
+pub(crate) fn run_options(stack: &Stack, run_id: &str) -> Options {
     Options {
         server: stack.ws_url(),
         token: stack.key.clone(),
@@ -44,22 +44,22 @@ fn run_options(stack: &Stack, run_id: &str) -> Options {
     }
 }
 
-fn start_run(opts: Options) -> JoinHandle<fleet_loadgen::Report> {
+pub(crate) fn start_run(opts: Options) -> JoinHandle<fleet_loadgen::Report> {
     tokio::spawn(async move { fleet_loadgen::run(opts).await.unwrap() })
 }
 
 /// The DOM, polled by script.
-struct Page<'a> {
-    client: &'a Client,
+pub(crate) struct Page<'a> {
+    pub(crate) client: &'a Client,
 }
 
 impl Page<'_> {
-    async fn eval(&self, script: &str, args: Vec<Value>) -> Value {
+    pub(crate) async fn eval(&self, script: &str, args: Vec<Value>) -> Value {
         self.client.execute(script, args).await.unwrap()
     }
 
     /// Waits until the JS expression is truthy; on timeout fails with what the page said.
-    async fn wait(&self, what: &str, expression: &str) {
+    pub(crate) async fn wait(&self, what: &str, expression: &str) {
         let script = format!("return Boolean({expression});");
         let outcome = tokio::time::timeout(PATIENCE, async {
             loop {
@@ -78,7 +78,7 @@ impl Page<'_> {
         }
     }
 
-    async fn texts(&self, css: &str) -> Vec<String> {
+    pub(crate) async fn texts(&self, css: &str) -> Vec<String> {
         let v = self
             .eval(
                 "return Array.from(document.querySelectorAll(arguments[0])).map(e => e.textContent.trim());",
@@ -88,7 +88,7 @@ impl Page<'_> {
         serde_json::from_value(v).unwrap()
     }
 
-    async fn count(&self, css: &str) -> usize {
+    pub(crate) async fn count(&self, css: &str) -> usize {
         self.eval(
             "return document.querySelectorAll(arguments[0]).length;",
             vec![json!(css)],
@@ -100,11 +100,11 @@ impl Page<'_> {
     }
 
     /// Marks this document: if the page reloads, the mark is gone.
-    async fn mark_loaded(&self) {
+    pub(crate) async fn mark_loaded(&self) {
         self.eval("window.__noReload = true;", vec![]).await;
     }
 
-    async fn never_reloaded(&self) -> bool {
+    pub(crate) async fn never_reloaded(&self) -> bool {
         self.eval("return window.__noReload === true;", vec![])
             .await
             == json!(true)
@@ -112,7 +112,7 @@ impl Page<'_> {
 }
 
 /// Waits for the project's first attempt on the server (REST, not the browser) and returns its id.
-async fn first_attempt(stack: &Stack) -> String {
+pub(crate) async fn first_attempt(stack: &Stack) -> String {
     let deadline = tokio::time::Instant::now() + PATIENCE;
     loop {
         let attempts = stack.get("/api/v1/projects/app/attempts").await;
@@ -127,22 +127,22 @@ async fn first_attempt(stack: &Stack) -> String {
     }
 }
 
-fn q(testid: &str) -> String {
+pub(crate) fn q(testid: &str) -> String {
     format!("[data-testid=\"{testid}\"]")
 }
 
 /// JS: the number in the first element matching `selector`.
-fn number_in(selector: &str) -> String {
+pub(crate) fn number_in(selector: &str) -> String {
     format!("Number((document.querySelector('{selector}') || {{}}).textContent)")
 }
 
 /// JS: how many elements match.
-fn count_of(selector: &str) -> String {
+pub(crate) fn count_of(selector: &str) -> String {
     format!("document.querySelectorAll('{selector}').length")
 }
 
 /// JS: some element matching `selector` has exactly this text.
-fn has_text(selector: &str, text: &str) -> String {
+pub(crate) fn has_text(selector: &str, text: &str) -> String {
     format!(
         "Array.from(document.querySelectorAll('{selector}')).some(e => e.textContent.trim() === '{text}')"
     )

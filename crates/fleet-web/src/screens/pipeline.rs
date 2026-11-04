@@ -35,7 +35,7 @@ use self::timeline::timeline_data;
 use crate::{
     api,
     app::ErrorNotice,
-    clock::now_ms,
+    clock::{now_ms, utc_offset_minutes},
     live::{
         model::LiveModel,
         socket::{Connection, Event, Subscription, connect},
@@ -159,16 +159,6 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
             }}
         </div>
     }
-}
-
-/// The viewer's offset from UTC in minutes.
-fn utc_offset_minutes() -> i32 {
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "a time-zone offset is a few hundred minutes"
-    )]
-    let minutes = -(js_sys::Date::new_0().get_timezone_offset() as i32);
-    minutes
 }
 
 #[component]

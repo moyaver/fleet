@@ -7,6 +7,7 @@
 
 mod browser;
 mod dashboard_ab;
+mod dashboard_cd;
 mod fixtures;
 mod network;
 mod scenarios;

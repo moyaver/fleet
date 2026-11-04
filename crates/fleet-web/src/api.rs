@@ -4,7 +4,10 @@
 
 use fleet_protocol::{
     live::ProjectView,
-    rest::{OverviewView, SessionView, TimelineView},
+    rest::{
+        DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView, TimelineView,
+        WorkerRunPage, WorkerView,
+    },
 };
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
@@ -96,6 +99,73 @@ pub async fn overview(project: &str) -> Result<OverviewView, ApiError> {
 pub async fn timeline(project: &str, attempt: Uuid) -> Result<TimelineView, ApiError> {
     get(&format!(
         "{API}/projects/{}/attempts/{attempt}/timeline",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen C's worker: the machine, its latest runs and devices.
+pub async fn worker(project: &str, worker: Uuid) -> Result<WorkerView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/workers/{worker}",
+        segment(project)
+    ))
+    .await
+}
+
+/// A page of a worker's runs, newest first; `cursor` is the previous page's `next_cursor`.
+pub async fn worker_runs(
+    project: &str,
+    worker: Uuid,
+    cursor: Option<&str>,
+) -> Result<WorkerRunPage, ApiError> {
+    let mut path = format!("{API}/projects/{}/workers/{worker}/runs", segment(project));
+    if let Some(cursor) = cursor {
+        path.push_str("?cursor=");
+        path.push_str(&crate::paths::escape(cursor));
+    }
+    get(&path).await
+}
+
+/// A worker's metric series; `query` is [`MetricsQuery::to_query_string`](crate::screens::metrics::MetricsQuery::to_query_string).
+pub async fn worker_metrics(
+    project: &str,
+    worker: Uuid,
+    query: &str,
+) -> Result<MetricsView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/workers/{worker}/metrics?{query}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen C's device session and the flows that ran on it.
+pub async fn device(project: &str, device: Uuid) -> Result<DeviceDetailView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/devices/{device}",
+        segment(project)
+    ))
+    .await
+}
+
+/// A device session's metric series (see [`worker_metrics`] for `query`).
+pub async fn device_metrics(
+    project: &str,
+    device: Uuid,
+    query: &str,
+) -> Result<MetricsView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/devices/{device}/metrics?{query}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen D's flow execution with its claims, steps and failure.
+pub async fn flow(project: &str, execution: Uuid) -> Result<FlowDetailView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/flows/{execution}",
         segment(project)
     ))
     .await

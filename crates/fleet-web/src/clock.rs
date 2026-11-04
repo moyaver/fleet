@@ -19,3 +19,14 @@ pub fn now_ms() -> i64 {
     let ms = js_sys::Date::now() as i64;
     ms
 }
+
+/// The viewer's offset from UTC in minutes (east is positive).
+#[must_use]
+pub fn utc_offset_minutes() -> i32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a time-zone offset is a few hundred minutes"
+    )]
+    let minutes = -(js_sys::Date::new_0().get_timezone_offset() as i32);
+    minutes
+}

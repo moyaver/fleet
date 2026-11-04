@@ -27,7 +27,11 @@ use leptos_router::{
 use crate::{
     api::{self, ApiError},
     paths::login_url,
-    screens::{overview::Overview, pipeline::PipelineDetail},
+    screens::{
+        overview::Overview,
+        pipeline::PipelineDetail,
+        routes::{DeviceRoute, FlowRoute, WorkerRoute},
+    },
 };
 
 /// What the shell knows about the person, shared with every page.
@@ -60,23 +64,12 @@ pub fn App() -> impl IntoView {
                 }>
                     <Route path=path!("/") view=Overview />
                     <Route path=path!("/p/:project/pipelines/:id") view=PipelineDetail />
-                    <Route path=path!("/workers/:id") view=|| view! { <Unavailable what="Worker" /> } />
-                    <Route path=path!("/devices/:id") view=|| view! { <Unavailable what="Device" /> } />
-                    <Route path=path!("/flows/:execution_id") view=|| view! { <Unavailable what="Flow" /> } />
+                    <Route path=path!("/workers/:id") view=WorkerRoute />
+                    <Route path=path!("/devices/:id") view=DeviceRoute />
+                    <Route path=path!("/flows/:execution_id") view=FlowRoute />
                 </Routes>
             </Layout>
         </Router>
-    }
-}
-
-/// A page that is routed but not built yet.
-#[component]
-fn Unavailable(what: &'static str) -> impl IntoView {
-    view! {
-        <EmptyState
-            title=format!("{what} details are not available yet")
-            description="This page is coming soon."
-        />
     }
 }
 
