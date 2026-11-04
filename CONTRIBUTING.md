@@ -42,7 +42,8 @@ The invariants in [PLAN §3](docs/PLAN.md#3-invariants-non-negotiable) are non-n
 - **No provider-specific code** (AWS, GCP, Azure, Cloudflare, Kubernetes) in core crates (I8).
 - **Crate dependency rules** ([PLAN §4.2](docs/PLAN.md#42-dependency-rules-checked-by-cargo-xtask-lint)): for example `fleet-agent` never depends on `fleet-store` or `fleet-server`.
 - **Every `.rs` file starts with** `// SPDX-License-Identifier: AGPL-3.0-only`.
-- **No `unsafe`.** The workspace denies `unsafe_code`. The only planned exception is `fleet-agent::sys` (signals and process groups), which must `#![allow(unsafe_code)]` locally and document every block with a `// SAFETY:` comment.
+- **Rust conventions** are in [docs/CONVENTIONS.md](docs/CONVENTIONS.md): package layout, errors, async, logging, testing, docs and lint exceptions. Most of it is enforced by `cargo xtask ci`.
+- **No `unsafe`.** The workspace denies `unsafe_code`; only `crates/fleet-agent/src/sys.rs` may opt out, with `#![expect(unsafe_code, reason = "…")]` and a `// SAFETY:` comment on every block. Safe APIs come first.
 - **Never invent Maestro output.** Parsers and tests are built from captured fixtures under `fixtures/maestro/` or quoted source. Mark anything else `// UNVERIFIED`.
 - **Only permissive dependency licenses** ([`deny.toml`](deny.toml)). No GPL, AGPL, LGPL or SSPL in anything linked into a binary.
 

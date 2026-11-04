@@ -17,7 +17,8 @@ use tower_http::set_header::SetResponseHeaderLayer;
 /// once artifacts exist (M5).
 static CSP: LazyLock<HeaderValue> = LazyLock::new(|| {
     let index = Dist::get("index.html").map(|f| String::from_utf8_lossy(&f.data).into_owned());
-    HeaderValue::try_from(csp(index.as_deref().unwrap_or_default())).expect("CSP is ASCII")
+    HeaderValue::try_from(csp(index.as_deref().unwrap_or_default()))
+        .expect("CSP should be ASCII: literals plus base64 hashes")
 });
 
 /// Trunk injects one inline module script that loads the wasm, and has no nonce option.
@@ -42,7 +43,7 @@ fn inline_scripts(html: &str) -> impl Iterator<Item = &str> {
     })
 }
 
-pub fn router() -> Router {
+pub(crate) fn router() -> Router {
     let headers = [
         (header::CONTENT_SECURITY_POLICY, CSP.clone()),
         (

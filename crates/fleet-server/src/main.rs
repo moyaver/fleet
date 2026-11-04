@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
 #[derive(Parser)]
 #[command(name = "fleet", version, about = "Fleet server")]
@@ -28,22 +28,51 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_env("FLEET_LOG").unwrap_or_else(|_| "info".into()))
-        .init();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .with_env_var("FLEET_LOG")
+        .from_env()
+        .context("parsing FLEET_LOG")?;
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     match Cli::parse().command {
         Command::Serve { listen } => {
             let listener = tokio::net::TcpListener::bind(listen)
                 .await
                 .with_context(|| format!("binding {listen}"))?;
-            tracing::info!("listening on http://{listen}");
+            tracing::info!(%listen, "server listening");
             axum::serve(listener, web::router())
-                .with_graceful_shutdown(async {
-                    let _ = tokio::signal::ctrl_c().await;
-                })
+                .with_graceful_shutdown(shutdown_signal())
                 .await?;
         }
     }
     Ok(())
+}
+
+/// Resolves on SIGINT or SIGTERM (`docker stop`). A handler that can't be installed is logged
+/// and never fires, rather than shutting the server down at once.
+async fn shutdown_signal() {
+    use tokio::signal::unix::{SignalKind, signal};
+    let ctrl_c = async {
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            tracing::warn!(%error, "SIGINT handler unavailable");
+            std::future::pending::<()>().await;
+        }
+    };
+    let terminate = async {
+        match signal(SignalKind::terminate()) {
+            Ok(mut s) => {
+                s.recv().await;
+            }
+            Err(error) => {
+                tracing::warn!(%error, "SIGTERM handler unavailable");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    tokio::select! {
+        () = ctrl_c => {}
+        () = terminate => {}
+    }
+    tracing::info!("shutting down");
 }

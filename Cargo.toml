@@ -11,12 +11,45 @@ license = "AGPL-3.0-only"
 publish = false
 repository = "https://github.com/moyaver/fleet"
 
+# Lints: see docs/CONVENTIONS.md. All warn; CI runs with -D warnings. Exceptions are
+# #[expect(lint, reason = "...")] in source: members cannot override [workspace.lints].
 [workspace.lints.rust]
-# The one planned exception is fleet-agent::sys (signals, process groups); see CONTRIBUTING.md.
+# deny, not forbid: crates/fleet-agent/src/sys.rs alone may opt out (checked by xtask lint).
 unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+unreachable_pub = "warn"
+missing_debug_implementations = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+ambiguous_negative_literals = "warn"
+redundant_imports = "warn"
+redundant_lifetimes = "warn"
+trivial_numeric_casts = "warn"
+unused_lifetimes = "warn"
+unit_bindings = "warn"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+# Unpublished app crates: documented thiserror variants carry the error contract.
+missing_errors_doc = "allow"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+unwrap_used = "warn"
+exit = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+mod_module_files = "warn"
+clone_on_ref_ptr = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+
+[workspace.lints.rustdoc]
+unescaped_backticks = "warn"
 
 [workspace.dependencies]
 fleet-protocol = { path = "crates/fleet-protocol" }
@@ -31,15 +64,17 @@ leptos = { version = "0.8.23", features = ["csr"] }
 rust-embed = { version = "8.13.0", features = ["mime-guess"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
-tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "signal"] }
-tower = "0.5"
+# Members add the features they need: features unify across the graph.
+tokio = "1.54.1"
+tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["set-header"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [profile.release]
 lto = true
 codegen-units = 1
+# panic stays "unwind": an observer panic must not take down the supervisor (I1, I2).
 
 # Trunk builds fleet-web with `--release`; keep the wasm small. PLAN §5.4.
 [profile.wasm-release]

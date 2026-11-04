@@ -122,10 +122,26 @@ const RULES: &[Rule] = &[
     },
 ];
 
+/// Library crates: they report errors with `thiserror` and leave logging setup to binaries
+/// (docs/CONVENTIONS.md), so these never appear among their direct dependencies.
+const LIBRARY_CRATES: &[&str] = &[
+    "fleet-protocol",
+    "fleet-core",
+    "fleet-maestro",
+    "fleet-store",
+    "fleet-blob",
+    "fleet-ui",
+    "fleet-web-assets",
+];
+const BINARY_ONLY: &[&str] = &["anyhow", "tracing-subscriber"];
+
+/// The only file allowed to opt out of `unsafe_code = "deny"`.
+const UNSAFE_FILE: &str = "crates/fleet-agent/src/sys.rs";
+
 /// External crates `fleet-protocol` may use directly (PLAN §4.2).
 const PROTOCOL_EXTERNAL: &[&str] = &["serde", "serde_json", "uuid", "time", "schemars"];
 
-pub fn run(root: &Path) -> anyhow::Result<()> {
+pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
     let mut problems = Vec::new();
     walk(root, root, &mut problems)?;
     let host = String::from_utf8(output(root, "rustc", &["--print", "host-tuple"])?)?;
@@ -179,8 +195,19 @@ fn file_problem(rel: &str, name: &str, contents: impl FnOnce() -> String) -> Opt
             "{rel}: JavaScript/Node files are not allowed (invariant I9)"
         ));
     }
-    if ext == "rs" && contents().lines().next() != Some(SPDX_HEADER) {
+    if ext != "rs" {
+        return None;
+    }
+    let text = contents();
+    if text.lines().next() != Some(SPDX_HEADER) {
         return Some(format!("{rel}: first line must be `{SPDX_HEADER}`"));
+    }
+    // Built at runtime so this file doesn't match its own pattern.
+    let opt_outs = ["allow", "expect"].map(|a| format!("{a}(unsafe_code"));
+    if rel != UNSAFE_FILE && opt_outs.iter().any(|p| text.contains(p.as_str())) {
+        return Some(format!(
+            "{rel}: only {UNSAFE_FILE} may opt out of unsafe_code"
+        ));
     }
     None
 }
@@ -264,6 +291,13 @@ fn dependency_problems(host: &Value, wasm: &Value) -> Vec<String> {
                 ));
             }
         }
+        if LIBRARY_CRATES.contains(&krate.as_str()) {
+            for dep in direct.iter().filter(|d| BINARY_ONLY.contains(&d.as_str())) {
+                problems.push(format!(
+                    "{krate}: `{dep}` belongs in binaries only (docs/CONVENTIONS.md)"
+                ));
+            }
+        }
         if krate == "fleet-protocol" {
             for dep in direct
                 .iter()
@@ -327,6 +361,14 @@ mod tests {
             file_problem("README.md", "README.md", || unreachable!()),
             None
         );
+        let opt_out = || {
+            format!(
+                "{SPDX_HEADER}\n#![{}(unsafe_code, reason = \"x\")]\n",
+                "expect"
+            )
+        };
+        assert!(file_problem("crates/fleet-core/src/lib.rs", "lib.rs", opt_out).is_some());
+        assert_eq!(file_problem(UNSAFE_FILE, "sys.rs", opt_out), None);
     }
 
     /// Builds minimal `cargo metadata` output from (crate, normal deps) pairs.
@@ -385,7 +427,8 @@ mod tests {
                 ("fleet-core", &["helper"]),
                 ("helper", &["tokio"]),
                 ("fleet-agent", &["fleet-store", "aws-sdk-s3"]),
-                ("fleet-store", &[]),
+                ("fleet-store", &["anyhow"]),
+                ("anyhow", &[]),
                 ("reqwest", &[]),
                 ("tokio", &[]),
                 ("aws-sdk-s3", &[]),
@@ -407,6 +450,14 @@ mod tests {
         assert!(
             problems.contains("fleet-agent: depends on provider-specific crate `aws-sdk-s3`"),
             "{problems}"
+        );
+        assert!(
+            problems.contains("fleet-store: `anyhow` belongs in binaries only"),
+            "{problems}"
+        );
+        assert!(
+            !problems.contains("fleet-agent: `anyhow`"),
+            "binaries may use anyhow"
         );
     }
 }

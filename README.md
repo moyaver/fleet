@@ -131,6 +131,7 @@ Then open <http://127.0.0.1:8080>. See [CONTRIBUTING.md](CONTRIBUTING.md) for th
 | [Research synthesis](research/00-synthesis.md) | Conclusions of research reports 01–07 on one page |
 | [Spec v1.0](docs/spec-v1.0.md) | The original product and architecture specification |
 | [Architecture decisions](docs/decisions/README.md) | ADRs 0001–0011 |
+| [Rust conventions](docs/CONVENTIONS.md) | How Fleet's Rust is written; most of it enforced by `cargo xtask ci` |
 | [Book](docs/src/SUMMARY.md) | User, runner and operator guides (`mdbook serve docs`), filled in from M2 |
 
 ## License

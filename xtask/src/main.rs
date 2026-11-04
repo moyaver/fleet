@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! `cargo xtask`: repository tooling. See PLAN §11.1.
+#![expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "xtask is a terminal tool; its output is the user interface"
+)]
 
 mod lint;
 
@@ -43,7 +48,7 @@ fn main() -> anyhow::Result<()> {
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .unwrap()
+        .expect("xtask/ should sit one level below the workspace root")
         .to_path_buf()
 }
 
@@ -71,6 +76,20 @@ fn ci(root: &Path) -> anyhow::Result<()> {
     lint::run(root)?;
     sh(root, "cargo deny --locked check")?;
     sh(root, "cargo nextest run --workspace --locked")?;
+    // nextest skips doctests; rustdoc warnings include broken intra-doc links.
+    sh(root, "cargo test --doc --workspace --locked")?;
+    run_env(
+        root,
+        "cargo",
+        &[
+            "doc",
+            "--workspace",
+            "--no-deps",
+            "--document-private-items",
+            "--locked",
+        ],
+        &[("RUSTDOCFLAGS", "-D warnings")],
+    )?;
     web(root, false)?;
     sh(root, "mdbook build docs")?;
     println!("xtask ci: all checks passed");
@@ -93,9 +112,14 @@ fn sh(dir: &Path, line: &str) -> anyhow::Result<()> {
 }
 
 fn run(dir: &Path, program: &str, args: &[&str]) -> anyhow::Result<()> {
+    run_env(dir, program, args, &[])
+}
+
+fn run_env(dir: &Path, program: &str, args: &[&str], env: &[(&str, &str)]) -> anyhow::Result<()> {
     println!("$ {program} {}", args.join(" "));
     let status = Command::new(program)
         .args(args)
+        .envs(env.iter().copied())
         .current_dir(dir)
         .status()
         .with_context(|| format!("running {program} (try `cargo xtask setup`)"))?;

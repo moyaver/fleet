@@ -143,7 +143,7 @@ Licensing the project's own code under PolyForm is compatible with permissive de
 maestro-fleet/
 ├─ Cargo.toml                 # [workspace] members, [workspace.package], [workspace.dependencies], lints
 ├─ Cargo.lock                 # committed
-├─ rust-toolchain.toml        # channel = "1.97", components rustfmt, clippy; targets wasm32-unknown-unknown,
+├─ rust-toolchain.toml        # channel = latest stable (1.99 at M0), components rustfmt, clippy; targets wasm32-unknown-unknown,
 │                             # x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin
 ├─ .cargo/config.toml         # alias xtask = "run -p xtask --"
 ├─ deny.toml  about.toml  about.hbs  rustfmt.toml  clippy.toml  .editorconfig  .gitignore
@@ -202,7 +202,7 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 ### 5.1 Workspace-wide
 | Purpose | Choice |
 |---|---|
-| Toolchain | Rust 1.97 stable, edition 2024 |
+| Toolchain | Latest stable Rust (1.99 at M0), edition 2024 |
 | Serialization | `serde` 1, `serde_json` 1 |
 | IDs | `uuid` 1 (v7, serde) |
 | Time | `time` 0.3 (or `jiff`; pick one in M0, ADR) |

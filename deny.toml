@@ -2,6 +2,15 @@
 
 [graph]
 all-features = true
+# Only the targets Fleet ships or builds on.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+  "aarch64-apple-darwin",
+  "wasm32-unknown-unknown",
+]
 
 [advisories]
 # Vulnerabilities, unsound and yanked crates are errors; unmaintained crates in the workspace too.
