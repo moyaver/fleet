@@ -551,7 +551,7 @@ pub(crate) fn prepare_text(bytes: &[u8], redactor: &Redactor) -> Result<Vec<u8>,
 #[cfg(test)]
 mod tests {
     use wiremock::{
-        Mock, MockServer, Request, Respond, ResponseTemplate,
+        Mock, MockServer, ResponseTemplate,
         matchers::{method, path},
     };
 
@@ -562,8 +562,12 @@ mod tests {
     const RUN: Uuid = Uuid::from_u128(0x0192_0000_0000_7000_8000_0000_0000_0001);
 
     fn config(server: &MockServer) -> Config {
+        config_for(server.uri())
+    }
+
+    fn config_for(base: String) -> Config {
         Config {
-            base: server.uri(),
+            base,
             credential: Arc::new(Mutex::new(Some("mf_agent_secret".into()))),
             agent_run_id: RUN,
             rate: 1 << 30,
@@ -732,45 +736,71 @@ mod tests {
         );
     }
 
-    /// Counts requests in flight and holds each for a moment.
-    struct Slow {
+    /// A minimal HTTP/1.1 server whose handler counts requests in flight, so the count
+    /// covers exactly each request's lifetime as the server sees it.
+    async fn serve_slow(
         now: Arc<AtomicUsize>,
         peak: Arc<AtomicUsize>,
         artifact: Uuid,
-    }
+    ) -> std::net::SocketAddr {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    impl Respond for Slow {
-        fn respond(&self, _: &Request) -> ResponseTemplate {
-            let now = self.now.fetch_add(1, Ordering::SeqCst) + 1;
-            self.peak.fetch_max(now, Ordering::SeqCst);
-            let now_counter = Arc::clone(&self.now);
-            // The decrement happens when the delay is over, approximated by a detached timer.
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(150)).await;
-                now_counter.fetch_sub(1, Ordering::SeqCst);
-            });
-            ResponseTemplate::new(200)
-                .set_delay(Duration::from_millis(150))
-                .set_body_json(serde_json::json!({
-                    "disposition": "exists", "artifact_id": self.artifact
-                }))
-        }
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let (now, peak) = (Arc::clone(&now), Arc::clone(&peak));
+                tokio::spawn(async move {
+                    // Read the head and the whole body so the client never sees a reset.
+                    let mut buf = Vec::new();
+                    let mut chunk = [0_u8; 4096];
+                    let (head_len, body_len) = loop {
+                        let n = stream.read(&mut chunk).await.unwrap();
+                        assert!(n > 0, "client closed before finishing the request");
+                        buf.extend_from_slice(&chunk[..n]);
+                        if let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                            let head = String::from_utf8_lossy(&buf[..end]).to_lowercase();
+                            let len = head
+                                .lines()
+                                .find_map(|l| l.strip_prefix("content-length:"))
+                                .map_or(0, |v| v.trim().parse::<usize>().unwrap());
+                            break (end + 4, len);
+                        }
+                    };
+                    while buf.len() < head_len + body_len {
+                        let n = stream.read(&mut chunk).await.unwrap();
+                        assert!(n > 0, "client closed mid-body");
+                        buf.extend_from_slice(&chunk[..n]);
+                    }
+
+                    let in_flight = now.fetch_add(1, Ordering::SeqCst) + 1;
+                    peak.fetch_max(in_flight, Ordering::SeqCst);
+                    tokio::time::sleep(Duration::from_millis(150)).await;
+                    now.fetch_sub(1, Ordering::SeqCst);
+
+                    let body = serde_json::json!({
+                        "disposition": "exists", "artifact_id": artifact
+                    })
+                    .to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\
+                         content-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    stream.write_all(response.as_bytes()).await.unwrap();
+                    stream.shutdown().await.unwrap();
+                });
+            }
+        });
+        addr
     }
 
     #[tokio::test]
     async fn at_most_two_uploads_run_at_a_time() {
-        let server = MockServer::start().await;
         let (now, peak) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
-        Mock::given(method("POST"))
-            .and(path("/api/v1/agent/artifacts"))
-            .respond_with(Slow {
-                now: Arc::clone(&now),
-                peak: Arc::clone(&peak),
-                artifact: Uuid::now_v7(),
-            })
-            .mount(&server)
-            .await;
-        let up = Uploader::new(config(&server)).unwrap();
+        let addr = serve_slow(Arc::clone(&now), Arc::clone(&peak), Uuid::now_v7()).await;
+        let up = Uploader::new(config_for(format!("http://{addr}"))).unwrap();
 
         for n in 0..6_u8 {
             up.submit(item(&[n; 8]));
