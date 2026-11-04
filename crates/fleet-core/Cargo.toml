@@ -11,3 +11,10 @@ repository.workspace = true
 [lints]
 workspace = true
 
+
+[dependencies]
+fleet-protocol.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

@@ -1,0 +1,34 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "pass",
+      "path": "<REPO>/examples/flows/phase0/pass.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 7,
+      "failure": null
+    }
+  ],
+  "events": 23,
+  "event_types": {
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 6,
+    "step.started": 7,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

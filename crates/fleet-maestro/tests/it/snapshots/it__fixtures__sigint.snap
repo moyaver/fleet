@@ -1,0 +1,48 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "slow": {
+      "commands": "empty",
+      "failure_screenshots": 0,
+      "flow": "slow",
+      "manifest": false,
+      "shard": null
+    }
+  },
+  "exit": 130,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "slow",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "orphan_lines": 0,
+    "other": {},
+    "records": 71,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5600",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 11,
+      "Pending": 8,
+      "Running": 13
+    },
+    "with_continuation": 0
+  },
+  "report": "absent",
+  "stdout": {
+    "flow_results": [],
+    "other": [],
+    "unrecognized": 0
+  }
+}

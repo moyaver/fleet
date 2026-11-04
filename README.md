@@ -7,7 +7,7 @@ Self-hosted, live observability for mobile UI tests running in CI, starting with
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
 > [!NOTE]
-> **Status: M2 (agent) in progress.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
+> **Status: M2 (agent) done, M3 next.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
 > Progress is tracked [below](#roadmap).
 
 Everything is **Rust**: the agent, the server and the dashboard. There's no Node.js, npm or hand-written JavaScript anywhere.
@@ -26,8 +26,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 |---|---|---|---|---|
 | ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
 | ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
-| 🚧 | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
-| ⬜ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
+| ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
+| ⏭️ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
 | ⬜ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
 | ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](docs/decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
 | ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
@@ -56,6 +56,18 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] The 17 questions answered, ADR-0003 accepted ([research 08](research/08-phase0-results.md))
 - [x] Build vs buy: Allure 3 reads Maestro's failures as passes ([research 08 §5](research/08-phase0-results.md#5-build-vs-buy-adr-0009)); ReportPortal not run (needs Docker)
 - [ ] Post the upstream `--events` proposal (owner: draft in [research 08 §6](research/08-phase0-results.md#6-upstream---events-reporter-open-decision-o3))
+
+### M2 checklist
+
+- [x] Supervisor: byte-exact passthrough, exit status and signal deaths unchanged, grace escalation, contained observer failures (I1)
+- [x] `fleet-maestro` parsers (session log, stdout, bundles, JUnit), snapshot-tested on all 24 fixtures
+- [x] Claim lattice (I3, I4, property-tested), redaction (I6), JUnit reconciliation
+- [x] Live observer, CRC-framed spool, WebSocket transport with server-authoritative resume, `flush` (I2, I5)
+- [x] Host, Maestro and agent metrics; adb device tracking without touching the adb server
+- [x] `run`, `inspect`, `flush`, `check`, `version`; planner shards (`--plan`, ADR-0013)
+- [x] Validated on a real emulator: unchanged result, 65 events gap-free, 0.14% of one core (I10)
+- [x] Release pipeline (cargo-dist): musl x86_64/aarch64 + macOS arm64, checksums, attestations, third-party notices
+- [ ] HTTPS proxy support and OIDC token exchange (need the M3 server)
 
 ### Owner actions
 

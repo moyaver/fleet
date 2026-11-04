@@ -11,3 +11,12 @@ repository.workspace = true
 [lints]
 workspace = true
 
+
+[dependencies]
+fleet-protocol.workspace = true
+quick-xml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

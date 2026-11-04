@@ -1,0 +1,8 @@
+# Steps cargo-dist adds to every release build job (dist-workspace.toml: github-build-setup).
+# Generates the third-party license notices shipped in each archive (PLAN §2.6, §11.2).
+- name: Install cargo-about
+  uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+  with:
+    tool: cargo-about
+- name: Generate THIRD_PARTY_LICENSES.html
+  run: cargo about generate --locked about.hbs -o THIRD_PARTY_LICENSES.html

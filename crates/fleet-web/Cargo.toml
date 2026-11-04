@@ -14,3 +14,7 @@ workspace = true
 [dependencies]
 console_error_panic_hook.workspace = true
 leptos.workspace = true
+
+[package.metadata.dist]
+# Not released by cargo-dist: the agent is (M2); the server ships as a container (M3).
+dist = false

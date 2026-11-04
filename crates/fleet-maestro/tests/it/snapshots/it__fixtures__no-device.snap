@@ -1,0 +1,25 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {},
+  "exit": 1,
+  "log": {
+    "crashes": [],
+    "flows_started": [],
+    "machine_pattern": true,
+    "orphan_lines": 0,
+    "other": {},
+    "records": 13,
+    "shards": [],
+    "steps": {},
+    "with_continuation": 0
+  },
+  "report": "absent",
+  "stdout": {
+    "flow_results": [],
+    "other": [],
+    "unrecognized": 0
+  }
+}

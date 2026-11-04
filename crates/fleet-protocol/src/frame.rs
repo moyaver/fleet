@@ -1,0 +1,353 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! WebSocket frames on `fleet.v1+json` (research 05 §3.3–§3.5).
+//!
+//! The agent sends `hello`, then contiguous `events` batches; the server acks cumulatively after
+//! committing (`ack{through}`). Resume is server-authoritative: `welcome.committed_through` tells
+//! the agent what to drop and what to resend. Upload and throttle frames arrive with M5.
+
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::journal::{ClockSample, EventEnvelope};
+
+/// Agent → server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum ClientFrame {
+    /// Opens or resumes an agent run.
+    Hello(Box<Hello>),
+    /// Journal events, contiguous in `seq`.
+    Events {
+        /// The batch, in `seq` order.
+        events: Vec<EventEnvelope>,
+    },
+    /// Metric samples, a separate stream with its own sequence (gaps allowed, research 05 §3.2).
+    Telemetry(Telemetry),
+    /// Liveness and queue depth.
+    Heartbeat {
+        /// Agent clock at send.
+        clock: ClockSample,
+        /// Events waiting for an ack.
+        unacked: u64,
+    },
+    /// Graceful end, after `run.ended` was acked.
+    Bye,
+}
+
+/// Server → agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum ServerFrame {
+    /// The handshake succeeded.
+    Welcome(Welcome),
+    /// The handshake was refused.
+    Reject {
+        /// Why.
+        code: ErrorCode,
+        /// Detail.
+        message: String,
+        /// When to try again, if at all.
+        retry_after_ms: Option<u64>,
+        /// Don't retry with the same credentials or run.
+        fatal: bool,
+    },
+    /// Everything up to and including `through` is committed.
+    Ack {
+        /// Highest committed `seq`.
+        through: u64,
+        /// The connection epoch the commit happened under.
+        epoch: u32,
+        /// Events in the batch that were already committed.
+        #[serde(default)]
+        duplicates: u32,
+    },
+    /// Telemetry up to and including `through` is stored.
+    TelemetryAck {
+        /// Highest stored `tseq`.
+        through: u64,
+    },
+    /// One event was refused for good; the cursor moved past it. Don't resend it.
+    EventRejected {
+        /// Which event.
+        seq: u64,
+        /// Why.
+        code: ErrorCode,
+        /// Always true today.
+        permanent: bool,
+        /// Detail.
+        message: String,
+    },
+    /// Something went wrong. `fatal` errors are followed by a close.
+    Error {
+        /// Why.
+        code: ErrorCode,
+        /// Whether the server will close.
+        fatal: bool,
+        /// Detail.
+        message: String,
+        /// For `seq_gap`: the `seq` the server expects next.
+        expected_seq: Option<u64>,
+    },
+    /// The server is going away; reconnect after the given delay.
+    Goaway {
+        /// Why.
+        reason: GoawayReason,
+        /// Delay before reconnecting.
+        reconnect_after_ms: u64,
+    },
+}
+
+/// A batch of metric samples.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Telemetry {
+    /// First sample's `tseq`.
+    pub tseq_from: u64,
+    /// Last sample's `tseq`.
+    pub tseq_to: u64,
+    /// Samples dropped since the previous batch (the ring was full).
+    #[serde(default)]
+    pub dropped_since_last: u32,
+    /// The samples.
+    pub samples: Vec<Sample>,
+}
+
+/// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Sample {
+    /// When it was taken.
+    pub at: ClockSample,
+    /// Host CPU use across all cores, percent.
+    pub host_cpu_pct: Option<f32>,
+    /// Host memory in use, bytes.
+    pub host_mem_used_bytes: Option<u64>,
+    /// Host memory total, bytes.
+    pub host_mem_total_bytes: Option<u64>,
+    /// Maestro's JVM: CPU percent of one core.
+    pub maestro_cpu_pct: Option<f32>,
+    /// Maestro's JVM: resident memory, bytes.
+    pub maestro_rss_bytes: Option<u64>,
+    /// The agent itself (supervisor + observer): CPU percent of one core since the last sample
+    /// (invariant I10).
+    pub agent_cpu_pct: Option<f32>,
+    /// The agent itself: peak resident memory, bytes.
+    pub agent_rss_bytes: Option<u64>,
+}
+
+/// The handshake payload.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hello {
+    /// Protocol versions the agent speaks.
+    pub protocol: ProtocolRange,
+    /// The agent build.
+    pub agent: AgentInfo,
+    /// Generated once per agent process (UUIDv7); owns the `seq` space.
+    pub agent_run_id: Uuid,
+    /// The run this one replaces after an agent restart in the same job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_agent_run_id: Option<Uuid>,
+    /// CI identity as the agent sees it; the server prefers OIDC claims.
+    pub ci: CiContext,
+    /// What the agent still holds.
+    pub resume: ResumeState,
+    /// Agent clock at send.
+    pub clock: ClockSample,
+}
+
+/// A closed range of protocol versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProtocolRange {
+    /// Oldest supported.
+    pub min: u16,
+    /// Newest supported.
+    pub max: u16,
+}
+
+/// The agent build.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentInfo {
+    /// Agent version.
+    pub version: String,
+    /// `std::env::consts::OS`.
+    pub os: String,
+    /// `std::env::consts::ARCH`.
+    pub arch: String,
+}
+
+/// What the agent can resend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResumeState {
+    /// The next `seq` the agent will assign.
+    pub next_seq: u64,
+    /// The oldest event it still holds unacked.
+    pub oldest_unacked_seq: Option<u64>,
+}
+
+/// CI provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CiProvider {
+    /// GitHub Actions.
+    GithubActions,
+    /// Anything else, described by `FLEET_*` variables.
+    Generic,
+}
+
+/// CI identity as claimed by the agent (research 06 §1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CiContext {
+    /// Which CI.
+    pub provider: CiProvider,
+    /// `owner/name`.
+    pub repository: Option<String>,
+    /// Workflow run ID.
+    pub run_id: Option<String>,
+    /// Re-run attempt, from 1.
+    pub run_attempt: Option<u32>,
+    /// Stable job identity within the attempt (PLAN §6.7).
+    pub job_key: String,
+    /// Job display name.
+    pub job_name: Option<String>,
+    /// Commit SHA.
+    pub sha: Option<String>,
+    /// Git ref.
+    pub git_ref: Option<String>,
+    /// Runner name.
+    pub runner: Option<String>,
+}
+
+/// The server's answer to `hello`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Welcome {
+    /// The version chosen.
+    pub protocol: u16,
+    /// This connection.
+    pub connection_id: Uuid,
+    /// Fencing epoch: older connections for the same run are superseded.
+    pub epoch: u32,
+    /// Highest `seq` the server has committed for this run.
+    pub committed_through: u64,
+    /// Whether the run is new, resumed or reopened after the grace period.
+    pub resume: ResumeOutcome,
+    /// Flow-control limits.
+    pub limits: Limits,
+}
+
+/// Outcome of the resume negotiation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResumeOutcome {
+    /// The server had never seen this run.
+    New,
+    /// The run continues.
+    Resumed,
+    /// The run had been abandoned and is open again.
+    Reopened,
+}
+
+/// Flow-control limits from the server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Limits {
+    /// Events in flight (sent, not acked) at most.
+    pub max_inflight_events: u32,
+    /// Largest frame accepted.
+    pub max_frame_bytes: u32,
+    /// How often the agent sends a heartbeat.
+    pub heartbeat_interval_ms: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_inflight_events: 512,
+            max_frame_bytes: 1024 * 1024,
+            heartbeat_interval_ms: 10_000,
+        }
+    }
+}
+
+/// Machine-readable error codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorCode {
+    /// Credentials missing or invalid.
+    Unauthorized,
+    /// No protocol version in common.
+    UnsupportedProtocol,
+    /// The agent reused a run ID with an older sequence.
+    SeqRegression,
+    /// A batch skipped sequence numbers.
+    SeqGap,
+    /// A newer connection took over this run.
+    Superseded,
+    /// The event broke a validation rule.
+    Invalid,
+    /// The frame was too large.
+    TooLarge,
+    /// Overloaded; retry later.
+    Overloaded,
+    /// Anything else.
+    Internal,
+    /// A code this build doesn't know.
+    #[serde(other)]
+    Unknown,
+}
+
+/// Why the server sent `goaway`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoawayReason {
+    /// The server is restarting.
+    Shutdown,
+    /// Load balancing.
+    Rebalance,
+    /// The agent's token expires soon.
+    CredentialExpiring,
+    /// A reason this build doesn't know.
+    #[serde(other)]
+    Other,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frames_use_an_op_tag() {
+        let ack = ServerFrame::Ack {
+            through: 211,
+            epoch: 7,
+            duplicates: 0,
+        };
+        assert_eq!(serde_json::to_value(&ack).unwrap()["op"], "ack");
+        let back: ServerFrame =
+            serde_json::from_str(r#"{"op":"ack","through":5,"epoch":1}"#).unwrap();
+        assert_eq!(
+            back,
+            ServerFrame::Ack {
+                through: 5,
+                epoch: 1,
+                duplicates: 0
+            },
+            "duplicates defaults to 0"
+        );
+        assert_eq!(
+            serde_json::to_value(ClientFrame::Bye).unwrap(),
+            serde_json::json!({ "op": "bye" })
+        );
+    }
+
+    #[test]
+    fn unknown_codes_decode_instead_of_failing() {
+        let f: ServerFrame = serde_json::from_str(
+            r#"{"op":"error","code":"brand_new","fatal":false,"message":"x","expected_seq":null}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            f,
+            ServerFrame::Error {
+                code: ErrorCode::Unknown,
+                ..
+            }
+        ));
+    }
+}

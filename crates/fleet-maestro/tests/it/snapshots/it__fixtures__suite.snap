@@ -1,0 +1,141 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "alpha": {
+      "commands": "final(6)",
+      "failure_screenshots": 0,
+      "flow": "alpha",
+      "manifest": true,
+      "shard": null
+    },
+    "bravo": {
+      "commands": "final(6)",
+      "failure_screenshots": 0,
+      "flow": "bravo",
+      "manifest": true,
+      "shard": null
+    },
+    "charlie": {
+      "commands": "final(6)",
+      "failure_screenshots": 0,
+      "flow": "charlie",
+      "manifest": true,
+      "shard": null
+    },
+    "delta-fails": {
+      "commands": "final(4)",
+      "failure_screenshots": 1,
+      "flow": "delta-fails",
+      "manifest": true,
+      "shard": null
+    }
+  },
+  "exit": 1,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "bravo",
+        "shard": null
+      },
+      {
+        "name": "charlie",
+        "shard": null
+      },
+      {
+        "name": "delta-fails",
+        "shard": null
+      },
+      {
+        "name": "alpha",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "orphan_lines": 0,
+    "other": {},
+    "records": 91,
+    "shards": [
+      {
+        "planned": 4,
+        "serial": "emulator-5600",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 21,
+      "Failed": 1,
+      "Running": 22
+    },
+    "with_continuation": 0
+  },
+  "report": {
+    "status": "Complete",
+    "suites": [
+      {
+        "cases": [
+          {
+            "has_failure": false,
+            "name": "bravo",
+            "outcome": "Passed"
+          },
+          {
+            "has_failure": false,
+            "name": "charlie",
+            "outcome": "Passed"
+          },
+          {
+            "has_failure": true,
+            "name": "delta-fails",
+            "outcome": "Failed"
+          },
+          {
+            "has_failure": false,
+            "name": "alpha",
+            "outcome": "Passed"
+          }
+        ],
+        "device": "Pixel_10a_s3"
+      }
+    ]
+  },
+  "stdout": {
+    "flow_results": [
+      {
+        "duration_ms": 10000,
+        "message": null,
+        "name": "bravo",
+        "passed": true,
+        "shard": null
+      },
+      {
+        "duration_ms": 10000,
+        "message": null,
+        "name": "charlie",
+        "passed": true,
+        "shard": null
+      },
+      {
+        "duration_ms": 19000,
+        "message": "Assertion is false: \"Fleet never shows this\" is visible",
+        "name": "delta-fails",
+        "passed": false,
+        "shard": null
+      },
+      {
+        "duration_ms": 12000,
+        "message": null,
+        "name": "alpha",
+        "passed": true,
+        "shard": null
+      }
+    ],
+    "other": [
+      "Summary { shard: None, count: 1, total: 4, all_passed: false }"
+    ],
+    "unrecognized": 0
+  }
+}

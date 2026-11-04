@@ -4,4 +4,4 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-print-in-tests = true
 allow-indexing-slicing-in-tests = true
-doc-valid-idents = ["WebSocket", "PostgreSQL", "OpenAPI", "JUnit", "WebDriver", ".."]
+doc-valid-idents = ["WebSocket", "PostgreSQL", "OpenAPI", "JUnit", "WebDriver", "UUIDv7", "UUIDv8", ".."]

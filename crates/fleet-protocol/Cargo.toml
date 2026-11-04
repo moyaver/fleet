@@ -11,3 +11,9 @@ repository.workspace = true
 [lints]
 workspace = true
 
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+uuid.workspace = true

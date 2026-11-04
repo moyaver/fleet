@@ -1,0 +1,31 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {},
+  "exit": 0,
+  "log": {
+    "crashes": [],
+    "flows_started": [],
+    "machine_pattern": false,
+    "orphan_lines": 0,
+    "other": {},
+    "records": 46,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5600",
+        "shard": 1
+      }
+    ],
+    "steps": {},
+    "with_continuation": 0
+  },
+  "report": "absent",
+  "stdout": {
+    "flow_results": [],
+    "other": [],
+    "unrecognized": 0
+  }
+}

@@ -1,0 +1,35 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "slow",
+      "path": "<REPO>/examples/flows/phase0/slow.yaml",
+      "outcome": "interrupted",
+      "finality": "inferred",
+      "source": "process_exit",
+      "conflict": false,
+      "steps": 13,
+      "failure": null
+    }
+  ],
+  "events": 34,
+  "event_types": {
+    "agent.warning": 1,
+    "flow.ended": 1,
+    "flow.started": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.signal": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 11,
+    "step.started": 13,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

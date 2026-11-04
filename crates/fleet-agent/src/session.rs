@@ -1,0 +1,870 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! The session state machine: the one place observations become journal events (research 02
+//! §15.2, "state actor"). The live observer and `fleet-agent inspect` both drive it, so offline
+//! inspection exercises exactly the live code path.
+//!
+//! Every outcome is a claim with a provenance; [`fleet_core::claims::resolve`] decides what a
+//! flow's outcome is (invariants I3, I4). Every text that leaves goes through the redactor (I6).
+
+use fleet_core::{
+    claims::{self, Claim, Resolution},
+    reconcile::{self, FlowKey},
+    redact::Redactor,
+};
+use fleet_maestro::{bundle, junit, log, stdout};
+use fleet_protocol::{
+    event::{
+        AgentWarning, ArtifactRegistered, EventBody, FailureInfo, FlowEnded, FlowOutcome, FlowRef,
+        FlowReported, FlowStarted, ProcessExited, ReportParsed, ReportStatus, RunEnded, RunSignal,
+        RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus, SuiteStarted,
+    },
+    journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
+};
+use uuid::Uuid;
+
+/// Longest failure message kept, in characters.
+const MAX_MESSAGE: usize = 2000;
+
+/// Something the agent saw.
+#[derive(Debug, Clone)]
+pub(crate) enum Observation {
+    /// A complete stdout line.
+    Stdout(String),
+    /// A complete record of the session `maestro.log`.
+    Log(log::Record),
+    /// A file appeared or changed under the debug output directory (relative path) — with the
+    /// bytes of `commands.json` when that's the file.
+    File {
+        rel: String,
+        contents: Option<Vec<u8>>,
+    },
+    /// The supervisor forwarded a signal.
+    Signal(i32),
+    /// Maestro exited.
+    Exited {
+        code: Option<i32>,
+        signal: Option<i32>,
+        /// Whether Maestro wrote its report (exit 1 with a report = test failures).
+        report_present: bool,
+    },
+    /// The final report, or `None` when there is none.
+    Report(Option<Vec<u8>>),
+    /// This run executes a shard of a Fleet plan.
+    Plan(fleet_protocol::event::PlanAssigned),
+    /// adb's current device list.
+    Devices(Vec<(String, fleet_protocol::event::AdbState)>),
+}
+
+/// A flow execution as the session tracks it.
+#[derive(Debug, Clone)]
+pub(crate) struct Flow {
+    pub(crate) id: Uuid,
+    pub(crate) shard: u32,
+    pub(crate) name: String,
+    pub(crate) path: Option<String>,
+    pub(crate) ordinal: u32,
+    pub(crate) started: bool,
+    pub(crate) claims: Vec<Claim>,
+    pub(crate) steps: u32,
+    open_step: Option<u32>,
+    pub(crate) failure: Option<String>,
+}
+
+impl Flow {
+    pub(crate) fn resolve(&self, suite_closed: bool) -> Resolution {
+        claims::resolve(&self.claims, self.started, suite_closed)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Shard {
+    number: u32,
+    id: Uuid,
+    device_session_id: Uuid,
+    planned: Vec<String>,
+}
+
+/// Generates entity IDs: UUIDv7 live, deterministic in tests and `inspect`.
+pub(crate) type IdGen = Box<dyn FnMut() -> Uuid + Send>;
+
+/// The session.
+pub(crate) struct Session {
+    redactor: Redactor,
+    new_id: IdGen,
+    suite_id: Uuid,
+    shards: Vec<Shard>,
+    pub(crate) flows: Vec<Flow>,
+    seq: u64,
+    sequence_aborted: bool,
+    closed: bool,
+    signalled: bool,
+    pub(crate) unrecognized_stdout: u32,
+    devices: std::collections::BTreeMap<String, fleet_protocol::event::AdbState>,
+    out: Vec<EventEnvelope>,
+}
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("suite_id", &self.suite_id)
+            .field("flows", &self.flows.len())
+            .field("seq", &self.seq)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Session {
+    /// Starts a session for a Maestro command line.
+    pub(crate) fn new(
+        argv: &[String],
+        redactor: Redactor,
+        mut new_id: IdGen,
+        at: ClockSample,
+    ) -> Self {
+        let suite_id = new_id();
+        let mut s = Self {
+            redactor,
+            new_id,
+            suite_id,
+            shards: Vec::new(),
+            flows: Vec::new(),
+            seq: 0,
+            sequence_aborted: false,
+            closed: false,
+            signalled: false,
+            unrecognized_stdout: 0,
+            devices: std::collections::BTreeMap::new(),
+            out: Vec::new(),
+        };
+        let argv_redacted = argv
+            .iter()
+            .map(|a| s.redactor.redact(a).into_owned())
+            .collect();
+        s.emit(
+            at,
+            Subject::default(),
+            SourceKind::AgentObserved,
+            None,
+            &EventBody::RunStarted(RunStarted {
+                argv: argv_redacted,
+                agent_version: env!("CARGO_PKG_VERSION").to_owned(),
+            }),
+        );
+        let inv = fleet_maestro::invocation::parse(argv);
+        let subject = s.suite_subject();
+        s.emit(
+            at,
+            subject,
+            SourceKind::Declared,
+            None,
+            &EventBody::SuiteStarted(SuiteStarted {
+                shard_mode: inv.shard_mode.unwrap_or(ShardMode::None),
+                shards: inv.shards,
+            }),
+        );
+        s
+    }
+
+    /// Events produced so far, removed from the session.
+    pub(crate) fn drain(&mut self) -> Vec<EventEnvelope> {
+        std::mem::take(&mut self.out)
+    }
+
+    /// Feeds one observation.
+    pub(crate) fn observe(&mut self, at: ClockSample, obs: Observation) {
+        match obs {
+            Observation::Stdout(line) => self.on_stdout(at, &line),
+            Observation::Log(record) => self.on_log(at, &record),
+            Observation::File { rel, contents } => self.on_file(at, &rel, contents.as_deref()),
+            Observation::Signal(signal) => {
+                self.signalled = true;
+                self.emit(
+                    at,
+                    Subject::default(),
+                    SourceKind::AgentObserved,
+                    None,
+                    &EventBody::RunSignal(RunSignal { signal }),
+                );
+            }
+            Observation::Exited {
+                code,
+                signal,
+                report_present,
+            } => self.on_exit(at, code, signal, report_present),
+            Observation::Report(bytes) => self.on_report(at, bytes.as_deref()),
+            Observation::Devices(list) => self.on_devices(at, list),
+            Observation::Plan(plan) => {
+                let subject = self.suite_subject();
+                self.emit(
+                    at,
+                    subject,
+                    SourceKind::Declared,
+                    None,
+                    &EventBody::PlanAssigned(plan),
+                );
+            }
+        }
+    }
+
+    /// Ends the run: open flows of a finished suite get their final finality.
+    pub(crate) fn end(&mut self, at: ClockSample, output_bytes_dropped: u64) {
+        self.closed = true;
+        self.emit(
+            at,
+            Subject::default(),
+            SourceKind::AgentObserved,
+            None,
+            &EventBody::RunEnded(RunEnded {
+                interrupted: self.signalled,
+                output_bytes_dropped,
+            }),
+        );
+    }
+
+    /// Emits a `device.state_observed` for every device whose state changed, and `absent` for
+    /// devices that left the list.
+    fn on_devices(
+        &mut self,
+        at: ClockSample,
+        list: Vec<(String, fleet_protocol::event::AdbState)>,
+    ) {
+        use fleet_protocol::event::{AdbState, DeviceStateObserved};
+        let mut changes: Vec<(String, AdbState)> = list
+            .iter()
+            .filter(|(s, st)| self.devices.get(s) != Some(st))
+            .cloned()
+            .collect();
+        changes.extend(
+            self.devices
+                .keys()
+                .filter(|s| !list.iter().any(|(l, _)| l == *s))
+                .map(|s| (s.clone(), AdbState::Absent)),
+        );
+        self.devices = list.into_iter().collect();
+        for (serial, state) in changes {
+            self.emit(
+                at,
+                Subject::default(),
+                SourceKind::AgentObserved,
+                Some("adb".into()),
+                &EventBody::DeviceStateObserved(DeviceStateObserved { serial, state }),
+            );
+        }
+    }
+
+    fn on_log(&mut self, at: ClockSample, record: &log::Record) {
+        let parser = format!("maestro-log@{}", fleet_maestro::PROFILE);
+        match log::classify(record) {
+            Some(log::Event::ShardAssigned {
+                shard,
+                serial,
+                flows,
+            }) => {
+                let suite_execution_id = Some(self.suite_id);
+                let s = self.shard(shard);
+                s.planned.clone_from(&flows);
+                let subject = Subject {
+                    suite_execution_id,
+                    shard_id: Some(s.id),
+                    device_session_id: Some(s.device_session_id),
+                    ..Subject::default()
+                };
+                let planned = flows
+                    .iter()
+                    .map(|p| FlowRef {
+                        name: stem(p),
+                        path: Some(p.clone()),
+                    })
+                    .collect();
+                self.emit(
+                    at,
+                    subject,
+                    SourceKind::DebugLog,
+                    Some(parser),
+                    &EventBody::ShardAssigned(ShardAssigned {
+                        shard_number: shard,
+                        device_serial: serial,
+                        planned,
+                    }),
+                );
+            }
+            Some(log::Event::FlowStarted { shard, name }) => {
+                let shard = shard.unwrap_or(1);
+                let idx = self.start_flow(shard, &name);
+                let f = self.flows.get(idx).cloned();
+                if let Some(f) = f {
+                    let subject = self.flow_subject(&f);
+                    self.emit(
+                        at,
+                        subject,
+                        SourceKind::DebugLog,
+                        Some(parser),
+                        &EventBody::FlowStarted(FlowStarted {
+                            flow: FlowRef {
+                                name: f.name.clone(),
+                                path: f.path.clone(),
+                            },
+                            shard_number: shard,
+                            ordinal: f.ordinal,
+                        }),
+                    );
+                }
+            }
+            Some(log::Event::Step {
+                shard,
+                description,
+                state,
+            }) => self.on_step(at, shard.unwrap_or(1), &description, state, parser),
+            Some(log::Event::FlowCrashed { exception }) => {
+                if let Some(idx) = self.open_flow(1, None).or_else(|| self.last_open_flow()) {
+                    let message = exception.map(|e| self.clip(&e));
+                    self.claim(
+                        at,
+                        idx,
+                        SourceKind::DebugLog,
+                        FlowOutcome::Failed,
+                        None,
+                        message,
+                        parser,
+                    );
+                }
+            }
+            Some(log::Event::RetryAttemptFailed { .. }) | None => {}
+        }
+    }
+
+    fn on_step(
+        &mut self,
+        at: ClockSample,
+        shard: u32,
+        description: &str,
+        state: log::StepState,
+        parser: String,
+    ) {
+        let Some(idx) = self.open_flow(shard, None) else {
+            return;
+        };
+        let description = self.redactor.redact(description).into_owned();
+        let Some(f) = self.flows.get_mut(idx) else {
+            return;
+        };
+        let status = match state {
+            log::StepState::Pending => return,
+            log::StepState::Running => {
+                let index = f.steps;
+                f.steps += 1;
+                f.open_step = Some(index);
+                let mut subject = self.flow_subject_at(idx);
+                subject.step = Some(StepRef { index });
+                self.emit(
+                    at,
+                    subject,
+                    SourceKind::DebugLog,
+                    Some(parser),
+                    &EventBody::StepStarted(StepStarted { description }),
+                );
+                return;
+            }
+            log::StepState::Completed => StepStatus::Completed,
+            log::StepState::Failed => StepStatus::Failed,
+            log::StepState::Warned => StepStatus::Warned,
+            log::StepState::Skipped => StepStatus::Skipped,
+        };
+        // A step that ends without a RUNNING line (SKIPPED, nested blocks) gets its own index.
+        let index = f.open_step.take().unwrap_or_else(|| {
+            let i = f.steps;
+            f.steps += 1;
+            i
+        });
+        let mut subject = self.flow_subject_at(idx);
+        subject.step = Some(StepRef { index });
+        self.emit(
+            at,
+            subject,
+            SourceKind::DebugLog,
+            Some(parser),
+            &EventBody::StepEnded(StepEnded { status }),
+        );
+    }
+
+    fn on_stdout(&mut self, at: ClockSample, line: &str) {
+        let parser = format!("maestro-console@{}", fleet_maestro::PROFILE);
+        match stdout::classify(line) {
+            stdout::Line::FlowResult {
+                shard,
+                name,
+                passed,
+                duration_ms,
+                message,
+            } => {
+                let shard = shard.unwrap_or(1);
+                let idx = self
+                    .open_flow(shard, Some(&name))
+                    .unwrap_or_else(|| self.start_flow(shard, &name));
+                let outcome = if passed {
+                    FlowOutcome::Passed
+                } else {
+                    FlowOutcome::Failed
+                };
+                let message = message.map(|m| self.clip(&m));
+                self.claim(
+                    at,
+                    idx,
+                    SourceKind::LiveConsole,
+                    outcome,
+                    duration_ms,
+                    message,
+                    parser,
+                );
+            }
+            stdout::Line::SequenceAborted { .. } => self.sequence_aborted = true,
+            stdout::Line::Unrecognized => self.unrecognized_stdout += 1,
+            stdout::Line::Summary { .. } | stdout::Line::ShardPlan { .. } | stdout::Line::Noise => {
+            }
+        }
+    }
+
+    fn on_file(&mut self, at: ClockSample, rel: &str, contents: Option<&[u8]>) {
+        match bundle::classify(rel) {
+            bundle::Entry::Commands { flow_dir } => {
+                let Some(bytes) = contents else { return };
+                let (name, shard) = bundle::split_shard_suffix(&flow_dir);
+                let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
+                    return;
+                };
+                match bundle::parse_commands(bytes) {
+                    bundle::Commands::Final(cmds) => {
+                        let failed = cmds.iter().any(|c| c.depth == 0 && c.status == "FAILED");
+                        let outcome = if failed {
+                            FlowOutcome::Failed
+                        } else {
+                            FlowOutcome::Passed
+                        };
+                        let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
+                        self.claim(
+                            at,
+                            idx,
+                            SourceKind::ArtifactFile,
+                            outcome,
+                            None,
+                            None,
+                            parser,
+                        );
+                    }
+                    bundle::Commands::Aborted(_)
+                    | bundle::Commands::Empty
+                    | bundle::Commands::Invalid => {
+                        let subject = self.flow_subject_at(idx);
+                        self.emit(
+                            at,
+                            subject,
+                            SourceKind::ArtifactFile,
+                            None,
+                            &EventBody::AgentWarning(AgentWarning {
+                                code: "commands_not_final".into(),
+                                message: format!("{rel} is incomplete: the flow was cut short"),
+                            }),
+                        );
+                    }
+                }
+            }
+            bundle::Entry::StepScreenshot { flow_dir, .. }
+            | bundle::Entry::StepHierarchy { flow_dir, .. } => {
+                let (name, shard) = bundle::split_shard_suffix(&flow_dir);
+                let class = if rel.contains("/screenshots/") {
+                    "failure_screenshot"
+                } else {
+                    "failure_hierarchy"
+                };
+                if let Some(idx) = self.find_flow(shard.unwrap_or(1), name) {
+                    let subject = self.flow_subject_at(idx);
+                    self.emit(
+                        at,
+                        subject,
+                        SourceKind::AgentObserved,
+                        None,
+                        &EventBody::ArtifactRegistered(ArtifactRegistered {
+                            class: class.into(),
+                            path: rel.to_owned(),
+                        }),
+                    );
+                }
+            }
+            bundle::Entry::FlowDir { .. }
+            | bundle::Entry::Manifest { .. }
+            | bundle::Entry::Other => {}
+        }
+    }
+
+    fn on_exit(
+        &mut self,
+        at: ClockSample,
+        code: Option<i32>,
+        signal: Option<i32>,
+        report_present: bool,
+    ) {
+        let class = fleet_maestro::exit_class(code, signal, report_present);
+        self.emit(
+            at,
+            self.suite_subject(),
+            SourceKind::ProcessExit,
+            None,
+            &EventBody::ProcessExited(ProcessExited {
+                code,
+                signal,
+                class,
+            }),
+        );
+        if self.signalled || signal.is_some() || matches!(code, Some(130 | 143)) {
+            for idx in 0..self.flows.len() {
+                let open = self
+                    .flows
+                    .get(idx)
+                    .is_some_and(|f| f.started && f.claims.is_empty());
+                if open {
+                    self.claim(
+                        at,
+                        idx,
+                        SourceKind::ProcessExit,
+                        FlowOutcome::Interrupted,
+                        None,
+                        None,
+                        "agent".into(),
+                    );
+                }
+            }
+        }
+    }
+
+    fn on_report(&mut self, at: ClockSample, bytes: Option<&[u8]>) {
+        let parser = format!("maestro-junit@{}", fleet_maestro::PROFILE);
+        let report = bytes.map(junit::parse);
+        let status = report.as_ref().map_or(ReportStatus::Absent, |r| r.status);
+        let (suites, tests, failures) = report.as_ref().map_or((0, 0, 0), |r| {
+            let tests: usize = r.suites.iter().map(|s| s.cases.len()).sum();
+            let failures = r
+                .suites
+                .iter()
+                .flat_map(|s| &s.cases)
+                .filter(|c| c.status.as_deref() == Some("ERROR"))
+                .count();
+            (r.suites.len(), tests, failures)
+        });
+        self.emit(
+            at,
+            self.suite_subject(),
+            SourceKind::JunitFinal,
+            Some(parser.clone()),
+            &EventBody::ReportParsed(ReportParsed {
+                status,
+                suites: u32::try_from(suites).unwrap_or(u32::MAX),
+                tests: u32::try_from(tests).unwrap_or(u32::MAX),
+                failures: u32::try_from(failures).unwrap_or(u32::MAX),
+            }),
+        );
+        let Some(report) = report.filter(|r| r.status != ReportStatus::Invalid) else {
+            if self.sequence_aborted {
+                self.mark_unstarted_skipped(at);
+            }
+            return;
+        };
+        self.apply_report(at, &report, &parser);
+        if self.sequence_aborted {
+            self.mark_unstarted_skipped(at);
+        }
+    }
+
+    /// Matches the report's test cases to live flows and records a `junit_final` claim for each.
+    fn apply_report(&mut self, at: ClockSample, report: &junit::Report, parser: &str) {
+        let max_shard = self
+            .flows
+            .iter()
+            .map(|f| f.shard)
+            .chain(self.shards.iter().map(|s| s.number))
+            .max()
+            .unwrap_or(1);
+        let live: Vec<Vec<FlowKey>> = (1..=max_shard)
+            .map(|n| {
+                self.flows
+                    .iter()
+                    .filter(|f| f.shard == n)
+                    .map(|f| FlowKey {
+                        name: f.name.clone(),
+                        path: f.path.clone(),
+                    })
+                    .collect()
+            })
+            .collect();
+        let cases: Vec<Vec<FlowKey>> = report
+            .suites
+            .iter()
+            .map(|s| {
+                s.cases
+                    .iter()
+                    .map(|c| FlowKey {
+                        name: c.name.clone(),
+                        path: c.file.clone(),
+                    })
+                    .collect()
+            })
+            .collect();
+        for m in reconcile::reconcile(&live, &cases) {
+            let Some(case) = report.suites.get(m.suite).and_then(|s| s.cases.get(m.case)) else {
+                continue;
+            };
+            let shard = u32::try_from(m.suite).unwrap_or(u32::MAX).saturating_add(1);
+            let idx = match m.live {
+                Some((s, f)) => self
+                    .flows
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, x)| x.shard as usize == s + 1)
+                    .nth(f)
+                    .map(|(i, _)| i),
+                None => None,
+            }
+            .unwrap_or_else(|| self.start_flow_unstarted(shard, &case.name, case.file.clone()));
+            let outcome = junit::outcome(case.status.as_deref());
+            let mut junit_case = case.clone();
+            junit_case.failure = junit_case.failure.map(|f| self.clip(&f));
+            if let Ok(c) = Claim::new(SourceKind::JunitFinal, outcome, self.seq + 1)
+                && let Some(f) = self.flows.get_mut(idx)
+            {
+                f.claims.push(c);
+                if f.failure.is_none() {
+                    f.failure.clone_from(&junit_case.failure);
+                }
+            }
+            let subject = self.flow_subject_at(idx);
+            self.emit(
+                at,
+                subject,
+                SourceKind::JunitFinal,
+                Some(parser.to_owned()),
+                &EventBody::FlowReported(FlowReported {
+                    testsuite_index: u32::try_from(m.suite).unwrap_or(u32::MAX),
+                    testcase_index: u32::try_from(m.case).unwrap_or(u32::MAX),
+                    matched: m.method,
+                    junit: junit_case,
+                    outcome,
+                }),
+            );
+        }
+    }
+
+    /// Planned flows that never started after an `executionOrder` abort were skipped by Maestro.
+    fn mark_unstarted_skipped(&mut self, at: ClockSample) {
+        let planned: Vec<(u32, String)> = self
+            .shards
+            .iter()
+            .flat_map(|s| s.planned.iter().map(move |p| (s.number, p.clone())))
+            .filter(|(n, p)| {
+                !self.flows.iter().any(|f| {
+                    f.shard == *n
+                        && f.path
+                            .as_deref()
+                            .is_some_and(|fp| reconcile::same_file(Some(fp), Some(p)))
+                })
+            })
+            .collect();
+        for (shard, path) in planned {
+            let idx = self.start_flow_unstarted(shard, &stem(&path), Some(path));
+            self.claim(
+                at,
+                idx,
+                SourceKind::Declared,
+                FlowOutcome::Skipped,
+                None,
+                None,
+                "agent".into(),
+            );
+        }
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one claim: who, what, and the evidence behind it"
+    )]
+    fn claim(
+        &mut self,
+        at: ClockSample,
+        idx: usize,
+        source: SourceKind,
+        outcome: FlowOutcome,
+        duration_ms: Option<u64>,
+        message: Option<String>,
+        parser: String,
+    ) {
+        let order = self.seq + 1;
+        let Ok(claim) = Claim::new(source, outcome, order) else {
+            return;
+        };
+        let Some(f) = self.flows.get_mut(idx) else {
+            return;
+        };
+        f.claims.push(claim);
+        if f.failure.is_none() {
+            f.failure.clone_from(&message);
+        }
+        let subject = self.flow_subject_at(idx);
+        self.emit(
+            at,
+            subject,
+            source,
+            Some(parser),
+            &EventBody::FlowEnded(FlowEnded {
+                outcome,
+                duration_ms,
+                failure: message.map(|message| FailureInfo { message }),
+            }),
+        );
+    }
+
+    fn shard(&mut self, number: u32) -> &mut Shard {
+        if !self.shards.iter().any(|s| s.number == number) {
+            let (id, device_session_id) = ((self.new_id)(), (self.new_id)());
+            self.shards.push(Shard {
+                number,
+                id,
+                device_session_id,
+                planned: Vec::new(),
+            });
+        }
+        let pos = self
+            .shards
+            .iter()
+            .position(|s| s.number == number)
+            .unwrap_or_default();
+        let last = self.shards.len() - 1;
+        let pos = pos.min(last);
+        self.shards
+            .get_mut(pos)
+            .expect("a shard was just inserted, so the list is not empty")
+    }
+
+    /// Records a flow start; its path comes from the shard's plan when the name matches a file.
+    fn start_flow(&mut self, shard: u32, name: &str) -> usize {
+        let idx = self.start_flow_unstarted(shard, name, None);
+        if let Some(f) = self.flows.get_mut(idx) {
+            f.started = true;
+        }
+        idx
+    }
+
+    fn start_flow_unstarted(&mut self, shard: u32, name: &str, path: Option<String>) -> usize {
+        let ordinal = u32::try_from(self.flows.iter().filter(|f| f.shard == shard).count())
+            .unwrap_or(u32::MAX);
+        let planned_path = path.or_else(|| {
+            self.shards
+                .iter()
+                .find(|s| s.number == shard)
+                .and_then(|s| s.planned.iter().find(|p| stem(p) == name).cloned())
+        });
+        let id = (self.new_id)();
+        self.flows.push(Flow {
+            id,
+            shard,
+            name: name.to_owned(),
+            path: planned_path,
+            ordinal,
+            started: false,
+            claims: Vec::new(),
+            steps: 0,
+            open_step: None,
+            failure: None,
+        });
+        self.flows.len() - 1
+    }
+
+    /// The most recent started flow on `shard` without a live result (optionally with `name`).
+    fn open_flow(&self, shard: u32, name: Option<&str>) -> Option<usize> {
+        self.flows.iter().rposition(|f| {
+            f.shard == shard
+                && f.started
+                && name.is_none_or(|n| n == f.name)
+                && !f
+                    .claims
+                    .iter()
+                    .any(|c| c.source() == SourceKind::LiveConsole)
+        })
+    }
+
+    fn last_open_flow(&self) -> Option<usize> {
+        self.flows
+            .iter()
+            .rposition(|f| f.started && f.claims.is_empty())
+    }
+
+    fn find_flow(&self, shard: u32, dir_name: &str) -> Option<usize> {
+        // Bundle folder names are sanitised flow names; match the latest flow with that name.
+        self.flows
+            .iter()
+            .rposition(|f| f.shard == shard && sanitize(&f.name) == dir_name)
+    }
+
+    fn suite_subject(&self) -> Subject {
+        Subject {
+            suite_execution_id: Some(self.suite_id),
+            ..Subject::default()
+        }
+    }
+
+    fn flow_subject_at(&self, idx: usize) -> Subject {
+        self.flows
+            .get(idx)
+            .map_or_else(|| self.suite_subject(), |f| self.flow_subject(f))
+    }
+
+    fn flow_subject(&self, f: &Flow) -> Subject {
+        let shard = self.shards.iter().find(|s| s.number == f.shard);
+        Subject {
+            suite_execution_id: Some(self.suite_id),
+            shard_id: shard.map(|s| s.id),
+            device_session_id: shard.map(|s| s.device_session_id),
+            flow_execution_id: Some(f.id),
+            step: None,
+        }
+    }
+
+    fn clip(&self, text: &str) -> String {
+        let redacted = self.redactor.redact(text);
+        redacted.chars().take(MAX_MESSAGE).collect()
+    }
+
+    fn emit(
+        &mut self,
+        at: ClockSample,
+        subject: Subject,
+        kind: SourceKind,
+        parser: Option<String>,
+        body: &EventBody,
+    ) {
+        self.seq += 1;
+        let mut src = Provenance::new(kind);
+        src.parser = parser;
+        self.out
+            .push(EventEnvelope::new(self.seq, at, subject, src, body));
+    }
+
+    /// The resolved state of every flow, for the end-of-run summary and `inspect`.
+    pub(crate) fn summary(&self) -> Vec<(Flow, Resolution)> {
+        self.flows
+            .iter()
+            .map(|f| (f.clone(), f.resolve(self.closed)))
+            .collect()
+    }
+}
+
+/// `flows/login.yaml` → `login`.
+fn stem(path: &str) -> String {
+    let file = path.rsplit('/').next().unwrap_or(path);
+    file.strip_suffix(".yaml")
+        .or_else(|| file.strip_suffix(".yml"))
+        .unwrap_or(file)
+        .to_owned()
+}
+
+/// Maestro's folder-name sanitising: `/` becomes `_`.
+fn sanitize(name: &str) -> String {
+    name.replace('/', "_")
+}

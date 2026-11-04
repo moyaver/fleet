@@ -1,0 +1,68 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "bravo",
+      "path": "<REPO>/examples/flows/phase0/suite/bravo.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 6,
+      "failure": null
+    },
+    {
+      "shard": 2,
+      "name": "charlie",
+      "path": "<REPO>/examples/flows/phase0/suite/charlie.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 6,
+      "failure": null
+    },
+    {
+      "shard": 1,
+      "name": "delta-fails",
+      "path": "<REPO>/examples/flows/phase0/suite/delta-fails.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 4,
+      "failure": "Assertion is false: \"Fleet never shows this\" is visible"
+    },
+    {
+      "shard": 2,
+      "name": "alpha",
+      "path": "<REPO>/examples/flows/phase0/suite/alpha.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 6,
+      "failure": null
+    }
+  ],
+  "events": 66,
+  "event_types": {
+    "artifact.registered": 2,
+    "flow.ended": 8,
+    "flow.reported": 4,
+    "flow.started": 4,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 2,
+    "step.ended": 19,
+    "step.started": 22,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

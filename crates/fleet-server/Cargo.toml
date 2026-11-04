@@ -29,3 +29,7 @@ tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
+
+[package.metadata.dist]
+# Not released by cargo-dist: the agent is (M2); the server ships as a container (M3).
+dist = false

@@ -1,0 +1,46 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "first-fails",
+      "path": "<REPO>/examples/flows/phase0/ordered/first-fails.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 4,
+      "failure": "Assertion is false: \"Fleet never shows this\" is visible"
+    },
+    {
+      "shard": 1,
+      "name": "never-runs",
+      "path": "<REPO>/examples/flows/phase0/ordered/never-runs.yaml",
+      "outcome": "skipped",
+      "finality": "inferred",
+      "source": "declared",
+      "conflict": false,
+      "steps": 0,
+      "failure": null
+    }
+  ],
+  "events": 20,
+  "event_types": {
+    "artifact.registered": 2,
+    "flow.ended": 3,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 3,
+    "step.started": 4,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

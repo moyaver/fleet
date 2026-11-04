@@ -1,0 +1,35 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "retry-fail",
+      "path": "<REPO>/examples/flows/phase0/retry-fail.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 6,
+      "failure": "Assertion is false: \"Fleet never shows this\" is visible"
+    }
+  ],
+  "events": 26,
+  "event_types": {
+    "artifact.registered": 5,
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 5,
+    "step.started": 6,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

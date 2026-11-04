@@ -14,3 +14,36 @@ workspace = true
 [[bin]]
 name = "fleet-agent"
 path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+crc32fast.workspace = true
+fleet-core.workspace = true
+fleet-maestro.workspace = true
+fleet-protocol.workspace = true
+futures-util.workspace = true
+nix.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+signal-hook.workspace = true
+sysinfo.workspace = true
+time.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "net", "io-util"] }
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid = { workspace = true, features = ["v7"] }
+
+[dev-dependencies]
+assert_cmd.workspace = true
+futures-util.workspace = true
+insta.workspace = true
+predicates.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
+tokio-tungstenite.workspace = true
+
+[package.metadata.dist]
+# publish = false hides crates from dist; the agent is the one binary it releases.
+dist = true

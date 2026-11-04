@@ -52,24 +52,43 @@ unnecessary_safety_doc = "warn"
 unescaped_backticks = "warn"
 
 [workspace.dependencies]
+fleet-core = { path = "crates/fleet-core" }
+fleet-maestro = { path = "crates/fleet-maestro" }
 fleet-protocol = { path = "crates/fleet-protocol" }
 fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
+assert_cmd = "2.2.2"
 axum = "0.8.9"
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 console_error_panic_hook = "0.1.7"
+crc32fast = "1.5.4"
+futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
+nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
+predicates = "3.1.4"
+proptest = "1.12.0"
+quick-xml = "0.42.0"
+regex = "1.13.1"
 rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
+signal-hook = "0.4.6"
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
 # Members add the features they need: features unify across the graph.
 tokio = "1.54.1"
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["set-header"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.29.0", features = ["serde"] }
 
 [profile.release]
 lto = true
@@ -81,3 +100,8 @@ codegen-units = 1
 inherits = "release"
 opt-level = "z"
 panic = "abort"
+
+# Release archives built by cargo-dist (dist-workspace.toml): release settings, stripped.
+[profile.dist]
+inherits = "release"
+strip = "symbols"

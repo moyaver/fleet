@@ -1,2 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Pure domain logic for Fleet. See PLAN §7.4. Work starts in M2.
+//! Pure domain logic for Fleet (PLAN §7.4). No I/O.
+//!
+//! - [`claims`]: the claim lattice that decides a flow's outcome (invariants I3, I4).
+//! - [`redact`]: secret redaction for everything that leaves the runner (invariant I6).
+//! - [`reconcile`]: matching the final JUnit report to the flows seen live.
+#![warn(
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::expect_used,
+    clippy::panic
+)]
+
+pub mod claims;
+pub mod reconcile;
+pub mod redact;
