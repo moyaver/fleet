@@ -15,10 +15,11 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    api,
     config::{Config, MigrateMode},
     health, ingest,
     state::AppState,
-    web,
+    sweeps, web,
 };
 
 /// A running server, for `serve` and for tests.
@@ -90,13 +91,22 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         .with_context(|| format!("binding {}", config.listen))?;
     let addr = listener.local_addr()?;
     let state = AppState::new(store, config);
+    // The live hub restarts from Postgres: versions continue where they were (§7.3).
+    let open = state
+        .hub
+        .rebuild(&state.store)
+        .await
+        .context("restoring live versions")?;
+    tracing::info!(open_attempts = open, "live hub restored");
     state
         .tracker
         .spawn(ingest::telemetry::flusher(state.clone()));
+    state.tracker.spawn(sweeps::run(state.clone()));
 
     let router = Router::new()
         .merge(health::router())
         .merge(ingest::router(&state))
+        .merge(api::router())
         .with_state(state.clone())
         .merge(web::router());
     let stop = CancellationToken::new();

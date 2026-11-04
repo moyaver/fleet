@@ -1,0 +1,182 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2))\n          ORDER BY r.started_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "job_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "job_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "worker_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "worker_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "runner_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "runner_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "trust_level!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "committed_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "committed_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "gaps!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "last_frame_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "last_frame_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "late_resume",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "late_resume"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "plan_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "plan_id"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "plan_shard_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "plan_shard_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "maestro_exit_code",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_exit_code"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "rev",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "rev"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "liveness",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      null,
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "bc6bc9c01f724d085334a05716409b40941715d4a8abd238069a0bdc3e5be009"
+}

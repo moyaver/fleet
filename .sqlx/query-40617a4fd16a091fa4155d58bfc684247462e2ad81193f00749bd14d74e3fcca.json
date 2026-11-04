@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions SET outcome = 'unknown', outcome_source = 'server_inferred',\n                rev = rev + 1\n          WHERE agent_run_id = $1 AND outcome IS NULL\n          RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "40617a4fd16a091fa4155d58bfc684247462e2ad81193f00749bd14d74e3fcca"
+}

@@ -11,8 +11,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use fleet_protocol::event::PlanAssigned;
-use serde::Deserialize;
+use fleet_protocol::{event::PlanAssigned, plan::PlanManifest};
 
 /// The command and where its outputs will be.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,20 +33,6 @@ pub(crate) struct Prepared {
 /// Why the command can't run as asked.
 #[derive(Debug)]
 pub(crate) struct PlanError(pub(crate) String);
-
-/// A Fleet plan manifest (ADR-0013).
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Manifest {
-    plan_id: String,
-    shards: Vec<ManifestShard>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ManifestShard {
-    id: u32,
-    flows: Vec<String>,
-}
 
 /// Prepares `command`. A plan that can't be read is an error, not a fail-open case: running the
 /// whole suite on every shard would be worse than stopping.
@@ -118,7 +103,7 @@ fn with_plan_flows(mut argv: Vec<OsString>, plan: Option<&PlanAssigned>) -> Vec<
 fn read_plan(path: &Path, shard: u32) -> Result<PlanAssigned, PlanError> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| PlanError(format!("reading plan {}: {e}", path.display())))?;
-    let manifest: Manifest = serde_json::from_str(&text)
+    let manifest: PlanManifest = serde_json::from_str(&text)
         .map_err(|e| PlanError(format!("plan {} is not a Fleet plan: {e}", path.display())))?;
     let s = manifest
         .shards

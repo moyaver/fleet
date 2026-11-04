@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order,\n                                  observed_at, detail)\n         SELECT id, 'server_inferred', 'sweep:' || $1::uuid::text, 'unknown', $2, now(),\n                '{\"reason\": \"agent_abandoned\"}'\n           FROM flow_executions WHERE agent_run_id = $1 AND state IN ('pending', 'running')\n         ON CONFLICT DO NOTHING\n         RETURNING flow_execution_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_execution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_claims",
+            "name": "flow_execution_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d93705b1353c00d1e4c7cf1a552d331445d508ee53ee4e0f4ef0ca87a8646bfa"
+}

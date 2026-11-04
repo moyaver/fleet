@@ -9,7 +9,7 @@ use std::sync::{
 use fleet_store::{Store, ingest::Change};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
-use crate::{config::Config, ingest::telemetry::TelemetryBuffer};
+use crate::{config::Config, ingest::telemetry::TelemetryBuffer, live::Hub};
 
 /// Cheap to clone; everything lives behind one `Arc`.
 #[derive(Debug, Clone)]
@@ -24,6 +24,7 @@ pub(crate) struct Inner {
     /// Every socket and background task, so shutdown can wait for them.
     pub(crate) tracker: TaskTracker,
     pub(crate) telemetry: TelemetryBuffer,
+    pub(crate) hub: Hub,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
 }
@@ -38,7 +39,12 @@ impl std::ops::Deref for AppState {
 
 impl AppState {
     pub(crate) fn new(store: Store, config: Config) -> Self {
+        let hub = Hub::new(
+            std::time::Duration::from_millis(config.liveness.stale_after_ms),
+            config.api.live_buffer,
+        );
         Self(Arc::new(Inner {
+            hub,
             store,
             config,
             shutdown: CancellationToken::new(),
@@ -56,15 +62,12 @@ impl AppState {
         self.ready.store(ready, Ordering::SeqCst);
     }
 
-    /// Hands a committed change to the live layer. Called after the ack, never before commit.
-    #[expect(
-        clippy::unused_self,
-        reason = "the live hub, next, publishes through the state"
-    )]
+    /// Hands a committed change to the live hub. Called after the ack, never before commit.
     pub(crate) fn publish(&self, change: Option<Change>) {
-        if let Some(change) = change {
-            tracing::trace!(attempt = %change.pipeline_attempt_id, version = change.version,
-                entities = change.entities.len(), "committed change");
-        }
+        let Some(change) = change else { return };
+        let state = self.clone();
+        self.tracker.spawn(async move {
+            state.hub.publish(&state.store, change).await;
+        });
     }
 }

@@ -59,6 +59,8 @@ pub struct Config {
     pub ingest: Ingest,
     /// Liveness thresholds (research 05 §6.8).
     pub liveness: Liveness,
+    /// Read APIs (REST and the browser WebSocket).
+    pub api: Api,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -70,6 +72,7 @@ impl Default for Config {
             database: Database::default(),
             ingest: Ingest::default(),
             liveness: Liveness::default(),
+            api: Api::default(),
             projects: Vec::new(),
         }
     }
@@ -167,6 +170,48 @@ impl Default for Liveness {
             sweep_interval_ms: 10_000,
         }
     }
+}
+
+/// Who may read run data until browser SSO arrives (M4). Agent credentials never can: they are
+/// write-only (PLAN §7.5).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Api {
+    /// Bearer tokens that may read every project. A single string is one token, so
+    /// `FLEET_API__VIEWER_TOKENS_FILE` can hold it.
+    #[serde(deserialize_with = "one_or_many")]
+    pub viewer_tokens: Vec<Secret>,
+    /// Let anyone read. Only for local development: run data is private (spec §10).
+    pub anonymous_read: bool,
+    /// The dashboard's public origin (`https://fleet.example.com`). Browser sockets from any
+    /// other `Origin` are refused (cross-site WebSocket hijacking). Unset: the `Host` header.
+    pub public_url: Option<String>,
+    /// Live messages buffered per project for slow browsers; beyond that they `resync`.
+    pub live_buffer: usize,
+}
+
+impl Default for Api {
+    fn default() -> Self {
+        Self {
+            viewer_tokens: Vec::new(),
+            anonymous_read: false,
+            public_url: None,
+            live_buffer: 1024,
+        }
+    }
+}
+
+fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<Secret>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(Secret),
+        Many(Vec<Secret>),
+    }
+    Ok(match OneOrMany::deserialize(d)? {
+        OneOrMany::One(s) => vec![s],
+        OneOrMany::Many(v) => v,
+    })
 }
 
 /// A project created at start-up.

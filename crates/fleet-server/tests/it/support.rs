@@ -30,6 +30,9 @@ use tokio_tungstenite::{
 };
 use uuid::Uuid;
 
+/// The viewer token every test server accepts.
+pub(crate) const VIEWER: &str = "viewer-secret";
+
 pub(crate) struct Harness {
     pub(crate) server: Option<fleet_server::Server>,
     pub(crate) config: Config,
@@ -46,6 +49,7 @@ pub(crate) fn test_config(url: &str) -> Config {
     c.ingest.ping_interval_ms = 500;
     c.ingest.shutdown_grace_ms = 5_000;
     c.ingest.reconnect_jitter_ms = 10;
+    c.api.viewer_tokens = vec![Secret::from(VIEWER)];
     c.projects = vec![ProjectConfig {
         slug: "app".into(),
         name: "App".into(),
@@ -386,11 +390,26 @@ pub(crate) async fn post_json(
     token: Option<&str>,
     body: &str,
 ) -> (u16, String) {
+    http(addr, "POST", path, token, body).await
+}
+
+/// A GET with an optional bearer token.
+pub(crate) async fn get(addr: SocketAddr, path: &str, token: Option<&str>) -> (u16, String) {
+    http(addr, "GET", path, token, "").await
+}
+
+async fn http(
+    addr: SocketAddr,
+    method: &str,
+    path: &str,
+    token: Option<&str>,
+    body: &str,
+) -> (u16, String) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut sock = tokio::net::TcpStream::connect(addr).await.unwrap();
     let auth = token.map_or(String::new(), |t| format!("Authorization: Bearer {t}\r\n"));
     let req = format!(
-        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n{auth}\
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n{auth}\
          Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
@@ -404,4 +423,43 @@ pub(crate) async fn post_json(
         .map(|(_, b)| b.to_owned())
         .unwrap_or_default();
     (status, body)
+}
+
+/// A browser-style live subscriber on `/api/v1/live`.
+pub(crate) async fn live(
+    addr: SocketAddr,
+    token: Option<&str>,
+    origin: Option<&str>,
+) -> Result<Ws, tokio_tungstenite::tungstenite::Error> {
+    let mut req = format!("ws://{addr}/api/v1/live")
+        .into_client_request()
+        .unwrap();
+    if let Some(t) = token {
+        req.headers_mut().insert(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {t}")).unwrap(),
+        );
+    }
+    if let Some(o) = origin {
+        req.headers_mut()
+            .insert("Origin", HeaderValue::from_str(o).unwrap());
+    }
+    tokio_tungstenite::connect_async(req)
+        .await
+        .map(|(ws, _)| ws)
+}
+
+/// The next JSON message on a live socket, within 10 s.
+pub(crate) async fn live_next(ws: &mut Ws) -> serde_json::Value {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        match tokio::time::timeout_at(deadline, ws.next())
+            .await
+            .expect("a live message within 10 s")
+        {
+            Some(Ok(Message::Text(t))) => return serde_json::from_str(t.as_str()).unwrap(),
+            Some(Ok(_)) => {}
+            other => panic!("live socket ended: {other:?}"),
+        }
+    }
 }

@@ -5,16 +5,22 @@
 //! - `ingest`: the agent WebSocket (`/api/v1/agent/ws`, `fleet.v1+json`) and the HTTPS batch
 //!   fallback (`/api/v1/agent/batch`). Each `events` frame is one transaction; the ack follows
 //!   the commit (research 05 §3.5).
+//! - `live` and `api`: the live hub (versioned, ordered deltas; rebuilt from Postgres), the
+//!   browser socket `/api/v1/live`, REST snapshots and `/api/v1/openapi.json`.
+//! - `sweeps`: liveness, and the leader's sweeps (advisory lock).
 //! - `app`: the router, graceful shutdown (`goaway`, close 1012) and start-up.
 //!
 //! `main.rs` only parses arguments and installs logging; [`run`] does the rest.
 
 pub mod config;
 
+mod api;
 mod app;
 mod health;
 mod ingest;
+mod live;
 mod state;
+mod sweeps;
 mod web;
 
 use std::path::PathBuf;

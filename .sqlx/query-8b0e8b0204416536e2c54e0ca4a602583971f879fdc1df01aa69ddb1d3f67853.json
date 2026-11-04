@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM agent_tokens t\n              WHERE t.expires_at < now() - interval '1 day'\n                AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r.token_id = t.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "8b0e8b0204416536e2c54e0ca4a602583971f879fdc1df01aa69ddb1d3f67853"
+}

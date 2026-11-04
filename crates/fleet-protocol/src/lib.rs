@@ -7,11 +7,13 @@
 //! - [`frame`]: what travels over the agent WebSocket (`fleet.v1+json`).
 //! - [`journal`]: the envelope every journal event shares, with its provenance.
 //! - [`event`]: the typed bodies the agent emits.
+//! - [`plan`]: Fleet Planner manifests (ADR-0013).
 
 pub mod brand;
 pub mod event;
 pub mod frame;
 pub mod journal;
+pub mod plan;
 
 /// The protocol version this build speaks.
 pub const PROTOCOL_VERSION: u16 = 1;

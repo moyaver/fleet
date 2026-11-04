@@ -1,0 +1,163 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, s.job_id, s.agent_run_id, s.shard_mode, s.shard_count, s.planned_count,\n                s.plan_source::text AS plan_source, s.lifecycle, s.outcome,\n                s.outcome_source::text AS outcome_source, s.report_status, s.exit_code, s.rev\n           FROM suite_executions s JOIN jobs j ON j.id = s.job_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR s.id = ANY($2))\n          ORDER BY s.started_at NULLS LAST, s.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "job_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "job_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "shard_mode",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "shard_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "shard_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "shard_count"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "planned_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "planned_count"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "plan_source",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "lifecycle",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "lifecycle"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "outcome",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "outcome_source",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "report_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "report_status"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "exit_code",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "exit_code"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "rev",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "rev"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      false,
+      true,
+      null,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "31f2ae04bf08e42977557c23bb45f3981d5246fa4c46fb28de73259f1bde0725"
+}

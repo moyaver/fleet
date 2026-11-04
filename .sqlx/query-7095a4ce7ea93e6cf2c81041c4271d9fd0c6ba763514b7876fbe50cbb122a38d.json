@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT manifest_sha256 = $3 AS \"same!\" FROM plans\n                  WHERE project_id = $1 AND plan_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "same!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7095a4ce7ea93e6cf2c81041c4271d9fd0c6ba763514b7876fbe50cbb122a38d"
+}

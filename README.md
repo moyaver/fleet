@@ -75,11 +75,11 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] Ingest transaction: epoch fencing, duplicate skip, ownership-checked upserts, claims resolved by the lattice, suite and job outcomes (`fleet-core::outcome`), gaps recorded (I3, I5)
 - [x] Agent WebSocket and HTTPS batch endpoints: acks, resume, fencing, keepalive, timeouts, `goaway` + 1012 on shutdown
 - [x] `fleet serve | migrate | check-config | healthcheck | api-key create`, figment config (TOML, `FLEET_*`, `*_FILE`)
-- [ ] Live hub, browser WebSocket (snapshot + versioned deltas, `resync`), rebuilt from Postgres after a restart
-- [ ] REST snapshots, OpenAPI (utoipa), liveness sweeps under an advisory-lock leader
+- [x] Live hub, browser WebSocket (snapshot + versioned deltas, `resync`), rebuilt from Postgres after a restart
+- [x] REST snapshots, OpenAPI (utoipa), liveness sweeps under an advisory-lock leader
 - [ ] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
 - [ ] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
-- [ ] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
+- [x] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
 - [ ] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image
 - [ ] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
 - [ ] Exit criteria proven by tests: concurrent agents, restart without loss, acceptance criteria 3, 10, 11, 15, fixture replay through the real agent and server

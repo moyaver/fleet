@@ -17,7 +17,7 @@
 //! ingestion.
 
 mod apply;
-mod derive;
+pub(crate) mod derive;
 #[cfg(test)]
 pub(crate) mod tests;
 
@@ -201,7 +201,7 @@ fn identity(p: &Publisher, h: &Hello) -> Identity {
     let attempt = claims.run_attempt.or(ci.run_attempt).unwrap_or(1).max(1);
     let job_key = claims.check_run_id.unwrap_or_else(|| ci.job_key.clone());
     let run_key = match &run_id {
-        Some(id) => format!("{}:{id}", repository.as_deref().unwrap_or("-")),
+        Some(id) => run_key(repository.as_deref(), id),
         // No CI run to group by: the agent run is its own pipeline.
         None => format!("agent-run:{}", h.agent_run_id),
     };
@@ -218,6 +218,11 @@ fn identity(p: &Publisher, h: &Hello) -> Identity {
         job_key,
         job_name: ci.job_name.clone(),
     }
+}
+
+/// The natural key of a CI run within a provider (research 05 §3.1).
+pub(crate) fn run_key(repository: Option<&str>, run_id: &str) -> String {
+    format!("{}:{run_id}", repository.unwrap_or("-"))
 }
 
 /// Agent-generated IDs must be UUIDv7 within ±7 days of the server clock (research 05 §5.5).
@@ -360,6 +365,20 @@ impl Store {
             resume,
             change,
         })
+    }
+
+    /// The server is restarting: the connection ends but the run stays `active` (it shows
+    /// `stale` until it reconnects, research 03 §5.4); the leader detaches it if it never does.
+    pub async fn connection_closed(&self, run: &RunHandle, reason: &str) -> Result<()> {
+        sqlx::query!(
+            "UPDATE connections SET closed_at = now(), close_reason = $2
+              WHERE id = $1 AND closed_at IS NULL",
+            run.connection_id,
+            reason
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
     }
 
     /// The connection closed without `bye` after `run.ended`: the run is detached until it
@@ -808,7 +827,7 @@ async fn write_journal(
 }
 
 /// Bumps the attempt's live version when anything changed; the hub orders deltas by it.
-async fn bump_version(
+pub(crate) async fn bump_version(
     tx: &mut PgConnection,
     project_id: Uuid,
     attempt_id: Uuid,

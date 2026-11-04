@@ -8,6 +8,9 @@
 //!   that fences the epoch, skips duplicates, applies claims and entities with ownership checks,
 //!   re-derives outcomes and advances the cursor (research 05 §9.4).
 //! - [`telemetry`]: buffered metric samples, written in one statement per flush.
+//! - [`live`]: read models for REST snapshots and live deltas, with a consistent `version`.
+//! - [`plans`]: immutable Fleet Planner manifests and planned totals (ADR-0013).
+//! - [`sweep`]: leader-only liveness sweeps (detach silent runs, abandon expired ones).
 //!
 //! Invariants upheld here: I3 (only the claim lattice decides a flow's outcome, and a `CHECK`
 //! constraint refuses a passed claim from an inferred source) and I5 (gaps are recorded in
@@ -15,6 +18,9 @@
 
 pub mod auth;
 pub mod ingest;
+pub mod live;
+pub mod plans;
+pub mod sweep;
 pub mod telemetry;
 #[cfg(feature = "test-util")]
 pub mod testing;

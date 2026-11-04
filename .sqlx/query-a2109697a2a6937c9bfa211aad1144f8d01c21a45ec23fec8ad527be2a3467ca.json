@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO plans (project_id, plan_id, pipeline_attempt_id, manifest, manifest_sha256,\n                                planned_total)\n             VALUES ($1, $2, $3, $4, $5, $6)\n             ON CONFLICT (project_id, plan_id) DO NOTHING\n             RETURNING plan_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "plan_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "plans",
+            "name": "plan_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Jsonb",
+        {
+          "Custom": {
+            "name": "sha256_t",
+            "kind": {
+              "Domain": "Bytea"
+            }
+          }
+        },
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a2109697a2a6937c9bfa211aad1144f8d01c21a45ec23fec8ad527be2a3467ca"
+}

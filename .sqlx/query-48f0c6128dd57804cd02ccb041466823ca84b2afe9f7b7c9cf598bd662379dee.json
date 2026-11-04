@@ -1,0 +1,159 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id, a.project_id, r.provider, r.provider_run_key AS run_key, r.repository,\n                r.commit_sha, r.git_ref, a.attempt, a.version, a.first_seen_at,\n                (SELECT sum(p.planned_total)::bigint FROM plans p\n                  WHERE p.project_id = a.project_id AND p.pipeline_attempt_id = a.id) AS planned_total,\n                (SELECT count(*) FROM jobs j WHERE j.pipeline_attempt_id = a.id) AS \"jobs!\",\n                (SELECT count(*) FROM jobs j\n                  WHERE j.pipeline_attempt_id = a.id AND j.lifecycle <> 'closed') AS \"open_jobs!\"\n           FROM pipeline_attempts a JOIN pipeline_runs r ON r.id = a.pipeline_run_id\n          WHERE ($1::uuid IS NULL OR a.project_id = $1) AND ($2::uuid IS NULL OR a.id = $2)\n          ORDER BY a.first_seen_at DESC\n          LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "run_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "provider_run_key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "repository",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "repository"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "commit_sha",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "commit_sha"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "git_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "git_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempt",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "attempt"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "first_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "planned_total",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "jobs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 12,
+        "name": "open_jobs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "48f0c6128dd57804cd02ccb041466823ca84b2afe9f7b7c9cf598bd662379dee"
+}

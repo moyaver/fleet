@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM oidc_jti_seen WHERE expires_at < now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4b06d20d2b9bee8db0e8a950af02c3b5e4557684798d66e0ddbb873cfc08bd68"
+}

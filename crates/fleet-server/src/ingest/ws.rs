@@ -86,10 +86,17 @@ async fn connection(state: AppState, mut socket: WebSocket, auth: Result<Publish
     let Some(run) = handshake(&state, &mut socket, auth).await else {
         return;
     };
+    state.hub.seen(&run);
     let ended = stream(&state, &mut socket, &run).await;
+    state.hub.disconnected(&run, ended == Ended::Bye);
     tracing::info!(agent_run_id = %run.agent_run_id, epoch = run.epoch, reason = ended.reason(),
         "agent connection ended");
-    if let Err(e) = state.store.detach(&run, ended.reason()).await {
+    let recorded = if ended == Ended::Shutdown {
+        state.store.connection_closed(&run, ended.reason()).await
+    } else {
+        state.store.detach(&run, ended.reason()).await
+    };
+    if let Err(e) = recorded {
         tracing::warn!(agent_run_id = %run.agent_run_id, error = %e, "recording a detach");
     }
 }
@@ -176,6 +183,7 @@ async fn stream(state: &AppState, socket: &mut WebSocket, run: &RunHandle) -> En
             msg = socket.recv() => {
                 let Some(Ok(msg)) = msg else { break Ended::Closed };
                 idle.as_mut().reset(Instant::now() + idle_after);
+                state.hub.seen(run);
                 let text = match msg {
                     Message::Text(t) => t,
                     Message::Close(_) => break Ended::Closed,

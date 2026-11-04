@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET state = 'abandoned', end_reason = 'abandoned', rev = rev + 1\n          WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "347594657006cb5e80645034d3f45b37f8ca8ec2533051b867f9e2c548221fdf"
+}
