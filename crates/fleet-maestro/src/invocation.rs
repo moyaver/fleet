@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use fleet_protocol::event::ShardMode;
+use fleet_protocol::event::{EvidenceSources, ReportReason, ReportSource, ShardMode};
 
 use crate::log::MACHINE_PATTERN;
 
@@ -195,21 +195,62 @@ pub struct Prepared {
     pub report: Option<String>,
     /// Whether the JUnit report was added, and if not, why.
     pub report_injection: ReportInjection,
+    /// The evidence sources this command will produce, for the dashboard.
+    pub evidence: EvidenceSources,
+}
+
+/// Where Maestro writes the JUnit report when `--format junit` has no `--output`: `report.xml` in
+/// its working directory (research 01 §test options, `TestCommand.kt` L691-699, Maestro 2.12.1).
+/// Relative on purpose: Maestro inherits the agent's working directory, so it resolves the same.
+pub const DEFAULT_REPORT: &str = "report.xml";
+
+// Picocli behaviour, checked against the real CLI (Homebrew Maestro 2.11.0, picocli 4.6.3):
+// `maestro test --output a.xml --output b.xml f.yaml` exits 2 with
+// "option '--output' (<output>) should be specified only once", and a repeated `--format` is
+// rejected the same way. So the agent must never add a second `--output` or `--format`: that
+// would turn a working command into a usage error (I1).
+
+/// What the user's `--format` is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UserFormat {
+    None,
+    Junit,
+    /// `html`, `html-detailed`, `noop`, or anything else: no JUnit report.
+    Other,
+}
+
+/// The report path the command asks Maestro for, if it asks for JUnit.
+#[must_use]
+pub fn requested_report(inv: &Invocation) -> Option<String> {
+    match user_format(inv) {
+        UserFormat::Junit => Some(
+            inv.output
+                .clone()
+                .unwrap_or_else(|| DEFAULT_REPORT.to_owned()),
+        ),
+        UserFormat::None | UserFormat::Other => None,
+    }
+}
+
+fn user_format(inv: &Invocation) -> UserFormat {
+    match inv.format.as_deref() {
+        None => UserFormat::None,
+        Some(f) if f.eq_ignore_ascii_case("junit") => UserFormat::Junit,
+        Some(_) => UserFormat::Other,
+    }
 }
 
 /// Decides whether `--format` can be added without changing Maestro's execution mode.
 ///
 /// Maestro takes its multi-flow path for more than one flow file or a directory, and for
 /// `--shard-all` (replication). `flows` is every flow path the run will get, `classify` says
-/// what each is. Anything unknown means no injection.
+/// what each is. Anything unknown means no injection. Only called when the user gave no
+/// `--format`, and rewriting is on.
 fn report_decision(
     inv: &Invocation,
     flows: &[String],
     classify: &impl Fn(&str) -> PathKind,
 ) -> ReportInjection {
-    if inv.format.is_some() {
-        return ReportInjection::UserProvided;
-    }
     if inv.continuous {
         return ReportInjection::SkippedContinuous;
     }
@@ -231,6 +272,18 @@ fn report_decision(
 ///
 /// `extra_flows` are flow paths the agent will append later (a planner shard); `classify` tells
 /// files from directories.
+///
+/// The report is one normalization over (user's `--format`, user's `--output`, injection
+/// decision); the agent never adds an option the user already gave:
+///
+/// | `--format` | `--output` | injection allowed | added | report read |
+/// |---|---|---|---|---|
+/// | none | none | yes | `--format junit --output <run>/report.xml` | that file |
+/// | none | `X` | yes | `--format junit` | `X` |
+/// | none | any | no | nothing | none (reason says why) |
+/// | `junit` | none | n/a | nothing | [`DEFAULT_REPORT`] |
+/// | `junit` | `X` | n/a | nothing | `X` |
+/// | other | any | n/a | nothing | none, by the user's choice |
 #[must_use]
 pub fn prepare(
     argv: &[String],
@@ -247,28 +300,18 @@ pub fn prepare(
         (Some(d), true) => Some(d.clone()),
         _ => None,
     };
-    let mut report = inv.output.clone().filter(|_| {
-        inv.format
-            .as_deref()
-            .is_some_and(|f| f.eq_ignore_ascii_case("junit"))
-    });
-    let mut injection = ReportInjection::Disabled;
-    if inv.format.is_some() && rewrite && inv.test_index.is_some() {
-        injection = ReportInjection::UserProvided;
-    }
-    if rewrite && let Some(t) = inv.test_index {
-        if inv.debug_output.is_none() && inv.test_output_dir.is_none() {
-            let dir = run_dir.join("artifacts").to_string_lossy().into_owned();
-            added.extend([
-                "--flatten-debug-output".to_owned(),
-                "--debug-output".to_owned(),
-                dir.clone(),
-            ]);
-            debug_dir = Some(dir);
+    let rewriting = rewrite && inv.test_index.is_some();
+    let format = user_format(&inv);
+    let decision = match (format, rewriting) {
+        (UserFormat::None, true) => {
+            let flows: Vec<String> = inv.positionals.iter().chain(extra_flows).cloned().collect();
+            report_decision(&inv, &flows, &classify)
         }
-        let flows: Vec<String> = inv.positionals.iter().chain(extra_flows).cloned().collect();
-        injection = report_decision(&inv, &flows, &classify);
-        if injection == ReportInjection::Injected {
+        (UserFormat::None, false) => ReportInjection::Disabled,
+        (UserFormat::Junit | UserFormat::Other, _) => ReportInjection::UserProvided,
+    };
+    let (report, reason) = match (format, inv.output.as_deref(), decision) {
+        (UserFormat::None, None, ReportInjection::Injected) => {
             let file = run_dir.join("report.xml").to_string_lossy().into_owned();
             added.extend([
                 "--format".to_owned(),
@@ -276,13 +319,34 @@ pub fn prepare(
                 "--output".to_owned(),
                 file.clone(),
             ]);
-            report = Some(file);
+            (Some(file), ReportReason::Injected)
         }
+        (UserFormat::None, Some(x), ReportInjection::Injected) => {
+            added.extend(["--format".to_owned(), "junit".to_owned()]);
+            (Some(x.to_owned()), ReportReason::Injected)
+        }
+        (UserFormat::None, _, skipped) => (None, skipped_reason(skipped)),
+        (UserFormat::Junit, ..) => (requested_report(&inv), ReportReason::UserJunit),
+        (UserFormat::Other, ..) => (None, ReportReason::UserFormat),
+    };
+    if rewriting && inv.debug_output.is_none() && inv.test_output_dir.is_none() {
+        let dir = run_dir.join("artifacts").to_string_lossy().into_owned();
+        added.splice(
+            0..0,
+            [
+                "--flatten-debug-output".to_owned(),
+                "--debug-output".to_owned(),
+                dir.clone(),
+            ],
+        );
+        debug_dir = Some(dir);
+    }
+    if let Some(t) = inv.test_index.filter(|_| rewriting) {
         for (k, flag) in added.iter().enumerate() {
             out.insert(t + 1 + k, flag.clone());
         }
     }
-    let env = [
+    let env: Vec<(String, String)> = [
         ("MAESTRO_CLI_NO_ANALYTICS", "1"),
         ("MAESTRO_DISABLE_UPDATE_CHECK", "true"),
         ("MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED", "true"),
@@ -292,13 +356,33 @@ pub fn prepare(
     .filter(|(k, _)| !user_env(k))
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
     .collect();
+    let maestro_log = env.iter().any(|(k, _)| k == "MAESTRO_CLI_LOG_PATTERN_FILE");
     Prepared {
         argv: out,
         env,
         added_flags: added,
+        evidence: EvidenceSources {
+            report: ReportSource {
+                path: report.clone(),
+                reason,
+            },
+            debug_output: debug_dir.clone(),
+            maestro_log,
+        },
         debug_dir,
         report,
-        report_injection: injection,
+        report_injection: decision,
+    }
+}
+
+/// The reason a report wasn't added, for the decision that said so.
+const fn skipped_reason(d: ReportInjection) -> ReportReason {
+    match d {
+        ReportInjection::SkippedSingleFlow => ReportReason::SkippedSingleFlow,
+        ReportInjection::SkippedContinuous => ReportReason::SkippedContinuous,
+        ReportInjection::SkippedUnclassified => ReportReason::SkippedUnclassified,
+        ReportInjection::Disabled => ReportReason::RewriteDisabled,
+        ReportInjection::Injected | ReportInjection::UserProvided => ReportReason::UserFormat,
     }
 }
 
@@ -462,5 +546,102 @@ mod tests {
             false
         });
         assert_eq!(p.argv, argv("maestro test flows/"), "rewrite off");
+    }
+
+    fn run(cmd: &str) -> Prepared {
+        prepare(&argv(cmd), Path::new("/run"), true, &[], dirs, |_| false)
+    }
+
+    fn count(p: &Prepared, flag: &str) -> usize {
+        p.argv.iter().filter(|a| *a == flag).count()
+    }
+
+    #[test]
+    fn format_junit_without_output_reads_maestros_default() {
+        let p = run("maestro test --format junit login.yaml");
+        assert_eq!(count(&p, "--format"), 1);
+        assert_eq!(count(&p, "--output"), 0, "{:?}", p.argv);
+        assert!(!p.added_flags.iter().any(|a| a == "--format"));
+        assert_eq!(p.report.as_deref(), Some(DEFAULT_REPORT));
+        assert_eq!(p.evidence.report.reason, ReportReason::UserJunit);
+        // Case-insensitive, like picocli's converter.
+        let p = run("maestro test --format=JUNIT login.yaml");
+        assert_eq!(p.report.as_deref(), Some(DEFAULT_REPORT));
+    }
+
+    #[test]
+    fn output_without_format_never_gets_a_second_output() {
+        // A suite: injecting `--format junit` is safe, and the user's path is the report.
+        let p = run("maestro test --output custom.xml flows/");
+        assert_eq!(count(&p, "--output"), 1, "{:?}", p.argv);
+        assert_eq!(count(&p, "--format"), 1);
+        assert_eq!(p.report.as_deref(), Some("custom.xml"));
+        assert_eq!(p.evidence.report.reason, ReportReason::Injected);
+        assert!(p.argv.windows(2).any(|w| w == ["--output", "custom.xml"]));
+        // A single flow: adding `--format` would change the execution mode (#28), so nothing.
+        let p = run("maestro test --output custom.xml login.yaml");
+        assert_eq!((count(&p, "--output"), count(&p, "--format")), (1, 0));
+        assert_eq!(p.report, None);
+        assert_eq!(p.evidence.report.reason, ReportReason::SkippedSingleFlow);
+        let p = run("maestro test -c --output custom.xml flows/");
+        assert_eq!((count(&p, "--output"), count(&p, "--format")), (1, 0));
+        assert_eq!(p.evidence.report.reason, ReportReason::SkippedContinuous);
+    }
+
+    #[test]
+    fn other_formats_are_no_junit_by_choice() {
+        for cmd in [
+            "maestro test --format html flows/",
+            "maestro test --format html-detailed --output r.html flows/",
+            "maestro test --format noop flows/",
+        ] {
+            let p = run(cmd);
+            assert_eq!(p.argv.len(), argv(cmd).len() + 3, "only debug flags: {cmd}");
+            assert_eq!(p.report, None, "{cmd}");
+            assert_eq!(p.evidence.report.reason, ReportReason::UserFormat);
+        }
+    }
+
+    #[test]
+    fn both_given_adds_nothing() {
+        let p = run("maestro test --format junit --output x.xml flows/");
+        assert_eq!((count(&p, "--format"), count(&p, "--output")), (1, 1));
+        assert_eq!(p.report.as_deref(), Some("x.xml"));
+        let p = prepare(
+            &argv("maestro test --format junit --output x.xml flows/"),
+            Path::new("/run"),
+            false,
+            &[],
+            dirs,
+            |_| false,
+        );
+        assert_eq!(
+            p.report.as_deref(),
+            Some("x.xml"),
+            "rewrite off still reads it"
+        );
+        assert_eq!(p.added_flags.len(), 0);
+    }
+
+    #[test]
+    fn nothing_given_follows_the_injection_decision() {
+        let p = run("maestro test flows/");
+        assert_eq!(p.evidence.report.path.as_deref(), Some("/run/report.xml"));
+        assert_eq!(p.evidence.report.reason, ReportReason::Injected);
+        assert_eq!(p.evidence.debug_output.as_deref(), Some("/run/artifacts"));
+        assert!(p.evidence.maestro_log);
+        let p = run("maestro test login.yaml");
+        assert_eq!(p.evidence.report.path, None);
+        assert_eq!(p.evidence.report.reason, ReportReason::SkippedSingleFlow);
+        let p = prepare(
+            &argv("maestro test flows/"),
+            Path::new("/r"),
+            false,
+            &[],
+            dirs,
+            |_| true,
+        );
+        assert_eq!(p.evidence.report.reason, ReportReason::RewriteDisabled);
+        assert!(!p.evidence.maestro_log, "the user's own log pattern");
     }
 }

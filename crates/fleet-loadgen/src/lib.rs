@@ -184,6 +184,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
         &EventBody::RunStarted(RunStarted {
             argv: vec!["maestro".into(), "test".into(), "flows/".into()],
             agent_version: "loadgen".into(),
+            evidence: None,
         }),
     );
     let suite = Subject {

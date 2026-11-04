@@ -141,6 +141,7 @@ pub(crate) fn suite_run(
             &EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
+                evidence: None,
             }),
         ),
         a.event(
@@ -351,6 +352,66 @@ async fn a_run_streams_resolves_and_closes_its_job(pool: PgPool) {
         a.seq,
         "every event is in the journal"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn run_started_persists_the_evidence_description(pool: PgPool) {
+    use fleet_protocol::event::{EvidenceSources, ReportReason, ReportSource};
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("102", "e2e");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let evidence = EvidenceSources {
+        report: ReportSource {
+            path: None,
+            reason: ReportReason::UserFormat,
+        },
+        debug_output: Some("/run/artifacts".into()),
+        maestro_log: true,
+    };
+    let started = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunStarted(RunStarted {
+            argv: vec!["maestro".into(), "test".into()],
+            agent_version: "0.0.0".into(),
+            evidence: Some(evidence.clone()),
+        }),
+    );
+    let applied = store.apply_batch(&h, &[started]).await.unwrap();
+    assert!(applied.rejected.is_empty(), "{:?}", applied.rejected);
+    let stored = sqlx::query_scalar!("SELECT evidence FROM agent_runs WHERE id = $1", a.id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+    let stored: EvidenceSources = serde_json::from_value(stored.unwrap()).unwrap();
+    assert_eq!(stored, evidence);
+    // An agent that sends none leaves NULL (unknown), not a made-up description.
+    let mut b = Agent::new("103", "e2e");
+    let hb = store
+        .open_run(&p, &b.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let old = b.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunStarted(RunStarted {
+            argv: vec!["maestro".into()],
+            agent_version: "0.0.0".into(),
+            evidence: None,
+        }),
+    );
+    store.apply_batch(&hb, &[old]).await.unwrap();
+    let none = sqlx::query_scalar!("SELECT evidence FROM agent_runs WHERE id = $1", b.id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+    assert!(none.is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]

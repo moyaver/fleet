@@ -13,7 +13,10 @@ use std::{
 };
 
 use fleet_maestro::invocation::PathKind;
-use fleet_protocol::{event::PlanAssigned, plan::PlanManifest};
+use fleet_protocol::{
+    event::{EvidenceSources, PlanAssigned},
+    plan::PlanManifest,
+};
 
 /// The command and where its outputs will be.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +33,8 @@ pub(crate) struct Prepared {
     pub(crate) run_dir: Option<PathBuf>,
     /// The planner shard, when `--plan` was given.
     pub(crate) plan: Option<PlanAssigned>,
+    /// The evidence sources the command will produce, when it was a `maestro test`.
+    pub(crate) evidence: Option<EvidenceSources>,
 }
 
 /// Why the command can't run as asked.
@@ -55,6 +60,7 @@ pub(crate) fn prepare(
         report: None,
         run_dir: None,
         plan: plan.clone(),
+        evidence: None,
     };
     let Some(argv): Option<Vec<String>> = command
         .iter()
@@ -126,6 +132,7 @@ pub(crate) fn prepare(
         report: p.report,
         run_dir,
         plan,
+        evidence: Some(p.evidence),
     })
 }
 

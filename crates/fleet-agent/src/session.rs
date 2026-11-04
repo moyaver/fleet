@@ -14,9 +14,10 @@ use fleet_core::{
 use fleet_maestro::{ReportState, bundle, junit, log, stdout};
 use fleet_protocol::{
     event::{
-        AgentWarning, ArtifactRegistered, EventBody, FailureInfo, FlowEnded, FlowOutcome, FlowRef,
-        FlowReported, FlowStarted, ProcessExited, ReportParsed, ReportStatus, RunEnded, RunSignal,
-        RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus, SuiteStarted,
+        AgentWarning, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo, FlowEnded,
+        FlowOutcome, FlowRef, FlowReported, FlowStarted, ProcessExited, ReportParsed, ReportStatus,
+        RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
+        StepStatus, SuiteStarted,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -122,6 +123,7 @@ impl Session {
     /// Starts a session for a Maestro command line.
     pub(crate) fn new(
         argv: &[String],
+        evidence: Option<EvidenceSources>,
         redactor: Redactor,
         mut new_id: IdGen,
         at: ClockSample,
@@ -153,6 +155,7 @@ impl Session {
             &EventBody::RunStarted(RunStarted {
                 argv: argv_redacted,
                 agent_version: env!("CARGO_PKG_VERSION").to_owned(),
+                evidence: evidence.map(|e| redact_evidence(e, &s.redactor)),
             }),
         );
         let inv = fleet_maestro::invocation::parse(argv);
@@ -894,6 +897,21 @@ impl Session {
         redacted.chars().take(MAX_MESSAGE).collect()
     }
 
+    /// Emits an `agent.warning` for the run, message redacted (I6).
+    pub(crate) fn warn(&mut self, at: ClockSample, code: &str, message: &str) {
+        let message = self.redactor.redact(message).into_owned();
+        self.emit(
+            at,
+            Subject::default(),
+            SourceKind::AgentObserved,
+            None,
+            &EventBody::AgentWarning(AgentWarning {
+                code: code.into(),
+                message,
+            }),
+        );
+    }
+
     fn emit(
         &mut self,
         at: ClockSample,
@@ -919,6 +937,14 @@ impl Session {
 }
 
 /// `flows/login.yaml` → `login`.
+/// Paths go off the host, so they are redacted like the command line (I6).
+fn redact_evidence(mut e: EvidenceSources, redactor: &Redactor) -> EvidenceSources {
+    let clean = |p: String| redactor.redact(&p).into_owned();
+    e.report.path = e.report.path.map(clean);
+    e.debug_output = e.debug_output.map(clean);
+    e
+}
+
 fn stem(path: &str) -> String {
     let file = path.rsplit('/').next().unwrap_or(path);
     file.strip_suffix(".yaml")
@@ -948,6 +974,48 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_warning_is_redacted() {
+        let mut s = Session::new(
+            &["maestro".into(), "test".into()],
+            None,
+            Redactor::new(["hunter2-secret".to_owned()]),
+            Box::new(|| Uuid::from_u128(1)),
+            at(),
+        );
+        s.drain();
+        s.warn(at(), "report_stale", "/tmp/hunter2-secret/report.xml old");
+        let json = serde_json::to_string(&s.drain()).unwrap();
+        assert!(
+            json.contains("report_stale") && !json.contains("hunter2-secret"),
+            "{json}"
+        );
+    }
+
+    #[test]
+    fn run_started_carries_the_evidence_description_redacted() {
+        use fleet_protocol::event::{ReportReason, ReportSource};
+        let evidence = EvidenceSources {
+            report: ReportSource {
+                path: Some("/tmp/hunter2-secret/report.xml".into()),
+                reason: ReportReason::UserJunit,
+            },
+            debug_output: None,
+            maestro_log: true,
+        };
+        let mut s = Session::new(
+            &["maestro".into(), "test".into()],
+            Some(evidence),
+            Redactor::new(["hunter2-secret".to_owned()]),
+            Box::new(|| Uuid::from_u128(1)),
+            at(),
+        );
+        let first = s.drain().remove(0);
+        let json = serde_json::to_string(&first).unwrap();
+        assert!(!json.contains("hunter2-secret"), "I6: {json}");
+        assert!(json.contains(r#""reason":"user_junit""#), "{json}");
+    }
+
     /// A session with one flow `pass` that Maestro printed no result for yet.
     fn session() -> Session {
         let mut n = 0u128;
@@ -957,6 +1025,7 @@ mod tests {
         });
         let mut s = Session::new(
             &["maestro".into(), "test".into()],
+            None,
             Redactor::new([]),
             ids,
             at(),

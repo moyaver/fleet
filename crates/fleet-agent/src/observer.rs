@@ -15,12 +15,12 @@ use std::{
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, atomic::Ordering},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use fleet_core::redact::Redactor;
 use fleet_maestro::{ReportState, stdout::strip_ansi};
-use fleet_protocol::{frame::Telemetry, journal::ClockSample};
+use fleet_protocol::{event::EvidenceSources, frame::Telemetry, journal::ClockSample};
 use time::OffsetDateTime;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -123,6 +123,8 @@ struct Live {
     tailer: Option<LogTailer>,
     scanner: Option<BundleScanner>,
     report: Option<PathBuf>,
+    /// When Maestro was spawned: a report older than this (less [`MTIME_TOLERANCE`]) is not ours.
+    started: SystemTime,
     pgid: Option<u32>,
     stdout: Lines,
     sampler: Sampler,
@@ -156,8 +158,8 @@ async fn observe() -> io::Result<()> {
     loop {
         tokio::select! {
             frame = frames.recv() => match frame {
-                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, debug_dir, report, run_dir, plan, .. })) => {
-                    let mut l = start(&argv, pid, pgid, debug_dir, report, run_dir.as_deref().map(Path::new), clock(), clock);
+                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, started_at_ms, debug_dir, report, run_dir, plan, evidence })) => {
+                    let mut l = start(&argv, pid, pgid, debug_dir, report, run_dir.as_deref().map(Path::new), evidence.map(|e| *e), UNIX_EPOCH + Duration::from_millis(started_at_ms), clock(), clock);
                     if let Some(plan) = plan {
                         l.session.observe(clock(), Observation::Plan(plan));
                     }
@@ -250,6 +252,8 @@ fn start(
     debug_dir: Option<String>,
     report: Option<String>,
     run_dir: Option<&Path>,
+    evidence: Option<EvidenceSources>,
+    started: SystemTime,
     at: ClockSample,
     clock: impl Fn() -> ClockSample + Send + Sync + 'static,
 ) -> Live {
@@ -261,7 +265,7 @@ fn start(
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str())),
     );
-    let session = Session::new(argv, redactor, Box::new(Uuid::now_v7), at);
+    let session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
         Outbox::with_spool(&d.join("spool.bin"), agent_run_id, Budget::default())
     });
@@ -303,6 +307,7 @@ fn start(
             .map(|d| LogTailer::new(d.join("maestro.log"))),
         scanner: debug.map(BundleScanner::new),
         report: report.map(PathBuf::from),
+        started,
         pgid: group,
         stdout: Lines::default(),
         sampler: Sampler::new(
@@ -377,6 +382,33 @@ fn flush(l: &mut Live) {
     l.shared.wake.notify_one();
 }
 
+/// Slack for filesystems with coarse modification times.
+const MTIME_TOLERANCE: Duration = Duration::from_secs(2);
+
+/// What reading the JUnit report found.
+#[derive(Debug, PartialEq, Eq)]
+enum ReportRead {
+    /// Written during this run.
+    Fresh(Vec<u8>),
+    /// There, but last modified before the run started.
+    Stale,
+    /// Not there, or unreadable.
+    Missing,
+}
+
+/// Reads `path`, accepting it only if modified at or after `started` (less the tolerance).
+fn read_report(path: &Path, started: SystemTime) -> ReportRead {
+    let Ok(bytes) = std::fs::read(path) else {
+        return ReportRead::Missing;
+    };
+    let modified = std::fs::metadata(path).and_then(|m| m.modified());
+    match modified {
+        Ok(m) if m + MTIME_TOLERANCE < started => ReportRead::Stale,
+        // Unknown mtime: can't prove it stale, and the report parser still validates it.
+        _ => ReportRead::Fresh(bytes),
+    }
+}
+
 async fn finalize(
     mut l: Live,
     (code, signal): (Option<i32>, Option<i32>),
@@ -386,7 +418,22 @@ async fn finalize(
     // Let Maestro's last writes land, then take a final look.
     tokio::time::sleep(POLL).await;
     watch(&mut l, true, &clock);
-    let report = l.report.as_ref().and_then(|p| std::fs::read(p).ok());
+    // I3: a report left by an earlier run in the same workspace is not this run's evidence.
+    let report = match l.report.as_deref().map(|p| (p, read_report(p, l.started))) {
+        Some((_, ReportRead::Fresh(bytes))) => Some(bytes),
+        Some((p, ReportRead::Stale)) => {
+            l.session.warn(
+                clock(),
+                "report_stale",
+                &format!(
+                    "{} was last written before this run started; ignored",
+                    p.display()
+                ),
+            );
+            None
+        }
+        Some((_, ReportRead::Missing)) | None => None,
+    };
     l.session.observe(
         clock(),
         Observation::Exited {
@@ -426,5 +473,35 @@ async fn finalize(
             Ok(Err(e)) => tracing::warn!(error = %e, "transport task failed"),
             Err(_) => tracing::warn!("transport did not flush in time; the spool keeps the events"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn report_with_age(dir: &Path, age: Duration) -> PathBuf {
+        let p = dir.join("report.xml");
+        let f = File::create(&p).unwrap();
+        f.set_modified(SystemTime::now() - age).unwrap();
+        p
+    }
+
+    #[test]
+    fn a_report_from_before_the_run_is_stale_and_a_fresh_one_is_used() {
+        let dir = std::env::temp_dir().join(format!("fleet-report-{}", Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let started = SystemTime::now() - Duration::from_secs(60);
+        let p = report_with_age(&dir, Duration::from_secs(3600));
+        assert_eq!(read_report(&p, started), ReportRead::Stale);
+        // Within the tolerance for coarse timestamps.
+        let p = report_with_age(&dir, Duration::from_secs(61));
+        assert!(matches!(read_report(&p, started), ReportRead::Fresh(_)));
+        let p = report_with_age(&dir, Duration::ZERO);
+        assert!(matches!(read_report(&p, started), ReportRead::Fresh(_)));
+        assert_eq!(
+            read_report(&dir.join("none.xml"), started),
+            ReportRead::Missing
+        );
     }
 }

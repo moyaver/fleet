@@ -286,6 +286,23 @@ fn a_run_streams_to_the_server_without_changing_the_result() {
     // The local journal has the same events.
     let journal = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
     assert_eq!(journal.lines().count() as u64, last);
+    // The run-start event says which evidence the command will have (#31).
+    let started = s
+        .committed
+        .values()
+        .find(|e| e["type"] == "run.started")
+        .unwrap();
+    let ev = &started["data"]["evidence"];
+    assert_eq!(ev["report"]["reason"], "injected", "{ev}");
+    assert_eq!(
+        ev["report"]["path"].as_str().map(Path::new),
+        Some(run_dir.join("report.xml").as_path())
+    );
+    assert_eq!(
+        ev["debug_output"].as_str().map(Path::new),
+        Some(run_dir.join("artifacts").as_path())
+    );
+    assert_eq!(ev["maestro_log"], true);
 }
 
 #[test]

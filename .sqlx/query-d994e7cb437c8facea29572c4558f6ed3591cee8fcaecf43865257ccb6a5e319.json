@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET argv = $2, agent_version = $3, evidence = $4, rev = rev + 1\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d994e7cb437c8facea29572c4558f6ed3591cee8fcaecf43865257ccb6a5e319"
+}

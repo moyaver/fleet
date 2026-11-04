@@ -123,6 +123,7 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
                 .as_ref()
                 .map(|d| d.to_string_lossy().into_owned()),
             plan: prepared.plan.clone(),
+            evidence: prepared.evidence.clone().map(Box::new),
         }));
     }
 

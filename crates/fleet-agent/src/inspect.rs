@@ -78,7 +78,7 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
         wall: t0 + time::Duration::milliseconds(i64::try_from(ms).unwrap_or(i64::MAX)),
         mono_ms: ms,
     };
-    let mut session = Session::new(&replay.argv, replay.redactor, ids, at(0));
+    let mut session = Session::new(&replay.argv, None, replay.redactor, ids, at(0));
     let mut last = 0;
     for (ms, obs) in replay.timeline {
         last = ms;
@@ -403,8 +403,7 @@ fn find_session_log(dir: &Path) -> Option<PathBuf> {
 
 /// Where the capture's command wrote its JUnit report (`<CAPTURE>` is the capture directory).
 fn report_path(argv: &[String], dir: &Path) -> Option<PathBuf> {
-    let inv = fleet_maestro::invocation::parse(argv);
-    let out = inv.output?;
+    let out = fleet_maestro::invocation::requested_report(&fleet_maestro::invocation::parse(argv))?;
     let rel = out.split_once("/run/").map_or(out.as_str(), |(_, r)| r);
     Some(dir.join("run").join(rel))
 }

@@ -312,6 +312,7 @@ CI shell ──waits on──► P1 supervisor (std only) ──spawn──► C
 - **Rewrite mode** (`--fleet-rewrite=auto|off`, default `auto`):
   - If neither `--debug-output` nor `--test-output-dir` is given, add `--flatten-debug-output --debug-output $RUN/artifacts`.
   - If no `--format` is given, add `--format junit --output $RUN/report.xml` only when that can't change Maestro's execution mode (`--format` selects its multi-flow path, which rejects `-c`): several flows, a directory, or `--shard-all N` with N > 1, and neither `-c` nor `--continuous`. A single flow, a continuous run, or a path that can't be classified gets no report, and the reason is logged.
+  - The report is one normalization over (`--format`, `--output`, injection decision), and Fleet never adds an option the user gave (picocli rejects a repeated `--output` or `--format` with exit 2): `--format junit` alone reads `--output` or Maestro's default `report.xml` in the working directory; `--output X` without `--format` gets only `--format junit` when injection is allowed (and reads `X`), else nothing; another `--format` means no JUnit report by choice. The resulting `EvidenceSources` (report path or reason, debug output, machine log) is sent in `run.started` and stored in `agent_runs.evidence`.
   - Never remove user flags. Log every injected flag.
 - **Warn** when several devices are connected but no `--device` is given. Maestro would silently pick the first.
 
@@ -453,8 +454,9 @@ Upload is relayed through the server by default; presigned direct upload is opti
 | `0003_execution` | `workers`, `device_profiles`, `device_sessions`, `suite_executions`, `shards`, `flow_definitions`, `flow_executions`, `flow_claims` (with **CHECK: inferred provenance ∌ passed**), `step_executions` (partitioned) |
 | `0004_journal` | `agent_events` (partitioned by `run_day`), `ingest_gaps`, `ingest_rejections` |
 | `0005_telemetry` | `host_samples`, `device_samples` (partitioned by time), `host_rollup_1m`, `host_rollup_1h`, `device_rollup_*` |
-| `0006_artifacts` | `blobs` (project, sha256), `artifacts`, `retention_classes`, `jobs_queue` |
-| `0007_analytics` | `condition_fingerprints`, `failure_fingerprints`, flaky views |
+| `0006_run_evidence` | `agent_runs.evidence` (jsonb: the run's evidence sources, from `run.started`) |
+| `0007_artifacts` | `blobs` (project, sha256), `artifacts`, `retention_classes`, `jobs_queue` |
+| `0008_analytics` | `condition_fingerprints`, `failure_fingerprints`, flaky views |
 
 **Retention:** 7 d raw 5 s samples; 90 d at 1 min; 1 y for hourly and daily aggregates. The raw journal is kept 14 d. All of it is configurable.
 

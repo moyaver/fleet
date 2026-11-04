@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT evidence FROM agent_runs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "evidence"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "8bdc2e7645a632003d33a09c3459dd409247ebd46b1a7f0f1d7fec71ee14f5ce"
+}

@@ -121,6 +121,52 @@ pub struct RunStarted {
     pub argv: Vec<String>,
     /// Agent version.
     pub agent_version: String,
+    /// Which evidence sources the prepared command will produce. Absent from older agents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<EvidenceSources>,
+}
+
+/// Why the run has, or has not, a JUnit report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReportReason {
+    /// The agent added `--format junit` (and `--output` unless the user gave one).
+    Injected,
+    /// The user asked for `--format junit`.
+    UserJunit,
+    /// The user chose another `--format`: no JUnit report by choice.
+    UserFormat,
+    /// Not added: a single flow, where `--format` would change Maestro's execution mode.
+    SkippedSingleFlow,
+    /// Not added: `-c`/`--continuous`, which the report path rejects.
+    SkippedContinuous,
+    /// Not added: the flow paths couldn't be classified.
+    SkippedUnclassified,
+    /// Not added: the agent doesn't rewrite commands (`--fleet-rewrite` off).
+    RewriteDisabled,
+    /// A value this build doesn't know: the report is treated as not expected.
+    #[serde(other)]
+    Unrecognized,
+}
+
+/// Where the JUnit report will be, if anywhere, and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportSource {
+    /// The report file, redacted. `None`: no report is expected.
+    pub path: Option<String>,
+    /// Why.
+    pub reason: ReportReason,
+}
+
+/// The evidence sources a run will have, so "no report" can be told from "report missing".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceSources {
+    /// The JUnit report.
+    pub report: ReportSource,
+    /// The debug output directory (session log and flow bundles), when it is known.
+    pub debug_output: Option<String>,
+    /// Whether Maestro's log is made machine-readable by the agent.
+    pub maestro_log: bool,
 }
 
 /// `suite.started`: one Maestro invocation began.
@@ -486,6 +532,14 @@ impl EventBody {
 mod tests {
     use super::*;
 
+    #[test]
+    fn run_started_without_evidence_still_parses_and_omits_it() {
+        let old: RunStarted =
+            serde_json::from_str(r#"{"argv":["maestro"],"agent_version":"0.0.0"}"#).unwrap();
+        assert_eq!(old.evidence, None);
+        assert!(!serde_json::to_string(&old).unwrap().contains("evidence"));
+    }
+
     fn samples() -> Vec<EventBody> {
         let flow = FlowRef {
             name: "login".into(),
@@ -495,6 +549,14 @@ mod tests {
             EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into()],
                 agent_version: "0.0.0".into(),
+                evidence: Some(EvidenceSources {
+                    report: ReportSource {
+                        path: None,
+                        reason: ReportReason::SkippedSingleFlow,
+                    },
+                    debug_output: Some("/run/artifacts".into()),
+                    maestro_log: true,
+                }),
             }),
             EventBody::SuiteStarted(SuiteStarted {
                 shard_mode: ShardMode::Split,

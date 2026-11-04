@@ -51,6 +51,9 @@ pub(crate) enum Control {
         /// The Fleet plan shard this run executes, if any.
         #[serde(default)]
         plan: Option<fleet_protocol::event::PlanAssigned>,
+        /// The evidence sources the prepared command will produce.
+        #[serde(default)]
+        evidence: Option<Box<fleet_protocol::event::EvidenceSources>>,
     },
     /// The supervisor received a signal and forwarded it.
     Signal {
@@ -166,6 +169,7 @@ mod tests {
                 report: None,
                 run_dir: None,
                 plan: None,
+                evidence: None,
             }),
             Frame::Control(Control::Gap {
                 stream: Stream::Stderr,
