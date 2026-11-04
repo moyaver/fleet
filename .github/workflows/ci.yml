@@ -45,6 +45,8 @@ jobs:
         with:
           # Latest releases; keep the list in sync with TOOLS in xtask/src/main.rs.
           tool: cargo-nextest,cargo-deny,trunk,mdbook,sqlx-cli
+      # The browser tests use the runner's preinstalled Chrome; xtask fetches the matching
+      # chromedriver and the Tailwind CLI into target/tools.
       - run: cargo xtask ci
 
   agent-macos:

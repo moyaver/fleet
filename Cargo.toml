@@ -70,12 +70,17 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 console_error_panic_hook = "0.1.7"
 crc32fast = "1.5.4"
 # figment: configuration from TOML, `FLEET_*` and `*_FILE` (research 03 §11).
+# WebDriver client for the browser tests; no TLS: chromedriver is on localhost.
+fantoccini = { version = "0.22.1", default-features = false }
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 getrandom = "0.4.3"
 # JWT parsing and validation for CI OIDC tokens (ADR-0008). No built-in backend: Fleet installs an
 # RS256 verifier on `ring` (fleet-server oidc), avoiding `rsa`/`crypto-bigint` advisories and aws-lc.
+http = "1.5.0"
 jsonwebtoken = { version = "11.1.0", default-features = false }
+# Plain HTTP connector for fantoccini.
+hyper-util = { version = "0.1.21", features = ["client-legacy", "http1", "tokio"] }
 insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
 nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
@@ -111,6 +116,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # OpenAPI 3.1 from the REST types (PLAN §5.3). No UI: it would ship JavaScript (I9).
 utoipa = { version = "6.0.0", default-features = false, features = ["macros", "uuid", "time"] }
+url = "2.5.8"
 uuid = { version = "1.29.0", features = ["serde"] }
 webpki-roots = "1.0.11"
 

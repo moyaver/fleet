@@ -9,6 +9,7 @@
 mod db;
 mod fixtures;
 mod lint;
+mod tools;
 
 use std::{
     path::{Path, PathBuf},
@@ -28,7 +29,8 @@ const TOOLS: &[&str] = &[
     "mdbook",
 ];
 
-const USAGE: &str = "usage: cargo xtask <setup | ci | lint | sqlx | web [--release] | fixtures …>";
+const USAGE: &str =
+    "usage: cargo xtask <setup | tools | ci | lint | sqlx | web [--release] | fixtures …>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -40,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         .as_slice()
     {
         ["setup"] => setup(&root),
+        ["tools"] => tools::install(&root),
         ["ci"] => ci(&root),
         ["lint"] => lint::run(&root),
         ["sqlx"] => db::prepare(&root),
@@ -63,7 +66,8 @@ fn setup(root: &Path) -> anyhow::Result<()> {
     for tool in TOOLS {
         sh(root, &format!("cargo install --locked {tool}"))?;
     }
-    Ok(())
+    // Tailwind and chromedriver (the browser tests) go to target/tools.
+    tools::install(root)
 }
 
 fn ci(root: &Path) -> anyhow::Result<()> {
@@ -102,6 +106,9 @@ fn ci(root: &Path) -> anyhow::Result<()> {
     )?;
     lint::run(root)?;
     sh(root, "cargo deny --locked check")?;
+    // The browser tests drive the built dashboard with chromedriver (PLAN §13).
+    tools::install(root)?;
+    web(root, false)?;
     run_env(
         root,
         "cargo",
@@ -142,17 +149,30 @@ fn ci(root: &Path) -> anyhow::Result<()> {
         ],
         &[("RUSTDOCFLAGS", "-D warnings"), offline[0]],
     )?;
-    web(root, false)?;
     sh(root, "mdbook build docs")?;
     println!("xtask ci: all checks passed");
     Ok(())
 }
 
 fn web(root: &Path, release: bool) -> anyhow::Result<()> {
-    let flag = if release { " --release" } else { "" };
-    sh(
+    let mut args = vec!["build", "--locked"];
+    if release {
+        args.push("--release");
+    }
+    // Trunk's tailwind asset finds the pinned CLI from `cargo xtask setup` on PATH.
+    let path = std::env::join_paths(
+        std::iter::once(tools::dir(root)).chain(
+            std::env::var_os("PATH")
+                .iter()
+                .flat_map(std::env::split_paths),
+        ),
+    )?;
+    let path = path.to_string_lossy();
+    run_env(
         &root.join("crates/fleet-web"),
-        &format!("trunk build --locked{flag}"),
+        "trunk",
+        &args,
+        &[("PATH", &path)],
     )
 }
 
