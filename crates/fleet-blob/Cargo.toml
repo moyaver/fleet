@@ -1,6 +1,6 @@
 [package]
 name = "fleet-blob"
-description = "Blob storage: S3-compatible (object_store) and local filesystem backends, signed upload tokens."
+description = "Blob storage: S3-compatible (object_store) and local filesystem backends, plus artifact verification."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,3 +11,27 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[dependencies]
+async-trait.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+infer.workspace = true
+object_store.workspace = true
+# Not called here: object_store's HTTP client needs reqwest's rustls features, which the workspace
+# entry (rustls on ring, no default provider) turns on.
+reqwest.workspace = true
+ruzstd.workspace = true
+rustls.workspace = true
+sha2.workspace = true
+tar.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util", "rt", "sync"] }
+tokio-util = { workspace = true, features = ["io"] }
+tracing.workspace = true
+uuid = { workspace = true, features = ["v7"] }
+zip.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "process", "net", "time"] }

@@ -21,6 +21,7 @@ axum.workspace = true
 base64.workspace = true
 clap.workspace = true
 figment.workspace = true
+fleet-blob.workspace = true
 fleet-core.workspace = true
 fleet-protocol = { workspace = true, features = ["openapi"] }
 fleet-store.workspace = true

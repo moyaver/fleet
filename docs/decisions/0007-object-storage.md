@@ -15,3 +15,8 @@ MinIO community edition: console removed (2025), binary and Docker distribution 
 
 ## Consequences
 IT must confirm the AGPL position, and provide a second hostname and certificate for user content.
+
+## Implementation notes (M5-L)
+- `object_store` is built with `aws-base`, `reqwest` and `ring`, not `aws`: that feature links `aws-lc-rs` and a second TLS backend, while Fleet runs rustls on `ring` everywhere. Only the generic S3 API is used (I8).
+- One contract test suite (`crates/fleet-blob/tests/it/contract.rs`) runs against the filesystem backend and against Garage in Docker (v2.5.0, pinned by digest, the same `garage.toml` and flags as the reference Compose file).
+- Verification (size, SHA-256, magic bytes, archive safety) lives in `fleet-blob::verify`, as pure functions over `Read + Seek`.

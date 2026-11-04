@@ -6,7 +6,11 @@
 //! Errors name the source and key of a bad value. Secrets never print: `check-config` shows
 //! `<redacted>`.
 
-use std::{net::SocketAddr, path::Path};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use figment::{
@@ -66,6 +70,8 @@ pub struct Config {
     /// Browser sign-in with the company's identity provider (PLAN §7.5). Unset: no browser
     /// sessions, and reads need a viewer token.
     pub login: Option<Login>,
+    /// Where artifacts are stored (PLAN §7.6, ADR-0007).
+    pub storage: Storage,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -80,7 +86,132 @@ impl Default for Config {
             api: Api::default(),
             oidc: Oidc::default(),
             login: None,
+            storage: Storage::default(),
             projects: Vec::new(),
+        }
+    }
+}
+
+/// Which blob store holds artifacts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageBackend {
+    /// A directory on the server's disk (`storage.path`): small installs and tests.
+    LocalFs,
+    /// Any S3-compatible store (`storage.s3`): Garage in the reference deployment.
+    S3,
+}
+
+/// Artifact storage (ADR-0007).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Storage {
+    /// Which backend.
+    pub backend: StorageBackend,
+    /// Blob directory for `local_fs`. Must be on a persistent volume.
+    pub path: PathBuf,
+    /// Settings for `s3`.
+    pub s3: S3Settings,
+}
+
+impl Default for Storage {
+    fn default() -> Self {
+        Self {
+            backend: StorageBackend::LocalFs,
+            path: PathBuf::from("/var/lib/fleet/blobs"),
+            s3: S3Settings::default(),
+        }
+    }
+}
+
+/// An S3-compatible bucket, addressed path-style at a custom endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct S3Settings {
+    /// The S3 API's base URL, for example `http://garage:3900`.
+    pub endpoint: Option<String>,
+    /// Signing region. Garage's default is `garage`.
+    pub region: String,
+    /// The bucket; it must exist.
+    pub bucket: Option<String>,
+    /// Access key id (`FLEET_STORAGE__S3__ACCESS_KEY_ID_FILE` can hold it).
+    pub access_key_id: Option<Secret>,
+    /// Secret access key (`FLEET_STORAGE__S3__SECRET_ACCESS_KEY_FILE` can hold it).
+    pub secret_access_key: Option<Secret>,
+}
+
+impl Storage {
+    fn validate(&self) -> anyhow::Result<()> {
+        match self.backend {
+            StorageBackend::LocalFs => anyhow::ensure!(
+                !self.path.as_os_str().is_empty(),
+                "storage.path is empty: set the blob directory"
+            ),
+            StorageBackend::S3 => {
+                let s3 = &self.s3;
+                let endpoint = s3.endpoint.as_deref().unwrap_or_default();
+                let url = url::Url::parse(endpoint)
+                    .with_context(|| format!("storage.s3.endpoint {endpoint:?} is not a URL"))?;
+                anyhow::ensure!(
+                    matches!(url.scheme(), "http" | "https"),
+                    "storage.s3.endpoint must be an http:// or https:// URL"
+                );
+                for (key, value) in [
+                    ("bucket", s3.bucket.as_deref()),
+                    ("region", Some(s3.region.as_str())),
+                    (
+                        "access_key_id",
+                        s3.access_key_id.as_ref().map(Secret::expose),
+                    ),
+                    (
+                        "secret_access_key",
+                        s3.secret_access_key.as_ref().map(Secret::expose),
+                    ),
+                ] {
+                    anyhow::ensure!(
+                        value.is_some_and(|v| !v.trim().is_empty()),
+                        "storage.backend is s3 but storage.s3.{key} is not set"
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens the configured blob store. Makes no request to an S3 endpoint: a wrong endpoint or
+    /// credential shows on first use.
+    pub fn open(&self) -> anyhow::Result<Arc<dyn fleet_blob::BlobStore>> {
+        Ok(match self.backend {
+            StorageBackend::LocalFs => Arc::new(
+                fleet_blob::LocalFs::new(&self.path)
+                    .with_context(|| format!("opening blob directory {}", self.path.display()))?,
+            ),
+            StorageBackend::S3 => {
+                let s3 = &self.s3;
+                let get = |v: Option<&str>| v.unwrap_or_default().to_owned();
+                Arc::new(
+                    fleet_blob::S3::new(&fleet_blob::S3Config {
+                        endpoint: get(s3.endpoint.as_deref()),
+                        region: s3.region.clone(),
+                        bucket: get(s3.bucket.as_deref()),
+                        access_key_id: get(s3.access_key_id.as_ref().map(Secret::expose)),
+                        secret_access_key: get(s3.secret_access_key.as_ref().map(Secret::expose)),
+                    })
+                    .context("opening the S3 blob store")?,
+                )
+            }
+        })
+    }
+}
+
+impl Default for S3Settings {
+    fn default() -> Self {
+        Self {
+            endpoint: None,
+            region: "garage".into(),
+            bucket: None,
+            access_key_id: None,
+            secret_access_key: None,
         }
     }
 }
@@ -436,6 +567,7 @@ impl Config {
                 );
             }
         }
+        self.storage.validate()?;
         for p in &self.projects {
             for t in &p.trust_policies {
                 anyhow::ensure!(
@@ -610,5 +742,109 @@ mod tests {
             &env(&[("FLEET_PROJECTS", "[{slug=\"Bad Slug\",name=\"x\"}]")]),
         );
         assert!(bad_slug.is_err());
+    }
+
+    #[test]
+    fn storage_defaults_to_a_local_directory() {
+        let c = Config::load(None, &[]).unwrap();
+        assert_eq!(c.storage.backend, StorageBackend::LocalFs);
+        assert_eq!(c.storage.path, Path::new("/var/lib/fleet/blobs"));
+    }
+
+    #[test]
+    fn s3_settings_layer_like_the_rest_and_credentials_stay_secret() {
+        let dir = std::env::temp_dir().join(format!("fleet-config-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let toml = dir.join("fleet.toml");
+        std::fs::write(
+            &toml,
+            "[storage]\nbackend = \"s3\"\n[storage.s3]\nendpoint = \"http://garage:3900\"\n\
+             bucket = \"fleet-artifacts\"\naccess_key_id = \"GKexample\"\n",
+        )
+        .unwrap();
+        let secret = dir.join("secret_key");
+        std::fs::write(&secret, "s3-secret-value\n").unwrap();
+        let c = Config::load(
+            Some(&toml),
+            &env(&[
+                (
+                    "FLEET_STORAGE__S3__SECRET_ACCESS_KEY_FILE",
+                    secret.to_str().unwrap(),
+                ),
+                ("FLEET_STORAGE__S3__REGION", "eu-1"),
+            ]),
+        )
+        .unwrap();
+        let s3 = &c.storage.s3;
+        assert_eq!(c.storage.backend, StorageBackend::S3);
+        assert_eq!(s3.endpoint.as_deref(), Some("http://garage:3900"));
+        assert_eq!(s3.bucket.as_deref(), Some("fleet-artifacts"));
+        assert_eq!(s3.region, "eu-1", "env beats the default");
+        assert_eq!(
+            s3.secret_access_key.as_ref().map(Secret::expose),
+            Some("s3-secret-value")
+        );
+        let shown = format!("{}{c:?}", c.redacted().unwrap());
+        assert!(
+            !shown.contains("s3-secret-value") && !shown.contains("GKexample"),
+            "{shown}"
+        );
+        c.storage.open().expect("a complete S3 configuration opens");
+    }
+
+    #[test]
+    fn an_incomplete_s3_configuration_names_what_is_missing() {
+        for (missing, pairs) in [
+            ("endpoint", vec![("FLEET_STORAGE__S3__BUCKET", "b")]),
+            (
+                "bucket",
+                vec![("FLEET_STORAGE__S3__ENDPOINT", "http://s3:9000")],
+            ),
+            (
+                "secret_access_key",
+                vec![
+                    ("FLEET_STORAGE__S3__ENDPOINT", "http://s3:9000"),
+                    ("FLEET_STORAGE__S3__BUCKET", "b"),
+                    ("FLEET_STORAGE__S3__ACCESS_KEY_ID", "k"),
+                ],
+            ),
+        ] {
+            let mut vars = vec![("FLEET_STORAGE__BACKEND", "s3")];
+            vars.extend(pairs);
+            let err = Config::load(None, &env(&vars)).unwrap_err();
+            let msg = format!("{err:#}");
+            assert!(msg.contains(missing), "{missing}: {msg}");
+        }
+        let bad_scheme = Config::load(
+            None,
+            &env(&[
+                ("FLEET_STORAGE__BACKEND", "s3"),
+                ("FLEET_STORAGE__S3__ENDPOINT", "ftp://s3"),
+            ]),
+        );
+        assert!(format!("{:#}", bad_scheme.unwrap_err()).contains("http"));
+    }
+
+    #[tokio::test]
+    async fn the_configured_local_store_stores_and_serves_blobs() {
+        use fleet_blob::{BlobKey, Sha256Digest};
+        use futures_util::StreamExt;
+
+        let dir = std::env::temp_dir().join(format!("fleet-blobs-{}", uuid::Uuid::now_v7()));
+        let c = Config::load(
+            None,
+            &env(&[("FLEET_STORAGE__PATH", dir.to_str().unwrap())]),
+        )
+        .unwrap();
+        let store = c.storage.open().unwrap();
+        let key = BlobKey::new(uuid::Uuid::now_v7(), Sha256Digest::of(b"bytes"));
+        let body = futures_util::stream::iter([Ok(bytes_of(b"bytes"))]).boxed();
+        store.put(&key, 5, body).await.unwrap();
+        assert_eq!(store.head(&key).await.unwrap().unwrap().size, 5);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn bytes_of(b: &'static [u8]) -> axum::body::Bytes {
+        axum::body::Bytes::from_static(b)
     }
 }

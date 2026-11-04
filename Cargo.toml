@@ -52,6 +52,7 @@ unnecessary_safety_doc = "warn"
 unescaped_backticks = "warn"
 
 [workspace.dependencies]
+fleet-blob = { path = "crates/fleet-blob" }
 fleet-core = { path = "crates/fleet-core" }
 fleet-loadgen = { path = "crates/fleet-loadgen" }
 fleet-maestro = { path = "crates/fleet-maestro" }
@@ -62,6 +63,7 @@ fleet-ui = { path = "crates/fleet-ui" }
 fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
+async-trait = "0.1.92"
 assert_cmd = "2.2.2"
 # Tests only: signs fake CI OIDC tokens with a key generated per test run.
 aws-lc-rs = "1.19.0"
@@ -69,6 +71,7 @@ aws-lc-rs = "1.19.0"
 axum-test = { version = "21.1.0", default-features = false, features = ["ws"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "tracing", "ws"] }
 base64 = "0.23.1"
+bytes = "1.12.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 console_error_panic_hook = "0.1.7"
 crc32fast = "1.5.4"
@@ -85,9 +88,14 @@ js-sys = "0.3.107"
 jsonwebtoken = { version = "11.1.0", default-features = false }
 # Plain HTTP connector for fantoccini.
 hyper-util = { version = "0.1.21", features = ["client-legacy", "http1", "tokio"] }
+# Magic-byte file type detection for artifact verification (PLAN §7.6).
+infer = { version = "0.22.0", default-features = false }
 insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
 nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
+# S3-compatible storage (ADR-0007). `aws-base` + `reqwest` + `ring`, not `aws`: that feature links
+# aws-lc-rs and a second TLS backend; Fleet runs rustls on ring (the workspace reqwest above).
+object_store = { version = "0.14.2", default-features = false, features = ["aws-base", "reqwest", "ring"] }
 predicates = "3.1.4"
 proptest = "1.12.0"
 quick-xml = "0.42.0"
@@ -107,6 +115,8 @@ sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio
 signal-hook = "0.4.6"
 # The verifier trait jsonwebtoken's pluggable crypto uses.
 signature = "2.2.0"
+# Streaming tar reader for artifact bundles; no xattr, nothing is ever unpacked to disk.
+tar = { version = "0.4.46", default-features = false }
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
@@ -123,8 +133,12 @@ utoipa = { version = "6.0.0", default-features = false, features = ["macros", "u
 # Builds the IdP redirect and the token request body (browser sign-in).
 url = "2.5.8"
 uuid = { version = "1.29.0", features = ["serde"] }
+# Pure-Rust zstd decoder (no C toolchain) for tar.zst artifact bundles.
+ruzstd = { version = "0.9.1", default-features = false, features = ["std"] }
 vte = { version = "0.15.0", default-features = false }
 webpki-roots = "1.0.11"
+# Reads artifact archives without extracting; stored and deflate entries only.
+zip = { version = "9.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # Tests only: the fake OIDC provider for browser sign-in.
 wiremock = "0.6.5"
 # Browser APIs for the canvas views; members add the web-sys features they use.
