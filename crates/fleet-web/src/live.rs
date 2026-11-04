@@ -3,6 +3,7 @@
 //!
 //! - [`backoff`]: the reconnect schedule.
 //! - [`queue`]: frames wait in a queue that is applied once per animation frame.
+//! - [`versions`]: spots a skipped version, which the socket answers with a new snapshot.
 //! - [`keys`]: which `(epoch, id)` keys a keyed list holds, so a re-snapshot rebuilds rows.
 //!
 //! The pure parts are tested natively. [`socket`] is the browser I/O and [`model`] the reactive
@@ -13,3 +14,4 @@ pub mod keys;
 pub mod model;
 pub mod queue;
 pub mod socket;
+pub mod versions;

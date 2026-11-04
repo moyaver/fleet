@@ -14,6 +14,8 @@
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
 //!   the index (see [`fails`]), so two runs can pass or fail the same flow;
+//! - `hold`: agents stop at chosen points of their script until the test lets them go, so a
+//!   browser test can look at a run that is open without racing the clock;
 //! - a server restart needs nothing special: agents reconnect until `deadline`.
 //!
 //! [`run`] returns what each agent knows, so a test can compare it with the server's state.
@@ -79,6 +81,8 @@ pub struct Options {
     pub arch: String,
     /// The index of the first agent: agent `first_agent + n` follows [`fails`] as that agent.
     pub first_agent: usize,
+    /// Stop at points of the script until released.
+    pub hold: Option<Hold>,
 }
 
 impl Default for Options {
@@ -100,7 +104,57 @@ impl Default for Options {
             git_ref: None,
             arch: "x86_64".into(),
             first_agent: 0,
+            hold: None,
         }
+    }
+}
+
+/// Where in its script an agent waits for [`Hold::release`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoldAt {
+    /// Right after the `n`th flow (in script order) ended in the live console.
+    AfterFlows(usize),
+    /// After every flow ended live, before the process exit and the JUnit report: the run is
+    /// still open and every outcome is provisional.
+    BeforeReport,
+}
+
+/// Holds every agent that shares it at the same points of its script, one point per release,
+/// in script order. Clones share the gate.
+#[derive(Debug, Clone)]
+pub struct Hold {
+    points: Vec<HoldAt>,
+    released: Arc<tokio::sync::watch::Sender<usize>>,
+}
+
+impl Hold {
+    /// A gate with one stop per point; they are applied in script order.
+    #[must_use]
+    pub fn new(points: impl IntoIterator<Item = HoldAt>) -> Self {
+        Self {
+            points: points.into_iter().collect(),
+            released: Arc::new(tokio::sync::watch::channel(0).0),
+        }
+    }
+
+    /// Lets the agents past the next stop (all of them, when no stop is left).
+    pub fn release(&self) {
+        self.released.send_modify(|n| *n += 1);
+    }
+
+    /// The event index of every stop in `script`, ascending.
+    fn indices(&self, script: &Script) -> Vec<usize> {
+        let mut at: Vec<usize> = self
+            .points
+            .iter()
+            .filter_map(|p| match p {
+                HoldAt::AfterFlows(n) => n.checked_sub(1).and_then(|i| script.flow_ends.get(i)),
+                HoldAt::BeforeReport => Some(&script.live_end),
+            })
+            .copied()
+            .collect();
+        at.sort_unstable();
+        at
     }
 }
 
@@ -177,6 +231,10 @@ fn clock(t0: Instant) -> ClockSample {
 }
 
 struct Script {
+    /// The index just after each flow's live end, in script order.
+    flow_ends: Vec<usize>,
+    /// The index of the process exit: everything before it is the live part.
+    live_end: usize,
     events: Vec<EventEnvelope>,
     failed: u32,
     serials: Vec<String>,
@@ -185,7 +243,10 @@ struct Script {
 #[expect(clippy::too_many_lines, reason = "one straight-line event script")]
 fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     let mut events = Vec::new();
+    // How many events were pushed, readable while `push` holds `events`.
+    let pushed = std::cell::Cell::new(0usize);
     let mut push = |subject: Subject, src: SourceKind, body: &EventBody| {
+        pushed.set(pushed.get() + 1);
         let seq = u64::try_from(events.len()).unwrap_or(u64::MAX) + 1;
         events.push(EventEnvelope::new(
             seq,
@@ -248,6 +309,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     }
     let mut failed = 0;
     let mut flow_ids = Vec::new();
+    let mut flow_ends = Vec::new();
     for f in 0..opts.flows {
         for (d, shard) in (0u32..).zip(&shards) {
             let flow = Subject {
@@ -303,9 +365,11 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     flow: None,
                 }),
             );
+            flow_ends.push(pushed.get());
             flow_ids.push((flow, name, d, f, fail));
         }
     }
+    let live_end = pushed.get();
     push(
         suite.clone(),
         SourceKind::ProcessExit,
@@ -363,6 +427,8 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
         }),
     );
     Script {
+        flow_ends,
+        live_end,
         events,
         failed,
         serials,
@@ -445,6 +511,11 @@ async fn agent(
     let id = Uuid::now_v7();
     let job_key = format!("job-{}", i % opts.job_keys.max(1));
     let s = script(opts.first_agent + i, opts, t0);
+    let hold_at = opts
+        .hold
+        .as_ref()
+        .map(|h| h.indices(&s))
+        .unwrap_or_default();
     let total = u64::try_from(s.events.len()).unwrap_or(u64::MAX);
     let mut report = AgentReport {
         agent_run_id: id,
@@ -471,6 +542,7 @@ async fn agent(
             id,
             &job_key,
             &s.events,
+            &hold_at,
             &mut report,
             &mut stormed,
             storm,
@@ -498,6 +570,7 @@ async fn stream(
     id: Uuid,
     job_key: &str,
     events: &[EventEnvelope],
+    hold_at: &[usize],
     report: &mut AgentReport,
     stormed: &mut bool,
     storm: &tokio::sync::Barrier,
@@ -533,7 +606,19 @@ async fn stream(
             return Ok(Ended::Dropped);
         }
         let from = usize::try_from(sent).unwrap_or(usize::MAX);
-        let to = (from + opts.batch.max(1)).min(events.len());
+        let mut to = (from + opts.batch.max(1)).min(events.len());
+        if let Some(hold) = &opts.hold {
+            // The next stop not yet released: never send past it, and wait there.
+            let released = *hold.released.borrow();
+            if let Some(&stop) = hold_at.get(released) {
+                if from >= stop {
+                    let mut rx = hold.released.subscribe();
+                    rx.wait_for(|n| *n > released).await?;
+                    continue;
+                }
+                to = to.min(stop);
+            }
+        }
         let mut batch: Vec<EventEnvelope> = events.get(from..to).unwrap_or_default().to_vec();
         if opts.duplicates && from > 0 {
             // Resend a few already-sent events and shuffle the batch.
@@ -690,5 +775,38 @@ mod tests {
             .count();
         assert_eq!(s.failed as usize, expected);
         assert_eq!(s.serials.len(), 4);
+    }
+
+    #[test]
+    fn hold_points_sit_after_live_flow_ends_and_before_the_process_exit() {
+        let opts = Options {
+            devices: 2,
+            flows: 3,
+            ..Options::default()
+        };
+        let s = script(0, &opts, Instant::now());
+        let hold = Hold::new([
+            HoldAt::BeforeReport,
+            HoldAt::AfterFlows(3),
+            HoldAt::AfterFlows(0),
+        ]);
+        let at = hold.indices(&s);
+        // AfterFlows(0) is no stop; the others come out in script order.
+        assert_eq!(at.len(), 2);
+        assert!(at[0] < at[1]);
+        assert_eq!(
+            s.events[at[0] - 1].kind,
+            "flow.ended",
+            "after the third flow ended"
+        );
+        assert_eq!(s.events[at[1]].kind, "process.exited", "before the exit");
+        assert_eq!(
+            s.events[..at[1]]
+                .iter()
+                .filter(|e| e.kind == "flow.ended")
+                .count(),
+            6,
+            "every flow ended live before the report"
+        );
     }
 }

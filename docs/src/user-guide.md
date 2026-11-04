@@ -53,9 +53,57 @@ At most two files at a time, hashed while they stream. Uploading never changes M
 
 `FLEET_REPOSITORY`, `FLEET_RUN_ID`, `FLEET_RUN_ATTEMPT`, `FLEET_SHA`, `FLEET_REF` and `FLEET_RUNNER` describe the CI run on systems other than GitHub Actions.
 
+## Watching a run
+
+Open the dashboard (your operator gives you the address; if they enabled single sign-on you are sent to your company login first, and back to the page you asked for). Everything updates by itself while a run is going: you never need to refresh, and the page says when it can't keep up (see [When data stops arriving](#when-data-stops-arriving)).
+
+A run is followed in four screens, each a click from the one before.
+
+**A. Overview** (`/`). Tiles count active pipelines, runners and their average CPU. *Active pipelines* lists every run in progress with its status, progress, passed and failed counts and elapsed time; *Runner health* shows each runner's host CPU, memory and temperature and how fresh they are; *Recently finished* keeps the runs that just ended. A run appears here as soon as its agent reports in. Click a pipeline to open it.
+
+**B. Pipeline detail** (`/p/<project>/pipelines/<id>`). The header shows the result (*Running* until every job has ended), the commit and a link to the CI run. Below it: *Test progress*, *Failures* (each links to its flow), *Jobs and devices* (each job, its agent's liveness, its devices and suites, and every flow with its outcome and badge), the *Execution timeline* (one lane per device, with the same data as a table for keyboard and screen-reader users) and *Live activity*. A *Live* / *Reconnecting* indicator in the header says whether the page is receiving updates.
+
+**C. Runner and device detail** (`/workers/<id>`, `/devices/<id>`). Charts of host, Maestro and device metrics, each labelled with what it measures and its unit (for example *Host CPU (%)*, *Maestro CPU (% of one core)*, *Host memory used (bytes)*). A sensor the agent doesn't report, such as a thermal sensor on a machine without one, reads **unavailable (reason)**: Fleet draws no line and shows no number rather than inventing one.
+
+**D. Flow investigation** (`/flows/<id>?project=<slug>`). The flow's outcome, Maestro's failure message, every *claim* about the outcome with its provenance badge (the live log's and the final report's, with the deciding one marked), and the steps in order. Evidence files (screenshots, logs) arrive with the artifact upload feature; until then the page says so.
+
+### Provenance badges
+
+Every outcome and reading carries a badge saying where it comes from, so you can tell a settled result from a guess:
+
+| Badge | Meaning |
+|---|---|
+| **Observed** | The agent saw it directly on the runner: a device's state, an exit code, a signal, a file. |
+| **Provisional** | Read from Maestro's live output while the run is open. The final report may differ. |
+| **Verified** | Confirmed by Maestro's final report. The result is settled. |
+| **Derived** | Computed from other measurements (a rollup), not a raw reading. |
+| **Inferred** | Fleet's explanation of something it did not see, such as a flow cut short by a signal. Never shown as passed. |
+| **Missing** | Nothing was received for this value. |
+| **Stale** | No update within 25 seconds; the last known value, not a current one. |
+
+While a run is live, outcomes come from Maestro's log and console (**Provisional**). When Maestro writes its report, the report decides (**Verified**). If Maestro never writes one, the outcomes stay as Fleet saw them, and a run that ends abnormally never shows as passed.
+
+### Progress, and when it is uncertain
+
+*Test progress* reads **"N of M flows finished"** when Fleet knows the total: when a [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md) was uploaded for the CI run, M is the plan's flows across all shards, known before the first job starts. M never changes while flows finish (unless more flows run than were planned, which raises it), and N never goes down.
+
+Without a plan Fleet can't know how many flows other jobs of the pipeline will still run, so it does not guess: the page counts what finished and says **"progress uncertain (no plan)"**, with no bar and no percentage. A single suite can still count its own flows ("4 of 4 flows finished") when Maestro's log said which flows it would run.
+
+### When data stops arriving
+
+| What you see | What it means |
+|---|---|
+| **Online** | The agent is connected and has been heard from recently. |
+| **Stale** | The agent is connected but silent for more than `liveness.stale_after_ms` (25 s by default). Its badges turn **Stale**: what you see is the last known state, not a live one. The same happens to every active run while the server restarts, until its agent reconnects. |
+| **Disconnected** | The agent's connection closed without saying goodbye (a network cut, a killed runner). The agent keeps its events and sends them when it reconnects, so a run that comes back picks up exactly where it was. |
+| **Completed** | The agent finished and said so. |
+| *Reconnecting* (page header) | The browser lost its connection to Fleet. The page keeps showing the last state it had, says so, and takes a fresh snapshot as soon as it reconnects. |
+
+A run that stays disconnected longer than `liveness.resume_grace_ms` (15 minutes by default) is abandoned: its unfinished flows become *unknown* (inferred by the server, never passed) and its jobs *interrupted*.
+
 ## Reading results: provenance
 
-Every outcome Fleet shows says where it came from. While a run is live, outcomes come from Maestro's log and console (**provisional**). When Maestro writes its report, the report decides (**verified**). An outcome Fleet had to infer, such as a flow cut short by a signal, says **inferred** and is never shown as passed.
+See [Provenance badges](#provenance-badges) above. The agent adds the same information to its own output: `fleet-agent inspect` prints each flow's outcome with its source.
 
 ## Investigating a failure
 

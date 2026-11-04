@@ -4,7 +4,8 @@
 //!
 //! The server takes a single `subscribe` per socket (the first message), so a page that follows
 //! several things opens several of these. A `resync` frame, a refusal or a closed socket all end
-//! in a new socket and a new subscribe, which brings a fresh snapshot.
+//! in a new socket and a new subscribe, which brings a fresh snapshot. So does a delta that skips
+//! a version: the live store stops applying deltas at a gap, and only a new snapshot resumes it.
 
 use std::{
     cell::{Cell, RefCell},
@@ -26,7 +27,11 @@ use leptos::{prelude::*, task::spawn_local};
 use uuid::Uuid;
 
 use crate::{
-    live::{backoff::Backoff, queue::FrameQueue},
+    live::{
+        backoff::Backoff,
+        queue::FrameQueue,
+        versions::{Contiguity, VersionWatch},
+    },
     paths::live_url,
 };
 
@@ -188,6 +193,7 @@ async fn session(
     if write.send(Message::Text(text)).await.is_err() {
         return Ended::Closed;
     }
+    let mut versions = VersionWatch::default();
     while let Some(message) = read.next().await {
         let Ok(Message::Text(text)) = message else {
             if message.is_err() {
@@ -204,7 +210,8 @@ async fn session(
             reached_live.set(true);
             set_connection.try_set(Connection::Live);
         }
-        let resync = matches!(frame, LiveFrame::Resync { .. });
+        let resync = matches!(frame, LiveFrame::Resync { .. })
+            || versions.observe(&frame) == Contiguity::Gap;
         let must_schedule = queue.borrow_mut().push(frame);
         if must_schedule {
             let (queue, on_event) = (Rc::clone(queue), Rc::clone(on_event));

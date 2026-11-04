@@ -19,11 +19,30 @@ mkdir -p "$DEBUG"
 while IFS= read -r line; do
   printf '%s\n' "$line" >> "$DEBUG/maestro.log"
 done < "$FIX/run/debug/maestro.log"
-for d in "$FIX"/run/debug/*/; do
-  [ -d "$d" ] && cp -R "${d%/}" "$DEBUG/"
-done
-sleep "${FLEET_FAKE_LINGER:-0.6}"
-cat "$FIX/stdout.bin"
+bundles() {
+  for d in "$FIX"/run/debug/*/; do
+    [ -d "$d" ] && cp -R "${d%/}" "$DEBUG/"
+  done
+}
+# Without a gate the bundles land with the log; with one they wait for the gate (below).
+[ -z "$FLEET_FAKE_GATE" ] && bundles
+# With FLEET_FAKE_GATE=<file>, print the console output now (the live outcomes), then wait until
+# that file exists (up to FLEET_FAKE_GATE_TIMEOUT seconds, default 120) before writing the flow
+# bundles (which, like the report, settle outcomes as verified) and the report, and exiting: a
+# test can look at the open run, every outcome provisional, without racing the clock. Otherwise
+# linger, then print.
+if [ -n "$FLEET_FAKE_GATE" ]; then
+  cat "$FIX/stdout.bin"
+  tries=$(( ${FLEET_FAKE_GATE_TIMEOUT:-120} * 20 ))
+  while [ ! -e "$FLEET_FAKE_GATE" ] && [ "$tries" -gt 0 ]; do
+    sleep 0.05
+    tries=$((tries - 1))
+  done
+  bundles
+else
+  sleep "${FLEET_FAKE_LINGER:-0.6}"
+  cat "$FIX/stdout.bin"
+fi
 [ -n "$OUT" ] && [ -f "$FIX/run/report.xml" ] && cp "$FIX/run/report.xml" "$OUT"
 code=$(sed -n 's/.*"code": *\([0-9][0-9]*\).*/\1/p' "$FIX/exit.json")
 exit "${code:-1}"

@@ -9,7 +9,7 @@
 use std::time::Duration;
 
 use fantoccini::Client;
-use fleet_loadgen::Options;
+use fleet_loadgen::{Hold, HoldAt, Options};
 use serde_json::{Value, json};
 use tokio::task::JoinHandle;
 
@@ -42,6 +42,22 @@ pub(crate) fn run_options(stack: &Stack, run_id: &str) -> Options {
         deadline: Duration::from_secs(120),
         ..Options::default()
     }
+}
+
+/// A run that stops, with every flow ended in the live console, just before the process exit and
+/// the report, until `hold` is released: the run stays open exactly as long as the test wants,
+/// whatever the machine's speed, and every outcome on the page is provisional until then.
+pub(crate) fn held_run_options(stack: &Stack, run_id: &str, hold: &Hold) -> Options {
+    Options {
+        pace: Duration::ZERO,
+        hold: Some(hold.clone()),
+        ..run_options(stack, run_id)
+    }
+}
+
+/// A gate with one stop, before the report.
+pub(crate) fn before_report() -> Hold {
+    Hold::new([HoldAt::BeforeReport])
 }
 
 pub(crate) fn start_run(opts: Options) -> JoinHandle<fleet_loadgen::Report> {
@@ -164,17 +180,25 @@ async fn a_run_appears_on_the_overview_and_its_counts_move_without_a_reload() {
         .await;
     page.mark_loaded().await;
 
-    let run = start_run(run_options(&stack, "overview-live"));
+    let hold = before_report();
+    let run = start_run(held_run_options(&stack, "overview-live", &hold));
 
     page.wait("the run to appear", &count_of(&q("active-row")))
         .await;
     let active = q("active-row");
+    // The script fails exactly one of the six flows; the other five pass, live.
     page.wait(
-        "a flow to pass while the run is still active",
-        &format!("{} >= 1", number_in(&format!("{active} {}", q("passed")))),
+        "the five live passes",
+        &format!(
+            "{} === 5 && {} === 1",
+            number_in(&format!("{active} {}", q("passed"))),
+            number_in(&format!("{active} {}", q("failed")))
+        ),
     )
     .await;
-    // No plan was given, so the page must say it cannot tell how far along the run is (AC6).
+    // The run is held open, so it is still active, and with no plan the page must say it cannot
+    // tell how far along the run is (AC6).
+    assert_eq!(page.count(&q("recent-row")).await, 0);
     let progress = page
         .texts(&format!("{active} {}", q("progress-text")))
         .await;
@@ -182,6 +206,7 @@ async fn a_run_appears_on_the_overview_and_its_counts_move_without_a_reload() {
         progress.iter().all(|t| t.contains("progress uncertain")),
         "an unplanned run is marked uncertain, got {progress:?}"
     );
+    hold.release();
     page.wait(
         "the finished run to move to recently finished",
         &format!(
@@ -301,9 +326,10 @@ async fn after_a_server_restart_the_page_resubscribes_and_keeps_updating() {
     let page = Page {
         client: &browser.client,
     };
-    let mut opts = run_options(&stack, "restart");
+    // Two stops: after the first four of ten flows ended, and before the report.
+    let hold = Hold::new([HoldAt::AfterFlows(4), HoldAt::BeforeReport]);
+    let mut opts = held_run_options(&stack, "restart", &hold);
     opts.flows = 5;
-    opts.pace = Duration::from_millis(450);
     let run = start_run(opts);
     let attempt = first_attempt(&stack).await;
     browser
@@ -317,29 +343,52 @@ async fn after_a_server_restart_the_page_resubscribes_and_keeps_updating() {
     page.mark_loaded().await;
     page.wait("the live connection", &has_text(&q("connection"), "Live"))
         .await;
+    // Four flows ended (the script fails exactly one of them) and the agent waits.
     page.wait(
-        "a first flow to finish",
-        &format!("{} >= 1", number_in(&q("count-passed"))),
+        "the first four flows",
+        &format!(
+            "{} === 3 && {} === 1",
+            number_in(&q("count-passed")),
+            number_in(&q("count-failed"))
+        ),
     )
     .await;
-    let before = page.texts(&q("count-passed")).await[0]
-        .parse::<u64>()
-        .unwrap();
 
     stack.restart().await;
 
-    // The page reconnects by itself, takes a new snapshot and goes on: more flows finish than
-    // had when the server went away, and the run ends with the report's verdict.
-    page.wait(
-        "more flows to finish after the restart",
-        &format!("{} > {before}", number_in(&q("count-passed"))),
-    )
-    .await;
+    // The page reconnects by itself and takes a new snapshot; what it shows survived the restart.
     page.wait(
         "the live connection again",
         &has_text(&q("connection"), "Live"),
     )
     .await;
+    page.wait(
+        "the same four flows after the restart",
+        &format!(
+            "{} === 3 && {} === 1",
+            number_in(&q("count-passed")),
+            number_in(&q("count-failed"))
+        ),
+    )
+    .await;
+    // The agent goes on (it reconnects to the new server), the page follows: the other six flows
+    // end live, with the run still open.
+    hold.release();
+    page.wait(
+        "more flows to finish after the restart",
+        &format!(
+            "{} === 9 && {} === 1",
+            number_in(&q("count-passed")),
+            number_in(&q("count-failed"))
+        ),
+    )
+    .await;
+    assert!(
+        page.texts(&q("pipeline-result")).await[0].contains("Running"),
+        "the run is still open"
+    );
+    // The run ends with the report's verdict.
+    hold.release();
     run.await.unwrap();
     page.wait(
         "the final verdict",
@@ -447,8 +496,9 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
         .await;
     page.mark_loaded().await;
 
-    let first = start_run(run_options(&stack, "concurrent-a"));
-    let second = start_run(run_options(&stack, "concurrent-b"));
+    let hold = before_report();
+    let first = start_run(held_run_options(&stack, "concurrent-a", &hold));
+    let second = start_run(held_run_options(&stack, "concurrent-b", &hold));
 
     page.wait(
         "both runs to be active",
@@ -460,11 +510,11 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
         &has_text(&format!("{} p", q("tile-active")), "2"),
     )
     .await;
-    // Both rows move: each has a passed flow while both are still active.
+    // Both rows move: each shows its own five live passes while both are still open.
     page.wait(
-        "both rows to show a passed flow",
+        "both rows to show five passed flows",
         &format!(
-            "{rows} === 2 && Array.from(document.querySelectorAll('{row} {passed}')).every(e => Number(e.textContent) >= 1)",
+            "{rows} === 2 && Array.from(document.querySelectorAll('{row} {passed}')).every(e => Number(e.textContent) === 5)",
             rows = count_of(&q("active-row")),
             row = q("active-row"),
             passed = q("passed"),
@@ -483,6 +533,7 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
     let attempts: Vec<String> = serde_json::from_value(attempts).unwrap();
     assert_ne!(attempts[0], attempts[1], "two different pipelines");
 
+    hold.release();
     first.await.unwrap();
     second.await.unwrap();
     page.wait(

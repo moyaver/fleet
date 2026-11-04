@@ -153,6 +153,21 @@ pub(crate) fn agent_bin() -> PathBuf {
 /// Runs `fleet-agent run -- maestro test flows/` with the fake Maestro replaying `fixture`, in a
 /// cleared environment (CI sets `GITHUB_*`, which the agent would read) plus `env`.
 pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
+    run_agent_with(fixture_name, env, None)
+}
+
+/// Like [`run_agent`], but the flows come from a Fleet plan (ADR-0013): `manifest` is written to
+/// disk, every flow it names is created (empty) under the agent's working directory, and the
+/// agent runs shard 0 with `--plan`. Flow paths in `manifest` are relative to that directory.
+pub(crate) fn run_agent_planned(
+    fixture_name: &str,
+    env: &[(&str, &str)],
+    manifest: &Value,
+) -> Output {
+    run_agent_with(fixture_name, env, Some(manifest))
+}
+
+fn run_agent_with(fixture_name: &str, env: &[(&str, &str)], plan: Option<&Value>) -> Output {
     let dir = std::env::temp_dir().join(format!("fleet-e2e-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&dir).unwrap();
     std::os::unix::fs::symlink(
@@ -170,12 +185,29 @@ pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
         }
     }
     cmd.args(["run", "--finalize-timeout", "30", "--run-dir"])
-        .arg(dir.join("run"))
-        .arg("--")
-        .arg(dir.join("maestro"))
-        .arg("test")
-        .arg(dir.join("flows"))
-        .env("FLEET_FAKE_FIXTURE", fixture(fixture_name))
+        .arg(dir.join("run"));
+    if let Some(manifest) = plan {
+        // More than one flow file makes the agent add the JUnit report, as a directory does.
+        for shard in manifest["shards"].as_array().unwrap() {
+            for flow in shard["flows"].as_array().unwrap() {
+                let file = dir.join(flow.as_str().unwrap());
+                std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+                std::fs::write(file, "appId: e2e\n---\n").unwrap();
+            }
+        }
+        std::fs::write(dir.join("plan.json"), manifest.to_string()).unwrap();
+        cmd.args(["--plan", "plan.json", "--shard", "0"])
+            .arg("--")
+            .arg(dir.join("maestro"))
+            .arg("test")
+            .current_dir(&dir);
+    } else {
+        cmd.arg("--")
+            .arg(dir.join("maestro"))
+            .arg("test")
+            .arg(dir.join("flows"));
+    }
+    cmd.env("FLEET_FAKE_FIXTURE", fixture(fixture_name))
         .env("FLEET_FAKE_LINGER", "0.2")
         .env("FLEET_FLUSH_TIMEOUT", "15")
         .stdin(Stdio::null());

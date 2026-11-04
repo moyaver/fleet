@@ -28,10 +28,10 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `ingest.idle_timeout_ms` | `45000` | A silent agent socket is closed and its run detached |
 | `ingest.telemetry_flush_ms` | `15000` | Telemetry checkpoint (10–30 s), then `telemetry_ack` |
 | `ingest.shutdown_grace_ms` | `15000` | Drain time for sockets on SIGTERM |
-| `liveness.stale_after_ms` | `25000` | A worker shows `stale` (display only) |
+| `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
 | `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown` |
 | `api.viewer_tokens` | — | Bearer tokens that may read every project (scripts, tests); people sign in with `[login]` |
-| `api.public_url` | — | The dashboard's origin; browser sockets from other origins are refused |
+| `api.public_url` | — | The dashboard's origin: browser sockets from other origins are refused, and the sign-in redirect URI is built from it (required with `[login]`) |
 | `login.*` | — | Browser sign-in with your identity provider; see [Browser sign-in](#browser-sign-in) |
 | `storage.backend` | `local_fs` | Where artifacts live: `local_fs` or `s3`; see [Artifact storage](#artifact-storage) |
 | `storage.path` | `/var/lib/fleet/blobs` | Blob directory for `local_fs` |
@@ -57,7 +57,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 
 ## Browser sign-in
 
-People sign in to the dashboard through your identity provider (OpenID Connect, authorization code with PKCE). Fleet is a confidential client: register it with the redirect URI `<api.public_url>/api/v1/auth/callback`. The provider must sign ID tokens with RS256 (Entra ID, Okta, Keycloak and Google do by default) and must send the user's groups in the ID token.
+People sign in to the dashboard through your identity provider (OpenID Connect, authorization code with PKCE). Register Fleet with the redirect URI `<api.public_url>/api/v1/auth/callback`; it is a confidential client when `client_secret` is set and a public (PKCE-only) client when it is not. The provider must sign ID tokens with RS256 (Entra ID, Okta, Keycloak and Google do by default) and must send the user's groups in the ID token.
 
 ```toml
 [api]
@@ -82,6 +82,7 @@ role = "admin"
 
 - **Roles come from groups, at sign-in.** A user's effective role on a project is the highest role granted by their groups (or bound to them directly) for that project or for all projects. A user whose groups grant nothing is refused, and so is an ID token with none of the `group_claims`: Fleet never guesses. Entra ID omits `groups` for users in more than 200 groups; use app roles (`roles`) there. A removed group membership takes effect at the next sign-in, within `session_ttl_minutes`.
 - **Sessions** are an opaque cookie (`__Host-fleet_session`: `HttpOnly`, `Secure`, `SameSite=Lax`) stored in Postgres by hash. Mutating requests made with the cookie must send the session's CSRF token (`X-CSRF-Token`, from `GET /api/v1/auth/session`) and, when the browser sends an `Origin`, the dashboard's own.
+- **Serve the dashboard over HTTPS.** The session cookie is `Secure` and carries the `__Host-` prefix, which browsers accept only from a secure origin, so sign-in cannot work over plain `http://` (browsers treat `localhost` and `127.0.0.1` as secure, which is how the end-to-end tests run). Put TLS in front of Fleet (the Compose file's Caddy does) and set `api.public_url` to the `https://` address people use.
 - A project the user has no role on looks exactly like a project that does not exist.
 
 ## Artifact storage

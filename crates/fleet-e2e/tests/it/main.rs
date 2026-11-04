@@ -11,6 +11,8 @@ mod dashboard_ab;
 mod dashboard_cd;
 mod dashboard_ef;
 mod fixtures;
+mod idp;
+mod m4_exit;
 mod m5_exit;
 mod network;
 mod scenarios;

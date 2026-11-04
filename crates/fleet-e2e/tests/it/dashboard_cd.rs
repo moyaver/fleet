@@ -9,7 +9,10 @@ use serde_json::Value;
 
 use crate::{
     browser::Browser,
-    dashboard_ab::{Page, count_of, first_attempt, has_text, q, run_options, stack, start_run},
+    dashboard_ab::{
+        Page, before_report, count_of, first_attempt, has_text, held_run_options, q, run_options,
+        stack, start_run,
+    },
     support::Stack,
 };
 
@@ -334,9 +337,8 @@ async fn a_device_page_lists_its_flows_with_links_and_shows_missing_sensors_as_u
 #[tokio::test]
 async fn a_flow_page_follows_its_run_live_from_provisional_to_verified() {
     let stack = stack(|_| {}).await;
-    let mut opts = run_options(&stack, "flow-live");
-    opts.pace = std::time::Duration::from_millis(500);
-    let run = start_run(opts);
+    let hold = before_report();
+    let run = start_run(held_run_options(&stack, "flow-live", &hold));
     let attempt = first_attempt(&stack).await;
     // flow-0-0 is the scripted failure; find its id as soon as the server has it.
     let deadline = tokio::time::Instant::now() + crate::dashboard_ab::PATIENCE;
@@ -377,8 +379,14 @@ async fn a_flow_page_follows_its_run_live_from_provisional_to_verified() {
     // While the run is open the page shows the live console's claim: provisional, one claim.
     page.wait("a provisional outcome", &badge_is("provisional"))
         .await;
-    // The final report arrives at the end of the run: the same page, without a reload, now
+    // The run is released: the final report arrives, and the same page, without a reload, now
     // lists both claims and shows the outcome as verified.
+    assert_eq!(
+        page.count(&q("claim")).await,
+        1,
+        "only the live console's claim while the run is open"
+    );
+    hold.release();
     page.wait(
         "the final report's claim",
         &format!("{} === 2", count_of(&q("claim"))),

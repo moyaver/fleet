@@ -150,6 +150,7 @@ fn Header() -> impl IntoView {
                             view! {
                                 <a
                                     data-testid="sign-in"
+                                    rel="external"
                                     class="rounded border border-border px-3 py-1.5 font-medium hover:bg-tone-neutral-bg"
                                     href=sign_in()
                                 >
@@ -196,7 +197,7 @@ pub fn ErrorNotice(
                             "Fleet shows private test data to signed-in people only."
                         </p>
                         <p class="mt-3">
-                            <a class="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-fg" href=href>
+                            <a class="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-fg" href=href rel="external">
                                 "Sign in"
                             </a>
                         </p>
