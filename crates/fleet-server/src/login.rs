@@ -17,8 +17,9 @@ use axum::{
 };
 use base64::Engine as _;
 use fleet_core::policy::Role;
+use fleet_protocol::rest::{SessionRole, SessionUser, SessionView};
 use fleet_store::auth::AuditActor;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use sha2::Digest as _;
 use time::OffsetDateTime;
@@ -403,29 +404,6 @@ fn local_path(return_to: Option<&str>) -> &str {
         .unwrap_or("/")
 }
 
-/// The signed-in user, for the SPA.
-#[derive(Debug, Serialize)]
-struct Whoami {
-    user: WhoamiUser,
-    /// Roles by project slug (`null`: every project).
-    roles: Vec<WhoamiRole>,
-    /// Send as `X-CSRF-Token` on every mutating request.
-    csrf_token: String,
-}
-
-#[derive(Debug, Serialize)]
-struct WhoamiUser {
-    id: uuid::Uuid,
-    email: Option<String>,
-    name: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct WhoamiRole {
-    project: Option<String>,
-    role: Role,
-}
-
 async fn whoami(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let active = match session::active(&state, &headers).await {
         Ok(Some(a)) => a,
@@ -441,20 +419,20 @@ async fn whoami(State(state): State<AppState>, headers: HeaderMap) -> Response {
         .grants
         .iter()
         .filter_map(|g| match g.project {
-            None => Some(WhoamiRole {
+            None => Some(SessionRole {
                 project: None,
-                role: g.role,
+                role: role_name(g.role).to_owned(),
             }),
-            Some(id) => slugs.iter().find(|p| p.id == id).map(|p| WhoamiRole {
+            Some(id) => slugs.iter().find(|p| p.id == id).map(|p| SessionRole {
                 project: Some(p.slug.clone()),
-                role: g.role,
+                role: role_name(g.role).to_owned(),
             }),
         })
         .collect();
     (
         [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
-        Json(Whoami {
-            user: WhoamiUser {
+        Json(SessionView {
+            user: SessionUser {
                 id: active.user_id,
                 email: active.data.email,
                 name: active.data.name,
@@ -487,6 +465,15 @@ async fn logout(State(state): State<AppState>, SignedIn(active): SignedIn) -> Re
         [(header::SET_COOKIE, session::clear())],
     )
         .into_response()
+}
+
+/// A role as the API spells it (the same words `fleet_core::policy::Role` serializes to).
+fn role_name(role: Role) -> &'static str {
+    match role {
+        Role::Viewer => "viewer",
+        Role::Maintainer => "maintainer",
+        Role::Admin => "admin",
+    }
 }
 
 /// Where the provider sends the user back: `<public_url>/api/v1/auth/callback`.

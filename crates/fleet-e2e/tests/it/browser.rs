@@ -143,6 +143,22 @@ impl Browser {
         serde_json::from_value(value).unwrap()
     }
 
+    /// Sets a host-only, `Secure`, `HttpOnly` cookie for `url` through the `DevTools` protocol.
+    /// (WebDriver's own cookie command refuses cookies without a registrable domain, and the
+    /// `__Host-` prefix forbids one.)
+    pub(crate) async fn set_secure_cookie(&self, url: &str, name: &str, value: &str) {
+        self.client
+            .issue_cmd(Cdp {
+                method: "Network.setCookie",
+                params: json!({
+                    "name": name, "value": value, "url": url,
+                    "path": "/", "secure": true, "httpOnly": true, "sameSite": "Lax"
+                }),
+            })
+            .await
+            .unwrap();
+    }
+
     /// Ends the session (chromedriver follows on drop).
     pub(crate) async fn quit(self) {
         self.client.close().await.unwrap();

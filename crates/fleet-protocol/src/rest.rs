@@ -611,3 +611,53 @@ pub struct FlowDetailView {
     /// Related artifacts (M5).
     pub artifacts: Vec<ArtifactRefView>,
 }
+
+/// The signed-in person, as `GET /api/v1/auth/session` tells the dashboard.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct SessionUser {
+    /// The user's ID.
+    pub id: Uuid,
+    /// Email, when the identity provider gave one.
+    pub email: Option<String>,
+    /// Display name, when the identity provider gave one.
+    pub name: Option<String>,
+}
+
+/// A role the session holds on one project, or on every project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct SessionRole {
+    /// The project's slug; `None` for every project.
+    pub project: Option<String>,
+    /// `viewer`, `maintainer` or `admin`.
+    pub role: String,
+}
+
+/// The signed-in session: who, what they may do, and the CSRF token to echo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct SessionView {
+    /// The person.
+    pub user: SessionUser,
+    /// Their roles by project.
+    pub roles: Vec<SessionRole>,
+    /// Send as `X-CSRF-Token` on every mutating request.
+    pub csrf_token: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_session_parses_from_the_documented_wire_form() {
+        let wire = r#"{"user":{"id":"00000000-0000-0000-0000-000000000001","email":"a@b.c","name":null},
+            "roles":[{"project":null,"role":"admin"},{"project":"app","role":"viewer"}],
+            "csrf_token":"tok"}"#;
+        let s: SessionView = serde_json::from_str(wire).unwrap();
+        assert_eq!(s.user.email.as_deref(), Some("a@b.c"));
+        assert_eq!(s.roles[1].project.as_deref(), Some("app"));
+        assert_eq!(s.csrf_token, "tok");
+    }
+}

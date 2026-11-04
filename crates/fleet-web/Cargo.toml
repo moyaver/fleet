@@ -13,8 +13,20 @@ workspace = true
 
 [dependencies]
 console_error_panic_hook.workspace = true
+fleet-protocol.workspace = true
 fleet-ui.workspace = true
+futures-util.workspace = true
+gloo-net = { workspace = true, features = ["http", "json", "websocket"] }
+gloo-timers = { workspace = true, features = ["futures"] }
+js-sys.workspace = true
 leptos.workspace = true
+leptos_router.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+uuid.workspace = true
+web-sys = { workspace = true, features = ["History", "Location", "Window"] }
 
 [package.metadata.dist]
 # Not released by cargo-dist: the agent is (M2); the server ships as a container (M3).

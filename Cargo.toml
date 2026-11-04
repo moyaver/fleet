@@ -81,6 +81,9 @@ fantoccini = { version = "0.22.1", default-features = false }
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 getrandom = "0.4.3"
+# REST and the live WebSocket in the browser; members add the features they use.
+gloo-net = { version = "0.7.0", default-features = false }
+gloo-timers = { version = "0.4.0", default-features = false }
 # JWT parsing and validation for CI OIDC tokens (ADR-0008). No built-in backend: Fleet installs an
 # RS256 verifier on `ring` (fleet-server oidc), avoiding `rsa`/`crypto-bigint` advisories and aws-lc.
 http = "1.5.0"
@@ -92,6 +95,8 @@ hyper-util = { version = "0.1.21", features = ["client-legacy", "http1", "tokio"
 infer = { version = "0.22.0", default-features = false }
 insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
+# Client-side routing for the dashboard; pinned exactly (PLAN §5.4).
+leptos_router = "=0.8.17"
 nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
 # S3-compatible storage (ADR-0007). `aws-base` + `reqwest` + `ring`, not `aws`: that feature links
 # aws-lc-rs and a second TLS backend; Fleet runs rustls on ring (the workspace reqwest above).

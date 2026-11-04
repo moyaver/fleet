@@ -13,6 +13,7 @@
 //! - a server restart needs nothing special: agents reconnect until `deadline`.
 //!
 //! [`run`] returns what each agent knows, so a test can compare it with the server's state.
+//! [`quiet`] is the opposite scenario: an agent that stops talking with its socket still open.
 
 use std::{
     sync::Arc,
@@ -574,6 +575,67 @@ async fn stream(
     ws.send(frame(&ClientFrame::Bye)).await?;
     let _ = ws.close(None).await;
     Ok(Ended::Done)
+}
+
+/// An agent that went quiet: it sent the start of a run and now holds its socket open without
+/// another word, like a runner whose process hung. The server shows it `stale`; after
+/// [`QuietAgent::disconnect`] it shows `disconnected`.
+#[derive(Debug)]
+pub struct QuietAgent {
+    ws: Ws,
+    /// Its agent run.
+    pub agent_run_id: Uuid,
+}
+
+impl QuietAgent {
+    /// Closes the socket without a `bye`: the run did not end, its connection did.
+    pub async fn disconnect(mut self) {
+        let _ = self.ws.close(None).await;
+    }
+}
+
+/// Connects one agent, sends the first `events` events of its script (and waits for their ack),
+/// then stops talking. `opts.agents` and `opts.pace` are ignored.
+pub async fn quiet(opts: &Options, events: usize) -> anyhow::Result<QuietAgent> {
+    let t0 = Instant::now();
+    let id = Uuid::now_v7();
+    let job_key = "job-0".to_owned();
+    let s = script(0, opts, t0);
+    let total = u64::try_from(s.events.len()).unwrap_or(u64::MAX);
+    let mut ws = connect(opts).await?;
+    let frame = |f: &ClientFrame| Message::text(serde_json::to_string(f).unwrap_or_default());
+    ws.send(frame(&ClientFrame::Hello(Box::new(hello(
+        id,
+        &job_key,
+        opts,
+        total + 1,
+        1,
+        t0,
+    )))))
+    .await?;
+    match recv(&mut ws).await? {
+        Some(ServerFrame::Welcome(_)) => {}
+        other => bail!("expected welcome, got {other:?}"),
+    }
+    let sent = events.min(s.events.len());
+    ws.send(frame(&ClientFrame::Events {
+        events: s.events.get(..sent).unwrap_or_default().to_vec(),
+    }))
+    .await?;
+    let want = u64::try_from(sent).unwrap_or(u64::MAX);
+    loop {
+        match recv(&mut ws).await? {
+            Some(ServerFrame::Ack { through, .. }) if through >= want => break,
+            Some(ServerFrame::Error { .. } | ServerFrame::Goaway { .. }) | None => {
+                bail!("the server stopped the quiet agent before acking its events")
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(QuietAgent {
+        ws,
+        agent_run_id: id,
+    })
 }
 
 /// The next protocol frame; `None` when the socket closed.
