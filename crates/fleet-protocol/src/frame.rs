@@ -151,7 +151,7 @@ pub struct Sample {
     /// The agent itself (supervisor + observer): CPU percent of one core since the last sample
     /// (invariant I10).
     pub agent_cpu_pct: Option<f32>,
-    /// The agent itself: peak resident memory, bytes.
+    /// The agent itself (supervisor + observer): current resident memory of both, summed, bytes.
     pub agent_rss_bytes: Option<u64>,
 }
 

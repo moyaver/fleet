@@ -37,6 +37,8 @@ use crate::{
 /// Fault injection for tests (research 02 §14): `observer_panic`, `observer_abort`,
 /// `observer_hang`, `observer_exit`.
 const FAULT_ENV: &str = "FLEET_FAULT";
+/// Environment variable carrying the supervisor's PID, set by the supervisor when it spawns us.
+pub(crate) const SUPERVISOR_PID_ENV: &str = "FLEET_SUPERVISOR_PID";
 /// Where the supervisor asks the observer to write its own log.
 pub(crate) const LOG_ENV: &str = "FLEET_OBSERVER_LOG";
 
@@ -303,7 +305,12 @@ fn start(
         report: report.map(PathBuf::from),
         pgid: group,
         stdout: Lines::default(),
-        sampler: Sampler::new(Some(pid)),
+        sampler: Sampler::new(
+            Some(pid),
+            std::env::var(SUPERVISOR_PID_ENV)
+                .ok()
+                .and_then(|v| v.parse().ok()),
+        ),
         shared,
         journal,
         telemetry,

@@ -455,6 +455,10 @@ impl Observer {
             cmd.env(crate::observer::LOG_ENV, d.join("observer.log"));
         }
         let mut child = match cmd
+            .env(
+                crate::observer::SUPERVISOR_PID_ENV,
+                std::process::id().to_string(),
+            )
             .arg("__observe")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
