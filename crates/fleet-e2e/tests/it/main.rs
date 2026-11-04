@@ -5,5 +5,7 @@
     reason = "test helpers: an unexpected error should fail the test right there"
 )]
 
+mod fixtures;
 mod network;
+mod scenarios;
 mod support;

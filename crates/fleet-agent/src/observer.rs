@@ -164,7 +164,14 @@ async fn observe() -> io::Result<()> {
                 }
                 Some(Frame::Output(Stream::Stdout, bytes)) => {
                     if let Some(l) = live.as_mut() {
-                        for line in l.stdout.push(&bytes) {
+                        let lines = l.stdout.push(&bytes);
+                        if !lines.is_empty() {
+                            // Maestro logs a flow's start before it prints its result. Catch up
+                            // on the log first, so a late-starting observer never reads a result
+                            // ahead of the start it belongs to (which would split one flow in two).
+                            watch(l, false, &clock);
+                        }
+                        for line in lines {
                             l.session.observe(clock(), Observation::Stdout(line));
                         }
                         flush(l);

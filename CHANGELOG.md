@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
+- `fleet-loadgen`: `wss://` servers panicked for want of a rustls crypto provider; it now installs ring, as the agent does.
+- Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).
+
 ### Changed
 
 - Relicensed from PolyForm Internal Use 1.0.0 to the GNU AGPL v3 (`AGPL-3.0-only`); a commercial license is available on request (ADR-0012).
@@ -12,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- M3: `fleet-loadgen` runs simulated agents against a real server (`--agents --devices --storm --duplicates`), replacing `mock-server`; `fleet-e2e` proves the M3 exit criteria (50 agents × 4 devices, reconnect storm, server restart mid-run, fixture replay matching `fleet-agent inspect`, jobs and same-serial emulators kept apart); the Docker image (`deploy/docker/Dockerfile`, cargo-chef + distroless) and the Compose reference deployment (Postgres 18, Garage, Caddy); operator guide and protocol reference.
 - M3: `POST /api/v1/agent/token` exchanges a CI OIDC token (configured issuers only, RS256, JWKS cached and refetched on an unknown `kid`, `aud`/`exp`/`nbf`/`iat` checked, each `jti` once) for a short-lived agent token, matched by trust policies on immutable repository IDs (`fleet-core::trust`; `pull_request_target` and `dynamic` always refused), or exchanges an API key. Verified claims name the pipeline run and job. The agent does the exchange on GitHub Actions (#25), tunnels through `HTTP(S)_PROXY` with `NO_PROXY` and trusts `FLEET_CA_FILE` (#24). `fleet-e2e` runs the real agent against the real server.
 - M3: the live hub and `/api/v1/live` (snapshot, then deltas in version order per attempt, `resync` for slow subscribers, `Origin` check), REST snapshots with a consistent `version` (`/api/v1/projects`, `…/attempts`, `…/attempts/{id}`), `/api/v1/openapi.json`, liveness (`online`/`stale`/`disconnected`/`completed`) and leader-only sweeps that detach silent runs and abandon expired ones (open flows become `unknown` from `server_inferred`, jobs `interrupted`), and Fleet plans (`POST /api/v1/plans`, immutable, planned totals before any job starts; #21). Reads need a viewer token until browser SSO (M4). The plan manifest type moved to `fleet-protocol::plan`.
 - M3: the server ingests agents: `/api/v1/agent/ws` (`fleet.v1+json`: welcome with server-authoritative resume, ack after commit, `event_rejected`, `seq_gap`, fencing, pings, idle timeout, `goaway` + close 1012 on shutdown), the HTTPS batch fallback `POST /api/v1/agent/batch`, telemetry checkpoints with `telemetry_ack`, API-key auth, `/livez` and `/readyz`, and the `serve`, `migrate`, `check-config`, `healthcheck` and `api-key create` subcommands with figment configuration (TOML, `FLEET_*`, `*_FILE`).

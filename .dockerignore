@@ -1,0 +1,10 @@
+# Build context for deploy/docker/Dockerfile: sources only.
+target/
+.git/
+crates/fleet-web/dist/
+docs/book/
+fixtures/
+research/
+**/*.rs.bk
+.env
+deploy/compose/secrets/

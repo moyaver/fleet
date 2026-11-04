@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Fleet reference deployment (research 06 §9.6): Caddy → Fleet → Postgres 18, plus Garage as the
+# S3-compatible object store (artifacts arrive in M5; it runs now so the stack is complete).
+# Quick start: deploy/compose/README.md.
+name: fleet
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  proxy:
+    <<: *restart
+    image: caddy:2.10
+    ports: ["80:80", "443:443"]
+    environment:
+      FLEET_DOMAIN: ${FLEET_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      fleet: { condition: service_healthy }
+
+  fleet:
+    <<: *restart
+    image: ${FLEET_IMAGE:-ghcr.io/moyaver/fleet:latest}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    command: ["serve"]
+    environment:
+      FLEET_LISTEN: 0.0.0.0:8080
+      FLEET_CONFIG: /etc/fleet/fleet.toml
+      FLEET_DATABASE__URL_FILE: /run/secrets/database_url
+      FLEET_DATABASE__MIGRATE: auto           # "manual" for IT-controlled upgrades (fleet migrate)
+      FLEET_API__VIEWER_TOKENS_FILE: /run/secrets/viewer_token
+      FLEET_API__PUBLIC_URL: https://${FLEET_DOMAIN:-localhost}
+      FLEET_LOG: info
+    volumes:
+      - ./fleet.toml:/etc/fleet/fleet.toml:ro
+    secrets: [database_url, viewer_token]
+    depends_on:
+      postgres: { condition: service_healthy }
+    stop_grace_period: 30s                     # the WebSocket drain needs more than Docker's 10 s
+    expose: ["8080"]                           # only the proxy is published
+
+  postgres:
+    <<: *restart
+    image: postgres:18
+    environment:
+      POSTGRES_DB: fleet
+      POSTGRES_USER: fleet
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - pg_data:/var/lib/postgresql             # Postgres 18 images: mount the parent, not …/data
+    secrets: [postgres_password]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U fleet -d fleet"]
+      interval: 5s
+      retries: 12
+    shm_size: 256mb
+
+  garage:
+    <<: *restart
+    image: dxflrs/garage:v2.5.0
+    # Single node, with a default key and bucket from the environment (no manual layout step).
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_ACCESS_KEY:?set GARAGE_ACCESS_KEY in .env}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_SECRET_KEY:?set GARAGE_SECRET_KEY in .env}
+      GARAGE_DEFAULT_BUCKET: fleet-artifacts
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?set GARAGE_RPC_SECRET in .env}
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    expose: ["3900"]                           # S3 API, internal only
+
+volumes:
+  caddy_data: {}
+  pg_data: {}
+  garage_meta: {}
+  garage_data: {}
+
+secrets:
+  database_url: { file: ./secrets/database_url }
+  postgres_password: { file: ./secrets/postgres_password }
+  viewer_token: { file: ./secrets/viewer_token }

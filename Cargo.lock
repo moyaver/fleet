@@ -962,6 +962,7 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.23.1",
+ "fleet-loadgen",
  "fleet-server",
  "fleet-store",
  "serde_json",
@@ -976,10 +977,14 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
+ "fleet-protocol",
  "futures-util",
+ "rustls",
  "serde_json",
+ "time",
  "tokio",
  "tokio-tungstenite 0.30.0",
+ "uuid",
 ]
 
 [[package]]

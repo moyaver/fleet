@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO pipeline_attempts (project_id, pipeline_run_id, attempt) VALUES ($1, $2, $3)\n         ON CONFLICT (pipeline_run_id, attempt) DO UPDATE SET attempt = EXCLUDED.attempt\n         RETURNING id",
+  "query": "INSERT INTO pipeline_attempts (project_id, pipeline_run_id, attempt) VALUES ($1, $2, $3)\n         ON CONFLICT (pipeline_run_id, attempt) DO NOTHING\n         RETURNING id",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "1be18d5d9b1a07da1495964ed17060fa1c4129c8f5285aba9fee0a079a8b68e5"
+  "hash": "2ac03832ec65519c790b785376e2c7d0bc3f03efd34e7bd6f717a21743ff5fb9"
 }

@@ -28,6 +28,7 @@ pub(crate) const VIEWER: &str = "e2e-viewer";
 
 pub(crate) struct Stack {
     pub(crate) server: Option<fleet_server::Server>,
+    pub(crate) config: Config,
     pub(crate) key: String,
 }
 
@@ -55,6 +56,7 @@ impl Stack {
             .unwrap();
         Self {
             server: Some(server),
+            config: c,
             key: key.expose().to_owned(),
         }
     }
@@ -65,6 +67,14 @@ impl Stack {
 
     pub(crate) fn ws_url(&self) -> String {
         format!("ws://{}", self.addr())
+    }
+
+    /// Stops the server and starts a new one on the same port and database.
+    pub(crate) async fn restart(&mut self) {
+        let addr = self.addr();
+        self.server.take().unwrap().stop().await.unwrap();
+        self.config.listen = addr;
+        self.server = Some(fleet_server::start(self.config.clone()).await.unwrap());
     }
 
     /// GET as a viewer; the JSON body.

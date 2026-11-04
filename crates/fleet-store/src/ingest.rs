@@ -674,16 +674,30 @@ async fn upsert_hierarchy(
     )
     .fetch_one(&mut *tx)
     .await?;
-    let attempt_id = sqlx::query_scalar!(
+    // DO NOTHING, not DO UPDATE: locking the attempt row here, before the job row, would invert
+    // apply_sorted's order (job row in derive, attempt row in bump_version) and deadlock.
+    let inserted = sqlx::query_scalar!(
         "INSERT INTO pipeline_attempts (project_id, pipeline_run_id, attempt) VALUES ($1, $2, $3)
-         ON CONFLICT (pipeline_run_id, attempt) DO UPDATE SET attempt = EXCLUDED.attempt
+         ON CONFLICT (pipeline_run_id, attempt) DO NOTHING
          RETURNING id",
         project,
         run_id,
         id.attempt
     )
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
+    let attempt_id = match inserted {
+        Some(id) => id,
+        None => {
+            sqlx::query_scalar!(
+                "SELECT id FROM pipeline_attempts WHERE pipeline_run_id = $1 AND attempt = $2",
+                run_id,
+                id.attempt
+            )
+            .fetch_one(&mut *tx)
+            .await?
+        }
+    };
     let job_id = sqlx::query_scalar!(
         "INSERT INTO jobs (project_id, pipeline_attempt_id, job_key, name) VALUES ($1, $2, $3, $4)
          ON CONFLICT (pipeline_attempt_id, job_key) DO UPDATE

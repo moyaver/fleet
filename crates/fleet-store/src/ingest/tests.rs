@@ -746,3 +746,48 @@ async fn concurrent_runs_in_one_job_and_attempt_stay_consistent(pool: PgPool) {
         .unwrap();
     assert_eq!(attempts, 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let first = Agent::new("107", "job");
+    let h = store
+        .open_run(&p, &first.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    // A batch mid-transaction, as apply_sorted holds it: derive has the job row and
+    // bump_version is still to come.
+    let mut batch = store.pool().begin().await.unwrap();
+    sqlx::query!("UPDATE jobs SET name = name WHERE id = $1", h.job_id)
+        .execute(&mut *batch)
+        .await
+        .unwrap();
+    // A second run in the same job opens meanwhile and waits for the job row.
+    let second = {
+        let (store, p) = (store.clone(), p.clone());
+        tokio::spawn(async move {
+            store
+                .open_run(
+                    &p,
+                    &Agent::new("107", "job").hello(None),
+                    Transport::WebSocket,
+                )
+                .await
+                .map(|_| ())
+        })
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    // The batch then bumps the attempt: open_run must not be holding it.
+    bump_version(
+        &mut batch,
+        h.project_id,
+        h.pipeline_attempt_id,
+        BTreeSet::from([EntityRef::Job(h.job_id)]),
+    )
+    .await
+    .unwrap();
+    batch.commit().await.unwrap();
+    assert!(second.await.unwrap().is_ok());
+}

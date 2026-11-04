@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Fleet server configuration. Every key can also be set as FLEET_<SECTION>__<KEY>; secrets as
+# FLEET_<…>_FILE. Check it with: docker compose run --rm fleet check-config
+
+[[projects]]
+slug = "mobile-app"
+name = "Mobile app"
+
+# GitHub Actions publishers (OIDC, no stored secret). IDs are GitHub's immutable numeric IDs:
+#   gh api repos/OWNER/REPO --jq '.id, .owner.id'
+# [[projects.trust_policies]]
+# name = "mobile-app-ci"
+# repository_id = 123456789
+# repository_owner_id = 987654321
+# trusted_refs = ["refs/heads/main", "refs/tags/v*"]
+# pr_policy = "restricted"     # restricted | full | deny

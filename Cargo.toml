@@ -53,6 +53,7 @@ unescaped_backticks = "warn"
 
 [workspace.dependencies]
 fleet-core = { path = "crates/fleet-core" }
+fleet-loadgen = { path = "crates/fleet-loadgen" }
 fleet-maestro = { path = "crates/fleet-maestro" }
 fleet-protocol = { path = "crates/fleet-protocol" }
 fleet-server = { path = "crates/fleet-server" }

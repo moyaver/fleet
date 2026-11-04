@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# TLS terminates here. `localhost` gets Caddy's internal CA; a real hostname gets ACME, or mount
+# your certificates and add `tls /certs/fleet.crt /certs/fleet.key`.
+{$FLEET_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy fleet:8080 {
+		# Config reloads would otherwise cut every agent and browser WebSocket (research 06 §9.2).
+		stream_close_delay 5m
+		flush_interval -1
+	}
+}

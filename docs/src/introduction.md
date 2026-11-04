@@ -4,7 +4,7 @@ Fleet is self-hosted, live observability for mobile UI tests running in CI, star
 It is not affiliated with mobile.dev, the makers of Maestro.
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
-> **Status:** pre-release. The repository is bootstrapped (milestone M0); there is no usable agent or server yet.
+> **Status:** pre-release. The agent (M2) and the server core (M3) work end to end: agents publish to a self-hosted server over WebSocket or HTTPS, and the REST API and live socket serve the state. The dashboard is next (M4).
 > See the [roadmap tracker](https://github.com/moyaver/fleet#roadmap) for progress.
 
 It has three parts, all in Rust:

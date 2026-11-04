@@ -7,7 +7,7 @@ Self-hosted, live observability for mobile UI tests running in CI, starting with
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
 > [!NOTE]
-> **Status: M2 (agent) done, M3 (server core) in progress.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
+> **Status: M3 (server core) done, M4 (dashboard) next.** The server ingests the agent's journal with server-authoritative resume, keeps live state that survives restarts, and never shows a failed or interrupted run as successful. M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)).
 > Progress is tracked [below](#roadmap).
 
 Everything is **Rust**: the agent, the server and the dashboard. There's no Node.js, npm or hand-written JavaScript anywhere.
@@ -27,8 +27,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
 | ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
 | ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
-| 🚧 | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
-| ⬜ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
+| ✅ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
+| ⏭️ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
 | ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](docs/decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
 | ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
 | ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
@@ -80,9 +80,24 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
 - [x] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
 - [x] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
-- [ ] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image
-- [ ] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
-- [ ] Exit criteria proven by tests: concurrent agents, restart without loss, acceptance criteria 3, 10, 11, 15, fixture replay through the real agent and server
+- [x] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image ([deploy/](deploy/compose/README.md))
+- [x] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
+- [x] Exit criteria proven by tests: concurrent agents, restart without loss, acceptance criteria 3, 10, 11, 15, fixture replay through the real agent and server ([below](#m3-exit-criteria))
+
+### M3 exit criteria
+
+Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). Next, before M4 builds on the agent's evidence: the integration-boundary hardening tracked in [#39](https://github.com/moyaver/fleet/issues/39).
+
+| Criterion | Proven by |
+|---|---|
+| Concurrent agents publish without corrupting state | `fleet-e2e` `scenarios::fifty_agents_with_four_devices_publish_without_corrupting_state` (50 agents × 4 devices, overlapping job names, resent and reordered batches: every event committed once, every flow under its own run, job and device); `fleet-store` `concurrent_runs_in_one_job_and_attempt_stay_consistent`, `a_new_run_never_deadlocks_with_a_batch_in_its_job` |
+| A restart loses no committed event | `fleet-server` `a_restart_loses_no_committed_event`, `after_a_restart_the_hub_rebuilds_from_postgres`; `fleet-e2e` `a_server_restart_mid_run_loses_no_committed_event` |
+| Acceptance 3: jobs and emulators stay separate | `fleet-e2e` `concurrent_jobs_and_same_serial_emulators_stay_separate` (two fixtures at once, one serial on both) and the 50-agent scenario |
+| Acceptance 10: network interruptions don't fail tests | `fleet-e2e` `a_reconnect_storm_loses_nothing`, `a_refused_oidc_token_never_affects_maestro`; agent fail-open tests from M2 |
+| Acceptance 11: the exit code is preserved | `fleet-e2e` `stored_outcomes_match_inspect_for_every_fixture` (12 fixtures, exit codes 0, 1, 130, 143) |
+| Acceptance 15: failed and interrupted jobs never look successful | `fleet-core` `outcome` property tests; the DB `CHECK` and lattice tests (`inferred_sources_can_never_claim_passed`); `an_agent_that_never_returns_is_abandoned_and_its_job_never_green`; every fixture's job outcome |
+| The real agent's stored outcomes match `fleet-agent inspect` | `fleet-e2e` `stored_outcomes_match_inspect_for_every_fixture` |
+| I3, I5, I8 | DB `CHECK`s + claim lattice; `ingest_gaps` for every loss (asserted zero where nothing was lost); `xtask lint` keeps provider crates out (the OIDC verifier runs on `ring`) |
 
 ### Owner actions
 

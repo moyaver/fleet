@@ -10,3 +10,4 @@ dist/
 .sqlx/*.tmp
 THIRD_PARTY_LICENSES.html
 .claude/
+deploy/compose/secrets/
