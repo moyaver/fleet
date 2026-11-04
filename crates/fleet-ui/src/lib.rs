@@ -12,14 +12,21 @@
 
 mod canvas;
 pub mod charts;
+pub mod combobox;
 pub mod components;
+pub mod datetime_range;
+pub mod filter_bar;
+pub mod keyboard;
 pub mod live_store;
 pub mod logview;
+pub mod menu;
 pub mod pagination;
 pub mod provenance;
 pub mod screenshots;
 pub mod steps;
 pub mod table;
+pub mod tabs;
 pub mod timeline;
+pub mod toast;
 pub mod tone;
 pub mod virtual_list;

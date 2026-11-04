@@ -1311,6 +1311,7 @@ dependencies = [
  "js-sys",
  "leptos",
  "proptest",
+ "thiserror 2.0.21",
  "time",
  "uuid",
  "vte",

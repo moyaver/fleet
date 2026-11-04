@@ -10,6 +10,8 @@
 
 pub mod controls;
 pub mod display;
+pub mod forms;
 pub mod layout;
+pub mod overlays;
 pub mod table;
 pub mod virtual_list;
