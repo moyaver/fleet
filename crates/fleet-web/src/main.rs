@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The Fleet dashboard (Leptos CSR). M0 only proves the wasm → embed → axum chain;
-//! screens start in M4 (PLAN §10).
+//! The Fleet dashboard (Leptos CSR). A minimal shell built from the `fleet-ui` kit; screens
+//! arrive later in M4 (PLAN §10).
 
+use fleet_ui::components::{
+    display::EmptyState,
+    layout::{Layout, Nav, NavItem},
+};
 use leptos::prelude::*;
 
 fn main() {
@@ -11,10 +15,24 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
+    let nav = || {
+        view! {
+            <Nav
+                title="Fleet"
+                items=vec![NavItem {
+                    label: "Overview".to_owned(),
+                    href: "/".to_owned(),
+                    current: true,
+                }]
+            />
+        }
+    };
     view! {
-        <main>
-            <h1>"Fleet"</h1>
-            <p>"Live observability for Maestro tests in CI. This is the M0 hello page."</p>
-        </main>
+        <Layout nav=nav>
+            <EmptyState
+                title="No runs yet"
+                description="Runs appear here as soon as an agent reports in."
+            />
+        </Layout>
     }
 }

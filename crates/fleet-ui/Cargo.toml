@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 fleet-protocol.workspace = true
+leptos.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

@@ -1,0 +1,126 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+/* Design tokens (PLAN §5.4, §10.2 order 1) as CSS custom properties with light and dark themes.
+   The OS preference decides unless <html data-theme="light|dark"> overrides it. Components use
+   only the semantic utilities generated from @theme below, never raw colours. */
+@import "tailwindcss";
+@source "../fleet-ui/src";
+@source "./src";
+
+:root {
+  color-scheme: light dark;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --fg: #0f172a;
+  --muted: #475569;
+  --border: #cbd5e1;
+  --primary: #1d4ed8;
+  --primary-fg: #ffffff;
+  --focus: #1d4ed8;
+  --tone-neutral-bg: #f1f5f9;
+  --tone-neutral-fg: #334155;
+  --tone-info-bg: #dbeafe;
+  --tone-info-fg: #1e40af;
+  --tone-success-bg: #dcfce7;
+  --tone-success-fg: #166534;
+  --tone-warning-bg: #fef3c7;
+  --tone-warning-fg: #92400e;
+  --tone-danger-bg: #fee2e2;
+  --tone-danger-fg: #991b1b;
+  --tone-accent-bg: #ede9fe;
+  --tone-accent-fg: #5b21b6;
+  --tone-muted-bg: #e2e8f0;
+  --tone-muted-fg: #475569;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120;
+    --surface: #111827;
+    --fg: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+    --primary: #60a5fa;
+    --primary-fg: #0b1120;
+    --focus: #93c5fd;
+    --tone-neutral-bg: #1e293b;
+    --tone-neutral-fg: #cbd5e1;
+    --tone-info-bg: #1e3a5f;
+    --tone-info-fg: #bfdbfe;
+    --tone-success-bg: #14361f;
+    --tone-success-fg: #bbf7d0;
+    --tone-warning-bg: #422006;
+    --tone-warning-fg: #fde68a;
+    --tone-danger-bg: #450a0a;
+    --tone-danger-fg: #fecaca;
+    --tone-accent-bg: #2e1065;
+    --tone-accent-fg: #ddd6fe;
+    --tone-muted-bg: #1e293b;
+    --tone-muted-fg: #94a3b8;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --surface: #111827;
+  --fg: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #334155;
+  --primary: #60a5fa;
+  --primary-fg: #0b1120;
+  --focus: #93c5fd;
+  --tone-neutral-bg: #1e293b;
+  --tone-neutral-fg: #cbd5e1;
+  --tone-info-bg: #1e3a5f;
+  --tone-info-fg: #bfdbfe;
+  --tone-success-bg: #14361f;
+  --tone-success-fg: #bbf7d0;
+  --tone-warning-bg: #422006;
+  --tone-warning-fg: #fde68a;
+  --tone-danger-bg: #450a0a;
+  --tone-danger-fg: #fecaca;
+  --tone-accent-bg: #2e1065;
+  --tone-accent-fg: #ddd6fe;
+  --tone-muted-bg: #1e293b;
+  --tone-muted-fg: #94a3b8;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-focus: var(--focus);
+  --color-tone-neutral-bg: var(--tone-neutral-bg);
+  --color-tone-neutral-fg: var(--tone-neutral-fg);
+  --color-tone-info-bg: var(--tone-info-bg);
+  --color-tone-info-fg: var(--tone-info-fg);
+  --color-tone-success-bg: var(--tone-success-bg);
+  --color-tone-success-fg: var(--tone-success-fg);
+  --color-tone-warning-bg: var(--tone-warning-bg);
+  --color-tone-warning-fg: var(--tone-warning-fg);
+  --color-tone-danger-bg: var(--tone-danger-bg);
+  --color-tone-danger-fg: var(--tone-danger-fg);
+  --color-tone-accent-bg: var(--tone-accent-bg);
+  --color-tone-accent-fg: var(--tone-accent-fg);
+  --color-tone-muted-bg: var(--tone-muted-bg);
+  --color-tone-muted-fg: var(--tone-muted-fg);
+}
+
+@layer base {
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}

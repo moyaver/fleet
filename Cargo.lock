@@ -1126,6 +1126,7 @@ name = "fleet-ui"
 version = "0.0.0"
 dependencies = [
  "fleet-protocol",
+ "leptos",
  "time",
  "uuid",
 ]
@@ -1135,6 +1136,7 @@ name = "fleet-web"
 version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "fleet-ui",
  "leptos",
 ]
 

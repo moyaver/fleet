@@ -58,6 +58,7 @@ fleet-maestro = { path = "crates/fleet-maestro" }
 fleet-protocol = { path = "crates/fleet-protocol" }
 fleet-server = { path = "crates/fleet-server" }
 fleet-store = { path = "crates/fleet-store" }
+fleet-ui = { path = "crates/fleet-ui" }
 fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
