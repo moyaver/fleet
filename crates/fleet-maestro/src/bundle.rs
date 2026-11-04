@@ -115,15 +115,25 @@ pub struct CommandRecord {
 /// What a `commands.json` says.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
-    /// Every command reached a final status.
+    /// Non-empty, and every command has a recognised terminal status ([`TERMINAL_STATUSES`]).
     Final(Vec<CommandRecord>),
     /// Written, but some commands are still `RUNNING` or `PENDING`: the flow was cut short.
     Aborted(Vec<CommandRecord>),
-    /// Empty (Maestro was terminated while writing it).
+    /// Some command has a status that is neither terminal nor in-flight: Maestro drift, so the
+    /// file proves nothing (fail closed, I3).
+    Unverified(Vec<CommandRecord>),
+    /// No commands: a zero-byte file (Maestro was terminated while writing it) or `[]`.
     Empty,
     /// Not valid JSON of the expected shape.
     Invalid,
 }
+
+/// Terminal statuses of a command, as captured in the 2.12.1 fixtures (`COMPLETED`, `FAILED`,
+/// `SKIPPED`, `WARNED`; research 08 §3, research 01 §14).
+pub const TERMINAL_STATUSES: [&str; 4] = ["COMPLETED", "FAILED", "SKIPPED", "WARNED"];
+
+/// In-flight statuses: a command still carrying one means the flow was cut short.
+const IN_FLIGHT_STATUSES: [&str; 2] = ["RUNNING", "PENDING"];
 
 #[derive(Deserialize)]
 struct RawCommand {
@@ -159,13 +169,15 @@ pub fn parse_commands(bytes: &[u8]) -> Commands {
             duration_ms: c.metadata.duration,
         })
         .collect();
-    if records
-        .iter()
-        .any(|r| r.status == "RUNNING" || r.status == "PENDING")
-    {
+    let is = |set: &[&str], r: &CommandRecord| set.contains(&r.status.as_str());
+    if records.is_empty() {
+        Commands::Empty
+    } else if records.iter().any(|r| is(&IN_FLIGHT_STATUSES, r)) {
         Commands::Aborted(records)
-    } else {
+    } else if records.iter().all(|r| is(&TERMINAL_STATUSES, r)) {
         Commands::Final(records)
+    } else {
+        Commands::Unverified(records)
     }
 }
 
@@ -223,6 +235,37 @@ mod tests {
         let running = br#"[{"metadata":{"status":"RUNNING","sequenceNumber":3,"depth":1}}]"#;
         assert!(matches!(parse_commands(running), Commands::Aborted(_)));
         assert_eq!(parse_commands(b""), Commands::Empty);
+        for status in TERMINAL_STATUSES {
+            let one =
+                format!(r#"[{{"metadata":{{"status":"{status}","sequenceNumber":0,"depth":0}}}}]"#);
+            assert!(matches!(parse_commands(one.as_bytes()), Commands::Final(_)));
+        }
         assert_eq!(parse_commands(b"[{\"metadata\":"), Commands::Invalid);
+    }
+
+    #[test]
+    fn commands_files_fail_closed() {
+        // An empty array proves nothing.
+        assert_eq!(parse_commands(b"[]"), Commands::Empty);
+        assert_eq!(parse_commands(b" [ ] \n"), Commands::Empty);
+        // An unknown status is never final.
+        let error = br#"[{"metadata":{"status":"ERROR","sequenceNumber":0,"depth":0}}]"#;
+        assert!(matches!(parse_commands(error), Commands::Unverified(_)));
+        // One unknown entry among completed ones taints the file.
+        let mixed = br#"[{"metadata":{"status":"COMPLETED","sequenceNumber":0,"depth":0}},
+            {"metadata":{"status":"completed","sequenceNumber":1,"depth":0}}]"#;
+        assert!(matches!(parse_commands(mixed), Commands::Unverified(_)));
+        let blank = br#"[{"metadata":{"status":"","sequenceNumber":0,"depth":0}}]"#;
+        assert!(matches!(parse_commands(blank), Commands::Unverified(_)));
+        // A missing status, metadata or non-array shape is invalid.
+        let no_status = br#"[{"metadata":{"sequenceNumber":0,"depth":0}}]"#;
+        assert_eq!(parse_commands(no_status), Commands::Invalid);
+        assert_eq!(parse_commands(b"[{}]"), Commands::Invalid);
+        assert_eq!(parse_commands(b"null"), Commands::Invalid);
+        assert_eq!(parse_commands(b"{}"), Commands::Invalid);
+        // In-flight beats unknown: the flow was cut short.
+        let cut = br#"[{"metadata":{"status":"ERROR","sequenceNumber":0,"depth":0}},
+            {"metadata":{"status":"RUNNING","sequenceNumber":1,"depth":0}}]"#;
+        assert!(matches!(parse_commands(cut), Commands::Aborted(_)));
     }
 }

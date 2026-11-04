@@ -277,6 +277,15 @@ impl Replay {
                         contents: Some(bytes),
                     },
                 ));
+                if e.path().join("manifest.json").exists() {
+                    timeline.push((
+                        0,
+                        Observation::File {
+                            rel: format!("{name}/manifest.json"),
+                            contents: None,
+                        },
+                    ));
+                }
             }
         }
         let report = [dir.join("report.xml"), debug.join("report.xml")]

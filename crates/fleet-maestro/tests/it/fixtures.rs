@@ -142,6 +142,7 @@ fn parse_bundles(debug: &Path) -> Value {
             Ok(b) => match bundle::parse_commands(&b) {
                 bundle::Commands::Final(v) => format!("final({})", v.len()),
                 bundle::Commands::Aborted(v) => format!("aborted({})", v.len()),
+                bundle::Commands::Unverified(v) => format!("unverified({})", v.len()),
                 bundle::Commands::Empty => "empty".into(),
                 bundle::Commands::Invalid => "invalid".into(),
             },

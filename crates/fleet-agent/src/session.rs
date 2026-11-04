@@ -68,6 +68,11 @@ pub(crate) struct Flow {
     pub(crate) steps: u32,
     open_step: Option<u32>,
     pub(crate) failure: Option<String>,
+    /// The flow's `manifest.json` appeared: Maestro finished writing the bundle.
+    manifest_seen: bool,
+    /// A fully terminal, failure-free `commands.json` waiting for the manifest before it may
+    /// claim `passed` (I3).
+    pending_pass: Option<String>,
 }
 
 impl Flow {
@@ -432,40 +437,27 @@ impl Session {
                 let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
                     return;
                 };
-                match bundle::parse_commands(bytes) {
-                    bundle::Commands::Final(cmds) => {
-                        let failed = cmds.iter().any(|c| c.depth == 0 && c.status == "FAILED");
-                        let outcome = if failed {
-                            FlowOutcome::Failed
-                        } else {
-                            FlowOutcome::Passed
-                        };
-                        let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
-                        self.claim(
-                            at,
-                            idx,
-                            SourceKind::ArtifactFile,
-                            outcome,
-                            None,
-                            None,
-                            parser,
-                        );
-                    }
-                    bundle::Commands::Aborted(_)
-                    | bundle::Commands::Empty
-                    | bundle::Commands::Invalid => {
-                        let subject = self.flow_subject_at(idx);
-                        self.emit(
-                            at,
-                            subject,
-                            SourceKind::ArtifactFile,
-                            None,
-                            &EventBody::AgentWarning(AgentWarning {
-                                code: "commands_not_final".into(),
-                                message: format!("{rel} is incomplete: the flow was cut short"),
-                            }),
-                        );
-                    }
+                self.on_commands(at, rel, idx, bytes);
+            }
+            bundle::Entry::Manifest { flow_dir } => {
+                let (name, shard) = bundle::split_shard_suffix(&flow_dir);
+                let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
+                    return;
+                };
+                let pending = self.flows.get_mut(idx).and_then(|f| {
+                    f.manifest_seen = true;
+                    f.pending_pass.take()
+                });
+                if let Some(parser) = pending {
+                    self.claim(
+                        at,
+                        idx,
+                        SourceKind::ArtifactFile,
+                        FlowOutcome::Passed,
+                        None,
+                        None,
+                        parser,
+                    );
                 }
             }
             bundle::Entry::StepScreenshot { flow_dir, .. }
@@ -490,9 +482,66 @@ impl Session {
                     );
                 }
             }
-            bundle::Entry::FlowDir { .. }
-            | bundle::Entry::Manifest { .. }
-            | bundle::Entry::Other => {}
+            bundle::Entry::FlowDir { .. } | bundle::Entry::Other => {}
+        }
+    }
+
+    /// Turns a flow's `commands.json` into a claim or a warning (fail closed, I3).
+    fn on_commands(&mut self, at: ClockSample, rel: &str, idx: usize, bytes: &[u8]) {
+        match bundle::parse_commands(bytes) {
+            bundle::Commands::Final(cmds) => {
+                let failed = cmds.iter().any(|c| c.depth == 0 && c.status == "FAILED");
+                let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
+                if failed {
+                    // Failure evidence needs no completion proof.
+                    self.claim(
+                        at,
+                        idx,
+                        SourceKind::ArtifactFile,
+                        FlowOutcome::Failed,
+                        None,
+                        None,
+                        parser,
+                    );
+                } else if self.flows.get(idx).is_some_and(|f| f.manifest_seen) {
+                    self.claim(
+                        at,
+                        idx,
+                        SourceKind::ArtifactFile,
+                        FlowOutcome::Passed,
+                        None,
+                        None,
+                        parser,
+                    );
+                } else if let Some(f) = self.flows.get_mut(idx) {
+                    // Wait for the manifest: without it the flow may have been cut short.
+                    f.pending_pass = Some(parser);
+                }
+            }
+            other => {
+                let (code, why) = match other {
+                    bundle::Commands::Unverified(_) => (
+                        "commands_unknown_status",
+                        "has a command status Fleet does not recognise",
+                    ),
+                    bundle::Commands::Empty => ("commands_not_final", "has no commands"),
+                    _ => (
+                        "commands_not_final",
+                        "is incomplete: the flow was cut short",
+                    ),
+                };
+                let subject = self.flow_subject_at(idx);
+                self.emit(
+                    at,
+                    subject,
+                    SourceKind::ArtifactFile,
+                    None,
+                    &EventBody::AgentWarning(AgentWarning {
+                        code: code.into(),
+                        message: format!("{rel} {why}"),
+                    }),
+                );
+            }
         }
     }
 
@@ -778,6 +827,8 @@ impl Session {
             steps: 0,
             open_step: None,
             failure: None,
+            manifest_seen: false,
+            pending_pass: None,
         });
         self.flows.len() - 1
     }
@@ -873,4 +924,113 @@ fn stem(path: &str) -> String {
 /// Maestro's folder-name sanitising: `/` becomes `_`.
 fn sanitize(name: &str) -> String {
     name.replace('/', "_")
+}
+
+#[cfg(test)]
+mod tests {
+    use time::OffsetDateTime;
+
+    use super::*;
+
+    const GOOD: &[u8] = br#"[{"metadata":{"status":"COMPLETED","sequenceNumber":0,"depth":0}}]"#;
+    const FAILED: &[u8] = br#"[{"metadata":{"status":"FAILED","sequenceNumber":0,"depth":0}}]"#;
+
+    fn at() -> ClockSample {
+        ClockSample {
+            wall: OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }
+    }
+
+    /// A session with one flow `pass` that Maestro printed no result for yet.
+    fn session() -> Session {
+        let mut n = 0u128;
+        let ids: IdGen = Box::new(move || {
+            n += 1;
+            Uuid::from_u128(n)
+        });
+        let mut s = Session::new(
+            &["maestro".into(), "test".into()],
+            Redactor::new([]),
+            ids,
+            at(),
+        );
+        s.start_flow(1, "pass");
+        s
+    }
+
+    fn file(s: &mut Session, rel: &str, contents: Option<&[u8]>) {
+        s.observe(
+            at(),
+            Observation::File {
+                rel: rel.into(),
+                contents: contents.map(<[u8]>::to_vec),
+            },
+        );
+    }
+
+    fn artifact_outcomes(s: &Session) -> Vec<FlowOutcome> {
+        s.flows[0]
+            .claims
+            .iter()
+            .filter(|c| c.source() == SourceKind::ArtifactFile)
+            .map(Claim::outcome)
+            .collect()
+    }
+
+    fn warnings(s: &mut Session) -> Vec<String> {
+        s.drain()
+            .into_iter()
+            .filter(|e| e.kind == "agent.warning")
+            .filter_map(|e| e.data["code"].as_str().map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn nothing_but_a_terminal_commands_file_with_a_manifest_passes() {
+        for bad in [
+            &b"[]"[..],
+            b"",
+            br#"[{"metadata":{"status":"ERROR","sequenceNumber":0,"depth":0}}]"#,
+            br#"[{"metadata":{"sequenceNumber":0,"depth":0}}]"#,
+            br#"[{"metadata":{"status":"RUNNING","sequenceNumber":0,"depth":0}}]"#,
+        ] {
+            let mut s = session();
+            file(&mut s, "pass/commands.json", Some(bad));
+            file(&mut s, "pass/manifest.json", None);
+            assert!(artifact_outcomes(&s).is_empty(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn unknown_status_is_reported_as_drift() {
+        let mut s = session();
+        let bad = br#"[{"metadata":{"status":"ERROR","sequenceNumber":0,"depth":0}}]"#;
+        file(&mut s, "pass/commands.json", Some(bad));
+        assert!(warnings(&mut s).contains(&"commands_unknown_status".to_owned()));
+    }
+
+    #[test]
+    fn a_valid_commands_file_needs_the_manifest_to_pass() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(GOOD));
+        assert!(artifact_outcomes(&s).is_empty(), "no manifest yet");
+        file(&mut s, "pass/manifest.json", None);
+        assert_eq!(artifact_outcomes(&s), [FlowOutcome::Passed]);
+    }
+
+    #[test]
+    fn a_manifest_seen_first_also_passes() {
+        let mut s = session();
+        file(&mut s, "pass/manifest.json", None);
+        file(&mut s, "pass/commands.json", Some(GOOD));
+        assert_eq!(artifact_outcomes(&s), [FlowOutcome::Passed]);
+    }
+
+    #[test]
+    fn failure_needs_no_manifest() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(FAILED));
+        assert_eq!(artifact_outcomes(&s), [FlowOutcome::Failed]);
+    }
 }
