@@ -17,6 +17,7 @@
 //! own (the batch is retried event by event under savepoints), so a bad event never wedges
 //! ingestion.
 
+mod analytics;
 mod apply;
 pub(crate) mod derive;
 #[cfg(test)]

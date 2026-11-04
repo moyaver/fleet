@@ -21,7 +21,7 @@ use sqlx::PgConnection;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use super::{EntityRef, RunHandle, derive, to_i64, valid_agent_id};
+use super::{EntityRef, RunHandle, analytics, derive, to_i64, valid_agent_id};
 
 /// What became of one event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,6 +171,8 @@ impl<'a> Ctx<'a> {
         for id in derive::flows(tx, &resolve).await? {
             self.changed.insert(EntityRef::Flow(id));
         }
+        // Whatever this batch touched may have become a final pass or failure.
+        analytics::finalize_flows(tx, &resolve).await?;
         if !resolve.is_empty() {
             let suites = sqlx::query_scalar!(
                 "SELECT DISTINCT suite_execution_id FROM flow_executions WHERE id = ANY($1)",

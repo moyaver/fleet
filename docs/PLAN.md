@@ -455,8 +455,8 @@ Upload is relayed through the server by default; presigned direct upload is opti
 | `0004_journal` | `agent_events` (partitioned by `run_day`), `ingest_gaps`, `ingest_rejections` |
 | `0005_telemetry` | `host_samples`, `device_samples` (partitioned by time), `host_rollup_1m`, `host_rollup_1h`, `device_rollup_*` |
 | `0006_run_evidence` | `agent_runs.evidence` (jsonb: the run's evidence sources, from `run.started`) |
-| `0007_artifacts` | `blobs` (project, sha256), `artifacts`, `retention_classes`, `jobs_queue` |
-| `0008_analytics` | `condition_fingerprints`, `failure_fingerprints`, flaky views |
+| `0007_analytics` | `condition_fingerprints`, `failure_fingerprints`, flaky views |
+| `0008_artifacts` | `blobs` (project, sha256), `artifacts`, `retention_classes`, `jobs_queue` |
 
 **Retention:** 7 d raw 5 s samples; 90 d at 1 min; 1 y for hourly and daily aggregates. The raw journal is kept 14 d. All of it is configurable.
 

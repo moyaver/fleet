@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions SET condition_fingerprint_id = $2\n          WHERE id = $1 AND condition_fingerprint_id IS DISTINCT FROM $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7c009b8446b05823625828f706a6d272029964924848b431d8ffe5d2eca6d68c"
+}

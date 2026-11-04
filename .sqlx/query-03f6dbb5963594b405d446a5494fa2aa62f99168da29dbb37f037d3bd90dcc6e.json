@@ -1,0 +1,147 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.id, f.project_id, f.state, f.finality::text AS \"finality!\", f.failure_message,\n                coalesce(d.repo_path, f.flow_name) AS \"flow!\",\n                (SELECT s.label FROM step_executions s\n                  WHERE s.flow_execution_id = f.id AND s.run_day = r.run_day\n                    AND s.status = 'failed'\n                  ORDER BY s.step_index LIMIT 1) AS failed_step,\n                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider,\n                coalesce(dp.model, dp.avd_or_runtime) AS device_model, dp.api_level AS \"api_level?\",\n                (SELECT h.host_mem_total_bytes FROM host_samples h\n                  WHERE h.agent_run_id = f.agent_run_id AND h.host_mem_total_bytes IS NOT NULL\n                  ORDER BY h.ts DESC LIMIT 1) AS host_memory\n           FROM flow_executions f\n           JOIN agent_runs r ON r.id = f.agent_run_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n           JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n           JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n           LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n           LEFT JOIN device_sessions ds ON ds.id = f.device_session_id\n           LEFT JOIN device_profiles dp ON dp.id = ds.profile_id\n          WHERE f.id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "finality!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "failure_message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "failure_message"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "flow!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "failed_step",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "os?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "os"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "arch?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "arch"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "device_model",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "api_level?",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "device_profiles",
+            "name": "api_level"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "host_memory",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      true,
+      null,
+      null,
+      true,
+      true,
+      false,
+      null,
+      true,
+      null
+    ]
+  },
+  "hash": "03f6dbb5963594b405d446a5494fa2aa62f99168da29dbb37f037d3bd90dcc6e"
+}

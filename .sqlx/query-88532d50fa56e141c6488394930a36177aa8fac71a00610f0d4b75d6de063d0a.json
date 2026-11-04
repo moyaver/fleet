@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM failure_fingerprints WHERE flow_execution_id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "88532d50fa56e141c6488394930a36177aa8fac71a00610f0d4b75d6de063d0a"
+}

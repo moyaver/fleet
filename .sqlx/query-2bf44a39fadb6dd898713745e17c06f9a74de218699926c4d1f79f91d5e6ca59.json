@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.flow_name, f.condition_fingerprint_id AS id, c.dims AS \"dims?\"\n               FROM flow_executions f\n               LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n              ORDER BY f.started_at, f.flow_name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "condition_fingerprint_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "dims?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "condition_fingerprints",
+            "name": "dims"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "2bf44a39fadb6dd898713745e17c06f9a74de218699926c4d1f79f91d5e6ca59"
+}

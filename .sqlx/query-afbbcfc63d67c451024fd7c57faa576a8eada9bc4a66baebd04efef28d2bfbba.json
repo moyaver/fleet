@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT flow AS \"flow!\", state AS \"state!\", outcome_source::text AS \"source!\",\n                    finality::text AS \"finality!\", is_default_branch AS \"default!\",\n                    condition_fingerprint AS \"condition!\"\n               FROM flaky_history ORDER BY flow",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flaky_history",
+            "name": "flow"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "state!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flaky_history",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "source!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "finality!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "default!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "flaky_history",
+            "name": "is_default_branch"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "condition!",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "flaky_history",
+            "name": "condition_fingerprint"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      null,
+      null,
+      true,
+      true
+    ]
+  },
+  "hash": "afbbcfc63d67c451024fd7c57faa576a8eada9bc4a66baebd04efef28d2bfbba"
+}

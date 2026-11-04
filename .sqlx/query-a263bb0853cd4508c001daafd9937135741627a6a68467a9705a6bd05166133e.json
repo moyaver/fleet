@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO failure_fingerprints (flow_execution_id, project_id, fingerprint,\n                                           step_kind, message)\n         VALUES ($1, $2, $3, $4, $5)\n         ON CONFLICT (flow_execution_id) DO UPDATE\n           SET fingerprint = EXCLUDED.fingerprint, step_kind = EXCLUDED.step_kind,\n               message = EXCLUDED.message, computed_at = now()\n         WHERE (failure_fingerprints.fingerprint, failure_fingerprints.step_kind,\n                failure_fingerprints.message)\n               IS DISTINCT FROM (EXCLUDED.fingerprint, EXCLUDED.step_kind, EXCLUDED.message)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a263bb0853cd4508c001daafd9937135741627a6a68467a9705a6bd05166133e"
+}

@@ -9,10 +9,11 @@ use fleet_protocol::{
     event::{
         ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted,
         JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
-        RunEnded, RunStarted, ShardAssigned, ShardMode, SuiteStarted,
+        RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
+        SuiteStarted,
     },
     frame::{AgentInfo, CiContext, ProtocolRange, ResumeState},
-    journal::{ClockSample, Provenance, SourceKind, Subject},
+    journal::{ClockSample, Provenance, SourceKind, StepRef, Subject},
 };
 use sqlx::PgPool;
 
@@ -128,11 +129,38 @@ impl SuiteIds {
 }
 
 /// A whole run of `flows` (name, passed?) on one device, ending normally.
-#[expect(clippy::too_many_lines, reason = "one straight-line event script")]
 pub(crate) fn suite_run(
     a: &mut Agent,
     ids: SuiteIds,
     flows: &[(&str, bool)],
+) -> Vec<EventEnvelope> {
+    let scripts: Vec<Script<'_>> = flows
+        .iter()
+        .map(|(name, passed)| Script {
+            name,
+            failure: (!passed).then_some("Assertion is false"),
+            failed_step: None,
+        })
+        .collect();
+    suite_run_scripted(a, ids, &scripts)
+}
+
+/// One flow of a scripted run: how it ends.
+#[derive(Clone, Copy)]
+pub(crate) struct Script<'a> {
+    pub(crate) name: &'a str,
+    /// `None` passes; `Some(message)` fails with that message.
+    pub(crate) failure: Option<&'a str>,
+    /// The description of the step that failed, when the script has one.
+    pub(crate) failed_step: Option<&'a str>,
+}
+
+/// A whole run of scripted flows on one device, ending normally.
+#[expect(clippy::too_many_lines, reason = "one straight-line event script")]
+pub(crate) fn suite_run_scripted(
+    a: &mut Agent,
+    ids: SuiteIds,
+    flows: &[Script<'_>],
 ) -> Vec<EventEnvelope> {
     let mut out = vec![
         a.event(
@@ -160,16 +188,17 @@ pub(crate) fn suite_run(
                 device_serial: "emulator-5554".into(),
                 planned: flows
                     .iter()
-                    .map(|(n, _)| FlowRef {
-                        name: (*n).into(),
-                        path: Some(format!("flows/{n}.yaml")),
+                    .map(|s| FlowRef {
+                        name: s.name.into(),
+                        path: Some(format!("flows/{}.yaml", s.name)),
                     })
                     .collect(),
             }),
         ),
     ];
     let mut flow_ids = Vec::new();
-    for (i, (name, passed)) in flows.iter().enumerate() {
+    for (i, s) in flows.iter().enumerate() {
+        let (name, passed) = (s.name, s.failure.is_none());
         let f = Uuid::now_v7();
         flow_ids.push(f);
         out.push(a.event(
@@ -177,31 +206,49 @@ pub(crate) fn suite_run(
             SourceKind::DebugLog,
             &EventBody::FlowStarted(FlowStarted {
                 flow: FlowRef {
-                    name: (*name).into(),
+                    name: name.into(),
                     path: Some(format!("flows/{name}.yaml")),
                 },
                 shard_number: 1,
                 ordinal: u32::try_from(i).unwrap(),
             }),
         ));
+        if let Some(step) = s.failed_step {
+            let subject = Subject {
+                step: Some(StepRef { index: 0 }),
+                ..ids.flow(f)
+            };
+            out.push(a.event(
+                subject.clone(),
+                SourceKind::LiveConsole,
+                &EventBody::StepStarted(StepStarted {
+                    description: step.into(),
+                }),
+            ));
+            out.push(a.event(
+                subject,
+                SourceKind::LiveConsole,
+                &EventBody::StepEnded(StepEnded {
+                    status: StepStatus::Failed,
+                }),
+            ));
+        }
         out.push(a.event(
             ids.flow(f),
             SourceKind::LiveConsole,
             &EventBody::FlowEnded(FlowEnded {
-                outcome: if *passed {
+                outcome: if passed {
                     FlowOutcome::Passed
                 } else {
                     FlowOutcome::Failed
                 },
                 duration_ms: Some(1000),
-                failure: (!passed).then(|| FailureInfo {
-                    message: "Assertion is false".into(),
-                }),
+                failure: s.failure.map(|m| FailureInfo { message: m.into() }),
                 flow: None,
             }),
         ));
     }
-    let all_passed = flows.iter().all(|(_, p)| *p);
+    let all_passed = flows.iter().all(|s| s.failure.is_none());
     out.push(a.event(
         ids.suite(),
         SourceKind::ProcessExit,
@@ -222,10 +269,11 @@ pub(crate) fn suite_run(
             status: ReportStatus::Complete,
             suites: 1,
             tests: u32::try_from(flows.len()).unwrap(),
-            failures: u32::try_from(flows.iter().filter(|(_, p)| !p).count()).unwrap(),
+            failures: u32::try_from(flows.iter().filter(|s| s.failure.is_some()).count()).unwrap(),
         }),
     ));
-    for (i, ((name, passed), f)) in flows.iter().zip(&flow_ids).enumerate() {
+    for (i, (s, f)) in flows.iter().zip(&flow_ids).enumerate() {
+        let (name, passed) = (s.name, s.failure.is_none());
         out.push(a.event(
             ids.flow(*f),
             SourceKind::JunitFinal,
@@ -234,15 +282,15 @@ pub(crate) fn suite_run(
                 testcase_index: u32::try_from(i).unwrap(),
                 matched: MatchMethod::Positional,
                 junit: JunitTestcase {
-                    id: Some((*name).into()),
-                    name: (*name).into(),
+                    id: Some(name.into()),
+                    name: name.into(),
                     file: Some(format!("flows/{name}.yaml")),
                     time_ms: Some(1000),
                     timestamp_local: None,
-                    status: Some(if *passed { "SUCCESS" } else { "ERROR" }.into()),
-                    failure: (!passed).then(|| "Assertion is false".into()),
+                    status: Some(if passed { "SUCCESS" } else { "ERROR" }.into()),
+                    failure: s.failure.map(Into::into),
                 },
-                outcome: if *passed {
+                outcome: if passed {
                     FlowOutcome::Passed
                 } else {
                     FlowOutcome::Failed
