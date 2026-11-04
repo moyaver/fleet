@@ -33,8 +33,6 @@ const TIMESTAMP: &str = "<ts>";
 const ADDRESS: &str = "<addr>";
 /// Placeholder for an emulator serial.
 const SERIAL: &str = "<serial>";
-/// Placeholder for a file system path.
-const PATH: &str = "<path>";
 /// Placeholder for a duration.
 const DURATION: &str = "<dur>";
 /// Placeholder for any number or numeric identifier, hexadecimal ones included: an id that
@@ -49,7 +47,7 @@ const BARE_HEX: &str = r"\b[0-9a-fA-F]{8,}\b";
 const RULES: &[(&str, &str)] = &[
     // Paths first: they hold UUIDs, dates and `1s`-like names that must not be cut out of them.
     (UNIX_PATH, "${1}<path>"),
-    (r#"\b[A-Za-z]:\\[^\s"'()<>]+"#, PATH),
+    (DRIVE_PATH, "${1}<path>"),
     (
         r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
         UUID,
@@ -69,6 +67,9 @@ const RULES: &[(&str, &str)] = &[
     ),
 ];
 
+/// A Windows path (`C:\x`) starts a token too. Not at a `\b`: a digit before the drive letter
+/// becomes `<n>`, and its `>` would open a boundary for this rule on the second pass.
+const DRIVE_PATH: &str = r#"(^|[\s"'(=\[])[A-Za-z]:\\[^\s"'()<>]+"#;
 /// A path starts a token: after whitespace, a quote, a bracket or `=`.
 const UNIX_PATH: &str = r#"(^|[\s"'(=\[])~?/[^\s"'()<>]+"#;
 /// A leading `[shard N]`, which Maestro adds when the suite is sharded.
@@ -448,6 +449,13 @@ mod tests {
             d.message
                 .starts_with("maestro.android.DeviceServerDiedException:")
         );
+    }
+
+    #[test]
+    fn a_placeholder_never_makes_a_drive_letter_path_appear() {
+        // `0` becomes `<n>`, which used to leave `A:\¡` at a word boundary for the path rule.
+        let once = normalize_failure_message("0A:\\¡");
+        assert_eq!(normalize_failure_message(&once), once);
     }
 
     mod properties {

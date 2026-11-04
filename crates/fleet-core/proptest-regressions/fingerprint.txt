@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 91ad8b4a148399697834d51383f16bf76dbfc784d45f8a9c253d692a50cd5917 # shrinks to raw = "0A:\\*", v = Volatile { serial: "emulator-0000", millis: "0", uuid: "000a0a0a-0aa0-0000-aaa0-aaaaa000aaaa", path: "/_/-", at: "2000-01-01T00:00:00Z", ip: "0.0.0.0", port: "00", hex: "0a0aa0aa", count: "0", order: "000", shard: "1" }
