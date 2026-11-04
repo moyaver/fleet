@@ -12,7 +12,7 @@ Maestro's `--shard-split` spreads flows across emulators on **one machine**. Spr
   3. estimates each unit's duration from Fleet history (per-flow p50, with p90 as a tie-breaker), falling back to supplied estimates or an even split when there's no history;
   4. allocates **Longest Processing Time first** across N shards;
   5. writes an **immutable assignment manifest** and a GitHub Actions matrix, and publishes the manifest to the server.
-- **The agent** runs a shard of a plan (`--plan <manifest> --shard <id>`), passes exactly those flows to Maestro, and reports the plan ID and planned flows before Maestro starts.
+- **The agent** runs a shard of a plan (`--plan <manifest> --shard <id>`), passes exactly those flows to Maestro (a command that already names flow paths is refused, exit 2), and reports the plan ID and planned flows before Maestro starts.
 - **The server** stores plans, links agent runs to their shard, and shows planned totals before any job starts and **planned vs actual** per shard afterwards.
 - **Static only.** A dynamic work queue (leases, idle runners pulling work) is orchestration and stays out of v1, unless measurements show static sharding falls short.
 - Two emulators per runner (planner across machines, `--shard-split` within one) is supported but not recommended until benchmarked: research 08 showed two emulators already stress a 16 GiB host.

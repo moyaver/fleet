@@ -32,6 +32,8 @@ pub struct Invocation {
     pub shard_mode: Option<ShardMode>,
     /// Shard count.
     pub shards: u32,
+    /// Flow files or directories given after `test` (not flags, not flag values).
+    pub positionals: Vec<String>,
 }
 
 /// Options of `maestro` and `maestro test` that take a value (so the value isn't a flow path).
@@ -58,6 +60,8 @@ const VALUE_OPTIONS: &[&str] = &[
     "--api-url",
     "--api-key",
     "--app-file",
+    "-s",
+    "--screen-size",
 ];
 
 /// Reads a `maestro …` argv (`argv[0]` is the program).
@@ -93,13 +97,20 @@ pub fn parse(argv: &[String]) -> Invocation {
             "--debug-output" => inv.debug_output.clone_from(&value),
             "--test-output-dir" => inv.test_output_dir.clone_from(&value),
             "--flatten-debug-output" => inv.flatten = true,
-            "--shard-split" | "--shards" => {
+            "--shard-split" | "--shards" | "-s" => {
                 inv.shard_mode = Some(ShardMode::Split);
                 inv.shards = value.as_deref().and_then(|v| v.parse().ok()).unwrap_or(1);
             }
             "--shard-all" => {
                 inv.shard_mode = Some(ShardMode::All);
                 inv.shards = value.as_deref().and_then(|v| v.parse().ok()).unwrap_or(1);
+            }
+            "--" if inv.test_index.is_some() => {
+                inv.positionals.extend(argv.iter().skip(i + 1).cloned());
+                break;
+            }
+            _ if inv.test_index.is_some() && !arg.starts_with('-') => {
+                inv.positionals.push(arg.clone());
             }
             _ => {}
         }
@@ -207,6 +218,26 @@ mod tests {
         assert_eq!(i.devices, ["A", "B"]);
         assert_eq!((i.shard_mode, i.shards), (Some(ShardMode::Split), 2));
         assert_eq!(i.output.as_deref(), Some("r.xml"));
+    }
+
+    #[test]
+    fn finds_flow_paths_but_not_option_values() {
+        let i = parse(&argv(
+            "maestro --device emulator-5554 test --device=B -e A=B --config c.yaml --format junit --output out/r.xml --debug-output dbg -s 2 --headless a.yaml flows/",
+        ));
+        assert_eq!(i.positionals, ["a.yaml", "flows/"]);
+        let i = parse(&argv("maestro test --include-tags smoke -- x.yaml"));
+        assert_eq!(i.positionals, ["x.yaml"], "everything after -- is a path");
+        assert_eq!(
+            parse(&argv("maestro test --device d -e K=V"))
+                .positionals
+                .len(),
+            0
+        );
+        assert!(
+            parse(&argv("maestro login.yaml")).positionals.is_empty(),
+            "no test"
+        );
     }
 
     #[test]

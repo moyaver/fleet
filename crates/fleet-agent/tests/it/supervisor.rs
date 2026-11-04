@@ -200,3 +200,36 @@ fn a_grandchild_holding_the_pipe_does_not_delay_the_exit() {
     assert!(t.elapsed() < Duration::from_secs(10), "{:?}", t.elapsed());
     thread::sleep(Duration::from_millis(10));
 }
+
+#[test]
+fn a_plan_with_flow_paths_is_refused_and_maestro_never_starts() {
+    let dir = std::env::temp_dir().join(format!("fleet-plan-it-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let plan = dir.join("plan.json");
+    std::fs::write(
+        &plan,
+        r#"{"planId":"p1","totalFlows":1,"shards":[{"id":0,"flows":["a.yaml"]}]}"#,
+    )
+    .unwrap();
+    let marker = dir.join("started");
+    let fake = dir.join("maestro");
+    std::fs::write(&fake, format!("#!/bin/sh\ntouch {}\n", marker.display())).unwrap();
+    std::fs::set_permissions(&fake, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let out = agent()
+        .args(["run", "--plan"])
+        .arg(&plan)
+        .args(["--shard", "0", "--"])
+        .arg(&fake)
+        .args(["test", ".maestro/"])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains(".maestro/") && err.contains("Remove the flow paths"),
+        "{err}"
+    );
+    assert!(!marker.exists(), "maestro must not be started");
+    std::fs::remove_dir_all(&dir).ok();
+}

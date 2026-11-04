@@ -72,6 +72,26 @@ pub(crate) fn prepare(
             ..unchanged
         });
     }
+    if let Some(p) = &plan {
+        let given = fleet_maestro::invocation::parse(&argv).positionals;
+        if !given.is_empty() {
+            return Err(PlanError(format!(
+                "--plan runs shard {} of plan {} ({} flows), but the command already names {}: {}. \
+                 Maestro would run those as well as the shard's flows, so the shard would run more than it was assigned. \
+                 Remove the flow paths from the command; the plan supplies the flows, e.g. `fleet-agent run --plan <plan> --shard {} -- maestro test`",
+                p.shard_id,
+                p.plan_id,
+                p.flows.len(),
+                if given.len() == 1 {
+                    "a flow path"
+                } else {
+                    "flow paths"
+                },
+                given.join(", "),
+                p.shard_id,
+            )));
+        }
+    }
     let run_dir = Some(run_dir.map_or_else(default_run_dir, Path::to_path_buf))
         .filter(|d| std::fs::create_dir_all(d).is_ok());
     let p = match &run_dir {
@@ -194,6 +214,42 @@ mod tests {
                 |_| false
             )
             .is_err()
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn plans_refuse_flow_paths_but_accept_options() {
+        let path = std::env::temp_dir().join(format!("fleet-plan-pos-{}.json", std::process::id()));
+        std::fs::write(
+            &path,
+            r#"{"planId":"p1","totalFlows":2,"shards":[{"id":0,"flows":["a.yaml"]}]}"#,
+        )
+        .unwrap();
+        let run = |cmd: &str| prepare(&os(cmd), false, None, Some((&path, 0)), |_| false);
+        for cmd in [
+            "maestro test .maestro/",
+            "maestro test --device d x.yaml",
+            "maestro test -- x.yaml",
+        ] {
+            let e = run(cmd).unwrap_err().0;
+            assert!(
+                e.contains("Remove the flow paths") && e.contains("p1"),
+                "{e}"
+            );
+        }
+        let p = run("maestro --device emulator-5554 test -e A=b/c.yaml --config cfg/c.yaml --output out/r.xml --format junit")
+            .unwrap();
+        let args: Vec<_> = p
+            .argv
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args.last().map(String::as_str), Some("a.yaml"));
+        assert_eq!(
+            args.iter().filter(|a| a.contains(".y")).count(),
+            3,
+            "only the option values and the shard flow"
         );
         std::fs::remove_file(&path).ok();
     }

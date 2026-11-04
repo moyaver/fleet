@@ -58,13 +58,13 @@ The server ignores events it already has, so flushing twice is safe.
 
 ## Fleet Planner shards
 
-To run one shard of a [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md), give the manifest and the shard. The shard's flows are added to the command:
+To run one shard of a [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md), give the manifest and the shard. The shard's flows are the only flows the command runs, so don't name any flow paths yourself:
 
 ```bash
 fleet-agent run --plan plan.json --shard 2 -- maestro test
 ```
 
-A plan that can't be read stops the step (exit 2) rather than running the whole suite on every shard.
+A plan that can't be read stops the step (exit 2) rather than running the whole suite on every shard. So does a command that already names flow files or directories (`maestro test .maestro/`): Maestro would run those too. Maestro options such as `--device` and `-e` are fine.
 
 ## Example workflow
 
