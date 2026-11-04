@@ -4,7 +4,7 @@ description = "The Leptos CSR dashboard, built by Trunk into dist/."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license-file.workspace = true
+license.workspace = true
 publish.workspace = true
 repository.workspace = true
 

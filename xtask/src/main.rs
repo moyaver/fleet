@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `cargo xtask`: repository tooling. See PLAN §11.1.
 
 mod lint;

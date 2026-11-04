@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! `fleet-agent`: the CI agent. See PLAN §6. Work starts in M2.
 
 fn main() {

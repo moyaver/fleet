@@ -4,7 +4,7 @@ description = "Postgres repositories, ingest transaction, partitions, rollups an
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license-file.workspace = true
+license.workspace = true
 publish.workspace = true
 repository.workspace = true
 

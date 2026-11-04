@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Protocol load generator. See PLAN §13. Work starts in M3.
 
 fn main() {

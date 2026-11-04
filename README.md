@@ -1,7 +1,7 @@
 # Fleet
 
 [![CI](https://github.com/moyaver/fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/moyaver/fleet/actions/workflows/ci.yml)
-[![License: PolyForm Internal Use 1.0.0](https://img.shields.io/badge/license-PolyForm%20Internal%20Use%201.0.0-blue)](LICENSING.md)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 
 Self-hosted, live observability for mobile UI tests running in CI, starting with [Maestro](https://github.com/mobile-dev-inc/maestro).
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
@@ -39,8 +39,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 
 - [x] Repository on the owner's personal account, private until the owner makes it public
 - [x] Spec, plan, ADRs and research imported unchanged
-- [x] `LICENSE.md` (PolyForm Internal Use 1.0.0, verbatim + Required Notice), `LICENSING.md`, `CLA.md`, `CLA-CORPORATE.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, verbatim), `SECURITY.md`, `FUNDING.yml`
-- [x] Workspace skeleton: every crate compiles, SPDX headers, `publish = false`, `license-file`, workspace lints
+- [x] `LICENSE` (GNU AGPL v3, verbatim; [ADR-0012](docs/decisions/0012-agpl-license.md)), `LICENSING.md`, `CLA.md`, `CLA-CORPORATE.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, verbatim), `SECURITY.md`, `FUNDING.yml`
+- [x] Workspace skeleton: every crate compiles, SPDX headers, `publish = false`, `license`, workspace lints
 - [x] `cargo xtask setup | ci | lint | web`
 - [x] `deny.toml` and `about.toml`
 - [x] `ci.yml` and `cla.yml`
@@ -54,7 +54,7 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 
 - [x] **Before product code:** written confirmation from the employer that this is personal IP ([#1](https://github.com/moyaver/fleet/issues/1), [PLAN §2.5](docs/PLAN.md#25-precondition-employer-ip-check-owner-action-before-m0-code))
 - [x] Decide the final product name: **Fleet** ([#5](https://github.com/moyaver/fleet/issues/5), [ADR-0011](docs/decisions/0011-name-and-runner-scope.md))
-- [ ] Ask a lawyer to review `LICENSE.md`, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/fleet/issues/6))
+- [ ] Ask a lawyer to review the AGPL + commercial-license model, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/fleet/issues/6))
 - [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/fleet/issues/2))
 - [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/fleet/issues/3))
 - [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/fleet/issues/4))
@@ -135,12 +135,13 @@ Then open <http://127.0.0.1:8080>. See [CONTRIBUTING.md](CONTRIBUTING.md) for th
 
 ## License
 
-Fleet is **source-available, not open source**. It is licensed under the [PolyForm Internal Use License 1.0.0](LICENSE.md):
+Fleet is **open source** under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`).
 
-- any organization may use and modify it for its own internal operations, for free;
-- redistribution, public forks of modified versions and offering it to third parties are not permitted.
+- Anyone may use, study, modify and share it, including companies running it internally, for free.
+- If you distribute Fleet, or let people use a modified Fleet over a network, you must offer them the complete source of your version under the same license. Nobody can take it closed.
+- Forks must not call themselves Fleet or suggest they are the official project.
 
-Read the plain-language [Licensing FAQ](LICENSING.md). For other terms, email <mhammadjaber00@outlook.com>.
+Need different terms, for example to embed Fleet in a proprietary product? A commercial license is available: email <mhammadjaber00@outlook.com>. Read the plain-language [Licensing FAQ](LICENSING.md).
 
 ## Contributing and sponsoring
 

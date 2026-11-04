@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The Fleet dashboard (Leptos CSR). M0 only proves the wasm → embed → axum chain;
 //! screens start in M4 (PLAN §10).
 

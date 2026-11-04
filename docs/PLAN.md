@@ -25,7 +25,7 @@ This document is the single source of truth for building the project. It is writ
 | # | Decision | Detail / ADR |
 |---|---|---|
 | D1 | **Everything in Rust**: agent, server, protocol, **and the dashboard** | ADR-0001, ADR-0004 (decided: Leptos CSR) |
-| D2 | **Source-available, not open source.** Companies may use it internally; no redistribution; contributions welcome; donations welcome | ADR-0010, §2 |
+| D2 | ~~Source-available, not open source~~ **Open source under AGPL-3.0-only**, contributions under a CLA, commercial license on request, donations welcome | ADR-0012 (supersedes ADR-0010) |
 | D3 | Hosted on the owner's **personal** GitHub account; the owner's employer uses it under the same license | §2.5 (employer IP check is a precondition) |
 | D4 | Focused build: live view + correlation + evidence; history and analytics kept thin | ADR-0009 |
 | D5 | Postgres 18 only; S3-compatible storage via `object_store`; Garage as the reference store; filesystem backend built in | ADR-0006, ADR-0007 |
@@ -44,6 +44,8 @@ This document is the single source of truth for building the project. It is writ
 
 ## 2. Licensing, contributions and donations
 
+> **Superseded (2026-11-04):** Fleet is now open source under AGPL-3.0-only ([ADR-0012](decisions/0012-agpl-license.md)). This section is kept as history; the CLA, donations and dependency-license rules still apply.
+
 ### 2.1 What the owner asked for, and what that means legally
 
 "Open source, but nobody may copy it, only contribute and donate" can't be done under an *open source* license. Every OSI-approved license must allow redistribution and derived works. The correct term is **source-available**. Say "source-available" in the README, never "open source".
@@ -61,7 +63,7 @@ Implementation:
 
 1. Fetch the exact text from the official source, polyformproject.org: PolyForm Internal Use 1.0.0. Save it as `LICENSE.md` without changing a word, then fill in only the "Required Notice" line, e.g. `Required Notice: Copyright (c) 2026 <Owner Name> (https://github.com/<owner>)`.
 2. **Cargo:** this license isn't in SPDX, so every crate uses `license-file = "../../LICENSE.md"` (adjusted per crate) instead of `license = …`. Also set `publish = false`: crates.io requires redistribution rights, and these crates are never published there.
-3. Add an SPDX-style header comment to every source file: `// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0`. Enforce it in `cargo xtask lint`.
+3. Add an SPDX-style header comment to every source file: `// SPDX-License-Identifier: AGPL-3.0-only`. Enforce it in `cargo xtask lint`.
 4. Add `LICENSING.md`, a plain-language FAQ, which must say:
    - It is source-available, not open source.
    - Internal use by any organization is free.

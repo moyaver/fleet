@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! The built dashboard, embedded at compile time.
 //!
 //! Debug builds read `crates/fleet-web/dist` from disk at runtime, so `cargo xtask web` is

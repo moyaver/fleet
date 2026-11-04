@@ -4,7 +4,7 @@ description = "Embeds the built dashboard (crates/fleet-web/dist) into the serve
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license-file.workspace = true
+license.workspace = true
 publish.workspace = true
 repository.workspace = true
 

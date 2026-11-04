@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Every product name in one place (PLAN §4.1), so a rename touches only this file,
 //! `docs/book.toml` and the crate directory names.
 

@@ -9,9 +9,10 @@ unmaintained = "workspace"
 yanked = "deny"
 
 [licenses]
-# Permissive licenses only in anything linked into a binary. MPL-2.0 is file-level copyleft and
-# acceptable when used unmodified. GPL, AGPL, LGPL, SSPL and non-commercial licenses are denied by
-# not being listed.
+# Permissive licenses only in anything linked into a binary, even though Fleet itself is AGPL: the
+# CLA lets the owner also offer Fleet under a commercial license, and copyleft dependencies would
+# block that. MPL-2.0 is file-level copyleft and acceptable when used unmodified. GPL, AGPL, LGPL,
+# SSPL and non-commercial licenses are denied by not being listed.
 allow = [
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
@@ -31,7 +32,7 @@ confidence-threshold = 0.93
 unused-allowed-license = "allow"
 
 [licenses.private]
-# Workspace crates are publish = false and use LICENSE.md (PolyForm Internal Use, not in SPDX).
+# Fleet's own crates (AGPL-3.0-only, publish = false).
 ignore = true
 
 [bans]

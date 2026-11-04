@@ -6,9 +6,8 @@ members = ["crates/*", "xtask"]
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.99"
-# PolyForm Internal Use is not in SPDX, so crates point at the file. Never published: crates.io needs
-# redistribution rights. See LICENSING.md.
-license-file = "LICENSE.md"
+# See LICENSING.md. Application crates, not libraries: they are not published to crates.io.
+license = "AGPL-3.0-only"
 publish = false
 repository = "https://github.com/moyaver/fleet"
 

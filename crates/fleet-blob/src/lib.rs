@@ -1,2 +1,2 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Blob storage abstraction. See ADR-0007. Work starts in M3.

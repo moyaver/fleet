@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //! Repository rules that rustc and clippy can't check (PLAN §3, §4.2).
 
 use std::{
@@ -11,7 +11,7 @@ use std::{
 use anyhow::{Context, bail};
 use serde_json::Value;
 
-const SPDX_HEADER: &str = "// SPDX-License-Identifier: LicenseRef-PolyForm-Internal-Use-1.0.0";
+const SPDX_HEADER: &str = "// SPDX-License-Identifier: AGPL-3.0-only";
 
 /// Directories never scanned: build output and VCS metadata.
 const SKIP_DIRS: &[&str] = &[".git", "target", "dist", "book"];
