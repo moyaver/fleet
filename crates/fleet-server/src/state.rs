@@ -9,7 +9,7 @@ use std::sync::{
 use fleet_store::{Store, ingest::Change};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
-use crate::{config::Config, ingest::telemetry::TelemetryBuffer, live::Hub};
+use crate::{config::Config, ingest::telemetry::TelemetryBuffer, live::Hub, oidc::Jwks};
 
 /// Cheap to clone; everything lives behind one `Arc`.
 #[derive(Debug, Clone)]
@@ -25,6 +25,7 @@ pub(crate) struct Inner {
     pub(crate) tracker: TaskTracker,
     pub(crate) telemetry: TelemetryBuffer,
     pub(crate) hub: Hub,
+    pub(crate) jwks: Jwks,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
 }
@@ -38,20 +39,21 @@ impl std::ops::Deref for AppState {
 }
 
 impl AppState {
-    pub(crate) fn new(store: Store, config: Config) -> Self {
+    pub(crate) fn new(store: Store, config: Config) -> anyhow::Result<Self> {
         let hub = Hub::new(
             std::time::Duration::from_millis(config.liveness.stale_after_ms),
             config.api.live_buffer,
         );
-        Self(Arc::new(Inner {
+        Ok(Self(Arc::new(Inner {
             hub,
+            jwks: Jwks::new()?,
             store,
             config,
             shutdown: CancellationToken::new(),
             tracker: TaskTracker::new(),
             telemetry: TelemetryBuffer::default(),
             ready: AtomicBool::new(false),
-        }))
+        })))
     }
 
     pub(crate) fn is_ready(&self) -> bool {

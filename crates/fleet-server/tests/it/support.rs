@@ -53,6 +53,7 @@ pub(crate) fn test_config(url: &str) -> Config {
     c.projects = vec![ProjectConfig {
         slug: "app".into(),
         name: "App".into(),
+        trust_policies: Vec::new(),
     }];
     c
 }

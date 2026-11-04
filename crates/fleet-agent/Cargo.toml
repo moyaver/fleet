@@ -17,6 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
 clap.workspace = true
 crc32fast.workspace = true
 fleet-core.workspace = true
@@ -24,7 +25,9 @@ fleet-maestro.workspace = true
 fleet-protocol.workspace = true
 futures-util.workspace = true
 nix.workspace = true
+reqwest.workspace = true
 rustls.workspace = true
+rustls-native-certs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 signal-hook.workspace = true
@@ -35,6 +38,7 @@ tokio-tungstenite.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid = { workspace = true, features = ["v7"] }
+webpki-roots.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true

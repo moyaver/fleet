@@ -55,11 +55,14 @@ unescaped_backticks = "warn"
 fleet-core = { path = "crates/fleet-core" }
 fleet-maestro = { path = "crates/fleet-maestro" }
 fleet-protocol = { path = "crates/fleet-protocol" }
+fleet-server = { path = "crates/fleet-server" }
 fleet-store = { path = "crates/fleet-store" }
 fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
 assert_cmd = "2.2.2"
+# Tests only: signs fake CI OIDC tokens with a key generated per test run.
+aws-lc-rs = "1.19.0"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "tracing", "ws"] }
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
@@ -69,6 +72,9 @@ crc32fast = "1.5.4"
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 getrandom = "0.4.3"
+# JWT parsing and validation for CI OIDC tokens (ADR-0008). No built-in backend: Fleet installs an
+# RS256 verifier on `ring` (fleet-server oidc), avoiding `rsa`/`crypto-bigint` advisories and aws-lc.
+jsonwebtoken = { version = "11.1.0", default-features = false }
 insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
 nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
@@ -76,14 +82,21 @@ predicates = "3.1.4"
 proptest = "1.12.0"
 quick-xml = "0.42.0"
 regex = "1.13.1"
+# OIDC discovery and JWKS. TLS via rustls with ring and the OS trust store (corporate CAs).
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json", "http2"] }
 rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+# RS256 signature verification for OIDC tokens; already linked through rustls.
+ring = "0.17.14"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-native-certs = "0.8.5"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
 # Postgres only (ADR-0006). TLS trusts the OS store, so corporate CAs work (research 03 §4).
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "time", "json", "tls-rustls-ring-native-roots"] }
 signal-hook = "0.4.6"
+# The verifier trait jsonwebtoken's pluggable crypto uses.
+signature = "2.2.0"
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
@@ -98,6 +111,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # OpenAPI 3.1 from the REST types (PLAN §5.3). No UI: it would ship JavaScript (I9).
 utoipa = { version = "6.0.0", default-features = false, features = ["macros", "uuid", "time"] }
 uuid = { version = "1.29.0", features = ["serde"] }
+webpki-roots = "1.0.11"
 
 [profile.release]
 lto = true

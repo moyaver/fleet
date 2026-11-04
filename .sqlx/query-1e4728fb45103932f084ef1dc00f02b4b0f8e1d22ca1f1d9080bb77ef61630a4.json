@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO oidc_jti_seen (issuer, jti, expires_at) VALUES ($1, $2, $3)\n             ON CONFLICT DO NOTHING RETURNING jti",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "jti",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oidc_jti_seen",
+            "name": "jti"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1e4728fb45103932f084ef1dc00f02b4b0f8e1d22ca1f1d9080bb77ef61630a4"
+}

@@ -32,12 +32,43 @@ use crate::outbox::Outbox;
 pub(crate) struct Config {
     /// `ws://` or `wss://` URL of the agent endpoint.
     pub(crate) url: String,
-    /// Bearer token.
+    /// Bearer token (`FLEET_TOKEN`).
     pub(crate) token: Option<String>,
+    /// Without a token: the GitHub OIDC token to exchange for one.
+    pub(crate) oidc: Option<crate::net::OidcRequest>,
+    /// TLS roots (Mozilla, OS, `FLEET_CA_FILE`).
+    pub(crate) tls: Arc<rustls::ClientConfig>,
+    /// The proxy for `url`, if any.
+    pub(crate) proxy: Option<crate::net::Proxy>,
     /// This agent run.
     pub(crate) agent_run_id: Uuid,
     /// CI identity.
     pub(crate) ci: CiContext,
+}
+
+impl Config {
+    /// From the environment: `FLEET_TOKEN`, GitHub's OIDC variables, `FLEET_CA_FILE` and the
+    /// proxy variables.
+    pub(crate) fn from_env(
+        url: String,
+        agent_run_id: Uuid,
+        ci: CiContext,
+        env: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let proxy = crate::net::Target::parse(&url).and_then(|t| crate::net::proxy_for(&t, &env));
+        if let Some(p) = &proxy {
+            tracing::info!(proxy = ?p, "connecting through a proxy");
+        }
+        Self {
+            token: env("FLEET_TOKEN").filter(|t| !t.is_empty()),
+            oidc: crate::net::OidcRequest::from_env(&env),
+            tls: crate::net::tls(env("FLEET_CA_FILE").as_deref()),
+            proxy,
+            url,
+            agent_run_id,
+            ci,
+        }
+    }
 }
 
 /// Shared between the observer and the transport task.
@@ -74,7 +105,24 @@ pub(crate) async fn run(
     clock: impl Fn() -> ClockSample,
 ) -> End {
     let mut attempt: u32 = 0;
+    let mut cfg = cfg;
     loop {
+        if cfg.token.is_none()
+            && let Some(req) = &cfg.oidc
+        {
+            match crate::net::exchange(req, &cfg.url, Arc::clone(&cfg.tls)).await {
+                Ok(t) => {
+                    tracing::info!("exchanged the job's OIDC token for an agent token");
+                    cfg.token = Some(t);
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, attempt, "OIDC token exchange failed");
+                    attempt = attempt.saturating_add(1);
+                    tokio::time::sleep(backoff(attempt)).await;
+                    continue;
+                }
+            }
+        }
         match connection(&cfg, &shared, &mut telemetry, &clock).await {
             Ok(end) => return end,
             Err(e) => tracing::warn!(error = %e, attempt, "agent connection lost"),
@@ -97,12 +145,13 @@ fn backoff(attempt: u32) -> Duration {
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
-async fn connection(
+/// Opens the WebSocket: TCP (through the proxy, if any), TLS with Fleet's roots, upgrade.
+async fn open(
     cfg: &Config,
-    shared: &Shared,
-    telemetry: &mut mpsc::Receiver<Telemetry>,
-    clock: &impl Fn() -> ClockSample,
-) -> Result<End, Error> {
+) -> Result<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    Error,
+> {
     let mut request = cfg.url.as_str().into_client_request()?;
     request.headers_mut().insert(
         "Sec-WebSocket-Protocol",
@@ -114,8 +163,29 @@ async fn connection(
             HeaderValue::from_str(&format!("Bearer {t}"))?,
         );
     }
-    let (ws, _) =
-        tokio::time::timeout(CONNECT_TIMEOUT, tokio_tungstenite::connect_async(request)).await??;
+    let target = crate::net::Target::parse(&cfg.url).ok_or("FLEET_SERVER is not a ws(s):// URL")?;
+    let (ws, _) = tokio::time::timeout(CONNECT_TIMEOUT, async {
+        let tcp = crate::net::tcp(&target, cfg.proxy.as_ref()).await?;
+        tokio_tungstenite::client_async_tls_with_config(
+            request,
+            tcp,
+            None,
+            Some(tokio_tungstenite::Connector::Rustls(Arc::clone(&cfg.tls))),
+        )
+        .await
+        .map_err(Error::from)
+    })
+    .await??;
+    Ok(ws)
+}
+
+async fn connection(
+    cfg: &Config,
+    shared: &Shared,
+    telemetry: &mut mpsc::Receiver<Telemetry>,
+    clock: &impl Fn() -> ClockSample,
+) -> Result<End, Error> {
+    let ws = open(cfg).await?;
     let (mut tx, mut rx) = ws.split();
 
     tx.send(Message::text(serde_json::to_string(&hello_frame(

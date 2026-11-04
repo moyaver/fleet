@@ -10,6 +10,7 @@ mod commands;
 pub mod inspect;
 mod ipc;
 mod metrics;
+mod net;
 mod observer;
 mod outbox;
 mod prepare;

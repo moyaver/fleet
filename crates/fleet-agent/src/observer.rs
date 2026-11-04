@@ -266,12 +266,12 @@ fn start(
     let (telemetry, transport) = match server_url() {
         Some(url) => {
             let (tx, rx) = mpsc::channel(64);
-            let cfg = transport::Config {
+            let cfg = transport::Config::from_env(
                 url,
-                token: std::env::var("FLEET_TOKEN").ok().filter(|t| !t.is_empty()),
                 agent_run_id,
-                ci: crate::ci::context(|k| std::env::var(k).ok()),
-            };
+                crate::ci::context(|k| std::env::var(k).ok()),
+                |k| std::env::var(k).ok(),
+            );
             (
                 Some(tx),
                 Some(tokio::spawn(transport::run(

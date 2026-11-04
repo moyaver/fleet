@@ -6,13 +6,15 @@ on: [pull_request]
 
 permissions:
   contents: read
+  id-token: write   # the agent exchanges the job's OIDC token for a Fleet agent token
 
 jobs:
   maestro:
     runs-on: ubuntu-latest
     env:
       FLEET_SERVER: https://fleet.example.com  # unset = offline: journal and spool only
-      FLEET_TOKEN: ${{ secrets.FLEET_TOKEN }}
+      # No FLEET_TOKEN needed with id-token: write. Without OIDC, use an API key:
+      # FLEET_TOKEN: ${{ secrets.FLEET_TOKEN }}
       FLEET_JOB_KEY: ${{ job.check_run_id }}   # unique per job, matrix legs included
       FLEET_RUN_DIR: ${{ runner.temp }}/fleet
     steps:

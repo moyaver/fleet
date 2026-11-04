@@ -61,6 +61,8 @@ pub struct Config {
     pub liveness: Liveness,
     /// Read APIs (REST and the browser WebSocket).
     pub api: Api,
+    /// CI OIDC token exchange (`POST /api/v1/agent/token`).
+    pub oidc: Oidc,
     /// Projects to create at start-up (by slug); an admin UI arrives in M6.
     pub projects: Vec<ProjectConfig>,
 }
@@ -73,6 +75,7 @@ impl Default for Config {
             ingest: Ingest::default(),
             liveness: Liveness::default(),
             api: Api::default(),
+            oidc: Oidc::default(),
             projects: Vec::new(),
         }
     }
@@ -214,6 +217,46 @@ fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<Secret>, D:
     })
 }
 
+/// The GitHub Actions OIDC issuer.
+pub const GITHUB_ISSUER: &str = "https://token.actions.githubusercontent.com";
+
+/// Which CI OIDC issuers are accepted (an allowlist: an unlisted `iss` is never fetched).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Oidc {
+    /// Accepted issuers and the audience each must carry.
+    pub issuers: Vec<OidcIssuer>,
+    /// Lifetime of minted agent tokens (the GitHub-hosted job limit is 6 h).
+    pub token_ttl_minutes: u64,
+    /// Refuse ID tokens issued longer ago than this.
+    pub max_token_age_seconds: u64,
+    /// Clock leeway for `exp`, `nbf` and `iat`.
+    pub leeway_seconds: u64,
+}
+
+impl Default for Oidc {
+    fn default() -> Self {
+        Self {
+            issuers: vec![OidcIssuer {
+                issuer: GITHUB_ISSUER.into(),
+                audience: fleet_protocol::brand::OIDC_AUDIENCE.into(),
+            }],
+            token_ttl_minutes: 360,
+            max_token_age_seconds: 600,
+            leeway_seconds: 60,
+        }
+    }
+}
+
+/// One accepted issuer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OidcIssuer {
+    /// `iss`, exactly.
+    pub issuer: String,
+    /// The audience the agent requests (`aud`).
+    pub audience: String,
+}
+
 /// A project created at start-up.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -221,6 +264,69 @@ pub struct ProjectConfig {
     pub slug: String,
     /// Display name.
     pub name: String,
+    /// Who may publish here with a CI OIDC token (ADR-0008). Replaces the stored set at start-up.
+    #[serde(default)]
+    pub trust_policies: Vec<TrustPolicyConfig>,
+}
+
+/// A publisher trust policy (research 06 §2.5). IDs are GitHub's immutable numeric IDs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrustPolicyConfig {
+    /// Unique per project.
+    pub name: String,
+    /// Issuer; GitHub Actions by default.
+    #[serde(default = "github_issuer")]
+    pub issuer: String,
+    /// Audience; `fleet` by default.
+    #[serde(default = "default_audience")]
+    pub audience: String,
+    /// `repository_id` claim.
+    #[serde(deserialize_with = "string_or_number")]
+    pub repository_id: String,
+    /// `repository_owner_id` claim.
+    #[serde(deserialize_with = "string_or_number")]
+    pub repository_owner_id: String,
+    /// Refs whose pushes are trusted (`*` wildcards).
+    #[serde(default)]
+    pub trusted_refs: Vec<String>,
+    /// Events accepted; empty means `push`, `schedule`, `workflow_dispatch`, `merge_group`
+    /// and `pull_request`. `pull_request_target` and `dynamic` are always refused.
+    #[serde(default)]
+    pub allowed_events: Vec<String>,
+    /// `restricted` (default), `full` or `deny`.
+    #[serde(default = "restricted")]
+    pub pr_policy: String,
+    /// Only tokens minted inside this reusable workflow.
+    #[serde(default)]
+    pub job_workflow_ref: Option<String>,
+    /// Only jobs in this environment.
+    #[serde(default)]
+    pub environment: Option<String>,
+}
+
+fn github_issuer() -> String {
+    GITHUB_ISSUER.into()
+}
+
+fn default_audience() -> String {
+    fleet_protocol::brand::OIDC_AUDIENCE.into()
+}
+
+fn restricted() -> String {
+    "restricted".into()
+}
+
+fn string_or_number<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Id {
+        S(String),
+        N(u64),
+    }
+    Ok(match Id::deserialize(d)? {
+        Id::S(s) => s,
+        Id::N(n) => n.to_string(),
+    })
 }
 
 impl Config {
@@ -256,6 +362,21 @@ impl Config {
             "ingest.idle_timeout_ms must exceed ingest.heartbeat_interval_ms"
         );
         for p in &self.projects {
+            for t in &p.trust_policies {
+                anyhow::ensure!(
+                    ["restricted", "full", "deny"].contains(&t.pr_policy.as_str()),
+                    "projects.{}.trust_policies.{}: pr_policy must be restricted, full or deny",
+                    p.slug,
+                    t.name
+                );
+                anyhow::ensure!(
+                    self.oidc.issuers.iter().any(|i| i.issuer == t.issuer),
+                    "projects.{}.trust_policies.{}: issuer {} is not in oidc.issuers",
+                    p.slug,
+                    t.name,
+                    t.issuer
+                );
+            }
             anyhow::ensure!(
                 p.slug.len() >= 2
                     && p.slug.len() <= 63

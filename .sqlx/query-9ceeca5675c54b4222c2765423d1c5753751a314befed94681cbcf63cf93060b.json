@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE publisher_trust_policies SET revoked_at = now()\n              WHERE project_id = $1 AND revoked_at IS NULL AND NOT (name = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9ceeca5675c54b4222c2765423d1c5753751a314befed94681cbcf63cf93060b"
+}

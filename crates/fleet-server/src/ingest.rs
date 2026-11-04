@@ -37,6 +37,7 @@ pub(crate) fn router(state: &AppState) -> Router<AppState> {
         .saturating_mul(8);
     Router::new()
         .route("/api/v1/agent/ws", get(ws::upgrade))
+        .route("/api/v1/agent/token", post(crate::oidc::token))
         .route(
             "/api/v1/agent/batch",
             post(batch::post).layer(DefaultBodyLimit::max(body_limit)),

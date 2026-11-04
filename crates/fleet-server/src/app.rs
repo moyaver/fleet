@@ -80,17 +80,21 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         .await
         .context("creating partitions")?;
     for p in &config.projects {
-        store
+        let id = store
             .upsert_project(&p.slug, &p.name)
             .await
             .with_context(|| format!("creating project {}", p.slug))?;
+        store
+            .sync_trust_policies(id, &policies(p))
+            .await
+            .with_context(|| format!("storing the trust policies of {}", p.slug))?;
     }
 
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .with_context(|| format!("binding {}", config.listen))?;
     let addr = listener.local_addr()?;
-    let state = AppState::new(store, config);
+    let state = AppState::new(store, config)?;
     // The live hub restarts from Postgres: versions continue where they were (§7.3).
     let open = state
         .hub
@@ -131,6 +135,31 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         stop,
         serving,
     })
+}
+
+fn policies(p: &crate::config::ProjectConfig) -> Vec<fleet_store::auth::PolicyRow> {
+    use fleet_core::trust::{Policy, PrPolicy};
+    p.trust_policies
+        .iter()
+        .map(|t| fleet_store::auth::PolicyRow {
+            name: t.name.clone(),
+            issuer: t.issuer.clone(),
+            audience: t.audience.clone(),
+            policy: Policy {
+                repository_id: t.repository_id.clone(),
+                repository_owner_id: t.repository_owner_id.clone(),
+                trusted_refs: t.trusted_refs.clone(),
+                allowed_events: t.allowed_events.clone(),
+                pr_policy: match t.pr_policy.as_str() {
+                    "full" => PrPolicy::Full,
+                    "deny" => PrPolicy::Deny,
+                    _ => PrPolicy::Restricted,
+                },
+                job_workflow_ref: t.job_workflow_ref.clone(),
+                environment: t.environment.clone(),
+            },
+        })
+        .collect()
 }
 
 /// `fleet serve`: runs until SIGINT or SIGTERM.

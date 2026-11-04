@@ -1,0 +1,139 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.id, t.project_id, p.slug, t.repository_id, t.repository_owner_id,\n                    t.trusted_refs, t.allowed_events, t.pr_policy, t.job_workflow_ref, t.environment\n               FROM publisher_trust_policies t JOIN projects p ON p.id = t.project_id\n              WHERE t.revoked_at IS NULL AND p.archived_at IS NULL\n                AND t.issuer = $1 AND t.audience = $2\n                AND t.repository_id = $3 AND t.repository_owner_id = $4\n              ORDER BY p.slug, t.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "repository_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "repository_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "repository_owner_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "repository_owner_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "trusted_refs",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "trusted_refs"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "allowed_events",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "allowed_events"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "pr_policy",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "pr_policy"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "job_workflow_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "job_workflow_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "environment",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "environment"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "1a3896a2a4b6deb28d7035d1749b1992d96a369ea34c8ba31cff26afd4ab350c"
+}

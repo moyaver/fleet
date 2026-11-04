@@ -33,12 +33,12 @@ pub(crate) fn flush(spool: &Path, timeout: Duration) -> anyhow::Result<String> {
         ..Shared::default()
     });
     shared.finishing.store(true, Ordering::SeqCst);
-    let cfg = transport::Config {
+    let cfg = transport::Config::from_env(
         url,
-        token: std::env::var("FLEET_TOKEN").ok().filter(|t| !t.is_empty()),
         agent_run_id,
-        ci: crate::ci::context(|k| std::env::var(k).ok()),
-    };
+        crate::ci::context(|k| std::env::var(k).ok()),
+        |k| std::env::var(k).ok(),
+    );
     let _ = rustls::crypto::ring::default_provider().install_default();
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

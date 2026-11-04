@@ -21,12 +21,19 @@ axum.workspace = true
 base64.workspace = true
 clap.workspace = true
 figment.workspace = true
+fleet-core.workspace = true
 fleet-protocol.workspace = true
 fleet-store.workspace = true
 fleet-web-assets.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+ring.workspace = true
+rustls.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+signature.workspace = true
+thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "time", "sync", "io-util"] }
 tokio-util.workspace = true
@@ -37,6 +44,7 @@ utoipa.workspace = true
 uuid = { workspace = true, features = ["v7"] }
 
 [dev-dependencies]
+aws-lc-rs.workspace = true
 fleet-store = { workspace = true, features = ["test-util"] }
 futures-util.workspace = true
 tokio-tungstenite.workspace = true

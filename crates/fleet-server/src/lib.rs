@@ -19,6 +19,7 @@ mod app;
 mod health;
 mod ingest;
 mod live;
+mod oidc;
 mod state;
 mod sweeps;
 mod web;

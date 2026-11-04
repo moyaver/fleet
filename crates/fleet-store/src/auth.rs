@@ -327,6 +327,153 @@ impl AuditActor {
     }
 }
 
+/// A trust policy as configured (ADR-0008).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyRow {
+    /// Name, unique per project.
+    pub name: String,
+    /// OIDC issuer.
+    pub issuer: String,
+    /// Expected audience.
+    pub audience: String,
+    /// The rule.
+    pub policy: fleet_core::trust::Policy,
+}
+
+/// A trust policy that may match a token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    /// Policy ID.
+    pub policy_id: Uuid,
+    /// The project it grants.
+    pub project_id: Uuid,
+    /// That project's slug.
+    pub project_slug: String,
+    /// The rule.
+    pub policy: fleet_core::trust::Policy,
+}
+
+fn pr_policy_name(p: fleet_core::trust::PrPolicy) -> &'static str {
+    match p {
+        fleet_core::trust::PrPolicy::Restricted => "restricted",
+        fleet_core::trust::PrPolicy::Full => "full",
+        fleet_core::trust::PrPolicy::Deny => "deny",
+    }
+}
+
+impl Store {
+    /// Makes a project's stored trust policies equal the configured ones: upserts by name,
+    /// revokes the rest.
+    pub async fn sync_trust_policies(&self, project_id: Uuid, rows: &[PolicyRow]) -> Result<()> {
+        let mut tx = self.pool().begin().await?;
+        for r in rows {
+            let p = &r.policy;
+            sqlx::query!(
+                "INSERT INTO publisher_trust_policies
+                   (project_id, name, issuer, audience, repository_id, repository_owner_id,
+                    trusted_refs, allowed_events, job_workflow_ref, environment, pr_policy)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                 ON CONFLICT (project_id, name) DO UPDATE SET
+                   issuer = EXCLUDED.issuer, audience = EXCLUDED.audience,
+                   repository_id = EXCLUDED.repository_id,
+                   repository_owner_id = EXCLUDED.repository_owner_id,
+                   trusted_refs = EXCLUDED.trusted_refs, allowed_events = EXCLUDED.allowed_events,
+                   job_workflow_ref = EXCLUDED.job_workflow_ref, environment = EXCLUDED.environment,
+                   pr_policy = EXCLUDED.pr_policy, revoked_at = NULL",
+                project_id,
+                r.name,
+                r.issuer,
+                r.audience,
+                p.repository_id,
+                p.repository_owner_id,
+                &p.trusted_refs,
+                &p.allowed_events,
+                p.job_workflow_ref,
+                p.environment,
+                pr_policy_name(p.pr_policy)
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        let names: Vec<String> = rows.iter().map(|r| r.name.clone()).collect();
+        sqlx::query!(
+            "UPDATE publisher_trust_policies SET revoked_at = now()
+              WHERE project_id = $1 AND revoked_at IS NULL AND NOT (name = ANY($2))",
+            project_id,
+            &names
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Live trust policies for a token's issuer, audience and repository.
+    pub async fn trust_candidates(
+        &self,
+        issuer: &str,
+        audience: &str,
+        repository_id: &str,
+        repository_owner_id: &str,
+    ) -> Result<Vec<Candidate>> {
+        let rows = sqlx::query!(
+            "SELECT t.id, t.project_id, p.slug, t.repository_id, t.repository_owner_id,
+                    t.trusted_refs, t.allowed_events, t.pr_policy, t.job_workflow_ref, t.environment
+               FROM publisher_trust_policies t JOIN projects p ON p.id = t.project_id
+              WHERE t.revoked_at IS NULL AND p.archived_at IS NULL
+                AND t.issuer = $1 AND t.audience = $2
+                AND t.repository_id = $3 AND t.repository_owner_id = $4
+              ORDER BY p.slug, t.name",
+            issuer,
+            audience,
+            repository_id,
+            repository_owner_id
+        )
+        .fetch_all(self.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Candidate {
+                policy_id: r.id,
+                project_id: r.project_id,
+                project_slug: r.slug,
+                policy: fleet_core::trust::Policy {
+                    repository_id: r.repository_id,
+                    repository_owner_id: r.repository_owner_id,
+                    trusted_refs: r.trusted_refs,
+                    allowed_events: r.allowed_events,
+                    pr_policy: match r.pr_policy.as_str() {
+                        "full" => fleet_core::trust::PrPolicy::Full,
+                        "deny" => fleet_core::trust::PrPolicy::Deny,
+                        _ => fleet_core::trust::PrPolicy::Restricted,
+                    },
+                    job_workflow_ref: r.job_workflow_ref,
+                    environment: r.environment,
+                },
+            })
+            .collect())
+    }
+
+    /// Records a token's `jti`. False when it was already used (a replay).
+    pub async fn claim_jti(
+        &self,
+        issuer: &str,
+        jti: &str,
+        expires_at: OffsetDateTime,
+    ) -> Result<bool> {
+        let fresh = sqlx::query_scalar!(
+            "INSERT INTO oidc_jti_seen (issuer, jti, expires_at) VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING RETURNING jti",
+            issuer,
+            jti,
+            expires_at
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        Ok(fresh.is_some())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

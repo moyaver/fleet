@@ -67,7 +67,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] `run`, `inspect`, `flush`, `check`, `version`; planner shards (`--plan`, ADR-0013)
 - [x] Validated on a real emulator: unchanged result, 65 events gap-free, 0.14% of one core (I10)
 - [x] Release pipeline (cargo-dist): musl x86_64/aarch64 + macOS arm64, checksums, attestations, third-party notices
-- [ ] HTTPS proxy support and OIDC token exchange (need the M3 server)
+- [x] HTTPS proxy support and OIDC token exchange (done in M3: [#24](https://github.com/moyaver/fleet/issues/24), [#25](https://github.com/moyaver/fleet/issues/25))
 
 ### M3 checklist
 
@@ -77,8 +77,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] `fleet serve | migrate | check-config | healthcheck | api-key create`, figment config (TOML, `FLEET_*`, `*_FILE`)
 - [x] Live hub, browser WebSocket (snapshot + versioned deltas, `resync`), rebuilt from Postgres after a restart
 - [x] REST snapshots, OpenAPI (utoipa), liveness sweeps under an advisory-lock leader
-- [ ] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
-- [ ] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
+- [x] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
+- [x] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
 - [x] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
 - [ ] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image
 - [ ] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
