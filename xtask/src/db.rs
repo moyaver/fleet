@@ -23,8 +23,9 @@ pub(crate) struct Throwaway {
 
 impl Drop for Throwaway {
     fn drop(&mut self) {
+        // -v also removes the container's anonymous volumes (Postgres declares a VOLUME).
         let _ = Command::new("docker")
-            .args(["rm", "-f", &self.name])
+            .args(["rm", "-f", "-v", &self.name])
             .output();
     }
 }

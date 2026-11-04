@@ -36,8 +36,9 @@ struct Garage {
 
 impl Drop for Garage {
     fn drop(&mut self) {
+        // -v also removes the container's anonymous volumes (Garage declares a VOLUME).
         let _ = Command::new("docker")
-            .args(["rm", "-f", &self.name])
+            .args(["rm", "-f", "-v", &self.name])
             .output();
     }
 }
