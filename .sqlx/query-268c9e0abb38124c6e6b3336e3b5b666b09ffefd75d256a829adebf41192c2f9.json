@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET committed_seq = $4, last_frame_at = now()\n              WHERE id = $1 AND epoch = $2 AND committed_seq = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "268c9e0abb38124c6e6b3336e3b5b666b09ffefd75d256a829adebf41192c2f9"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions SET state = 'passed', outcome_source = 'process_exit' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40a3ebad8234058ec0367f23256608a194a34e858e866f9a8c99be469db7a965"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT suite_execution_id FROM flow_executions WHERE id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "suite_execution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "suite_execution_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ae620a8a28da0b21b0aff3d346230f8dfee745fcf2d75f7332f86aff8c0b19ba"
+}

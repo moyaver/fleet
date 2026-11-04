@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE device_sessions\n                SET state = CASE WHEN state IN ('released', 'lost') THEN state\n                                 WHEN $3 THEN 'offline'\n                                 WHEN $4 AND state IN ('offline', 'discovered', 'booting') THEN 'ready'\n                                 ELSE state END,\n                    last_seen_at = $5, rev = rev + 1\n              WHERE agent_run_id = $1 AND (id = $2 OR ($2::uuid IS NULL AND serial = $6))\n              RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "55acdbfca4ac2eff09455c73659f645b6bf03e94ec7eeb620ac48e15a2ba544b"
+}

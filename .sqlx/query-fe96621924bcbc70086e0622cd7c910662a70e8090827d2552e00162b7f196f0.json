@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET plan_id = $2, plan_shard_id = $3, rev = rev + 1 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe96621924bcbc70086e0622cd7c910662a70e8090827d2552e00162b7f196f0"
+}

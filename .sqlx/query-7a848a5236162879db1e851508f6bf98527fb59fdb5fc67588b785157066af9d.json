@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_executions (id, project_id, agent_run_id, suite_execution_id,\n                                          shard_id, device_session_id, flow_name, flow_path,\n                                          shard_number, ordinal, started, state, started_at,\n                                          pipeline_attempt_id, job_id)\n             SELECT $1, s.project_id, s.agent_run_id, s.id, $3, $4, $5, $6, $7, $8, $9,\n                    CASE WHEN $9 THEN 'running' ELSE 'pending' END,\n                    CASE WHEN $9 THEN $10::timestamptz END, j.pipeline_attempt_id, s.job_id\n               FROM suite_executions s JOIN jobs j ON j.id = s.job_id\n              WHERE s.id = $2 AND s.agent_run_id = $11\n             ON CONFLICT (id) DO UPDATE\n               SET started = flow_executions.started OR EXCLUDED.started,\n                   started_at = coalesce(flow_executions.started_at, EXCLUDED.started_at),\n                   flow_name = CASE WHEN EXCLUDED.started THEN EXCLUDED.flow_name\n                                    ELSE flow_executions.flow_name END,\n                   flow_path = coalesce(flow_executions.flow_path, EXCLUDED.flow_path),\n                   shard_id = coalesce(flow_executions.shard_id, EXCLUDED.shard_id),\n                   device_session_id = coalesce(flow_executions.device_session_id,\n                                                EXCLUDED.device_session_id),\n                   shard_number = coalesce(flow_executions.shard_number, EXCLUDED.shard_number),\n                   ordinal = coalesce(flow_executions.ordinal, EXCLUDED.ordinal),\n                   rev = flow_executions.rev + 1\n               WHERE flow_executions.agent_run_id = EXCLUDED.agent_run_id\n             RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Bool",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7a848a5236162879db1e851508f6bf98527fb59fdb5fc67588b785157066af9d"
+}

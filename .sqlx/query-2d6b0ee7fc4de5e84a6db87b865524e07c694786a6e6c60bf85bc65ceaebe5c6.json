@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT flow_execution_id, source AS \"source!\", outcome AS \"outcome!\", claim_order\n           FROM flow_claims WHERE flow_execution_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_execution_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_claims",
+            "name": "flow_execution_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "source!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_claims",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "outcome!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_claims",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "claim_order",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_claims",
+            "name": "claim_order"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2d6b0ee7fc4de5e84a6db87b865524e07c694786a6e6c60bf85bc65ceaebe5c6"
+}

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT from_seq, to_seq, reason FROM ingest_gaps WHERE agent_run_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "from_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "from_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "to_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "to_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5a3b35ab6aec0cc63355ecc073cdad2ff747776ca7a041bdc80bf37146dfc5ce"
+}

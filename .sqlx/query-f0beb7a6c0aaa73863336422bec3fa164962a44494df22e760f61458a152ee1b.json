@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs\n                SET epoch = epoch + 1,\n                    committed_seq = $2,\n                    state = CASE WHEN state = 'ended' THEN state\n                                 WHEN state = 'finalizing' THEN state\n                                 ELSE 'active' END,\n                    late_resume = late_resume OR state = 'abandoned',\n                    detached_at = NULL,\n                    last_frame_at = now(),\n                    rev = rev + 1\n              WHERE id = $1\n              RETURNING epoch",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "epoch",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "epoch"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f0beb7a6c0aaa73863336422bec3fa164962a44494df22e760f61458a152ee1b"
+}

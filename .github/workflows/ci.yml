@@ -20,6 +20,20 @@ jobs:
   ci:
     name: cargo xtask ci
     runs-on: ubuntu-latest
+    services:
+      # The sqlx tests and `sqlx prepare --check` (PLAN §11.2). Each test makes its own database.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: fleet
+          POSTGRES_PASSWORD: fleet
+          POSTGRES_DB: fleet
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U fleet -d fleet"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      DATABASE_URL: postgres://fleet:fleet@127.0.0.1:5432/fleet
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,7 +44,7 @@ jobs:
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           # Latest releases; keep the list in sync with TOOLS in xtask/src/main.rs.
-          tool: cargo-nextest,cargo-deny,trunk,mdbook
+          tool: cargo-nextest,cargo-deny,trunk,mdbook,sqlx-cli
       - run: cargo xtask ci
 
   agent-macos:

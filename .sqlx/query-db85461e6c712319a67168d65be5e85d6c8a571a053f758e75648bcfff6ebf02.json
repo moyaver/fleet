@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT committed_seq FROM agent_runs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "committed_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "committed_seq"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "db85461e6c712319a67168d65be5e85d6c8a571a053f758e75648bcfff6ebf02"
+}

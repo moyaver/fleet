@@ -4,6 +4,7 @@
 //! - [`claims`]: the claim lattice that decides a flow's outcome (invariants I3, I4).
 //! - [`redact`]: secret redaction for everything that leaves the runner (invariant I6).
 //! - [`reconcile`]: matching the final JUnit report to the flows seen live.
+//! - [`outcome`]: suite and job outcomes, which never read as successful by default (I3).
 #![warn(
     clippy::indexing_slicing,
     clippy::string_slice,
@@ -12,5 +13,6 @@
 )]
 
 pub mod claims;
+pub mod outcome;
 pub mod reconcile;
 pub mod redact;

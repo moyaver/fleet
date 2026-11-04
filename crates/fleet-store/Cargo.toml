@@ -11,3 +11,23 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[features]
+# A fresh, migrated database per test, for other crates' integration tests.
+test-util = []
+
+[dependencies]
+base64.workspace = true
+fleet-core.workspace = true
+fleet-protocol.workspace = true
+getrandom.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tracing.workspace = true
+uuid = { workspace = true, features = ["v7"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

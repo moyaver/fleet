@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions SET lifecycle = 'running', rev = rev + 1\n                  WHERE id = $1 AND lifecycle = 'starting'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14665c8b62bd2ea22bae83ddcf5426116f2535f6ca484480a5dee626f07ecb89"
+}

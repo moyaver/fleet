@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT flow_name, state, finality::text AS \"finality!\", outcome_source::text AS source\n           FROM flow_executions WHERE agent_run_id = $1 ORDER BY ordinal, flow_name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "finality!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "source",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "514011f6580d54ed7a35c99f4480676a5b4f0d9d95a3273ab70917fb81ef2ff9"
+}

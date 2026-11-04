@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- M3: `fleet-store` with migrations 0001–0005 (Postgres 18) and the ingest transaction (epoch fencing, duplicate skip, ownership-checked upserts, claim-lattice outcomes, recorded gaps); `fleet-core::outcome` (suite and job outcomes); `cargo xtask sqlx`; CI runs the database tests against a Postgres 18 service.
+- Protocol: `flow.ended` may name its flow (`flow`), so a claim about a flow that never started (a skipped `executionOrder` flow) creates it.
 - M2: the `fleet-agent` CLI (`run`, `inspect`, `flush`, `check`, `version`): supervisor, live observer, spool, WebSocket transport, metrics, adb tracking, planner shards; `fleet-loadgen mock-server`; cargo-dist release pipeline.
 - M1: `cargo xtask fixtures capture | import`, 24 Maestro 2.12.1 fixtures, Phase 0 flows, research 08; ADR-0003 accepted.
 - M0 repository bootstrap: Cargo workspace skeleton, `cargo xtask` (setup, ci, lint, web), CI and CLA workflows,

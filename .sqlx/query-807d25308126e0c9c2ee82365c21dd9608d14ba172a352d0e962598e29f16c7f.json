@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions\n                SET failure_message = coalesce(failure_message, $2),\n                    duration_ms = coalesce(duration_ms, $3),\n                    ended_at = coalesce(ended_at, $4),\n                    rev = rev + 1\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "807d25308126e0c9c2ee82365c21dd9608d14ba172a352d0e962598e29f16c7f"
+}

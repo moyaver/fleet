@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT job_key, lifecycle, outcome FROM jobs ORDER BY job_key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "job_key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "lifecycle",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "lifecycle"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "outcome",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "outcome"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a2efd3d51c6ca867d0ea682b2860e979ad90204a6f45c32ac7e9d2af288924e0"
+}

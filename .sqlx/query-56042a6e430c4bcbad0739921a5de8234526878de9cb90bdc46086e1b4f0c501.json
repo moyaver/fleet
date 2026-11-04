@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO device_sessions (id, project_id, agent_run_id, serial, state,\n                                              first_seen_at, last_seen_at)\n                 VALUES ($1, $2, $3, $4, 'ready', $5, $5)\n                 ON CONFLICT (id) DO UPDATE\n                   SET serial = EXCLUDED.serial, last_seen_at = EXCLUDED.last_seen_at,\n                       rev = device_sessions.rev + 1\n                   WHERE device_sessions.agent_run_id = EXCLUDED.agent_run_id\n                 RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "56042a6e430c4bcbad0739921a5de8234526878de9cb90bdc46086e1b4f0c501"
+}

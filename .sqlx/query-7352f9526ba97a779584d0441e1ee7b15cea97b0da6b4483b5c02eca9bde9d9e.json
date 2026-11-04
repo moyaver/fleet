@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions\n                SET exit_code = $3, exit_signal = $4, exit_class = $5, ended_at = $6,\n                    lifecycle = CASE WHEN lifecycle = 'closed' THEN lifecycle ELSE 'reporting' END,\n                    rev = rev + 1\n              WHERE id = $1 AND agent_run_id = $2\n              RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7352f9526ba97a779584d0441e1ee7b15cea97b0da6b4483b5c02eca9bde9d9e"
+}

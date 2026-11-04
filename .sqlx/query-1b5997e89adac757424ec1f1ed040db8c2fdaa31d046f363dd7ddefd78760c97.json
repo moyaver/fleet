@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO audit_events (actor_kind, project_id, action, target_kind,\n                                           target_id, details)\n                 VALUES ('system', $1, 'ingest.foreign_entity', 'agent_run', $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1b5997e89adac757424ec1f1ed040db8c2fdaa31d046f363dd7ddefd78760c97"
+}

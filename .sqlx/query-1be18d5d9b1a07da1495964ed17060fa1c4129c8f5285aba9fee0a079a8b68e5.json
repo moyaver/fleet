@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO pipeline_attempts (project_id, pipeline_run_id, attempt) VALUES ($1, $2, $3)\n         ON CONFLICT (pipeline_run_id, attempt) DO UPDATE SET attempt = EXCLUDED.attempt\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pipeline_attempts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1be18d5d9b1a07da1495964ed17060fa1c4129c8f5285aba9fee0a079a8b68e5"
+}

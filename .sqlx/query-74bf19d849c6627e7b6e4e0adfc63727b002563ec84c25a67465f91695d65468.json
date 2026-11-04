@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET state = 'finalizing', rev = rev + 1\n              WHERE id = $1 AND state IN ('active', 'detached', 'abandoned')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "74bf19d849c6627e7b6e4e0adfc63727b002563ec84c25a67465f91695d65468"
+}

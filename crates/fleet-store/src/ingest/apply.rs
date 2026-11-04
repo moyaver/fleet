@@ -1,0 +1,861 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Applying one journal event to the derived tables (research 05 §6, §9.3).
+//!
+//! Every write is an idempotent upsert keyed by an agent-generated ID, guarded by ownership:
+//! `ON CONFLICT … DO UPDATE … WHERE owner = this run`, so a row owned by another run is never
+//! touched and the event is rejected as `foreign_entity` instead (§3.11). Outcomes are never
+//! written here: claims go to `flow_claims` and [`super::derive`] resolves them.
+
+use std::collections::BTreeSet;
+
+use fleet_core::claims::Claim;
+use fleet_protocol::{
+    event::{
+        AdbState, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef, FlowReported,
+        JournalGap, PlanAssigned, ProcessExited, ReportParsed, RunEnded, RunSignal, RunStarted,
+        ShardAssigned, StepEnded, StepStarted, SuiteStarted,
+    },
+    journal::{EventEnvelope, SourceKind},
+};
+use sqlx::PgConnection;
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+use super::{EntityRef, RunHandle, derive, to_i64, valid_agent_id};
+
+/// What became of one event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Effect {
+    /// Projected into the derived tables.
+    Applied,
+    /// Stored in the journal only: a type, version or event this build doesn't project.
+    Unsupported,
+    /// Refused for good: (stored code, detail).
+    Rejected(&'static str, String),
+}
+
+impl Effect {
+    pub(crate) fn status(&self) -> &'static str {
+        match self {
+            Self::Applied => "applied",
+            Self::Unsupported => "unsupported",
+            Self::Rejected(..) => "rejected",
+        }
+    }
+}
+
+fn reject(code: &'static str, message: impl Into<String>) -> Effect {
+    Effect::Rejected(code, message.into())
+}
+
+/// The snake-case wire name of a serde enum value.
+pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
+    serde_json::to_value(v)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
+/// What one batch touched, so derivation and broadcasts cover exactly that.
+#[derive(Debug)]
+pub(crate) struct Ctx<'a> {
+    run: &'a RunHandle,
+    now: OffsetDateTime,
+    /// Flows with new claims or a start: re-resolve.
+    pub(crate) resolve: BTreeSet<Uuid>,
+    /// Suites whose facts changed: re-derive.
+    pub(crate) suites: BTreeSet<Uuid>,
+    /// Suites that closed in this batch: their flows' finality may change.
+    pub(crate) closed: BTreeSet<Uuid>,
+    /// Devices whose busy/ready state may change.
+    pub(crate) devices: BTreeSet<Uuid>,
+    /// Entities whose stored row changed.
+    pub(crate) changed: BTreeSet<EntityRef>,
+}
+
+impl<'a> Ctx<'a> {
+    pub(crate) fn new(run: &'a RunHandle, now: OffsetDateTime) -> Self {
+        Self {
+            run,
+            now,
+            resolve: BTreeSet::new(),
+            suites: BTreeSet::new(),
+            closed: BTreeSet::new(),
+            devices: BTreeSet::new(),
+            changed: BTreeSet::new(),
+        }
+    }
+
+    /// Applies one event. A database error aborts the transaction; the caller retries the batch
+    /// under savepoints when it was the event's fault.
+    pub(crate) async fn apply(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+    ) -> Result<Effect, sqlx::Error> {
+        if matches!(
+            e.src.kind,
+            SourceKind::ServerInferred | SourceKind::Unrecognized
+        ) {
+            return Ok(reject(
+                "invalid",
+                format!("agents may not send {} evidence", wire(e.src.kind)),
+            ));
+        }
+        let s = &e.subject;
+        for id in [
+            s.suite_execution_id,
+            s.shard_id,
+            s.device_session_id,
+            s.flow_execution_id,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !valid_agent_id(id, self.now) {
+                return Ok(reject("invalid", format!("{id} is not a current UUIDv7")));
+            }
+        }
+        let body = match e.decode() {
+            Ok(Some(body)) => body,
+            Ok(None) => return Ok(Effect::Unsupported),
+            Err(err) => return Ok(reject("invalid", format!("bad {} payload: {err}", e.kind))),
+        };
+        match body {
+            EventBody::RunStarted(b) => self.run_started(tx, &b).await,
+            EventBody::SuiteStarted(b) => self.suite_started(tx, e, &b).await,
+            EventBody::ShardAssigned(b) => self.shard_assigned(tx, e, &b).await,
+            EventBody::FlowStarted(b) => {
+                let flow = FlowRef {
+                    name: b.flow.name.clone(),
+                    path: b.flow.path.clone(),
+                };
+                self.upsert_flow(tx, e, &flow, Some(b.shard_number), Some(b.ordinal), true)
+                    .await
+            }
+            EventBody::StepStarted(b) => self.step_started(tx, e, &b).await,
+            EventBody::StepEnded(b) => self.step_ended(tx, e, &b).await,
+            EventBody::FlowEnded(b) => self.flow_ended(tx, e, &b).await,
+            EventBody::FlowReported(b) => self.flow_reported(tx, e, &b).await,
+            EventBody::ProcessExited(b) => self.process_exited(tx, e, &b).await,
+            EventBody::ReportParsed(b) => self.report_parsed(tx, e, &b).await,
+            EventBody::RunSignal(b) => self.run_signal(tx, &b).await,
+            EventBody::RunFinalizing => self.run_finalizing(tx).await,
+            EventBody::RunEnded(b) => self.run_ended(tx, e, &b).await,
+            EventBody::PlanAssigned(b) => self.plan_assigned(tx, &b).await,
+            EventBody::DeviceStateObserved(b) => self.device_state(tx, e, &b).await,
+            EventBody::JournalGap(b) => self.journal_gap(tx, &b).await,
+            // Kept in the journal; projected by later milestones (artifacts: M5).
+            EventBody::ArtifactRegistered(_)
+            | EventBody::AgentWarning(_)
+            | EventBody::ParserUnrecognized(_) => Ok(Effect::Applied),
+        }
+    }
+
+    /// Re-derives what this batch touched; returns every changed entity.
+    pub(crate) async fn derive(
+        mut self,
+        tx: &mut PgConnection,
+    ) -> Result<BTreeSet<EntityRef>, sqlx::Error> {
+        if !self.closed.is_empty() {
+            let closed: Vec<Uuid> = self.closed.iter().copied().collect();
+            let flows = sqlx::query_scalar!(
+                "SELECT id FROM flow_executions WHERE suite_execution_id = ANY($1)",
+                &closed
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            self.resolve.extend(flows);
+        }
+        let resolve: Vec<Uuid> = self.resolve.iter().copied().collect();
+        for id in derive::flows(tx, &resolve).await? {
+            self.changed.insert(EntityRef::Flow(id));
+        }
+        if !resolve.is_empty() {
+            let suites = sqlx::query_scalar!(
+                "SELECT DISTINCT suite_execution_id FROM flow_executions WHERE id = ANY($1)",
+                &resolve
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            self.suites.extend(suites);
+        }
+        let suites: Vec<Uuid> = self.suites.iter().copied().collect();
+        for id in derive::suites(tx, &suites).await? {
+            self.changed.insert(EntityRef::Suite(id));
+        }
+        let devices: Vec<Uuid> = self.devices.iter().copied().collect();
+        for id in derive::devices(tx, &devices).await? {
+            self.changed.insert(EntityRef::Device(id));
+        }
+        if derive::job(tx, self.run.job_id).await? {
+            self.changed.insert(EntityRef::Job(self.run.job_id));
+        }
+        Ok(self.changed)
+    }
+
+    fn run_changed(&mut self) {
+        self.changed
+            .insert(EntityRef::AgentRun(self.run.agent_run_id));
+    }
+
+    async fn run_started(
+        &mut self,
+        tx: &mut PgConnection,
+        b: &RunStarted,
+    ) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs SET argv = $2, agent_version = $3, rev = rev + 1 WHERE id = $1",
+            self.run.agent_run_id,
+            serde_json::to_value(&b.argv).unwrap_or_default(),
+            b.agent_version
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    async fn suite_started(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &SuiteStarted,
+    ) -> Result<Effect, sqlx::Error> {
+        let Some(suite) = e.subject.suite_execution_id else {
+            return Ok(reject(
+                "invalid",
+                "suite.started needs a suite_execution_id",
+            ));
+        };
+        let owned = sqlx::query_scalar!(
+            "INSERT INTO suite_executions (id, project_id, agent_run_id, job_id, shard_mode,
+                                           shard_count, started_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id) DO UPDATE SET rev = suite_executions.rev
+               WHERE suite_executions.agent_run_id = EXCLUDED.agent_run_id
+             RETURNING id",
+            suite,
+            self.run.project_id,
+            self.run.agent_run_id,
+            self.run.job_id,
+            wire(b.shard_mode),
+            i32::try_from(b.shards).unwrap_or(i32::MAX),
+            e.at.wall
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if owned.is_none() {
+            return Ok(foreign(suite));
+        }
+        self.suites.insert(suite);
+        self.changed.insert(EntityRef::Suite(suite));
+        Ok(Effect::Applied)
+    }
+
+    async fn shard_assigned(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &ShardAssigned,
+    ) -> Result<Effect, sqlx::Error> {
+        let (Some(suite), Some(shard)) = (e.subject.suite_execution_id, e.subject.shard_id) else {
+            return Ok(reject(
+                "invalid",
+                "shard.assigned needs a suite_execution_id and a shard_id",
+            ));
+        };
+        let device = e.subject.device_session_id;
+        if let Some(device) = device {
+            let owned = sqlx::query_scalar!(
+                "INSERT INTO device_sessions (id, project_id, agent_run_id, serial, state,
+                                              first_seen_at, last_seen_at)
+                 VALUES ($1, $2, $3, $4, 'ready', $5, $5)
+                 ON CONFLICT (id) DO UPDATE
+                   SET serial = EXCLUDED.serial, last_seen_at = EXCLUDED.last_seen_at,
+                       rev = device_sessions.rev + 1
+                   WHERE device_sessions.agent_run_id = EXCLUDED.agent_run_id
+                 RETURNING id",
+                device,
+                self.run.project_id,
+                self.run.agent_run_id,
+                b.device_serial,
+                e.at.wall
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            if owned.is_none() {
+                return Ok(foreign(device));
+            }
+            self.changed.insert(EntityRef::Device(device));
+        }
+        let planned = serde_json::to_value(&b.planned).unwrap_or_default();
+        let owned = sqlx::query_scalar!(
+            "INSERT INTO shards (id, project_id, agent_run_id, suite_execution_id, shard_index,
+                                 device_session_id, planned, planned_count)
+             SELECT $1, s.project_id, s.agent_run_id, s.id, $3, $4, $5, $6
+               FROM suite_executions s WHERE s.id = $2 AND s.agent_run_id = $7
+             ON CONFLICT (id) DO UPDATE
+               SET device_session_id = coalesce(EXCLUDED.device_session_id, shards.device_session_id),
+                   planned = EXCLUDED.planned, planned_count = EXCLUDED.planned_count
+               WHERE shards.agent_run_id = EXCLUDED.agent_run_id
+             RETURNING id",
+            shard,
+            suite,
+            i32::try_from(b.shard_number).unwrap_or(i32::MAX),
+            device,
+            planned,
+            i32::try_from(b.planned.len()).unwrap_or(i32::MAX),
+            self.run.agent_run_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if owned.is_none() {
+            return Ok(foreign(shard));
+        }
+        // The plan is known live, so progress is determinate (research 08 §4).
+        sqlx::query!(
+            "UPDATE suite_executions
+                SET planned_count = (SELECT sum(planned_count)::int FROM shards
+                                      WHERE suite_execution_id = $1),
+                    plan_source = $2,
+                    lifecycle = CASE WHEN lifecycle = 'starting' THEN 'running' ELSE lifecycle END,
+                    rev = rev + 1
+              WHERE id = $1",
+            suite,
+            wire(e.src.kind)
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.changed.insert(EntityRef::Suite(suite));
+        Ok(Effect::Applied)
+    }
+
+    /// Creates or updates a flow execution. `started` marks a live `flow.started`; claims about
+    /// a flow that never started create it without starting it.
+    async fn upsert_flow(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        flow: &FlowRef,
+        shard_number: Option<u32>,
+        ordinal: Option<u32>,
+        started: bool,
+    ) -> Result<Effect, sqlx::Error> {
+        let (Some(suite), Some(id)) = (e.subject.suite_execution_id, e.subject.flow_execution_id)
+        else {
+            return Ok(reject(
+                "invalid",
+                format!(
+                    "{} needs a suite_execution_id and a flow_execution_id",
+                    e.kind
+                ),
+            ));
+        };
+        let owned = sqlx::query_scalar!(
+            "INSERT INTO flow_executions (id, project_id, agent_run_id, suite_execution_id,
+                                          shard_id, device_session_id, flow_name, flow_path,
+                                          shard_number, ordinal, started, state, started_at,
+                                          pipeline_attempt_id, job_id)
+             SELECT $1, s.project_id, s.agent_run_id, s.id, $3, $4, $5, $6, $7, $8, $9,
+                    CASE WHEN $9 THEN 'running' ELSE 'pending' END,
+                    CASE WHEN $9 THEN $10::timestamptz END, j.pipeline_attempt_id, s.job_id
+               FROM suite_executions s JOIN jobs j ON j.id = s.job_id
+              WHERE s.id = $2 AND s.agent_run_id = $11
+             ON CONFLICT (id) DO UPDATE
+               SET started = flow_executions.started OR EXCLUDED.started,
+                   started_at = coalesce(flow_executions.started_at, EXCLUDED.started_at),
+                   flow_name = CASE WHEN EXCLUDED.started THEN EXCLUDED.flow_name
+                                    ELSE flow_executions.flow_name END,
+                   flow_path = coalesce(flow_executions.flow_path, EXCLUDED.flow_path),
+                   shard_id = coalesce(flow_executions.shard_id, EXCLUDED.shard_id),
+                   device_session_id = coalesce(flow_executions.device_session_id,
+                                                EXCLUDED.device_session_id),
+                   shard_number = coalesce(flow_executions.shard_number, EXCLUDED.shard_number),
+                   ordinal = coalesce(flow_executions.ordinal, EXCLUDED.ordinal),
+                   rev = flow_executions.rev + 1
+               WHERE flow_executions.agent_run_id = EXCLUDED.agent_run_id
+             RETURNING id",
+            id,
+            suite,
+            e.subject.shard_id,
+            e.subject.device_session_id,
+            flow.name,
+            flow.path,
+            shard_number.and_then(|n| i32::try_from(n).ok()),
+            ordinal.and_then(|n| i32::try_from(n).ok()),
+            started,
+            e.at.wall,
+            self.run.agent_run_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if owned.is_none() {
+            return Ok(foreign(id));
+        }
+        if started {
+            sqlx::query!(
+                "UPDATE suite_executions SET lifecycle = 'running', rev = rev + 1
+                  WHERE id = $1 AND lifecycle = 'starting'",
+                suite
+            )
+            .execute(&mut *tx)
+            .await?;
+            self.suites.insert(suite);
+        }
+        self.resolve.insert(id);
+        self.changed.insert(EntityRef::Flow(id));
+        if let Some(d) = e.subject.device_session_id {
+            self.devices.insert(d);
+        }
+        Ok(Effect::Applied)
+    }
+
+    async fn owned_flow(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+    ) -> Result<Result<Uuid, Effect>, sqlx::Error> {
+        let Some(id) = e.subject.flow_execution_id else {
+            return Ok(Err(reject(
+                "invalid",
+                format!("{} needs a flow_execution_id", e.kind),
+            )));
+        };
+        let owner =
+            sqlx::query_scalar!("SELECT agent_run_id FROM flow_executions WHERE id = $1", id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        Ok(match owner {
+            Some(o) if o == self.run.agent_run_id => Ok(id),
+            Some(_) => Err(foreign(id)),
+            None => Err(reject(
+                "unknown_entity",
+                format!("flow execution {id} was never declared"),
+            )),
+        })
+    }
+
+    async fn step_started(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &StepStarted,
+    ) -> Result<Effect, sqlx::Error> {
+        self.step(tx, e, Some(&b.description), "running").await
+    }
+
+    async fn step_ended(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &StepEnded,
+    ) -> Result<Effect, sqlx::Error> {
+        self.step(tx, e, None, &wire(b.status)).await
+    }
+
+    async fn step(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        label: Option<&str>,
+        status: &str,
+    ) -> Result<Effect, sqlx::Error> {
+        let Some(step) = &e.subject.step else {
+            return Ok(reject("invalid", format!("{} needs a step", e.kind)));
+        };
+        let flow = match self.owned_flow(tx, e).await? {
+            Ok(f) => f,
+            Err(effect) => return Ok(effect),
+        };
+        let running = status == "running";
+        sqlx::query!(
+            "INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status,
+                                          source, started_at, ended_at)
+             VALUES ($1, $2, $3, $4, $5, $6,
+                     CASE WHEN $7 THEN $8::timestamptz END, CASE WHEN NOT $7 THEN $8::timestamptz END)
+             ON CONFLICT (run_day, flow_execution_id, step_index) DO UPDATE
+               SET label = coalesce(EXCLUDED.label, step_executions.label),
+                   status = CASE WHEN $7 THEN step_executions.status ELSE EXCLUDED.status END,
+                   source = EXCLUDED.source,
+                   started_at = coalesce(step_executions.started_at, EXCLUDED.started_at),
+                   ended_at = coalesce(EXCLUDED.ended_at, step_executions.ended_at)",
+            self.run.run_day,
+            flow,
+            i32::try_from(step.index).unwrap_or(i32::MAX),
+            label,
+            status,
+            wire(e.src.kind),
+            running,
+            e.at.wall
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE flow_executions SET rev = rev + 1 WHERE id = $1",
+            flow
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.changed.insert(EntityRef::Flow(flow));
+        Ok(Effect::Applied)
+    }
+
+    async fn flow_ended(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &FlowEnded,
+    ) -> Result<Effect, sqlx::Error> {
+        let flow = match &b.flow {
+            Some(f) => match self.upsert_flow(tx, e, f, None, None, false).await? {
+                Effect::Applied => e.subject.flow_execution_id,
+                other => return Ok(other),
+            },
+            None => match self.owned_flow(tx, e).await? {
+                Ok(id) => Some(id),
+                Err(effect) => return Ok(effect),
+            },
+        };
+        let Some(flow) = flow else {
+            return Ok(reject("invalid", "flow.ended needs a flow_execution_id"));
+        };
+        let message = b.failure.as_ref().map(|f| f.message.as_str());
+        self.claim(tx, e, flow, b.outcome, message, b.duration_ms, None)
+            .await
+    }
+
+    async fn flow_reported(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &FlowReported,
+    ) -> Result<Effect, sqlx::Error> {
+        let flow_ref = FlowRef {
+            name: b.junit.name.clone(),
+            path: b.junit.file.clone(),
+        };
+        let shard = b.testsuite_index.saturating_add(1);
+        match self
+            .upsert_flow(tx, e, &flow_ref, Some(shard), None, false)
+            .await?
+        {
+            Effect::Applied => {}
+            other => return Ok(other),
+        }
+        let Some(flow) = e.subject.flow_execution_id else {
+            return Ok(reject("invalid", "flow.reported needs a flow_execution_id"));
+        };
+        if let Some(file) = &b.junit.file {
+            // The JUnit `file` is repository-relative: the flow's stable identity.
+            let def = sqlx::query_scalar!(
+                "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)
+                 ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name
+                 RETURNING id",
+                self.run.project_id,
+                file,
+                b.junit.name
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            sqlx::query!(
+                "UPDATE flow_executions SET flow_definition_id = $2 WHERE id = $1",
+                flow,
+                def
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        let detail = serde_json::json!({
+            "testsuite_index": b.testsuite_index,
+            "testcase_index": b.testcase_index,
+            "matched": b.matched,
+            "junit": b.junit,
+        });
+        self.claim(
+            tx,
+            e,
+            flow,
+            b.outcome,
+            b.junit.failure.as_deref(),
+            b.junit.time_ms,
+            Some(detail),
+        )
+        .await
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one claim: which flow, what, and the evidence behind it"
+    )]
+    async fn claim(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        flow: Uuid,
+        outcome: FlowOutcome,
+        message: Option<&str>,
+        duration_ms: Option<u64>,
+        detail: Option<serde_json::Value>,
+    ) -> Result<Effect, sqlx::Error> {
+        // Invariant I3: the lattice's rules decide who may claim what, before the database's
+        // CHECK constraint gets a say.
+        let claim = match Claim::new(e.src.kind, outcome, e.seq) {
+            Ok(c) => c,
+            Err(refused) => return Ok(reject("invalid", refused.to_string())),
+        };
+        let mut detail = detail.unwrap_or_else(|| serde_json::json!({}));
+        if let (Some(parser), Some(obj)) = (&e.src.parser, detail.as_object_mut()) {
+            obj.insert("parser".into(), parser.clone().into());
+        }
+        sqlx::query!(
+            "INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order,
+                                      observed_at, detail)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
+            flow,
+            wire(claim.source()),
+            format!("{}:{}", self.run.agent_run_id, e.seq),
+            wire(claim.outcome()),
+            to_i64(e.seq),
+            e.at.wall,
+            detail
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE flow_executions
+                SET failure_message = coalesce(failure_message, $2),
+                    duration_ms = coalesce(duration_ms, $3),
+                    ended_at = coalesce(ended_at, $4),
+                    rev = rev + 1
+              WHERE id = $1",
+            flow,
+            message,
+            duration_ms.map(to_i64),
+            e.at.wall
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.resolve.insert(flow);
+        self.changed.insert(EntityRef::Flow(flow));
+        if let Some(d) = e.subject.device_session_id {
+            self.devices.insert(d);
+        }
+        Ok(Effect::Applied)
+    }
+
+    fn owned_suite_update(&mut self, e: &EventEnvelope, updated: Option<Uuid>) -> Effect {
+        match (e.subject.suite_execution_id, updated) {
+            (Some(s), Some(_)) => {
+                self.suites.insert(s);
+                self.changed.insert(EntityRef::Suite(s));
+                Effect::Applied
+            }
+            (Some(s), None) => reject(
+                "unknown_entity",
+                format!("suite {s} is unknown or not owned by this run"),
+            ),
+            (None, _) => reject("invalid", format!("{} needs a suite_execution_id", e.kind)),
+        }
+    }
+
+    async fn process_exited(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &ProcessExited,
+    ) -> Result<Effect, sqlx::Error> {
+        let updated = sqlx::query_scalar!(
+            "UPDATE suite_executions
+                SET exit_code = $3, exit_signal = $4, exit_class = $5, ended_at = $6,
+                    lifecycle = CASE WHEN lifecycle = 'closed' THEN lifecycle ELSE 'reporting' END,
+                    rev = rev + 1
+              WHERE id = $1 AND agent_run_id = $2
+              RETURNING id",
+            e.subject.suite_execution_id,
+            self.run.agent_run_id,
+            b.code,
+            b.signal,
+            wire(b.class),
+            e.at.wall
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE agent_runs SET maestro_exit_code = $2, maestro_exit_signal = $3, rev = rev + 1
+              WHERE id = $1",
+            self.run.agent_run_id,
+            b.code,
+            b.signal
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(self.owned_suite_update(e, updated))
+    }
+
+    async fn report_parsed(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &ReportParsed,
+    ) -> Result<Effect, sqlx::Error> {
+        let updated = sqlx::query_scalar!(
+            "UPDATE suite_executions
+                SET report_status = $3, lifecycle = 'closed', ended_at = coalesce(ended_at, $4),
+                    rev = rev + 1
+              WHERE id = $1 AND agent_run_id = $2
+              RETURNING id",
+            e.subject.suite_execution_id,
+            self.run.agent_run_id,
+            wire(b.status),
+            e.at.wall
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(s) = updated {
+            self.closed.insert(s);
+        }
+        Ok(self.owned_suite_update(e, updated))
+    }
+
+    async fn run_signal(
+        &mut self,
+        tx: &mut PgConnection,
+        b: &RunSignal,
+    ) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs SET signal_received = $2, rev = rev + 1 WHERE id = $1",
+            self.run.agent_run_id,
+            b.signal
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    async fn run_finalizing(&mut self, tx: &mut PgConnection) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs SET state = 'finalizing', rev = rev + 1
+              WHERE id = $1 AND state IN ('active', 'detached', 'abandoned')",
+            self.run.agent_run_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    async fn run_ended(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &RunEnded,
+    ) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs
+                SET state = 'ended', end_seq = $2, ended_at = now(),
+                    end_reason = CASE WHEN $3 THEN 'interrupted' ELSE 'normal' END,
+                    rev = rev + 1
+              WHERE id = $1",
+            self.run.agent_run_id,
+            to_i64(e.seq),
+            b.interrupted
+        )
+        .execute(&mut *tx)
+        .await?;
+        let released = sqlx::query_scalar!(
+            "UPDATE device_sessions SET state = 'released', rev = rev + 1
+              WHERE agent_run_id = $1 AND state <> 'released'
+              RETURNING id",
+            self.run.agent_run_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        self.changed
+            .extend(released.into_iter().map(EntityRef::Device));
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    async fn plan_assigned(
+        &mut self,
+        tx: &mut PgConnection,
+        b: &PlanAssigned,
+    ) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs SET plan_id = $2, plan_shard_id = $3, rev = rev + 1 WHERE id = $1",
+            self.run.agent_run_id,
+            b.plan_id,
+            i32::try_from(b.shard_id).unwrap_or(i32::MAX)
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    async fn device_state(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &DeviceStateObserved,
+    ) -> Result<Effect, sqlx::Error> {
+        let offline = matches!(b.state, AdbState::Offline | AdbState::Absent);
+        let online = b.state == AdbState::Device;
+        let updated = sqlx::query_scalar!(
+            "UPDATE device_sessions
+                SET state = CASE WHEN state IN ('released', 'lost') THEN state
+                                 WHEN $3 THEN 'offline'
+                                 WHEN $4 AND state IN ('offline', 'discovered', 'booting') THEN 'ready'
+                                 ELSE state END,
+                    last_seen_at = $5, rev = rev + 1
+              WHERE agent_run_id = $1 AND (id = $2 OR ($2::uuid IS NULL AND serial = $6))
+              RETURNING id",
+            self.run.agent_run_id,
+            e.subject.device_session_id,
+            offline,
+            online,
+            e.at.wall,
+            b.serial
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        self.changed
+            .extend(updated.into_iter().map(EntityRef::Device));
+        Ok(Effect::Applied)
+    }
+
+    async fn journal_gap(
+        &mut self,
+        tx: &mut PgConnection,
+        b: &JournalGap,
+    ) -> Result<Effect, sqlx::Error> {
+        if b.from_seq > b.to_seq || b.from_seq == 0 {
+            return Ok(reject(
+                "invalid",
+                format!("bad gap {}..{}", b.from_seq, b.to_seq),
+            ));
+        }
+        sqlx::query!(
+            "INSERT INTO ingest_gaps (agent_run_id, stream, from_seq, to_seq, reason)
+             VALUES ($1, 'journal', $2, $3, $4) ON CONFLICT DO NOTHING",
+            self.run.agent_run_id,
+            to_i64(b.from_seq),
+            to_i64(b.to_seq),
+            format!("journal.gap: {}", b.reason)
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+}
+
+fn foreign(id: Uuid) -> Effect {
+    reject(
+        "foreign_entity",
+        format!("{id} belongs to another agent run"),
+    )
+}

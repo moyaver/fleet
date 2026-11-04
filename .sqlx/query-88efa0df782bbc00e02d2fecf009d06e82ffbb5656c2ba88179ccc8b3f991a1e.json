@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha, git_ref)\n         VALUES ($1, $2, $3, $4, $5, $6)\n         ON CONFLICT (project_id, provider, provider_run_key) DO UPDATE\n           SET commit_sha = coalesce(pipeline_runs.commit_sha, EXCLUDED.commit_sha)\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pipeline_runs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "88efa0df782bbc00e02d2fecf009d06e82ffbb5656c2ba88179ccc8b3f991a1e"
+}

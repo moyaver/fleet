@@ -706,6 +706,11 @@ impl Session {
         if f.failure.is_none() {
             f.failure.clone_from(&message);
         }
+        // A flow that never started has no `flow.started` to name it.
+        let flow = (!f.started).then(|| FlowRef {
+            name: f.name.clone(),
+            path: f.path.clone(),
+        });
         let subject = self.flow_subject_at(idx);
         self.emit(
             at,
@@ -716,6 +721,7 @@ impl Session {
                 outcome,
                 duration_ms,
                 failure: message.map(|message| FailureInfo { message }),
+                flow,
             }),
         );
     }

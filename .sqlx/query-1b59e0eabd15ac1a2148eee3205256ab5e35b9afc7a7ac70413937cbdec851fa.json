@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT agent_run_id FROM flow_executions WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "agent_run_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1b59e0eabd15ac1a2148eee3205256ab5e35b9afc7a7ac70413937cbdec851fa"
+}

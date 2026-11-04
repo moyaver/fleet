@@ -7,7 +7,7 @@ Self-hosted, live observability for mobile UI tests running in CI, starting with
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
 > [!NOTE]
-> **Status: M2 (agent) done, M3 next.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
+> **Status: M2 (agent) done, M3 (server core) in progress.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
 > Progress is tracked [below](#roadmap).
 
 Everything is **Rust**: the agent, the server and the dashboard. There's no Node.js, npm or hand-written JavaScript anywhere.
@@ -27,7 +27,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
 | ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
 | ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
-| ⏭️ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
+| 🚧 | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
 | ⬜ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
 | ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](docs/decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
 | ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
@@ -68,6 +68,21 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] Validated on a real emulator: unchanged result, 65 events gap-free, 0.14% of one core (I10)
 - [x] Release pipeline (cargo-dist): musl x86_64/aarch64 + macOS arm64, checksums, attestations, third-party notices
 - [ ] HTTPS proxy support and OIDC token exchange (need the M3 server)
+
+### M3 checklist
+
+- [x] Migrations 0001–0005 on Postgres 18: tenancy, CI identity, execution (`CHECK`: inferred sources never claim passed), journal partitioned by `run_day`, telemetry; committed `.sqlx` data, `cargo xtask sqlx`
+- [x] Ingest transaction: epoch fencing, duplicate skip, ownership-checked upserts, claims resolved by the lattice, suite and job outcomes (`fleet-core::outcome`), gaps recorded (I3, I5)
+- [ ] Agent WebSocket and HTTPS batch endpoints: acks, resume, fencing, keepalive, timeouts, `goaway` + 1012 on shutdown
+- [ ] `fleet serve | migrate | check-config | healthcheck`, figment config (TOML, `FLEET_*`, `*_FILE`)
+- [ ] Live hub, browser WebSocket (snapshot + versioned deltas, `resync`), rebuilt from Postgres after a restart
+- [ ] REST snapshots, OpenAPI (utoipa), liveness sweeps under an advisory-lock leader
+- [ ] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
+- [ ] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
+- [ ] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
+- [ ] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image
+- [ ] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
+- [ ] Exit criteria proven by tests: concurrent agents, restart without loss, acceptance criteria 3, 10, 11, 15, fixture replay through the real agent and server
 
 ### Owner actions
 

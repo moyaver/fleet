@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs\n                SET state = 'ended', end_seq = $2, ended_at = now(),\n                    end_reason = CASE WHEN $3 THEN 'interrupted' ELSE 'normal' END,\n                    rev = rev + 1\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ad94f68b0c37b4d56ec8f7e894fcfa4b80709bed8a0a03d794e6f9c8f2b9925c"
+}

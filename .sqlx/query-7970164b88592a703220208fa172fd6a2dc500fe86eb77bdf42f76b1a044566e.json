@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions\n                SET planned_count = (SELECT sum(planned_count)::int FROM shards\n                                      WHERE suite_execution_id = $1),\n                    plan_source = $2,\n                    lifecycle = CASE WHEN lifecycle = 'starting' THEN 'running' ELSE lifecycle END,\n                    rev = rev + 1\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "source_t",
+            "kind": {
+              "Domain": "Text"
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7970164b88592a703220208fa172fd6a2dc500fe86eb77bdf42f76b1a044566e"
+}

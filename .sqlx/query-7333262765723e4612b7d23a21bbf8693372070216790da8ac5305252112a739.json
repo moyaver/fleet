@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions\n                SET report_status = $3, lifecycle = 'closed', ended_at = coalesce(ended_at, $4),\n                    rev = rev + 1\n              WHERE id = $1 AND agent_run_id = $2\n              RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7333262765723e4612b7d23a21bbf8693372070216790da8ac5305252112a739"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser,\n                                   occurred_at, mono_ms, subject, flow_execution_id,\n                                   apply_status, data)\n         SELECT $1, $2, u.seq, u.type, u.v, u.src_kind, u.src_parser, u.occurred_at, u.mono_ms,\n                u.subject, u.flow, u.status, u.data\n           FROM unnest($3::bigint[], $4::text[], $5::smallint[], $6::text[], $7::text[],\n                       $8::timestamptz[], $9::bigint[], $10::jsonb[], $11::uuid[], $12::text[],\n                       $13::jsonb[])\n             AS u(seq, type, v, src_kind, src_parser, occurred_at, mono_ms, subject, flow,\n                  status, data)\n         ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Uuid",
+        "Int8Array",
+        "TextArray",
+        "Int2Array",
+        "TextArray",
+        "TextArray",
+        "TimestamptzArray",
+        "Int8Array",
+        "JsonbArray",
+        "UuidArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "baffcf61e19417cacfaef550c84179c094e6616136ac61ef40d031464ca1cbbf"
+}

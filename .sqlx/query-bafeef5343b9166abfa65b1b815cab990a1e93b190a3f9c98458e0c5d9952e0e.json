@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions f\n            SET state = u.state, outcome_source = u.source, finality = u.finality,\n                has_conflict = u.conflict, rev = f.rev + 1\n           FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::bool[])\n             AS u(id, state, source, finality, conflict)\n          WHERE f.id = u.id\n            AND (f.state, f.outcome_source, f.finality::text, f.has_conflict)\n                IS DISTINCT FROM (u.state, u.source, u.finality, u.conflict)\n          RETURNING f.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "BoolArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bafeef5343b9166abfa65b1b815cab990a1e93b190a3f9c98458e0c5d9952e0e"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH next AS (\n           SELECT d.id,\n                  CASE WHEN EXISTS (SELECT 1 FROM flow_executions f\n                                     WHERE f.device_session_id = d.id AND f.state = 'running')\n                       THEN 'busy' ELSE 'ready' END AS state\n             FROM device_sessions d\n            WHERE d.id = ANY($1) AND d.state IN ('ready', 'busy'))\n         UPDATE device_sessions d SET state = next.state, rev = d.rev + 1\n           FROM next\n          WHERE d.id = next.id AND d.state <> next.state\n          RETURNING d.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "device_sessions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f147c359b7652a49a63ed54b9ce41c0ac1456019fbbedfe655aeabc0d5e8300d"
+}

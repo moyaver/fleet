@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET signal_received = $2, rev = rev + 1 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d18ab80e4eb1aecc3ec5b29c71d1261f2badaa9c408352b7c09432301f2ab996"
+}

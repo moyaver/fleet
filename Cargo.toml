@@ -55,6 +55,7 @@ unescaped_backticks = "warn"
 fleet-core = { path = "crates/fleet-core" }
 fleet-maestro = { path = "crates/fleet-maestro" }
 fleet-protocol = { path = "crates/fleet-protocol" }
+fleet-store = { path = "crates/fleet-store" }
 fleet-web-assets = { path = "crates/fleet-web-assets" }
 
 anyhow = "1.0.104"
@@ -65,6 +66,7 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 console_error_panic_hook = "0.1.7"
 crc32fast = "1.5.4"
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+getrandom = "0.4.3"
 insta = { version = "1.49.0", features = ["json"] }
 leptos = { version = "0.8.23", features = ["csr"] }
 nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
@@ -77,6 +79,8 @@ rustls = { version = "0.23.46", default-features = false, features = ["ring", "s
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
+# Postgres only (ADR-0006). TLS trusts the OS store, so corporate CAs work (research 03 §4).
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "time", "json", "tls-rustls-ring-native-roots"] }
 signal-hook = "0.4.6"
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 thiserror = "2.0.21"

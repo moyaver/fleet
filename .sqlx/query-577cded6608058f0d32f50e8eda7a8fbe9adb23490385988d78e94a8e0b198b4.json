@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS \"cancelled!\",\n                EXISTS (SELECT 1 FROM suite_executions s\n                         WHERE s.agent_run_id = r.id AND s.lifecycle <> 'closed') AS \"suite_open!\"\n           FROM agent_runs r WHERE r.job_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "cancelled!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "suite_open!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "577cded6608058f0d32f50e8eda7a8fbe9adb23490385988d78e94a8e0b198b4"
+}

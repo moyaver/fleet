@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE jobs\n            SET lifecycle = $2, outcome = $3, outcome_source = $4,\n                closed_at = CASE WHEN $2 = 'closed' THEN coalesce(closed_at, now()) END,\n                reopened_count = reopened_count + (lifecycle = 'closed' AND $2 <> 'closed')::int,\n                rev = rev + 1\n          WHERE id = $1\n            AND (lifecycle, outcome, outcome_source::text) IS DISTINCT FROM ($2, $3, $4)\n          RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1273aadc52f64d7aaa3d919440f31bc42ae4d3839f6555a12cc4b66c2e1f809b"
+}

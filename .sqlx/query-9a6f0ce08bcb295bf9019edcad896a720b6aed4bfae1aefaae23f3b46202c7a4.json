@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE suite_executions SET outcome = $2, outcome_source = $3, rev = rev + 1\n              WHERE id = $1 AND (outcome, outcome_source::text) IS DISTINCT FROM ($2, $3)\n              RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "suite_executions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9a6f0ce08bcb295bf9019edcad896a720b6aed4bfae1aefaae23f3b46202c7a4"
+}

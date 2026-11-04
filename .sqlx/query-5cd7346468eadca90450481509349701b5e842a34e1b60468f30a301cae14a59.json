@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT apply_status FROM agent_events WHERE agent_run_id = $1 ORDER BY seq",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "apply_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_events",
+            "name": "apply_status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5cd7346468eadca90450481509349701b5e842a34e1b60468f30a301cae14a59"
+}

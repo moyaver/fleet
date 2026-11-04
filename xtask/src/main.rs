@@ -6,6 +6,7 @@
     reason = "xtask is a terminal tool; its output is the user interface"
 )]
 
+mod db;
 mod fixtures;
 mod lint;
 
@@ -22,11 +23,12 @@ const TOOLS: &[&str] = &[
     "cargo-deny",
     // The binary sits behind the `cli` feature.
     "cargo-about --features cli",
+    "sqlx-cli --no-default-features --features rustls,postgres",
     "trunk",
     "mdbook",
 ];
 
-const USAGE: &str = "usage: cargo xtask <setup | ci | lint | web [--release] | fixtures …>";
+const USAGE: &str = "usage: cargo xtask <setup | ci | lint | sqlx | web [--release] | fixtures …>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -40,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         ["setup"] => setup(&root),
         ["ci"] => ci(&root),
         ["lint"] => lint::run(&root),
+        ["sqlx"] => db::prepare(&root),
         ["web"] => web(&root, false),
         ["web", "--release"] => web(&root, true),
         ["fixtures", rest @ ..] => fixtures::run(&root, rest),
@@ -64,10 +67,32 @@ fn setup(root: &Path) -> anyhow::Result<()> {
 }
 
 fn ci(root: &Path) -> anyhow::Result<()> {
+    // The sqlx tests need Postgres 18: CI's service container, or a throwaway one locally.
+    let throwaway;
+    let url = if let Ok(url) = std::env::var("DATABASE_URL") {
+        url
+    } else {
+        throwaway = db::start()?;
+        throwaway.url.clone()
+    };
+    db::migrate(root, &url)?;
+    // Builds use the committed `.sqlx/` data, exactly like the Docker image build.
+    let offline = [("SQLX_OFFLINE", "true")];
     sh(root, "cargo fmt --all --check")?;
-    sh(
+    run_env(
         root,
-        "cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "cargo",
+        &[
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--locked",
+            "--",
+            "-D",
+            "warnings",
+        ],
+        &offline,
     )?;
     // Proves the browser-side crates stay wasm-safe (PLAN §4.2).
     sh(
@@ -77,9 +102,34 @@ fn ci(root: &Path) -> anyhow::Result<()> {
     )?;
     lint::run(root)?;
     sh(root, "cargo deny --locked check")?;
-    sh(root, "cargo nextest run --workspace --locked")?;
+    run_env(
+        root,
+        "cargo",
+        &[
+            "nextest",
+            "run",
+            "--workspace",
+            "--all-features",
+            "--locked",
+        ],
+        &[offline[0], ("DATABASE_URL", &url)],
+    )?;
+    // The committed offline data matches the queries (fails when a query changed).
+    let mut check = db::PREPARE.to_vec();
+    check.insert(2, "--check");
+    run_env(
+        root,
+        "cargo",
+        &check,
+        &[("DATABASE_URL", &url), ("SQLX_OFFLINE", "false")],
+    )?;
     // nextest skips doctests; rustdoc warnings include broken intra-doc links.
-    sh(root, "cargo test --doc --workspace --locked")?;
+    run_env(
+        root,
+        "cargo",
+        &["test", "--doc", "--workspace", "--locked"],
+        &offline,
+    )?;
     run_env(
         root,
         "cargo",
@@ -90,7 +140,7 @@ fn ci(root: &Path) -> anyhow::Result<()> {
             "--document-private-items",
             "--locked",
         ],
-        &[("RUSTDOCFLAGS", "-D warnings")],
+        &[("RUSTDOCFLAGS", "-D warnings"), offline[0]],
     )?;
     web(root, false)?;
     sh(root, "mdbook build docs")?;
@@ -117,7 +167,12 @@ fn run(dir: &Path, program: &str, args: &[&str]) -> anyhow::Result<()> {
     run_env(dir, program, args, &[])
 }
 
-fn run_env(dir: &Path, program: &str, args: &[&str], env: &[(&str, &str)]) -> anyhow::Result<()> {
+pub(crate) fn run_env(
+    dir: &Path,
+    program: &str,
+    args: &[&str],
+    env: &[(&str, &str)],
+) -> anyhow::Result<()> {
     println!("$ {program} {}", args.join(" "));
     let status = Command::new(program)
         .args(args)

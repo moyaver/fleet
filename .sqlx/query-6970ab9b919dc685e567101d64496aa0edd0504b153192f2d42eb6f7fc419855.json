@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_regclass('_sqlx_migrations')::text",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "to_regclass",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6970ab9b919dc685e567101d64496aa0edd0504b153192f2d42eb6f7fc419855"
+}

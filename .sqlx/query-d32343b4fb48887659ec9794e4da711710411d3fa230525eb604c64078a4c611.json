@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)\n                 ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name\n                 RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_definitions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d32343b4fb48887659ec9794e4da711710411d3fa230525eb604c64078a4c611"
+}

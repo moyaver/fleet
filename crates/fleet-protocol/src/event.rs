@@ -185,6 +185,10 @@ pub struct FlowEnded {
     /// Why it failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<FailureInfo>,
+    /// Which flow, set when no `flow.started` named it first (a planned flow Maestro skipped), so
+    /// the server can create the flow execution from the claim alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow: Option<FlowRef>,
 }
 
 /// One `<testcase>` of the final report.
@@ -513,6 +517,7 @@ mod tests {
                 failure: Some(FailureInfo {
                     message: "Assertion is false".into(),
                 }),
+                flow: None,
             }),
             EventBody::ReportParsed(ReportParsed {
                 status: ReportStatus::Absent,

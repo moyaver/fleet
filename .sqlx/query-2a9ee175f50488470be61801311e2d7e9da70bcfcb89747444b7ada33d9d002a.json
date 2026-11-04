@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order)\n         VALUES ($1, 'server_inferred', 'test', 'passed', 1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2a9ee175f50488470be61801311e2d7e9da70bcfcb89747444b7ada33d9d002a"
+}
