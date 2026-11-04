@@ -1,0 +1,20 @@
+{
+  "uuid" : "befa8795-6fd5-44ea-a057-c879ee0ebfdc",
+  "enabled" : false,
+  "cachedToken" : null,
+  "lastUploadedForCLI" : null,
+  "lastUploadedTime" : null,
+  "email" : null,
+  "user_id" : null,
+  "name" : null,
+  "workOSOrgId" : null,
+  "orgId" : null,
+  "orgName" : null,
+  "orgPlan" : null,
+  "orgTrialExpiresOn" : null,
+  "orgStatus" : null,
+  "currentPlan" : null,
+  "isInTrial" : null,
+  "daysUntilTrialExpiry" : null,
+  "daysUntilGracePeriodExpiry" : null
+}

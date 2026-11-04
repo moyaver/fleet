@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="2" failures="1" time="29.676" timestamp="2026-11-04T02:32:25">
+    <testcase id="bravo" name="bravo" classname="bravo" file="examples/flows/phase0/suite/bravo.yaml" time="11.115" timestamp="2026-11-04T02:32:25" status="SUCCESS"/>
+    <testcase id="delta-fails" name="delta-fails" classname="delta-fails" file="examples/flows/phase0/suite/delta-fails.yaml" time="18.548" timestamp="2026-11-04T02:32:36" status="ERROR">
+      <failure>[shard 1] Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="2" failures="0" time="21.855" timestamp="2026-11-04T02:32:31">
+    <testcase id="charlie" name="charlie" classname="charlie" file="examples/flows/phase0/suite/charlie.yaml" time="12.646" timestamp="2026-11-04T02:32:31" status="SUCCESS"/>
+    <testcase id="alpha" name="alpha" classname="alpha" file="examples/flows/phase0/suite/alpha.yaml" time="9.196" timestamp="2026-11-04T02:32:44" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

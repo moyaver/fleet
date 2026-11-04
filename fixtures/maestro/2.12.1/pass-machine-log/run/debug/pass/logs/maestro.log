@@ -1,0 +1,21 @@
+02:24:51.463 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:24:51.466 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:24:51.466 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:24:51.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:24:51.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:24:51.576 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:24:51.576 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:24:51.858 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:24:51.859 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:24:54.246 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:24:54.247 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:24:54.683 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:24:56.300 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:24:56.303 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:24:58.801 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:24:58.802 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:24:58.803 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+02:24:59.381 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+02:24:59.382 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:24:59.388 [ INFO] maestro.Maestro.backPress: Pressing back
+02:25:01.504 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED

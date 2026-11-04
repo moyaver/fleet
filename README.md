@@ -7,8 +7,8 @@ Self-hosted, live observability for mobile UI tests running in CI, starting with
 It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
 
 > [!NOTE]
-> **Status: M0 (bootstrap).** The workspace, tooling, CI and licensing are in place; there's no product logic yet.
-> Next up is **M1**: capturing real Maestro output on emulators. Progress is tracked [below](#roadmap).
+> **Status: M2 (agent) in progress.** M1 proved the live-signal strategy on a real emulator ([research 08](research/08-phase0-results.md)): Maestro's log is flushed live, step by step.
+> Progress is tracked [below](#roadmap).
 
 Everything is **Rust**: the agent, the server and the dashboard. There's no Node.js, npm or hand-written JavaScript anywhere.
 
@@ -25,8 +25,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | | Milestone | Scope | Exit criteria | Estimate |
 |---|---|---|---|---|
 | ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
-| ⏭️ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
-| ⬜ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
+| ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
+| 🚧 | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
 | ⬜ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
 | ⬜ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
 | ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
@@ -47,6 +47,15 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] Leptos hello page built by Trunk, embedded and served by `fleet serve` with the CSP
 - [x] mdBook skeleton under `docs/`
 - [x] GitHub settings: Discussions, merge options, topics, labels, milestones, `main` ruleset, private vulnerability reporting, secret scanning
+
+### M1 checklist
+
+- [x] Emulator capture setup with the latest Maestro (2.12.1), two emulators of one AVD
+- [x] 24 scenarios captured as fixtures: pass, fail, suite, shards, `executionOrder`, retry, nested `runFlow`, signals, device loss, no device, bad flag, planted secrets, output paths, TTY/ANSI, adb load
+- [x] `cargo xtask fixtures capture | import`
+- [x] The 17 questions answered, ADR-0003 accepted ([research 08](research/08-phase0-results.md))
+- [x] Build vs buy: Allure 3 reads Maestro's failures as passes ([research 08 §5](research/08-phase0-results.md#5-build-vs-buy-adr-0009)); ReportPortal not run (needs Docker)
+- [ ] Post the upstream `--events` proposal (owner: draft in [research 08 §6](research/08-phase0-results.md#6-upstream---events-reporter-open-decision-o3))
 
 ### Owner actions
 
@@ -102,7 +111,9 @@ crates/
   fleet-e2e/         browser and full-stack tests
 xtask/               cargo xtask: setup, ci, lint, web
 docs/                mdBook, implementation plan, spec, ADRs
-research/            research reports 00–07 and Maestro CLI fixtures
+research/            research reports 00–08
+fixtures/maestro/    captured Maestro runs, by version and scenario
+examples/flows/      flows used to capture them
 ```
 
 ## Development
@@ -129,6 +140,7 @@ Then open <http://127.0.0.1:8080>. See [CONTRIBUTING.md](CONTRIBUTING.md) for th
 |---|---|
 | [Implementation plan](docs/PLAN.md) | The single source of truth: decisions, invariants, stack, milestones |
 | [Research synthesis](research/00-synthesis.md) | Conclusions of research reports 01–07 on one page |
+| [Phase 0 results](research/08-phase0-results.md) | What Maestro really does on an emulator, answered from captured fixtures |
 | [Spec v1.0](docs/spec-v1.0.md) | The original product and architecture specification |
 | [Architecture decisions](docs/decisions/README.md) | ADRs 0001–0011 |
 | [Rust conventions](docs/CONVENTIONS.md) | How Fleet's Rust is written; most of it enforced by `cargo xtask ci` |

@@ -1,0 +1,5 @@
+appId: com.android.settings
+---
+- tapOn: "Apps"
+- assertVisible: "Apps"
+- back

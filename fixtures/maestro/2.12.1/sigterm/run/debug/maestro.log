@@ -1,0 +1,74 @@
+MFLT1|1793752474839|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1793752474840|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1793752474840|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1793752474841|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1793752474841|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1793752474841|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1793752474841|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1793752474841|main|INFO|MAESTRO|Java Version: 26
+MFLT1|1793752474966|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1793752474970|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1793752474974|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1793752474974|main|INFO|MAESTRO|---------------------
+MFLT1|1793752474998|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1793752476218|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 50163 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/slow.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752479064|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow slow
+MFLT1|1793752479072|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1793752479228|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1793752479394|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1793752479397|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1793752479398|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1793752479398|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1793752479398|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1793752479441|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752479441|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752479693|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1793752479694|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 40 times RUNNING
+MFLT1|1793752479697|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752481485|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752482740|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752482744|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752484824|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752484825|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752484825|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752484825|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752486210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752486210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752486210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752486210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752486320|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752487581|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752487582|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752489518|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752489518|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752489518|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752489518|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752490817|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752490818|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752490818|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752490818|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752490920|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752492184|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752492184|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752494056|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752494056|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752494056|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752494056|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752495534|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752495534|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752495534|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752495534|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752495630|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752496871|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752496872|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752498776|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752498776|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752498777|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752498777|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752500166|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752500167|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752500167|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752500167|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752500257|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752501856|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752501857|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait

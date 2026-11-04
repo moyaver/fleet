@@ -1,0 +1,204 @@
+{"src":"proc","t_ms":82,"tree":[{"command":"/bin/sh <MAESTRO_HOME>/bin/maestro --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.0","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"144"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":1546}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":1546}
+{"bytes":473,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @1a84f40f (file:<MAESTRO_HOME>/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":1614}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":1614}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":1614}
+{"event":"dir","path":"run/debug","src":"fs","t_ms":2134}
+{"src":"proc","t_ms":2147,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"54.7","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"197440"}]}
+{"event":"created","path":"run/debug/maestro.log","size":760,"src":"fs","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444117|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444118|main|INFO|MAESTRO|---- System Info ----\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444118|main|INFO|MAESTRO|Maestro Version: 2.12.1\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444119|main|INFO|MAESTRO|CI: Undefined\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444119|main|INFO|MAESTRO|OS Name: Mac OS X\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444119|main|INFO|MAESTRO|OS Version: 26.7.1\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444119|main|INFO|MAESTRO|Architecture: aarch64\n","src":"log","t_ms":2186}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444119|main|INFO|MAESTRO|Java Version: 26\n","src":"log","t_ms":2186}
+{"event":"size","path":"run/debug/maestro.log","size":1008,"src":"fs","t_ms":2292}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444234|main|INFO|MAESTRO|Xcode Version: 27.1\n","src":"log","t_ms":2292}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444238|main|INFO|MAESTRO|Flutter Version: Undefined\n","src":"log","t_ms":2292}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444242|main|INFO|MAESTRO|Flutter Channel: Undefined\n","src":"log","t_ms":2292}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752444242|main|INFO|MAESTRO|---------------------\n","src":"log","t_ms":2292}
+{"event":"size","path":"run/debug/maestro.log","size":1812,"src":"fs","t_ms":3671}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752445609|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 49798 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/slow.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))\n","src":"log","t_ms":3671}
+{"src":"proc","t_ms":4211,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"37.7","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"253920"}]}
+{"src":"proc","t_ms":6281,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.4","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"94816"}]}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":6926}
+{"bytes":33,"line":"Waiting for flows to complete...\n","src":"stdout","t_ms":6926}
+{"event":"dir","path":"run/debug/slow","src":"fs","t_ms":6930}
+{"event":"size","path":"run/debug/maestro.log","size":1922,"src":"fs","t_ms":6930}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752448891|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow slow\n","src":"log","t_ms":6930}
+{"event":"size","path":"run/debug/maestro.log","size":2010,"src":"fs","t_ms":6984}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752448900|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info\n","src":"log","t_ms":6984}
+{"bytes":75,"line":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\n","src":"stderr","t_ms":7029}
+{"bytes":412,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:<MAESTRO_HOME>/lib/protobuf-java-3.21.9.jar)\n","src":"stderr","t_ms":7029}
+{"bytes":114,"line":"WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\n","src":"stderr","t_ms":7029}
+{"bytes":78,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n","src":"stderr","t_ms":7029}
+{"event":"size","path":"run/debug/maestro.log","size":2194,"src":"fs","t_ms":7142}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449061|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)\n","src":"log","t_ms":7142}
+{"event":"dir","path":"run/debug/slow/logs","src":"fs","t_ms":7197}
+{"event":"created","path":"run/debug/slow/logs/maestro.log","size":0,"src":"fs","t_ms":7197}
+{"event":"size","path":"run/debug/maestro.log","size":2796,"src":"fs","t_ms":7307}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449230|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING\n","src":"log","t_ms":7307}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449233|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED\n","src":"log","t_ms":7307}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449234|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":7307}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449234|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":7307}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449234|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":7307}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":533,"src":"fs","t_ms":7307}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.230 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING\n","src":"log","t_ms":7307}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.233 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED\n","src":"log","t_ms":7307}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.234 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":7307}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.234 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":7307}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.234 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":7307}
+{"event":"size","path":"run/debug/maestro.log","size":3015,"src":"fs","t_ms":7359}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449284|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings\n","src":"log","t_ms":7359}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449284|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch\n","src":"log","t_ms":7359}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":730,"src":"fs","t_ms":7359}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.284 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings\n","src":"log","t_ms":7359}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.284 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch\n","src":"log","t_ms":7359}
+{"event":"size","path":"run/debug/maestro.log","size":3375,"src":"fs","t_ms":7841}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449763|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.android.settings\" COMPLETED\n","src":"log","t_ms":7841}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449764|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 40 times RUNNING\n","src":"log","t_ms":7841}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752449769|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":7841}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":1048,"src":"fs","t_ms":7841}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.763 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.android.settings\" COMPLETED\n","src":"log","t_ms":7841}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.764 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 40 times RUNNING\n","src":"log","t_ms":7841}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:09.769 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":7841}
+{"src":"proc","t_ms":8376,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"7.5","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"172880"}]}
+{"event":"size","path":"run/debug/maestro.log","size":3945,"src":"fs","t_ms":9970}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752451903|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":9970}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":1600,"src":"fs","t_ms":9970}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:11.903 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":9970}
+{"src":"proc","t_ms":10483,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"9.0","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"116592"}]}
+{"event":"size","path":"run/debug/maestro.log","size":4173,"src":"fs","t_ms":11258}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752453193|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":11258}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752453197|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":11258}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":1806,"src":"fs","t_ms":11258}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:13.193 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":11258}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:13.197 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":11258}
+{"src":"proc","t_ms":12584,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.2","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"118112"}]}
+{"event":"size","path":"run/debug/maestro.log","size":4614,"src":"fs","t_ms":14039}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752455976|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":14039}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752455981|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":14039}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752455982|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":14039}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752455987|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":14039}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":2196,"src":"fs","t_ms":14039}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:15.976 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":14039}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:15.981 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":14039}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:15.982 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":14039}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:15.987 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":14039}
+{"src":"proc","t_ms":14681,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"2.5","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"107648"}]}
+{"event":"size","path":"run/debug/maestro.log","size":5058,"src":"fs","t_ms":15562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752457522|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":15562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752457523|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" PENDING\n","src":"log","t_ms":15562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752457523|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING\n","src":"log","t_ms":15562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752457523|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":15562}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":2583,"src":"fs","t_ms":15563}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:17.522 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":15563}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:17.523 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on \"Apps\" PENDING\n","src":"log","t_ms":15563}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:17.523 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING\n","src":"log","t_ms":15563}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:17.523 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":15563}
+{"event":"size","path":"run/debug/maestro.log","size":5628,"src":"fs","t_ms":15726}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752457650|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":15726}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":3135,"src":"fs","t_ms":15726}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:17.650 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":15726}
+{"src":"proc","t_ms":16737,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.3","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"145408"}]}
+{"event":"size","path":"run/debug/maestro.log","size":5856,"src":"fs","t_ms":17007}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752458939|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":17007}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752458940|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":17007}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":3341,"src":"fs","t_ms":17007}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:18.939 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":17007}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:18.940 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":17007}
+{"src":"proc","t_ms":18811,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"7.3","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"150928"}]}
+{"event":"size","path":"run/debug/maestro.log","size":6297,"src":"fs","t_ms":18843}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752460785|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":18843}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752460786|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":18843}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752460786|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":18843}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752460786|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":18843}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":3731,"src":"fs","t_ms":18843}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:20.785 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":18843}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:20.786 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":18843}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:20.786 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":18843}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:20.786 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":18843}
+{"event":"size","path":"run/debug/maestro.log","size":6741,"src":"fs","t_ms":20196}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752462150|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":20196}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752462150|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" PENDING\n","src":"log","t_ms":20196}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752462150|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING\n","src":"log","t_ms":20196}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752462150|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":20196}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":4118,"src":"fs","t_ms":20196}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:22.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":20196}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:22.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on \"Apps\" PENDING\n","src":"log","t_ms":20196}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:22.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING\n","src":"log","t_ms":20196}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:22.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":20196}
+{"event":"size","path":"run/debug/maestro.log","size":7311,"src":"fs","t_ms":20305}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752462253|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":20305}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":4670,"src":"fs","t_ms":20305}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:22.253 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":20305}
+{"src":"proc","t_ms":20905,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"2.9","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"139008"}]}
+{"event":"size","path":"run/debug/maestro.log","size":7539,"src":"fs","t_ms":21655}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752463574|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":21655}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752463575|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":21655}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":4876,"src":"fs","t_ms":21655}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:23.574 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":21655}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:23.575 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":21655}
+{"src":"proc","t_ms":22998,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.3","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"96496"}]}
+{"event":"size","path":"run/debug/maestro.log","size":7980,"src":"fs","t_ms":23505}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752465449|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":23505}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752465450|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":23505}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752465450|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":23505}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752465450|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":23505}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":5266,"src":"fs","t_ms":23505}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:25.449 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":23505}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:25.450 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":23505}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:25.450 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":23505}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:25.450 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":23505}
+{"event":"size","path":"run/debug/maestro.log","size":8424,"src":"fs","t_ms":24899}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752466836|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":24899}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752466837|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" PENDING\n","src":"log","t_ms":24899}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752466837|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING\n","src":"log","t_ms":24899}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752466837|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":24899}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":5653,"src":"fs","t_ms":24899}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:26.836 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":24899}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:26.837 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on \"Apps\" PENDING\n","src":"log","t_ms":24899}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:26.837 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING\n","src":"log","t_ms":24899}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:26.837 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":24899}
+{"event":"size","path":"run/debug/maestro.log","size":8994,"src":"fs","t_ms":25003}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752466939|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":25003}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":6205,"src":"fs","t_ms":25003}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:26.939 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":25003}
+{"src":"proc","t_ms":25062,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"34.6","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"118320"}]}
+{"event":"size","path":"run/debug/maestro.log","size":9222,"src":"fs","t_ms":26288}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752468199|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":26288}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752468200|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":26288}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":6411,"src":"fs","t_ms":26288}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:28.199 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":26288}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:28.200 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait\n","src":"log","t_ms":26288}
+{"src":"proc","t_ms":27137,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"1.4","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"121472"}]}
+{"event":"size","path":"run/debug/maestro.log","size":9663,"src":"fs","t_ms":28184}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752470130|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":28184}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752470130|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":28184}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752470130|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":28184}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752470131|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":28184}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":6801,"src":"fs","t_ms":28184}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:30.130 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":28184}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:30.130 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":28184}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:30.130 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":28184}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:30.131 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":28184}
+{"src":"proc","t_ms":29195,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath <MAESTRO_HOME>/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/slow.yaml","cpu":"0.3","pgid":"75043","pid":83723,"ppid":83722,"rss_kib":"114288"}]}
+{"event":"size","path":"run/debug/maestro.log","size":10107,"src":"fs","t_ms":29606}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752471529|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":29606}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752471529|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" PENDING\n","src":"log","t_ms":29606}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752471529|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING\n","src":"log","t_ms":29606}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752471529|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":29606}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":7188,"src":"fs","t_ms":29606}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:31.529 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":29606}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:31.529 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on \"Apps\" PENDING\n","src":"log","t_ms":29606}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:31.529 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING\n","src":"log","t_ms":29606}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:31.529 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":29606}
+{"event":"size","path":"run/debug/maestro.log","size":10677,"src":"fs","t_ms":29661}
+{"file":"run/debug/maestro.log","line":"MFLT1|1793752471620|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":29661}
+{"event":"size","path":"run/debug/slow/logs/maestro.log","size":7740,"src":"fs","t_ms":29661}
+{"file":"run/debug/slow/logs/maestro.log","line":"02:34:31.620 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))\n","src":"log","t_ms":29661}
+{"ok":true,"pid":83723,"signal":"INT","src":"signal","t_ms":30048}
+{"event":"created","path":"run/debug/slow/commands.json","size":0,"src":"fs","t_ms":30256}

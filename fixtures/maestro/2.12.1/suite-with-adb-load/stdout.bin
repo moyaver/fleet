@@ -1,0 +1,18 @@
+
+Waiting for flows to complete...
+[Passed] bravo (10s)
+[Passed] charlie (10s)
+[Failed] delta-fails (19s) (Assertion is false: "Fleet never shows this" is visible)
+[Passed] alpha (8s)
+
+1/4 Flow Failed
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                │
+│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │
+│                                                                                                │
+│   Run your flows on Maestro Cloud:                                                             │
+│   maestro cloud app_file flows_folder/                                                         │
+│                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+

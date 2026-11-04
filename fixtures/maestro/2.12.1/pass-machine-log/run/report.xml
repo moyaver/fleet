@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="1" failures="0" time="11.058" timestamp="2026-11-04T02:24:51">
+    <testcase id="pass" name="pass" classname="pass" file="examples/flows/phase0/pass.yaml" time="11.047" timestamp="2026-11-04T02:24:51" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

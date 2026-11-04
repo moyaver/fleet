@@ -1,0 +1,174 @@
+--------- beginning of main
+11-04 02:25:10.264 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-04 02:25:10.264 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-04 02:25:10.264 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10155} in 0ms
+11-04 02:25:10.265 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-04 02:25:10.265 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-04 02:25:10.265 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={20155} in 1ms
+11-04 02:25:10.313 I/adbd    (  518): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+--------- beginning of system
+11-04 02:25:10.327 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-04 02:25:10.335 I/adbd    (  518): adbd service requested 'sync:'
+11-04 02:25:10.371 I/adbd    (  518): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-04 02:25:10.383 I/ActivityManager(  642): Force stopping com.android.settings appid=1000 user=0: from pid 5813
+11-04 02:25:10.383 I/ActivityManager(  642): Killing 5555:com.android.settings/1000 (adj 0): stop com.android.settings due to from pid 5813
+11-04 02:25:10.388 W/ActivityTaskManager(  642): Force removing ActivityRecord{25669183 u0 com.android.settings/.Settings t1960 f}: app died, no saved state
+11-04 02:25:10.390 V/WindowManagerShell(  909): Transition requested (#21): android.os.BinderProxy@c256686 TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=1960 effectiveUid=1000 seqId=0 displayId=0 isRunning=false baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.android.settings cmp=com.android.settings/.Settings } baseActivity=null topActivity=null origActivity=ComponentInfo{com.android.settings/com.android.settings.Settings} realActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} realActivityIsAppLockEnabled=false numActivities=0 lastActiveTime=543777 supportsMultiWindow=true supportsMultiWindowWithoutConstraints=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.os.BinderProxy@aa21351} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isInteractive=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=true lastNonFullscreenBounds=null leafTaskBoundsFromOptions= false capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=503 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false isLeafTask= true eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 0, 0) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null topNonResizableActivityAspectRatio=-1.0} topActivityMainWindowFrame=null isAppBubble=false}, pipChange = null, remoteTransitionInfo = null, displayChanges = null, requestedLocation = null, userChange = null, windowingLayerChange = null, fullscreenRequestChange = null, flags = 0, debugId = 21 }
+11-04 02:25:10.390 D/WindowManager(  642): TaskFragmentOrganizer=android.window.ITaskFragmentOrganizer$Stub$Proxy@83dffc0 died
+11-04 02:25:10.392 V/ShellDesktopMode(  909): DesktopTasksController: skipping handleRequest reason=triggerTask's display doesn't support desktop mode
+11-04 02:25:10.394 I/libbinder.BpBinder(  493): onLastStrongRef automatically unlinking death recipients for binder (0xb4007990a4053620) with descriptor: '(not cached)'
+11-04 02:25:10.396 V/WindowManager(  642): Defer transition id=21 for TaskFragmentTransaction=android.os.Binder@4d294f9
+11-04 02:25:10.396 D/ViewRootImpl( 1028): Skipping stats log for color mode
+11-04 02:25:10.396 D/BaseActivity( 1028): Launcher flags updated: [state_started] +[state_started]
+11-04 02:25:10.398 V/RecentTasksController(  909): Notify recent tasks changed: 1
+11-04 02:25:10.399 I/HidDeviceService( 1053): unregisterAppUid(): uid=10150
+11-04 02:25:10.399 D/BaseActivity( 1028): Launcher flags updated: [state_started|state_resumed|state_user_active] +[state_resumed|state_user_active]
+11-04 02:25:10.399 W/HidDeviceService( 1053): unregisterAppUid(): caller UID doesn't match user UID
+11-04 02:25:10.399 D/BaseActivity( 1028): Launcher flags updated: [state_started|state_resumed|state_user_active] +[]
+11-04 02:25:10.399 D/BaseActivity( 1028): Launcher flags updated: [state_started|state_resumed|state_deferred_resumed|state_user_active] +[state_deferred_resumed]
+11-04 02:25:10.399 W/InputDispatcher(  642): channel '161a8c4 com.android.settings/com.android.settings.Settings' ~ Consumer closed input channel or an error occurred.  events=0x9
+11-04 02:25:10.399 E/InputDispatcher(  642): channel '161a8c4 com.android.settings/com.android.settings.Settings' ~ Channel is unrecoverably broken and will be disposed!
+11-04 02:25:10.399 I/WindowManager(  642): WINDOW DIED Window{161a8c4 u0 com.android.settings/com.android.settings.Settings}
+11-04 02:25:10.400 D/StatsLog( 1028): LAUNCHER_ONRESUME
+11-04 02:25:10.401 I/WindowManager(  642): WIN DEATH: Window{161a8c4 u0 com.android.settings/com.android.settings.Settings EXITING}
+11-04 02:25:10.401 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.401 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.401 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.401 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.401 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.401 I/ImeTracker(  642): com.android.settings:c78da80b: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false userId 0 displayId 0
+11-04 02:25:10.402 D/SmartspaceInteractor( 1028): notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+11-04 02:25:10.402 I/Zygote  (  433): Process 5555 exited due to signal 9 (Killed)
+11-04 02:25:10.402 D/WindowManager(  642): setClientSurface Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#196)/@0x36afa9f for a59c58f com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+11-04 02:25:10.402 I/Surface ( 1028): Creating surface for consumer unnamed-1028-12 with slotExpansion=1 for 64 slots
+11-04 02:25:10.403 I/Surface ( 1028): Creating surface for consumer VRI[NexusLauncherActivity]#8(BLAST Consumer)8 with slotExpansion=1 for 64 slots
+11-04 02:25:10.403 I/ImeTracker(  642): com.android.settings:c78da80b: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-04 02:25:10.404 D/QuickstepModelDelegate( 1028): notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+11-04 02:25:10.405 V/ActivityManager(  642): Got obituary of 5555:com.android.settings
+11-04 02:25:10.406 W/ActivityManager(  642): setHasOverlayUi called on unknown pid: 5555
+11-04 02:25:10.409 I/adbd    (  518): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-04 02:25:10.411 D/CarrierSvcBindHelper( 1025): onHandleForceStop: [com.android.settings]
+11-04 02:25:10.413 I/AiAiEcho( 1542): Predicting[0]:  [CONTEXT sampling_count=5 ]
+11-04 02:25:10.413 D/SsBaseTemplateCard( 1028): Passed-in item info is null
+11-04 02:25:10.413 D/SsBaseTemplateCard( 1028): Passed-in item info is null
+11-04 02:25:10.413 D/SsBaseTemplateCard( 1028): Passed-in item info is null
+11-04 02:25:10.413 D/SsBaseTemplateCard( 1028): Passed-in item info is null
+11-04 02:25:10.413 I/SsBaseTemplateCard( 1028): Secondary card pane is null
+11-04 02:25:10.414 I/AiAiEcho( 1542): EchoTargets: 
+11-04 02:25:10.414 I/AiAiEcho( 1542): Filtered by AiAi flag check: 
+11-04 02:25:10.414 I/AiAiEcho( 1542): [CONTEXT ratelimit_period="10 SECONDS" ]
+11-04 02:25:10.414 I/AiAiEcho( 1542): #remoteViewsTwiddler: feature disabled.
+11-04 02:25:10.414 I/AiAiEcho( 1542): AmbientDataPredictorImpl No tracked ambient data found for ID: null; for event type: 6, skipping event processing.
+11-04 02:25:10.415 D/CarrierSvcBindHelper( 1025): No carrier app for: 0
+11-04 02:25:10.415 I/SubtypeOperator( 1412): SubtypeOperator$1.onUnbindInput():43 
+11-04 02:25:10.416 W/InputChannel-JNI( 1412): Channel already disposed.
+11-04 02:25:10.416 I/libprocessgroup(  642): Removed cgroup /sys/fs/cgroup/system/uid_1000/pid_5555
+11-04 02:25:10.416 I/AiAiEcho( 1542): #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+11-04 02:25:10.417 D/BaseDepthController( 1028): setSurface:
+11-04 02:25:10.417 D/BaseDepthController( 1028): 	mWaitingOnSurfaceValidity: false
+11-04 02:25:10.417 D/BaseDepthController( 1028): 	mBaseSurface: Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#196)/@0xc98636b
+11-04 02:25:10.417 V/BaseDepthController( 1028): Applying blur: 0 to Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#196)/@0xc98636b applyImmediately: false
+11-04 02:25:10.419 D/BaseDepthController( 1028): shouldBlurWorkspace: false targetState: Normal currentStableState: Normal mCurrentBlur: 0 mLauncher.getDepthBlurTargets(): [com.android.launcher3.Workspace{aef1ec8 V.ED..... ......ID 0,0-1080,2424 #7f0a0498 app:id/workspace}, com.android.launcher3.Hotseat{9e13b61 V.ED..... .......D 0,1929-1080,2424 #7f0a01f8 app:id/hotseat}]
+11-04 02:25:10.419 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.419 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.419 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.419 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.419 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.429 D/WallpaperService(  909): onVisibilityChanged(true): com.android.systemui.wallpapers.ImageWallpaper$CanvasEngine@dba287b
+11-04 02:25:10.460 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.460 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.460 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.460 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.460 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.461 V/WindowManager(  642): Unknown focus tokens, dropping reportFocusChanged
+11-04 02:25:10.474 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-04 02:25:10.486 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.486 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.486 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.486 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.486 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.530 W/TransitionChain(  642): Combining startAct into #21(CLOSE|R|0x0) from appDied
+11-04 02:25:10.536 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.536 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.536 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.536 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.536 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.539 I/ActivityTaskManager(  642): Add Task{196930c #1960 type=standard A=1000:com.android.settings.root} to hidden list because adding Task{63a347f #1961 type=standard A=1000:com.android.settings.root}
+11-04 02:25:10.539 V/ActivityTaskManager(  642): TaskLaunchParamsModifier: phase=2 task=Task{63a347f #1961 type=standard A=1000:com.android.settings.root} activity=ActivityRecord{23458206 u0 com.android.settings/.Settings t-1} display-from-task=0 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@112346529 inherit-from-task=fullscreen non-freeform-task-display-area display-area=DefaultTaskDisplayArea@112346529 skip-bounds-fullscreen
+11-04 02:25:10.539 I/ActivityTaskManager(  642): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 xflg=0x4 pkg=com.android.settings cmp=com.android.settings/.Settings} with LAUNCH_MULTIPLE from uid 10327 (dev.mobile.maestro) (BAL_ALLOW_PERMISSION) result code=0
+11-04 02:25:10.543 V/RecentTasksController(  909): Notify recent tasks changed: 1
+11-04 02:25:10.545 V/RecentTasksController(  909): onRecentTaskRemovedForAddTask; removing task=1960
+11-04 02:25:10.546 D/ShellDesktopMode(  909): DesktopRepository(0): Removes freeform task: taskId=1960
+11-04 02:25:10.546 W/ShellDesktopMode(  909): DesktopRepository(0): No display id found for task: taskId=1960
+11-04 02:25:10.546 V/RecentTasksController(  909): Notify recent tasks changed: 1
+11-04 02:25:10.551 D/Zygote  (  433): Forked child process 5823
+11-04 02:25:10.552 I/ActivityManager(  642): Start proc 5823:com.android.settings/1000 for next-top-activity {com.android.settings/com.android.settings.Settings}
+11-04 02:25:10.553 D/RecentTasksList( 1028): invalidateLoadedTasks - previous requestLoadId: -1
+11-04 02:25:10.558 I/libprocessgroup( 5823): Created cgroup /sys/fs/cgroup/system/uid_1000/pid_5823
+11-04 02:25:10.558 D/RecentsView( 1028): onTaskDisplayChanged: 1961, new displayId = 0
+11-04 02:25:10.558 D/BaseActivity( 1028): Launcher flags updated: [state_started|state_resumed|state_deferred_resumed|state_user_active] -[]
+11-04 02:25:10.559 D/BaseActivity( 1028): Launcher flags updated: [state_started|state_resumed|state_deferred_resumed] -[state_user_active]
+11-04 02:25:10.559 D/BaseActivity( 1028): Launcher flags updated: [state_started] -[state_resumed|state_deferred_resumed]
+11-04 02:25:10.560 W/SplitSelectStateCtor( 1028): Missing session instanceIds
+11-04 02:25:10.560 D/StatsLog( 1028): LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+11-04 02:25:10.566 V/WindowManager(  642): Defer transition id=21 for TaskFragmentTransaction=android.os.Binder@5a1b15a
+11-04 02:25:10.567 D/RecentTasksList( 1028): invalidateLoadedTasks - previous requestLoadId: -1
+11-04 02:25:10.567 D/RecentTasksList( 1028): invalidateLoadedTasks - previous requestLoadId: -1
+11-04 02:25:10.568 W/InputChannel-JNI(  642): Channel already disposed.
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:10.568 V/WindowManager(  642): Continue transition id=21 for TaskFragmentTransaction=android.os.Binder@4d294f9
+11-04 02:25:10.582 V/WindowManager(  642): Continue transition id=21 for TaskFragmentTransaction=android.os.Binder@5a1b15a
+11-04 0
+[... fleet fixtures import: 3879523 bytes cut ...]
+l, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@2fddc; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 2864 - 1080, 2361); boundsInWindow: Rect(0, 2864 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@32727; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 3093 - 1080, 2361); boundsInWindow: Rect(0, 3093 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: false; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@32ae8; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 3098 - 1080, 2361); boundsInWindow: Rect(0, 3098 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@35433; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 3295 - 1080, 2361); boundsInWindow: Rect(0, 3295 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@37d7e; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 3492 - 1080, 2361); boundsInWindow: Rect(0, 3492 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@3a6c9; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 3689 - 1080, 2361); boundsInWindow: Rect(0, 3689 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@3d014; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 3886 - 1080, 2361); boundsInWindow: Rect(0, 3886 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@3f95f; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 4083 - 1080, 2361); boundsInWindow: Rect(0, 4083 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@422aa; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 4280 - 1080, 2361); boundsInWindow: Rect(0, 4280 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@44bf5; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 4509 - 1080, 2361); boundsInWindow: Rect(0, 4509 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: false; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@44fb6; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 4514 - 1080, 2361); boundsInWindow: Rect(0, 4514 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 I/Maestro ( 5778): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@47901; boundsInParent: Rect(0, 0 - 1080, 192); boundsInScreen: Rect(0, 4711 - 1080, 2361); boundsInWindow: Rect(0, 4711 - 1080, 2361); packageName: com.android.settings; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: true; focused: false; selected: false; clickable: true; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_FOCUS - null, AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_CLICK - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-04 02:25:27.780 D/Maestro ( 5778): View hierarchy received in 32 ms
+11-04 02:25:27.963 D/WindowManager(  642): captureDisplay
+11-04 02:25:27.963 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.964 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.966 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.966 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:27.966 W/skia    (  493): AGTM parsing failed flags.readFromStream(s) at 159
+11-04 02:25:28.012 W/libc    ( 5778): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-04 02:25:28.017 I/DisplayManager( 5778): Choreographer implicitly registered for the refresh rate.
+11-04 02:25:28.033 I/GFXSTREAM( 5778): [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+11-04 02:25:28.033 I/GFXSTREAM( 5778): [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+11-04 02:25:28.034 W/libc    ( 5778): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-04 02:25:28.036 W/HWUI    ( 5778): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-04 02:25:28.037 W/HWUI    ( 5778): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-04 02:25:28.049 E/WifiDataStall(  642): Ignore this poll. newStats: null txLinkSpeedMbps: 1 rxLinkSpeedMbps: 2 rssi: -50 connectionCapabilities: com.android.server.wifi.WifiNative$ConnectionCapabilities@53d7906
+11-04 02:25:28.372 I/adbd    (  518): adbd service requested 'shell,v2,raw:logcat -v time -d'

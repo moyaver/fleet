@@ -1,0 +1,31 @@
+MFLT1|1793752090071|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1793752090073|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1793752090073|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1793752090073|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1793752090073|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1793752090073|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1793752090073|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1793752090073|main|INFO|MAESTRO|Java Version: 26
+MFLT1|1793752090204|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1793752090209|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1793752090214|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1793752090214|main|INFO|MAESTRO|---------------------
+MFLT1|1793752090290|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1793752090672|main|INFO|maestro.orchestra.workspace.WorkspaceExecutionPlanner|Created execution plan: ExecutionPlan(flowsToRun=[], sequence=FlowSequence(flows=[<REPO>/examples/flows/phase0/ordered/first-fails.yaml, <REPO>/examples/flows/phase0/ordered/never-runs.yaml], continueOnFailure=false), workspaceConfig=WorkspaceConfig(flows=[*.yaml], includeTags=null, excludeTags=null, executionOrder=ExecutionOrder(continueOnFailure=false, flowsOrder=[first-fails, never-runs]), baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752091948|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 61539 with execution plan ExecutionPlan(flowsToRun=[], sequence=FlowSequence(flows=[<REPO>/examples/flows/phase0/ordered/first-fails.yaml, <REPO>/examples/flows/phase0/ordered/never-runs.yaml], continueOnFailure=false), workspaceConfig=WorkspaceConfig(flows=[*.yaml], includeTags=null, excludeTags=null, executionOrder=ExecutionOrder(continueOnFailure=false, flowsOrder=[first-fails, never-runs]), baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752094967|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow first-fails
+MFLT1|1793752094977|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1793752095153|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1793752095313|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1793752095318|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1793752095319|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1793752095319|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1793752095319|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1793752095367|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752095367|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752095504|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1793752095504|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Fleet never shows this" is visible RUNNING
+MFLT1|1793752112749|DefaultDispatcher-worker-3|ERROR|maestro.orchestra.Orchestra|[Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+MFLT1|1793752112875|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Taking screenshot
+MFLT1|1793752112878|DefaultDispatcher-worker-1|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink
+MFLT1|1793752113198|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Fleet never shows this" is visible FAILED

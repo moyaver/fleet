@@ -1,0 +1,8 @@
+{"src":"proc","t_ms":63,"tree":[{"command":"/bin/sh <MAESTRO_HOME>/bin/maestro --device emulator-5600 test --not-a-real-flag <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"75043","pid":80351,"ppid":80350,"rss_kib":"272"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":1328}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":1328}
+{"bytes":473,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @1a84f40f (file:<MAESTRO_HOME>/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":1591}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":1591}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":1591}
+{"bytes":36,"line":"Unknown option: '--not-a-real-flag'\n","src":"stderr","t_ms":1650}
+{"bytes":42,"line":"Possible solutions: --no-color, --no-ansi\n","src":"stderr","t_ms":1650}

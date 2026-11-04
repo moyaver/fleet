@@ -1,0 +1,8 @@
+appId: com.android.settings
+name: retry-fail
+---
+- launchApp
+- retry:
+    maxRetries: 1
+    commands:
+      - assertVisible: "Fleet never shows this"

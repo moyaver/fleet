@@ -1,0 +1,7 @@
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - first-fails
+    - never-runs

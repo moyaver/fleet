@@ -12,5 +12,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- M1: `cargo xtask fixtures capture | import`, 24 Maestro 2.12.1 fixtures, Phase 0 flows, research 08; ADR-0003 accepted.
 - M0 repository bootstrap: Cargo workspace skeleton, `cargo xtask` (setup, ci, lint, web), CI and CLA workflows,
   licensing and governance files, mdBook skeleton, and a Leptos hello page served by `fleet serve`.

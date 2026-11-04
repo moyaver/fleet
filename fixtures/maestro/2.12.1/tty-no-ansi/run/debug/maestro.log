@@ -1,0 +1,32 @@
+02:30:56.564 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: <CAPTURE>/run/debug
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.12.1
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: OS Version: 26.7.1
+02:30:56.566 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+02:30:56.567 [ INFO] MAESTRO.logSystemInfo: Java Version: 26
+02:30:56.674 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 27.1
+02:30:56.679 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+02:30:56.683 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+02:30:56.683 [ INFO] MAESTRO.logSystemInfo: ---------------------
+02:30:56.771 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+02:30:57.812 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5600 using port 63783 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/fail.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+02:31:02.158 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow fail
+02:31:02.170 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+02:31:02.333 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+02:31:02.577 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:31:02.580 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:31:02.581 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:31:02.581 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:31:02.581 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:31:02.654 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:31:02.654 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:31:03.062 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:31:03.063 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:31:05.838 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:31:05.839 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+02:31:20.293 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+02:31:20.502 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:31:20.504 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:31:20.779 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED

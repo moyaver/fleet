@@ -1,0 +1,19 @@
+02:31:31.215 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:31:31.218 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:31:31.219 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:31:31.219 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:31:31.220 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:31:31.272 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:31:31.272 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:31:31.434 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:31:31.434 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:31:33.214 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:31:33.215 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Storage" RUNNING
+02:31:33.631 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+02:31:35.090 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:31:35.097 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (293, 2338) using hierarchy based logic for wait
+02:31:38.322 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:31:38.323 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Storage" COMPLETED
+02:31:38.323 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:31:38.325 [ INFO] maestro.Maestro.backPress: Pressing back
+02:31:39.914 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED

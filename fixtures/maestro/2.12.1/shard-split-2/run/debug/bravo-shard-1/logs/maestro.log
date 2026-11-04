@@ -1,0 +1,31 @@
+02:32:26.307 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Define variables RUNNING
+02:32:26.312 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Define variables COMPLETED
+02:32:26.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Apply configuration RUNNING
+02:32:26.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Apply configuration COMPLETED
+02:32:26.314 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Launch app "com.android.settings" RUNNING
+02:32:26.409 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:32:26.410 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:32:26.638 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Launch app "com.android.settings" COMPLETED
+02:32:26.639 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Assert that "Network & internet" is visible RUNNING
+02:32:29.246 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Assert that "Network & internet" is visible COMPLETED
+02:32:29.252 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Tap on "Storage" RUNNING
+02:32:29.979 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+02:32:31.237 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:32:31.239 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (293, 2338) using hierarchy based logic for wait
+02:32:31.898 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow: [shard 2]  Running flow charlie
+02:32:31.898 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+02:32:32.113 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+02:32:32.824 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Define variables RUNNING
+02:32:32.825 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Define variables COMPLETED
+02:32:32.826 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Apply configuration RUNNING
+02:32:32.826 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Apply configuration COMPLETED
+02:32:32.826 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Launch app "com.android.settings" RUNNING
+02:32:32.959 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:32:32.959 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:32:33.364 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Launch app "com.android.settings" COMPLETED
+02:32:33.364 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Assert that "Network & internet" is visible RUNNING
+02:32:34.429 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:32:34.430 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Tap on "Storage" COMPLETED
+02:32:34.430 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Press back RUNNING
+02:32:34.432 [ INFO] maestro.Maestro.backPress: Pressing back
+02:32:36.084 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Press back COMPLETED

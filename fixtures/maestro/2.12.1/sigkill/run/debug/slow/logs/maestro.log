@@ -1,0 +1,57 @@
+02:35:10.305 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:35:10.307 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:35:10.308 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:35:10.308 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:35:10.308 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:35:10.350 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:35:10.350 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:35:10.590 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:35:10.591 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 40 times RUNNING
+02:35:10.593 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:35:12.567 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:35:13.820 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:35:13.823 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:35:16.453 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:35:16.453 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:35:16.453 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:35:16.455 [ INFO] maestro.Maestro.backPress: Pressing back
+02:35:17.875 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:35:17.875 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on "Apps" PENDING
+02:35:17.875 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING
+02:35:17.876 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:35:17.989 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:35:19.298 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:35:19.299 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:35:21.144 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:35:21.145 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:35:21.145 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:35:21.145 [ INFO] maestro.Maestro.backPress: Pressing back
+02:35:22.486 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:35:22.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on "Apps" PENDING
+02:35:22.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING
+02:35:22.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:35:22.590 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:35:23.882 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:35:23.883 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:35:25.749 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:35:25.749 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:35:25.749 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:35:25.749 [ INFO] maestro.Maestro.backPress: Pressing back
+02:35:27.067 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:35:27.067 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on "Apps" PENDING
+02:35:27.067 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING
+02:35:27.067 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:35:27.165 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:35:28.426 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:35:28.427 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:35:30.303 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:35:30.304 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:35:30.304 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:35:30.304 [ INFO] maestro.Maestro.backPress: Pressing back
+02:35:31.659 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:35:31.659 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on "Apps" PENDING
+02:35:31.659 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING
+02:35:31.659 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:35:31.750 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:35:33.006 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:35:33.006 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait

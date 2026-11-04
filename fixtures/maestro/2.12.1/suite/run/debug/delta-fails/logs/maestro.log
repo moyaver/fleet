@@ -1,0 +1,13 @@
+02:25:57.200 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:25:57.201 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:25:57.202 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:25:57.202 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:25:57.202 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:25:57.292 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:25:57.292 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:25:57.655 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:25:57.656 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+02:26:15.303 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+02:26:15.483 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:26:15.485 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:26:15.803 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED

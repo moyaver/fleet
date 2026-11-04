@@ -1,0 +1,35 @@
+appId: com.android.settings
+name: features
+env:
+  PLANTED_E: ${PASSWORD}
+onFlowStart:
+  - pressKey: Home
+onFlowComplete:
+  - pressKey: Home
+---
+- launchApp
+- runFlow: subflows/open-apps.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - assertVisible: "Network & internet"
+- repeat:
+    times: 2
+    commands:
+      - scroll
+      - scrollUntilVisible:
+          element: "Network & internet"
+          direction: UP
+- assertVisible:
+    text: "Fleet optional marker"
+    optional: true
+- runFlow:
+    when:
+      visible: "Fleet never shows this"
+    commands:
+      - tapOn: "Fleet never shows this"
+- tapOn: "Search Settings"
+- inputText: ${PLANTED_E}
+- eraseText
+- inputText: ${MAESTRO_FLEET_TOKEN}
+- back

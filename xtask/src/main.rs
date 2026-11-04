@@ -6,6 +6,7 @@
     reason = "xtask is a terminal tool; its output is the user interface"
 )]
 
+mod fixtures;
 mod lint;
 
 use std::{
@@ -25,7 +26,7 @@ const TOOLS: &[&str] = &[
     "mdbook",
 ];
 
-const USAGE: &str = "usage: cargo xtask <setup | ci | lint | web [--release]>";
+const USAGE: &str = "usage: cargo xtask <setup | ci | lint | web [--release] | fixtures …>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -41,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         ["lint"] => lint::run(&root),
         ["web"] => web(&root, false),
         ["web", "--release"] => web(&root, true),
+        ["fixtures", rest @ ..] => fixtures::run(&root, rest),
         _ => bail!(USAGE),
     }
 }

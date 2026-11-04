@@ -1,0 +1,15 @@
+02:25:10.645 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:25:10.647 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:25:10.648 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:25:10.648 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:25:10.648 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:25:10.708 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:25:10.708 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:25:10.896 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:25:10.897 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:25:12.442 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:25:12.442 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+02:25:28.077 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+02:25:28.281 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:25:28.282 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:25:28.543 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED

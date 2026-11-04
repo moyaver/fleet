@@ -1,0 +1,19 @@
+02:32:44.651 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Define variables RUNNING
+02:32:44.652 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Define variables COMPLETED
+02:32:44.653 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Apply configuration RUNNING
+02:32:44.653 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Apply configuration COMPLETED
+02:32:44.653 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Launch app "com.android.settings" RUNNING
+02:32:44.720 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:32:44.721 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:32:45.014 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Launch app "com.android.settings" COMPLETED
+02:32:45.014 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Assert that "Network & internet" is visible RUNNING
+02:32:47.204 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Assert that "Network & internet" is visible COMPLETED
+02:32:47.205 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Tap on "Storage" RUNNING
+02:32:47.670 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+02:32:49.027 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:32:49.028 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (293, 2338) using hierarchy based logic for wait
+02:32:52.300 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:32:52.302 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Tap on "Storage" COMPLETED
+02:32:52.302 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Press back RUNNING
+02:32:52.303 [ INFO] maestro.Maestro.backPress: Pressing back
+02:32:53.681 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Press back COMPLETED

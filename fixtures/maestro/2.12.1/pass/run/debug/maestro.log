@@ -1,0 +1,38 @@
+02:24:03.342 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: <CAPTURE>/run/debug
+02:24:03.343 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.12.1
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: OS Version: 26.7.1
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+02:24:03.344 [ INFO] MAESTRO.logSystemInfo: Java Version: 26
+02:24:03.459 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 27.1
+02:24:03.464 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+02:24:03.468 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+02:24:03.468 [ INFO] MAESTRO.logSystemInfo: ---------------------
+02:24:03.667 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+02:24:04.804 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5600 using port 58806 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+02:24:10.638 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow pass
+02:24:10.648 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+02:24:10.810 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+02:24:11.279 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:24:11.284 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:24:11.284 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:24:11.285 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:24:11.285 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:24:11.366 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:24:11.366 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:24:11.693 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:24:11.694 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:24:13.749 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:24:13.750 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:24:14.150 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:24:15.541 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:24:15.544 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:24:18.237 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:24:18.238 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:24:18.238 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+02:24:18.584 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+02:24:18.584 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:24:18.586 [ INFO] maestro.Maestro.backPress: Pressing back
+02:24:20.103 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED

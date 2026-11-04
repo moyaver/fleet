@@ -1,0 +1,39 @@
+02:33:04.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Define variables RUNNING
+02:33:04.489 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Define variables COMPLETED
+02:33:04.490 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Apply configuration RUNNING
+02:33:04.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Apply configuration COMPLETED
+02:33:04.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Define variables RUNNING
+02:33:04.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Launch app "com.android.settings" RUNNING
+02:33:04.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Define variables COMPLETED
+02:33:04.492 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Apply configuration RUNNING
+02:33:04.492 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Apply configuration COMPLETED
+02:33:04.492 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Launch app "com.android.settings" RUNNING
+02:33:04.571 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:33:04.571 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:33:04.572 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:33:04.572 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:33:05.118 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Launch app "com.android.settings" COMPLETED
+02:33:05.119 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Assert that "Network & internet" is visible RUNNING
+02:33:05.253 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Launch app "com.android.settings" COMPLETED
+02:33:05.253 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Assert that "Network & internet" is visible RUNNING
+02:33:08.660 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Assert that "Network & internet" is visible COMPLETED
+02:33:08.662 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Tap on "Storage" RUNNING
+02:33:08.900 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Assert that "Network & internet" is visible COMPLETED
+02:33:08.900 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Tap on "Storage" RUNNING
+02:33:09.177 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+02:33:09.505 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+02:33:10.594 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:33:10.597 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (293, 2338) using hierarchy based logic for wait
+02:33:10.763 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:33:10.764 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (293, 2338) using hierarchy based logic for wait
+02:33:16.225 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:33:16.226 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Tap on "Storage" COMPLETED
+02:33:16.226 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Press back RUNNING
+02:33:16.231 [ INFO] maestro.Maestro.backPress: Pressing back
+02:33:17.016 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:33:17.016 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Tap on "Storage" COMPLETED
+02:33:17.016 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Press back RUNNING
+02:33:17.016 [ INFO] maestro.Maestro.backPress: Pressing back
+02:33:17.876 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Press back COMPLETED
+02:33:18.525 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow: [shard 2]  Running flow charlie
+02:33:18.616 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Press back COMPLETED

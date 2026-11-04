@@ -1,0 +1,89 @@
+02:26:36.402 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:26:36.404 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:26:36.405 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:26:37.153 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:26:37.153 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press Home key RUNNING
+02:26:37.154 [ INFO] maestro.Maestro.pressKey: Pressing key HOME
+02:26:38.712 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press Home key COMPLETED
+02:26:38.712 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:26:38.713 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:26:38.713 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:26:38.765 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:26:38.766 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:26:38.928 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:26:38.928 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run subflows/open-apps.yaml RUNNING
+02:26:38.930 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:26:38.931 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:26:38.931 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+02:26:40.913 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+02:26:42.196 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:26:42.203 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1124) using hierarchy based logic for wait
+02:26:44.852 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:26:44.852 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+02:26:44.853 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+02:26:45.049 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+02:26:45.049 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:26:45.049 [ INFO] maestro.Maestro.backPress: Pressing back
+02:26:46.731 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:26:46.731 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run subflows/open-apps.yaml COMPLETED
+02:26:46.733 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Retry 2 times RUNNING
+02:26:46.734 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+02:26:47.244 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+02:26:47.245 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Retry 2 times COMPLETED
+02:26:47.245 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 2 times RUNNING
+02:26:47.247 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scroll vertically RUNNING
+02:26:47.248 [ INFO] maestro.Maestro.scrollVertical: Scrolling vertically
+02:26:48.445 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scroll vertically COMPLETED
+02:26:48.446 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling UP until "Network & internet" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled RUNNING
+02:26:49.140 [ WARN] maestro.orchestra.Orchestra.scrollUntilVisible: Error: maestro.MaestroException$ElementNotFound: Element not found: Text matching regex: Network & internet
+02:26:49.146 [ INFO] maestro.Maestro.swipeFromCenter: Swiping DOWN from center
+02:26:50.874 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 1080, DeviceWidth: 2424
+02:26:50.874 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=221, y=665, width=345, height=57)
+02:26:50.875 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+02:26:50.879 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Network & internet, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=UP, scrollDuration=601, visibilityPercentage=100, timeout=20000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=false).centerElement
+02:26:50.879 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+02:26:50.879 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling UP until "Network & internet" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled COMPLETED
+02:26:50.880 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Scroll vertically PENDING
+02:26:50.880 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Scrolling UP until "Network & internet" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled PENDING
+02:26:50.880 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scroll vertically RUNNING
+02:26:50.880 [ INFO] maestro.Maestro.scrollVertical: Scrolling vertically
+02:26:52.502 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scroll vertically COMPLETED
+02:26:52.504 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling UP until "Network & internet" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled RUNNING
+02:26:53.128 [ WARN] maestro.orchestra.Orchestra.scrollUntilVisible: Error: maestro.MaestroException$ElementNotFound: Element not found: Text matching regex: Network & internet
+02:26:53.134 [ INFO] maestro.Maestro.swipeFromCenter: Swiping DOWN from center
+02:26:55.207 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 1080, DeviceWidth: 2424
+02:26:55.207 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=221, y=498, width=345, height=57)
+02:26:55.208 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+02:26:55.208 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Network & internet, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=UP, scrollDuration=601, visibilityPercentage=100, timeout=20000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=false).centerElement
+02:26:55.208 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+02:26:55.208 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling UP until "Network & internet" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled COMPLETED
+02:26:55.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Repeat 2 times COMPLETED
+02:26:55.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that (Optional) "Fleet optional marker" is visible RUNNING
+02:27:12.431 [ INFO] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandWarned: Assertion is false: "Fleet optional marker" is visible
+02:27:12.637 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:27:12.637 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:27:12.874 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that (Optional) "Fleet optional marker" is visible WARNED
+02:27:12.874 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Fleet never shows this" is visible RUNNING
+02:27:13.046 [ INFO] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandSkipped: null
+02:27:13.046 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Fleet never shows this" is visible SKIPPED
+02:27:13.047 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Search Settings" RUNNING
+02:27:13.137 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Search Settings, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=com.android.settings:id/search_bar_title, clickable=false, bounds=[189,222][578,293], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=189, y=222, width=389, height=71))
+02:27:14.363 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+02:27:14.364 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (383, 257) using hierarchy based logic for wait
+02:27:16.787 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+02:27:16.788 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Search Settings" COMPLETED
+02:27:16.789 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Input text ${PLANTED_E} RUNNING
+02:27:16.809 [ INFO] maestro.Maestro.inputText: Inputting text: fleet-planted-e-secret-7f3a
+02:27:24.944 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Input text ${PLANTED_E} COMPLETED
+02:27:24.945 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Erase text RUNNING
+02:27:24.963 [ INFO] maestro.Maestro.eraseText$lambda$53: Erasing 50 characters
+02:27:30.680 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Erase text COMPLETED
+02:27:30.681 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Input text ${MAESTRO_FLEET_TOKEN} RUNNING
+02:27:30.697 [ INFO] maestro.Maestro.inputText: Inputting text: fleet-planted-maestro-secret-91c2
+02:27:36.277 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Input text ${MAESTRO_FLEET_TOKEN} COMPLETED
+02:27:36.278 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+02:27:36.278 [ INFO] maestro.Maestro.backPress: Pressing back
+02:27:37.216 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+02:27:37.216 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press Home key RUNNING
+02:27:37.217 [ INFO] maestro.Maestro.pressKey: Pressing key HOME
+02:27:38.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press Home key COMPLETED

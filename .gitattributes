@@ -1,0 +1,2 @@
+# Captured Maestro output must stay byte-exact: no line-ending or text conversion.
+fixtures/** -text

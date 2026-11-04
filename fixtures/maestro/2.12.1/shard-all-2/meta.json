@@ -1,0 +1,44 @@
+{
+  "command": [
+    "<MAESTRO_HOME>/bin/maestro",
+    "--device",
+    "emulator-5600,emulator-5602",
+    "test",
+    "--shard-all",
+    "2",
+    "--format",
+    "junit",
+    "--output",
+    "<CAPTURE>/run/report.xml",
+    "--flatten-debug-output",
+    "--debug-output",
+    "<CAPTURE>/run/debug",
+    "<REPO>/examples/flows/phase0/suite"
+  ],
+  "default_env": [
+    {
+      "name": "MAESTRO_CLI_NO_ANALYTICS",
+      "value": "1"
+    },
+    {
+      "name": "MAESTRO_DISABLE_UPDATE_CHECK",
+      "value": "true"
+    },
+    {
+      "name": "MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED",
+      "value": "true"
+    }
+  ],
+  "env": [
+    {
+      "name": "MAESTRO_CLI_LOG_PATTERN_FILE",
+      "value": "MFLT1|%d{UNIX_MILLIS}|%t|%level|%logger|%enc{%msg}{CRLF}%n"
+    }
+  ],
+  "host": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "signal": null,
+  "started_at_unix_ms": 1793752377165
+}

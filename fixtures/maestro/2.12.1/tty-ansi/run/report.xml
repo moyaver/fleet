@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="1" failures="1" time="18.79" timestamp="2026-11-04T02:30:33">
+    <testcase id="fail" name="fail" classname="fail" file="examples/flows/phase0/fail.yaml" time="18.782" timestamp="2026-11-04T02:30:33" status="ERROR">
+      <failure>Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

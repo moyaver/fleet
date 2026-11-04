@@ -1,0 +1,75 @@
+02:27:47.776 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+02:27:47.779 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+02:27:47.780 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+02:27:47.781 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+02:27:47.781 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+02:27:47.824 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:27:47.824 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:27:47.975 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+02:27:47.976 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Retry 1 times RUNNING
+02:27:47.977 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+02:28:05.424 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:28:05.434 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:28:05.876 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED
+02:28:05.878 [ERROR] maestro.orchestra.Orchestra.retryCommand: Attempt 1 failed for retry command
+maestro.MaestroException$AssertionFailure: Assertion is false: "Fleet never shows this" is visible
+	at maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)
+	at maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)
+	at maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)
+	at maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)
+	at maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)
+	at maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)
+	at maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+02:28:05.879 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+02:28:06.246 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:28:06.246 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:28:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED
+02:28:06.415 [ERROR] maestro.orchestra.Orchestra.retryCommand: Max retries (1) reached. Commands failed.
+maestro.MaestroException$AssertionFailure: Assertion is false: "Fleet never shows this" is visible
+	at maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)
+	at maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)
+	at maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)
+	at maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)
+	at maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)
+	at maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)
+	at maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+02:28:06.415 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+02:28:06.416 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:28:06.416 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:28:06.551 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Retry 1 times FAILED

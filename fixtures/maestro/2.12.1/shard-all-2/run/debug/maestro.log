@@ -1,0 +1,168 @@
+MFLT1|1793752378898|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1793752378899|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1793752378899|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1793752378900|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1793752378900|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1793752378900|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1793752378900|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1793752378900|main|INFO|MAESTRO|Java Version: 26
+MFLT1|1793752379032|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1793752379063|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1793752379072|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1793752379083|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1793752379083|main|INFO|MAESTRO|---------------------
+MFLT1|1793752379284|main|INFO|maestro.orchestra.workspace.WorkspaceExecutionPlanner|Created execution plan: ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/suite/bravo.yaml, <REPO>/examples/flows/phase0/suite/charlie.yaml, <REPO>/examples/flows/phase0/suite/delta-fails.yaml, <REPO>/examples/flows/phase0/suite/alpha.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752380198|DefaultDispatcher-worker-2|INFO|maestro.cli.command.TestCommand|[shard 2] Selected device emulator-5602 using port 65335 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/suite/bravo.yaml, <REPO>/examples/flows/phase0/suite/charlie.yaml, <REPO>/examples/flows/phase0/suite/delta-fails.yaml, <REPO>/examples/flows/phase0/suite/alpha.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752380198|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 65334 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/suite/bravo.yaml, <REPO>/examples/flows/phase0/suite/charlie.yaml, <REPO>/examples/flows/phase0/suite/delta-fails.yaml, <REPO>/examples/flows/phase0/suite/alpha.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752384010|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 2]  Running flow bravo
+MFLT1|1793752384010|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 1]  Running flow bravo
+MFLT1|1793752384038|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1793752384039|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Getting device info
+MFLT1|1793752384307|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1793752384307|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1793752384487|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables RUNNING
+MFLT1|1793752384489|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables COMPLETED
+MFLT1|1793752384490|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration RUNNING
+MFLT1|1793752384491|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration COMPLETED
+MFLT1|1793752384491|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables RUNNING
+MFLT1|1793752384491|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" RUNNING
+MFLT1|1793752384491|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables COMPLETED
+MFLT1|1793752384492|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration RUNNING
+MFLT1|1793752384492|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration COMPLETED
+MFLT1|1793752384492|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" RUNNING
+MFLT1|1793752384571|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752384571|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752384572|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752384572|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752385118|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752385119|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752385253|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752385253|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752388660|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752388662|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" RUNNING
+MFLT1|1793752388900|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752388900|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" RUNNING
+MFLT1|1793752389177|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752389505|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752390594|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752390597|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752390763|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752390764|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752396225|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752396226|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" COMPLETED
+MFLT1|1793752396226|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back RUNNING
+MFLT1|1793752396231|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752397016|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752397016|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" COMPLETED
+MFLT1|1793752397016|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back RUNNING
+MFLT1|1793752397016|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752397876|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back COMPLETED
+MFLT1|1793752398525|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 2]  Running flow charlie
+MFLT1|1793752398616|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back COMPLETED
+MFLT1|1793752398670|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables RUNNING
+MFLT1|1793752398671|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables COMPLETED
+MFLT1|1793752398671|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration RUNNING
+MFLT1|1793752398672|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration COMPLETED
+MFLT1|1793752398672|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" RUNNING
+MFLT1|1793752398713|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 1]  Running flow charlie
+MFLT1|1793752398760|DefaultDispatcher-worker-4|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752398760|DefaultDispatcher-worker-4|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752398820|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables RUNNING
+MFLT1|1793752398820|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables COMPLETED
+MFLT1|1793752398821|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration RUNNING
+MFLT1|1793752398822|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration COMPLETED
+MFLT1|1793752398822|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" RUNNING
+MFLT1|1793752398968|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752398968|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752399280|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752399281|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752399858|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752399858|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752403744|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752403746|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" RUNNING
+MFLT1|1793752403928|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752404038|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752404038|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" RUNNING
+MFLT1|1793752404468|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752405520|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752405520|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752405821|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752405823|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752408596|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752408599|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" COMPLETED
+MFLT1|1793752408599|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back RUNNING
+MFLT1|1793752408599|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752409409|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752409410|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" COMPLETED
+MFLT1|1793752409410|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back RUNNING
+MFLT1|1793752409410|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752410133|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back COMPLETED
+MFLT1|1793752410215|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 2]  Running flow delta-fails
+MFLT1|1793752410327|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables RUNNING
+MFLT1|1793752410328|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables COMPLETED
+MFLT1|1793752410329|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration RUNNING
+MFLT1|1793752410329|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration COMPLETED
+MFLT1|1793752410329|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" RUNNING
+MFLT1|1793752410401|DefaultDispatcher-worker-4|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752410401|DefaultDispatcher-worker-4|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752410718|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752410719|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Fleet never shows this" is visible RUNNING
+MFLT1|1793752411099|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back COMPLETED
+MFLT1|1793752411288|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 1]  Running flow delta-fails
+MFLT1|1793752411487|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables RUNNING
+MFLT1|1793752411488|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables COMPLETED
+MFLT1|1793752411489|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration RUNNING
+MFLT1|1793752411490|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration COMPLETED
+MFLT1|1793752411490|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" RUNNING
+MFLT1|1793752411677|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752411677|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752412088|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752412089|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Fleet never shows this" is visible RUNNING
+MFLT1|1793752427941|DefaultDispatcher-worker-2|ERROR|maestro.orchestra.Orchestra|[Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+MFLT1|1793752428046|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Taking screenshot
+MFLT1|1793752428047|DefaultDispatcher-worker-1|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink
+MFLT1|1793752428330|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Fleet never shows this" is visible FAILED
+MFLT1|1793752428464|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 2]  Running flow alpha
+MFLT1|1793752428568|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables RUNNING
+MFLT1|1793752428569|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Define variables COMPLETED
+MFLT1|1793752428569|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration RUNNING
+MFLT1|1793752428569|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Apply configuration COMPLETED
+MFLT1|1793752428569|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" RUNNING
+MFLT1|1793752428620|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752428620|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752428843|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752428843|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752429329|DefaultDispatcher-worker-3|ERROR|maestro.orchestra.Orchestra|[Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+MFLT1|1793752429455|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Taking screenshot
+MFLT1|1793752429459|DefaultDispatcher-worker-5|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink
+MFLT1|1793752429955|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Fleet never shows this" is visible FAILED
+MFLT1|1793752430170|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor|[shard 1]  Running flow alpha
+MFLT1|1793752430281|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables RUNNING
+MFLT1|1793752430282|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Define variables COMPLETED
+MFLT1|1793752430282|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration RUNNING
+MFLT1|1793752430283|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Apply configuration COMPLETED
+MFLT1|1793752430283|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" RUNNING
+MFLT1|1793752430302|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752430303|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" RUNNING
+MFLT1|1793752430321|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752430321|DefaultDispatcher-worker-5|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752430503|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Launch app "com.android.settings" COMPLETED
+MFLT1|1793752430504|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible RUNNING
+MFLT1|1793752430756|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752431900|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Assert that "Network & internet" is visible COMPLETED
+MFLT1|1793752431900|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" RUNNING
+MFLT1|1793752432118|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752432118|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752432335|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Storage, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,2315][366,2361], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=2315, width=145, height=46))
+MFLT1|1793752433725|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752433726|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (293, 2338) using hierarchy based logic for wait
+MFLT1|1793752434925|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752434927|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Tap on "Storage" COMPLETED
+MFLT1|1793752434927|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back RUNNING
+MFLT1|1793752434929|DefaultDispatcher-worker-2|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752436489|DefaultDispatcher-worker-2|INFO|maestro.cli.runner.CliConsoleListener|[shard 2] Press back COMPLETED
+MFLT1|1793752436814|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752436814|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Tap on "Storage" COMPLETED
+MFLT1|1793752436814|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back RUNNING
+MFLT1|1793752436814|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752438359|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|[shard 1] Press back COMPLETED

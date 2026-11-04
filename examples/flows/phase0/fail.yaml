@@ -1,0 +1,6 @@
+appId: com.android.settings
+name: fail
+---
+- launchApp
+- assertVisible: "Network & internet"
+- assertVisible: "Fleet never shows this"

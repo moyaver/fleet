@@ -1,0 +1,20 @@
+
+Requested 1 shards, but it cannot be higher than the number of flows (0). Will use 1 shards instead.
+
+Waiting for flows to complete...
+[Failed] first-fails (19s) (Assertion is false: "Fleet never shows this" is visible)
+
+Flow first-fails failed and continueOnFailure is set to false, aborting running sequential Flows
+
+
+1/1 Flow Failed
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                │
+│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │
+│                                                                                                │
+│   Run your flows on Maestro Cloud:                                                             │
+│   maestro cloud app_file flows_folder/                                                         │
+│                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+

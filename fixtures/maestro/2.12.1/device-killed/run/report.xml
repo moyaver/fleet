@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="1" failures="1" time="32.443" timestamp="2026-11-04T02:35:40">
+    <testcase id="slow" name="slow" classname="slow" file="examples/flows/phase0/slow.yaml" time="32.437" timestamp="2026-11-04T02:35:40" status="ERROR">
+      <failure>maestro.android.DeviceServerDiedException: Device server died during 'viewHierarchy' on emulator-5602 (2267ms since last byte, connection age 34368ms): StatusRuntimeException: UNAVAILABLE
+	at maestro.android.AndroidDeviceConnection.onGrpcDeath(AndroidDeviceConnection.kt:319)
+	at maestro.android.AndroidDeviceConnection.mapTransport(AndroidDeviceConnection.kt:306)
+	at maestro.android.AndroidDeviceConnection.execute(AndroidDeviceConnection.kt:122)
+	at maestro.drivers.AndroidDriver.callViewHierarchy(AndroidDriver.kt:368)
+	at maestro.drivers.AndroidDriver.contentDescriptor$lambda$16(AndroidDriver.kt:329)
+	at maestro.utils.Metrics.measured(Metrics.kt:48)
+	at maestro.drivers.AndroidDriver.contentDescriptor(AndroidDriver.kt:328)
+	at maestro.ViewHierarchy$Companion.from-8JJjmZI(ViewHierarchy.kt:29)
+	at maestro.utils.ScreenshotUtils$Companion.viewHierarchy-c1iYVAs(ScreenshotUtils.kt:99)
+	at maestro.utils.ScreenshotUtils$Companion.waitForAppToSettle-OpTFbEc(ScreenshotUtils.kt:58)
+	at maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke-prqvCes(AndroidDriver.kt:721)
+	at maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke(AndroidDriver.kt:717)
+	at maestro.utils.Metrics.measured(Metrics.kt:48)
+	at maestro.drivers.AndroidDriver.waitForAppToSettle-5RpGHs4(AndroidDriver.kt:717)
+	at maestro.Maestro$waitForAppToSettle$2.invoke-F9mIFpk(Maestro.kt:583)
+	at maestro.Maestro$waitForAppToSettle$2.invoke(Maestro.kt:582)
+	at kotlinx.coroutines.InterruptibleKt.runInterruptibleInExpectedContext(Interruptible.kt:48)
+	at kotlinx.coroutines.InterruptibleKt.access$runInterruptibleInExpectedContext(Interruptible.kt:1)
+	at kotlinx.coroutines.InterruptibleKt$runInterruptible$2.invokeSuspend(Interruptible.kt:40)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+Caused by: io.grpc.StatusRuntimeException: UNAVAILABLE
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:275)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:256)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:169)
+	at maestro_android.MaestroDriverGrpc$MaestroDriverBlockingStub.viewHierarchy(MaestroDriverGrpc.java:747)
+	at maestro.drivers.AndroidDriver.callViewHierarchy$lambda$19(AndroidDriver.kt:368)
+	at maestro.android.AndroidDeviceConnection.execute(AndroidDeviceConnection.kt:120)
+	... 24 more
+Caused by: java.io.IOException: Command failed (host:transport:emulator-5602): device offline
+	at dadb.adbserver.AdbServer.send$dadb(AdbServer.kt:103)
+	at dadb.adbserver.AdbServerDadb.open(AdbServer.kt:148)
+	at maestro.android.AndroidDeviceConnection.buildChannel$lambda$2(AndroidDeviceConnection.kt:98)
+	at maestro.android.RawAdbSocket.connect(AdbSocketFactory.kt:206)
+	at java.base/java.net.Socket.connect(Socket.java:598)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:57)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:63)
+	at io.grpc.okhttp.OkHttpClientTransport$3.run(OkHttpClientTransport.java:535)
+	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

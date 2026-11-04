@@ -1,0 +1,136 @@
+MFLT1|1793752536901|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1793752536902|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1793752536902|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1793752536902|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1793752536902|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1793752536902|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1793752536902|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1793752536903|main|INFO|MAESTRO|Java Version: 26
+MFLT1|1793752537007|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1793752537012|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1793752537016|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1793752537016|main|INFO|MAESTRO|---------------------
+MFLT1|1793752537362|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1793752537927|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5602 using port 50863 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/slow.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1793752540621|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow slow
+MFLT1|1793752540629|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1793752540769|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1793752540919|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1793752540921|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1793752540921|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1793752540922|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1793752540922|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1793752540973|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1793752540973|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1793752541158|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1793752541158|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 40 times RUNNING
+MFLT1|1793752541159|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752543350|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752544686|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752544689|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752547060|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752547062|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752547063|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752547066|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752548573|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752548574|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752548574|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752548574|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752548677|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752549965|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752549966|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752551881|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752551881|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752551881|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752551882|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752553258|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752553258|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752553258|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752553259|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752553375|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752555075|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752555077|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752557014|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752557014|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752557014|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752557015|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752558437|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752558437|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752558438|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752558438|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752558529|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752560575|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752560577|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752562575|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752562575|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752562575|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752562575|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752564022|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752564022|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752564022|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752564022|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752564117|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752565377|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752565378|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752567283|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1793752567283|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1793752567283|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1793752567283|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1793752568706|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1793752568707|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1793752568707|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1793752568707|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1793752568826|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+MFLT1|1793752570090|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1793752570091|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1124) using hierarchy based logic for wait
+MFLT1|1793752572992|DefaultDispatcher-worker-1|WARN|maestro.drivers.AndroidDriver|Failed to collect logcat output: Command failed (host:transport:emulator-5602): device 'emulator-5602' not found
+MFLT1|1793752573057|DefaultDispatcher-worker-3|ERROR|maestro.cli.runner.TestSuiteInteractor|Failed to complete flow
+maestro.android.DeviceServerDiedException: Device server died during 'viewHierarchy' on emulator-5602 (2267ms since last byte, connection age 34368ms): StatusRuntimeException: UNAVAILABLE
+	at maestro.android.AndroidDeviceConnection.onGrpcDeath(AndroidDeviceConnection.kt:319)
+	at maestro.android.AndroidDeviceConnection.mapTransport(AndroidDeviceConnection.kt:306)
+	at maestro.android.AndroidDeviceConnection.execute(AndroidDeviceConnection.kt:122)
+	at maestro.drivers.AndroidDriver.callViewHierarchy(AndroidDriver.kt:368)
+	at maestro.drivers.AndroidDriver.contentDescriptor$lambda$16(AndroidDriver.kt:329)
+	at maestro.utils.Metrics.measured(Metrics.kt:48)
+	at maestro.drivers.AndroidDriver.contentDescriptor(AndroidDriver.kt:328)
+	at maestro.ViewHierarchy$Companion.from-8JJjmZI(ViewHierarchy.kt:29)
+	at maestro.utils.ScreenshotUtils$Companion.viewHierarchy-c1iYVAs(ScreenshotUtils.kt:99)
+	at maestro.utils.ScreenshotUtils$Companion.waitForAppToSettle-OpTFbEc(ScreenshotUtils.kt:58)
+	at maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke-prqvCes(AndroidDriver.kt:721)
+	at maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke(AndroidDriver.kt:717)
+	at maestro.utils.Metrics.measured(Metrics.kt:48)
+	at maestro.drivers.AndroidDriver.waitForAppToSettle-5RpGHs4(AndroidDriver.kt:717)
+	at maestro.Maestro$waitForAppToSettle$2.invoke-F9mIFpk(Maestro.kt:583)
+	at maestro.Maestro$waitForAppToSettle$2.invoke(Maestro.kt:582)
+	at kotlinx.coroutines.InterruptibleKt.runInterruptibleInExpectedContext(Interruptible.kt:48)
+	at kotlinx.coroutines.InterruptibleKt.access$runInterruptibleInExpectedContext(Interruptible.kt:1)
+	at kotlinx.coroutines.InterruptibleKt$runInterruptible$2.invokeSuspend(Interruptible.kt:40)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+Caused by: io.grpc.StatusRuntimeException: UNAVAILABLE
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:275)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:256)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:169)
+	at maestro_android.MaestroDriverGrpc$MaestroDriverBlockingStub.viewHierarchy(MaestroDriverGrpc.java:747)
+	at maestro.drivers.AndroidDriver.callViewHierarchy$lambda$19(AndroidDriver.kt:368)
+	at maestro.android.AndroidDeviceConnection.execute(AndroidDeviceConnection.kt:120)
+	... 24 more
+Caused by: java.io.IOException: Command failed (host:transport:emulator-5602): device offline
+	at dadb.adbserver.AdbServer.send$dadb(AdbServer.kt:103)
+	at dadb.adbserver.AdbServerDadb.open(AdbServer.kt:148)
+	at maestro.android.AndroidDeviceConnection.buildChannel$lambda$2(AndroidDeviceConnection.kt:98)
+	at maestro.android.RawAdbSocket.connect(AdbSocketFactory.kt:206)
+	at java.base/java.net.Socket.connect(Socket.java:598)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:57)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:63)
+	at io.grpc.okhttp.OkHttpClientTransport$3.run(OkHttpClientTransport.java:535)
+	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1516)

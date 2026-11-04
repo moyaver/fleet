@@ -1,0 +1,64 @@
+[30m[TRACE][m Saved analytics to <CAPTURE>/state/maestro/analytics.json, value: {
+  "uuid" : "c4d5810d-8f8f-4a93-9091-5923fb5a0f88",
+  "enabled" : false,
+  "cachedToken" : null,
+  "lastUploadedForCLI" : null,
+  "lastUploadedTime" : null,
+  "email" : null,
+  "user_id" : null,
+  "name" : null,
+  "workOSOrgId" : null,
+  "orgId" : null,
+  "orgName" : null,
+  "orgPlan" : null,
+  "orgTrialExpiresOn" : null,
+  "orgStatus" : null,
+  "currentPlan" : null,
+  "isInTrial" : null,
+  "daysUntilTrialExpiry" : null,
+  "daysUntilGracePeriodExpiry" : null
+}
+[32m[ INFO][m Debug output path: <CAPTURE>/run/debug
+[32m[ INFO][m ---- System Info ----
+[32m[ INFO][m Maestro Version: 2.12.1
+[32m[ INFO][m CI: Undefined
+[32m[ INFO][m OS Name: Mac OS X
+[32m[ INFO][m OS Version: 26.7.1
+[32m[ INFO][m Architecture: aarch64
+[32m[ INFO][m Java Version: 26
+[32m[ INFO][m Xcode Version: 27.1
+[32m[ INFO][m Flutter Version: Undefined
+[32m[ INFO][m Flutter Channel: Undefined
+[32m[ INFO][m ---------------------
+[36m[DEBUG][m Using SLF4J as the default logging framework
+[32m[ INFO][m [shard 1] Selected device emulator-5600 using port 62101 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+
+Waiting for flows to complete...
+[32m[ INFO][m  Running flow pass
+[32m[ INFO][m Getting device info
+[32m[ INFO][m Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+[32m[ INFO][m Define variables RUNNING
+[32m[ INFO][m Define variables COMPLETED
+[32m[ INFO][m Apply configuration RUNNING
+[32m[ INFO][m Apply configuration COMPLETED
+[32m[ INFO][m Launch app "com.android.settings" RUNNING
+[32m[ INFO][m Launching app com.android.settings
+[32m[ INFO][m Stopping com.android.settings app during launch
+[32m[ INFO][m Launch app "com.android.settings" COMPLETED
+[32m[ INFO][m Assert that "Network & internet" is visible RUNNING
+[32m[ INFO][m Assert that "Network & internet" is visible COMPLETED
+[32m[ INFO][m Tap on "Apps" RUNNING
+[32m[ INFO][m Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1096][318,1153], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1096, width=97, height=57))
+[32m[ INFO][m Tap aimed via settled hierarchy
+[32m[ INFO][m Tapping at (269, 1124) using hierarchy based logic for wait
+[32m[ INFO][m Something has changed in the UI judging by view hierarchy. Proceed.
+[32m[ INFO][m Tap on "Apps" COMPLETED
+[32m[ INFO][m Assert that "Apps" is visible RUNNING
+[32m[ INFO][m Assert that "Apps" is visible COMPLETED
+[32m[ INFO][m Press back RUNNING
+[32m[ INFO][m Pressing back
+[32m[ INFO][m Press back COMPLETED
+[Passed] pass (9s)
+
+1/1 Flow Passed in 9s
+

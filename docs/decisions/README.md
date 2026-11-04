@@ -8,7 +8,7 @@ and should be confirmed by Phase 0 results or by the team.
 |---|---|---|
 | [0001](0001-rust-for-agent-server-protocol.md) | Rust for agent, server and shared protocol | Accepted |
 | [0002](0002-agent-supervisor-observer.md) | Agent: supervisor/observer process split, fail-open | Proposed |
-| [0003](0003-live-signal-strategy.md) | Live progress from `maestro.log` + bundle folders + stdout | Proposed (Phase 0 gate) |
+| [0003](0003-live-signal-strategy.md) | Live progress from `maestro.log` + bundle folders + stdout | Accepted (Phase 0 passed) |
 | [0004](0004-frontend.md) | Dashboard: Leptos CSR, all Rust, own component kit | Accepted |
 | [0005](0005-wire-protocol.md) | Wire protocol: JSON journal + telemetry streams, server-authoritative resume | Proposed |
 | [0006](0006-postgres-only.md) | PostgreSQL 18 only, native partitioning; no TimescaleDB, Redis or Kafka | Proposed |

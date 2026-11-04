@@ -1,0 +1,7 @@
+appId: com.android.settings
+name: bravo
+---
+- launchApp
+- assertVisible: "Network & internet"
+- tapOn: "Storage"
+- back

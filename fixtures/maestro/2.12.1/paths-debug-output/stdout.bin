@@ -1,0 +1,7 @@
+Running on Pixel_10a_s3
+ > Flow pass
+Launch app "com.android.settings"... COMPLETED
+Assert that "Network & internet" is visible... COMPLETED
+Tap on "Apps"... COMPLETED
+Assert that "Apps" is visible... COMPLETED
+Press back... COMPLETED

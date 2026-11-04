@@ -1,0 +1,9 @@
+appId: com.android.settings
+name: slow
+---
+- launchApp
+- repeat:
+    times: 40
+    commands:
+      - tapOn: "Apps"
+      - back

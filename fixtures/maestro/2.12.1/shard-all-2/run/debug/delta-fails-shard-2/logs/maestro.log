@@ -1,0 +1,24 @@
+02:33:30.327 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Define variables RUNNING
+02:33:30.328 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Define variables COMPLETED
+02:33:30.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Apply configuration RUNNING
+02:33:30.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Apply configuration COMPLETED
+02:33:30.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Launch app "com.android.settings" RUNNING
+02:33:30.401 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:33:30.401 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:33:30.718 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Launch app "com.android.settings" COMPLETED
+02:33:30.719 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 2] Assert that "Fleet never shows this" is visible RUNNING
+02:33:31.099 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Press back COMPLETED
+02:33:31.288 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow: [shard 1]  Running flow delta-fails
+02:33:31.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Define variables RUNNING
+02:33:31.488 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Define variables COMPLETED
+02:33:31.489 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Apply configuration RUNNING
+02:33:31.490 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Apply configuration COMPLETED
+02:33:31.490 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Launch app "com.android.settings" RUNNING
+02:33:31.677 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+02:33:31.677 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+02:33:32.088 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 1] Launch app "com.android.settings" COMPLETED
+02:33:32.089 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: [shard 1] Assert that "Fleet never shows this" is visible RUNNING
+02:33:47.941 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+02:33:48.046 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+02:33:48.047 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+02:33:48.330 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: [shard 2] Assert that "Fleet never shows this" is visible FAILED

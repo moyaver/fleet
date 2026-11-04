@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="1" failures="1" time="19.575" timestamp="2026-11-04T02:27:47">
+    <testcase id="retry-fail" name="retry-fail" classname="retry-fail" file="examples/flows/phase0/retry-fail.yaml" time="19.564" timestamp="2026-11-04T02:27:47" status="ERROR">
+      <failure>Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

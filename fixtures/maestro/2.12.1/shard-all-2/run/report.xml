@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="4" failures="1" time="54.413" timestamp="2026-11-04T02:33:04">
+    <testcase id="bravo" name="bravo" classname="bravo" file="examples/flows/phase0/suite/bravo.yaml" time="14.701" timestamp="2026-11-04T02:33:04" status="SUCCESS"/>
+    <testcase id="charlie" name="charlie" classname="charlie" file="examples/flows/phase0/suite/charlie.yaml" time="12.574" timestamp="2026-11-04T02:33:18" status="SUCCESS"/>
+    <testcase id="delta-fails" name="delta-fails" classname="delta-fails" file="examples/flows/phase0/suite/delta-fails.yaml" time="18.881" timestamp="2026-11-04T02:33:31" status="ERROR">
+      <failure>[shard 1] Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+    <testcase id="alpha" name="alpha" classname="alpha" file="examples/flows/phase0/suite/alpha.yaml" time="8.245" timestamp="2026-11-04T02:33:50" status="SUCCESS"/>
+  </testsuite>
+  <testsuite name="Test Suite" device="Pixel_10a_s3" tests="4" failures="1" time="52.593" timestamp="2026-11-04T02:33:04">
+    <testcase id="bravo" name="bravo" classname="bravo" file="examples/flows/phase0/suite/bravo.yaml" time="14.508" timestamp="2026-11-04T02:33:04" status="SUCCESS"/>
+    <testcase id="charlie" name="charlie" classname="charlie" file="examples/flows/phase0/suite/charlie.yaml" time="11.684" timestamp="2026-11-04T02:33:18" status="SUCCESS"/>
+    <testcase id="delta-fails" name="delta-fails" classname="delta-fails" file="examples/flows/phase0/suite/delta-fails.yaml" time="18.246" timestamp="2026-11-04T02:33:30" status="ERROR">
+      <failure>[shard 2] Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+    <testcase id="alpha" name="alpha" classname="alpha" file="examples/flows/phase0/suite/alpha.yaml" time="8.132" timestamp="2026-11-04T02:33:48" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

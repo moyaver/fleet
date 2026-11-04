@@ -1,0 +1,37 @@
+Will run 2 shards, with all 4 flows in each shard
+
+[shard 2] Waiting for flows to complete...
+
+[shard 1] Waiting for flows to complete...
+[shard 2] [Passed] bravo (15s)
+[shard 1] [Passed] bravo (15s)
+[shard 2] [Passed] charlie (12s)
+[shard 1] [Passed] charlie (13s)
+[shard 2] [Failed] delta-fails (18s) (Assertion is false: "Fleet never shows this" is visible)
+[shard 1] [Failed] delta-fails (19s) (Assertion is false: "Fleet never shows this" is visible)
+[shard 2] [Passed] alpha (8s)
+
+[shard 2] 1/4 Flow Failed
+
+[shard 1] [Passed] alpha (8s)
+
+[shard 1] 1/4 Flow Failed
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                │
+│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │
+│                                                                                                │
+│   Run your flows on Maestro Cloud:                                                             │
+│   maestro cloud app_file flows_folder/                                                         │
+│                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+╭────────────────────────────╮
+│                            │
+│   Passed: 6/8              │
+│   [ Pixel_10a_s3 ] - 3/4   │
+│   [ Pixel_10a_s3 ] - 3/4   │
+│                            │
+╰────────────────────────────╯
+

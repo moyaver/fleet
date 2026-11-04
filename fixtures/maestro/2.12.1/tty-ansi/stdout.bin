@@ -1,0 +1,22 @@
+^DWARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @1a84f40f (file:<MAESTRO_HOME>/lib/picocli-4.6.3.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+[36m
+Waiting for flows to complete...[m
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:<MAESTRO_HOME>/lib/protobuf-java-3.21.9.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+[36m[39m[91m[Failed][39m fail (19s)[31m (Assertion is false: "Fleet never shows this" is visible)[39m
+
+[31;1m1/1 Flow Failed[22;39m
+
+[32m╭[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m╮[m
+[32m│[m                                                                                                [32m│[m
+[32m│[m   Debug tests faster by easy access to [36mtest recordings, maestro logs, screenshots, and more[m.   [32m│[m
+[32m│[m                                                                                                [32m│[m
+[32m│[m   Run your flows on Maestro Cloud:                                                             [32m│[m
+[32m│[m   [32mmaestro cloud app_file flows_folder/[m                                                         [32m│[m
+[32m│[m                                                                                                [32m│[m
+[32m╰[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m─[m[32m╯[m
+[22m
