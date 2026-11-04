@@ -70,6 +70,8 @@ pub(crate) enum Control {
         code: Option<i32>,
         /// Signal number, if a signal killed it.
         signal: Option<i32>,
+        /// Authoritative total of output bytes not copied to the observer (invariant I5).
+        output_bytes_dropped: u64,
     },
 }
 
@@ -172,6 +174,7 @@ mod tests {
             Frame::Control(Control::ChildExited {
                 code: None,
                 signal: Some(15),
+                output_bytes_dropped: 7,
             }),
         ];
         let mut buf = Vec::new();

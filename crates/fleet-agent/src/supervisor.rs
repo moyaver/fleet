@@ -11,7 +11,7 @@ use std::{
     process::{Child, ChildStdin, Command, ExitStatus, Stdio},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError},
     },
     thread,
@@ -96,7 +96,7 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
     let mut child = match spawn_child(program, args, own_group, &prepared.env) {
         Ok(c) => c,
         Err(code) => {
-            finish_observer(observer.as_mut(), Outcome::Code(code), opts, &warnings);
+            finish_observer(observer.as_mut(), Outcome::Code(code), 0, opts, &warnings);
             return Outcome::Code(code);
         }
     };
@@ -139,18 +139,22 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
     }
 
     let last_stderr_byte = Arc::new(Mutex::new(b'\n'));
+    // Authoritative count of output bytes not copied to the observer (I5), both streams.
+    let dropped_total = Arc::new(AtomicU64::new(0));
     let pumps = [
         spawn_pump(
             &mut child,
             Stream::Stdout,
             observer.as_ref().and_then(Observer::sender),
             None,
+            Arc::clone(&dropped_total),
         ),
         spawn_pump(
             &mut child,
             Stream::Stderr,
             observer.as_ref().and_then(Observer::sender),
             Some(Arc::clone(&last_stderr_byte)),
+            Arc::clone(&dropped_total),
         ),
     ];
 
@@ -165,7 +169,10 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
     }
 
     let outcome = outcome(status);
-    finish_observer(observer.as_mut(), outcome, opts, &warnings);
+    // Read after the pumps stop. A pump still held open by a grandchild past the drain deadline
+    // may drop more later; those bytes are not part of the run's total.
+    let dropped = dropped_total.load(Ordering::SeqCst);
+    finish_observer(observer.as_mut(), outcome, dropped, opts, &warnings);
     warnings.flush(&last_stderr_byte);
     outcome
 }
@@ -204,6 +211,7 @@ fn spawn_child(
 fn finish_observer(
     observer: Option<&mut Observer>,
     outcome: Outcome,
+    output_bytes_dropped: u64,
     opts: &Options,
     warnings: &Warnings,
 ) {
@@ -213,7 +221,11 @@ fn finish_observer(
         Outcome::Signal(s) => (None, Some(s)),
     };
     o.finish(
-        Control::ChildExited { code, signal },
+        Control::ChildExited {
+            code,
+            signal,
+            output_bytes_dropped,
+        },
         opts.finalize_timeout,
         warnings,
     );
@@ -279,6 +291,7 @@ fn spawn_pump(
     stream: Stream,
     observer: Option<SyncSender<Frame>>,
     last_byte: Option<Arc<Mutex<u8>>>,
+    dropped_total: Arc<AtomicU64>,
 ) -> Option<thread::JoinHandle<()>> {
     let source: Box<dyn Read + Send> = match stream {
         Stream::Stdout => Box::new(child.stdout.take()?),
@@ -291,6 +304,7 @@ fn spawn_pump(
             stream,
             observer.as_ref(),
             last_byte.as_deref(),
+            &dropped_total,
         ),
         Stream::Stderr => pump(
             source,
@@ -298,17 +312,22 @@ fn spawn_pump(
             stream,
             observer.as_ref(),
             last_byte.as_deref(),
+            &dropped_total,
         ),
     }))
 }
 
 /// Writes every chunk to `sink` (flushed, so partial lines appear at once), then offers a copy.
+///
+/// Every byte whose copy is dropped is added to `dropped_total`, so the count survives a gap
+/// notice that never fits before EOF (I5). `Control::Gap` only serves live accounting.
 fn pump(
     mut source: impl Read,
     mut sink: impl Write,
     stream: Stream,
     observer: Option<&SyncSender<Frame>>,
     last_byte: Option<&Mutex<u8>>,
+    dropped_total: &AtomicU64,
 ) {
     let mut buf = vec![0u8; CHUNK];
     let mut sink_ok = true;
@@ -340,13 +359,17 @@ fn pump(
                 .is_err()
             {
                 dropped += n as u64;
+                dropped_total.fetch_add(n as u64, Ordering::SeqCst);
                 continue;
             }
             dropped = 0;
         }
         match tx.try_send(Frame::Output(stream, chunk.to_vec())) {
             Ok(()) | Err(TrySendError::Disconnected(_)) => {}
-            Err(TrySendError::Full(_)) => dropped += n as u64,
+            Err(TrySendError::Full(_)) => {
+                dropped += n as u64;
+                dropped_total.fetch_add(n as u64, Ordering::SeqCst);
+            }
         }
     }
 }
@@ -566,7 +589,14 @@ mod tests {
         // 3 chunks into a queue of 1: the first copy fits, the rest are dropped and counted.
         let data = vec![b'x'; CHUNK * 3];
         let mut sink = Vec::new();
-        pump(data.as_slice(), &mut sink, Stream::Stderr, Some(&tx), None);
+        pump(
+            data.as_slice(),
+            &mut sink,
+            Stream::Stderr,
+            Some(&tx),
+            None,
+            &AtomicU64::new(0),
+        );
         assert_eq!(
             sink, data,
             "the sink gets everything, even when copies are dropped"
@@ -575,6 +605,30 @@ mod tests {
         let frames: Vec<Frame> = rx.into_iter().collect();
         assert_eq!(frames.len(), 1);
         assert!(matches!(&frames[0], Frame::Output(Stream::Stderr, b) if b.len() == CHUNK));
+    }
+
+    #[test]
+    fn pump_counts_bytes_dropped_at_eof() {
+        // Queue of 1 that nobody reads: chunk 1 is queued, chunks 2 and 3 (the last) are dropped
+        // and no later chunk exists to carry a Gap, yet the total must include them.
+        let (tx, rx) = mpsc::sync_channel::<Frame>(1);
+        let total = AtomicU64::new(0);
+        let data = vec![b'x'; CHUNK * 3 - 5];
+        pump(
+            data.as_slice(),
+            io::sink(),
+            Stream::Stdout,
+            Some(&tx),
+            None,
+            &total,
+        );
+        drop(tx);
+        let frames: Vec<Frame> = rx.into_iter().collect();
+        assert!(
+            frames.iter().all(|f| matches!(f, Frame::Output(..))),
+            "{frames:?}"
+        );
+        assert_eq!(total.load(Ordering::SeqCst), (CHUNK * 2 - 5) as u64);
     }
 
     #[test]
@@ -588,7 +642,14 @@ mod tests {
             chunks: 3,
             delay: Duration::from_millis(100),
         };
-        pump(slow, io::sink(), Stream::Stderr, Some(&tx), None);
+        pump(
+            slow,
+            io::sink(),
+            Stream::Stderr,
+            Some(&tx),
+            None,
+            &AtomicU64::new(0),
+        );
         drop(tx);
         let frames = reader.join().unwrap();
         let output: usize = frames

@@ -189,9 +189,9 @@ async fn observe() -> io::Result<()> {
                         flush(l);
                     }
                 }
-                Some(Frame::Control(Control::ChildExited { code, signal })) => {
+                Some(Frame::Control(Control::ChildExited { code, signal, output_bytes_dropped })) => {
                     if let Some(l) = live.take() {
-                        finalize(l, code, signal, clock).await;
+                        finalize(l, (code, signal), output_bytes_dropped, clock).await;
                     }
                     return Ok(());
                 }
@@ -202,7 +202,7 @@ async fn observe() -> io::Result<()> {
                             let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pgid), nix::sys::signal::Signal::SIGTERM);
                         }
                         l.session.observe(clock(), Observation::Signal(15));
-                        finalize(l, None, None, clock).await;
+                        finalize(l, (None, None), 0, clock).await;
                     }
                     return Ok(());
                 }
@@ -372,8 +372,8 @@ fn flush(l: &mut Live) {
 
 async fn finalize(
     mut l: Live,
-    code: Option<i32>,
-    signal: Option<i32>,
+    (code, signal): (Option<i32>, Option<i32>),
+    output_bytes_dropped: u64,
     clock: impl Fn() -> ClockSample,
 ) {
     // Let Maestro's last writes land, then take a final look.
@@ -389,7 +389,9 @@ async fn finalize(
         },
     );
     l.session.observe(clock(), Observation::Report(report));
-    l.session.end(clock(), l.dropped_bytes);
+    // Gap sums are a subset of the authoritative total: never under-report or double-count.
+    l.session
+        .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
     flush(&mut l);
     l.shared.finishing.store(true, Ordering::SeqCst);
     l.shared.wake.notify_one();
