@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Pure domain logic for Fleet (PLAN §7.4). No I/O.
 //!
+//! - [`downsample`]: LTTB downsampling of chart series (PLAN §5.4).
 //! - [`claims`]: the claim lattice that decides a flow's outcome (invariants I3, I4).
 //! - [`redact`]: secret redaction for everything that leaves the runner (invariant I6).
 //! - [`reconcile`]: matching the final JUnit report to the flows seen live.
@@ -15,6 +16,7 @@
 )]
 
 pub mod claims;
+pub mod downsample;
 pub mod outcome;
 pub mod policy;
 pub mod reconcile;

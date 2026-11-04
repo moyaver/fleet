@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A scroll container that renders only the rows in view.
 
-use leptos::{prelude::*, web_sys};
+use leptos::prelude::*;
 
 use crate::virtual_list::window;
 

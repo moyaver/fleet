@@ -13,10 +13,26 @@ workspace = true
 
 
 [dependencies]
+fleet-core.workspace = true
 fleet-protocol.workspace = true
+js-sys.workspace = true
 leptos.workspace = true
+time.workspace = true
 uuid.workspace = true
 vte.workspace = true
+web-sys = { workspace = true, features = [
+    "CanvasRenderingContext2d",
+    "CssStyleDeclaration",
+    "DomRect",
+    "Element",
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "KeyboardEvent",
+    "MouseEvent",
+    "PointerEvent",
+    "WheelEvent",
+    "Window",
+] }
 
 [dev-dependencies]
-time.workspace = true
+proptest.workspace = true

@@ -2,7 +2,6 @@
 //! Thin Leptos view over the screenshot viewer: plain `<img>` elements with model URLs.
 
 use leptos::prelude::*;
-use leptos::web_sys;
 
 use crate::screenshots::{ScreenshotViewer, Zoom};
 

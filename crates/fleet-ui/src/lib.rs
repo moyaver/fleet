@@ -7,7 +7,11 @@
 //!
 //! - [`live_store`]: the dashboard's client-side mirror of the live socket, pure Rust.
 //! - [`logview`], [`steps`], [`screenshots`]: log viewer, step tree and screenshot viewer.
+//! - [`charts`]: sparkline and time-series chart (order 5).
+//! - [`timeline`]: swimlane timeline of flows per device (order 6).
 
+mod canvas;
+pub mod charts;
 pub mod components;
 pub mod live_store;
 pub mod logview;
@@ -16,5 +20,6 @@ pub mod provenance;
 pub mod screenshots;
 pub mod steps;
 pub mod table;
+pub mod timeline;
 pub mod tone;
 pub mod virtual_list;

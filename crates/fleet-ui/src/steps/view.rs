@@ -2,7 +2,6 @@
 //! Thin Leptos view over the step tree (WAI-ARIA `tree`).
 
 use leptos::prelude::*;
-use leptos::web_sys;
 
 use crate::components::display::{ProvenanceBadge, StatusPill};
 use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_tone};

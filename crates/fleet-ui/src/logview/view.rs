@@ -3,7 +3,6 @@
 //! colors are set through the CSSOM so the strict CSP (`style-src 'self'`) holds.
 
 use leptos::prelude::*;
-use leptos::web_sys;
 
 use crate::logview::ansi::{self, Span};
 use crate::logview::model::{LogModel, anchor};

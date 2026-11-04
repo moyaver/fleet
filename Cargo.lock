@@ -1306,11 +1306,15 @@ dependencies = [
 name = "fleet-ui"
 version = "0.0.0"
 dependencies = [
+ "fleet-core",
  "fleet-protocol",
+ "js-sys",
  "leptos",
+ "proptest",
  "time",
  "uuid",
  "vte",
+ "web-sys",
 ]
 
 [[package]]
