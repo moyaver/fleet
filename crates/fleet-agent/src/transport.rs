@@ -95,6 +95,8 @@ pub(crate) enum End {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+const SILENCE_TIMEOUT: Duration = Duration::from_secs(30);
+const PING_INTERVAL: Duration = Duration::from_secs(10);
 const BATCH: usize = 64;
 const BACKOFF_BASE: Duration = Duration::from_millis(250);
 const BACKOFF_CAP: Duration = Duration::from_secs(30);
@@ -221,10 +223,13 @@ async fn connection(
     let ws = open(cfg).await?;
     let (mut tx, mut rx) = ws.split();
 
-    tx.send(Message::text(serde_json::to_string(&hello_frame(
-        cfg, shared, clock,
-    )?)?))
-    .await?;
+    tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        tx.send(Message::text(serde_json::to_string(&hello_frame(
+            cfg, shared, clock,
+        )?)?)),
+    )
+    .await??;
 
     let welcome = tokio::time::timeout(HELLO_TIMEOUT, await_welcome(&mut rx)).await??;
     let welcome = match welcome {
@@ -248,7 +253,12 @@ async fn connection(
         limits.heartbeat_interval_ms.max(1000),
     ));
     let mut tick = tokio::time::interval(Duration::from_millis(250));
+    let mut ping = tokio::time::interval(PING_INTERVAL);
+    let mut last_frame = tokio::time::Instant::now();
     loop {
+        if last_frame.elapsed() >= SILENCE_TIMEOUT {
+            return Err("server stopped sending frames".into());
+        }
         // Send what the window allows.
         let batch = {
             let mut o = shared.outbox.lock().map_err(|_| "outbox lock")?;
@@ -260,10 +270,13 @@ async fn connection(
         };
         if let Some(last) = batch.last() {
             sent = last.seq;
-            tx.send(Message::text(serde_json::to_string(
-                &ClientFrame::Events { events: batch },
-            )?))
-            .await?;
+            tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                tx.send(Message::text(serde_json::to_string(
+                    &ClientFrame::Events { events: batch },
+                )?)),
+            )
+            .await??;
             continue;
         }
         let (drained, finishing) = {
@@ -274,27 +287,34 @@ async fn connection(
             )
         };
         if finishing && drained {
-            tx.send(Message::text(serde_json::to_string(&ClientFrame::Bye)?))
-                .await?;
-            let _ = tx.close().await;
+            tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                tx.send(Message::text(serde_json::to_string(&ClientFrame::Bye)?)),
+            )
+            .await??;
+            let _ = tokio::time::timeout(CONNECT_TIMEOUT, tx.close()).await;
             return Ok(End::Flushed);
         }
         tokio::select! {
             msg = rx.next() => {
                 let Some(msg) = msg else { return Err("connection closed".into()) };
+                last_frame = tokio::time::Instant::now();
                 if let Some(end) = on_frame(decode(&msg?), shared, &mut sent).await? {
                     return Ok(end);
                 }
             }
             t = telemetry.recv() => {
                 if let Some(t) = t {
-                    tx.send(Message::text(serde_json::to_string(&ClientFrame::Telemetry(t))?)).await?;
+                    tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::text(serde_json::to_string(&ClientFrame::Telemetry(t))?))).await??;
                 }
             }
             () = shared.wake.notified() => {}
             _ = heartbeat.tick() => {
                 let unacked = { let o = shared.outbox.lock().map_err(|_| "outbox lock")?; o.last_seq().saturating_sub(o.acked_through()) };
-                tx.send(Message::text(serde_json::to_string(&ClientFrame::Heartbeat { clock: clock(), unacked })?)).await?;
+                tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::text(serde_json::to_string(&ClientFrame::Heartbeat { clock: clock(), unacked })?))).await??;
+            }
+            _ = ping.tick() => {
+                tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::Ping(Vec::new().into()))).await??;
             }
             _ = tick.tick() => {}
         }
@@ -428,6 +448,49 @@ mod tests {
         )
         .await;
         assert!(matches!(result, Ok(End::Refused(_))), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn silent_server_is_reconnected() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            #[expect(clippy::result_large_err, reason = "tungstenite callback signature")]
+            let callback = |_req: &tokio_tungstenite::tungstenite::handshake::server::Request, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                response.headers_mut().insert("Sec-WebSocket-Protocol", HeaderValue::from_static(WS_SUBPROTOCOL));
+                Ok(response)
+            };
+            let mut ws = tokio_tungstenite::accept_hdr_async(socket, callback)
+                .await
+                .unwrap();
+            let _ = ws.next().await.unwrap().unwrap();
+            ws.send(Message::text(
+                serde_json::json!({ "op": "welcome", "protocol": 1,
+                "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
+                "committed_through": 0, "resume": "new", "limits": { "max_inflight_events": 512,
+                "max_frame_bytes": 1048576, "heartbeat_interval_ms": 10000 } })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            let second = tokio::time::timeout(Duration::from_secs(35), listener.accept()).await;
+            drop(ws);
+            assert!(second.is_ok(), "agent did not reconnect to silent server");
+        });
+        let cfg = Config::from_env(
+            format!("ws://{addr}"),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |_| None,
+        );
+        let (_tx, rx) = mpsc::channel(1);
+        let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+            wall: time::OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }));
+        server.await.unwrap();
+        agent.abort();
     }
 
     #[tokio::test]

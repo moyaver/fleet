@@ -107,7 +107,13 @@ async fn connection(
         s.connections
     };
     let mut received_here = 0usize;
-    while let Some(Ok(Message::Text(text))) = ws.next().await {
+    while let Some(Ok(message)) = ws.next().await {
+        let Message::Text(text) = message else {
+            if ws.flush().await.is_err() {
+                return;
+            }
+            continue;
+        };
         let frame: Value = serde_json::from_str(text.as_str()).unwrap();
         st.lock().unwrap().raw.push_str(text.as_str());
         let reply = match frame["op"].as_str().unwrap() {
