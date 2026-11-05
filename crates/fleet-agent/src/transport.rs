@@ -272,6 +272,10 @@ async fn batch(
         for frame in response.frames {
             match frame {
                 ServerFrame::Welcome(welcome) => {
+                    let acked = shared.outbox.lock().map_or(0, |o| o.acked_through());
+                    if let Err(reason) = validate_welcome(&welcome, acked) {
+                        return Ok(End::Refused(reason.into()));
+                    }
                     seen_welcome = true;
                     shared
                         .connected

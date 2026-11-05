@@ -109,3 +109,54 @@ async fn the_agent_tunnels_through_an_http_proxy() {
         "the run arrived whole"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let stack = Stack::start(|_| {}).await;
+    let upstream = stack.addr();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let proxy = tokio::spawn(async move {
+        loop {
+            let (mut client, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let mut head = Vec::new();
+                while !head.ends_with(b"\r\n\r\n") {
+                    match client.read_u8().await {
+                        Ok(byte) => head.push(byte),
+                        Err(_) => return,
+                    }
+                }
+                if head.starts_with(b"GET ") {
+                    let _ = client.write_all(b"HTTP/1.1 426 Upgrade Required\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+                } else {
+                    let mut server = tokio::net::TcpStream::connect(upstream).await.unwrap();
+                    server.write_all(&head).await.unwrap();
+                    let _ = tokio::io::copy_bidirectional(&mut client, &mut server).await;
+                }
+            });
+        }
+    });
+    let url = format!("ws://{address}/api/v1/agent/ws");
+    let key = stack.key.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        run_agent(
+            "pass",
+            &[
+                ("FLEET_SERVER", &url),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_FAKE_LINGER", "4"),
+                ("FLEET_FLUSH_TIMEOUT", "15"),
+                ("FLEET_UPLOAD_ARTIFACTS", "off"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let snapshot = stack.latest_snapshot().await;
+    assert_eq!(snapshot["agent_runs"][0]["state"], "ended");
+    assert!(!flows(&snapshot).is_empty());
+    proxy.abort();
+}

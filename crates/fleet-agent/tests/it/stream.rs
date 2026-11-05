@@ -696,3 +696,44 @@ fn unreachable_server_gets_a_short_finalization_budget() {
     );
     assert!(run_dir.join("spool.bin").exists());
 }
+
+#[test]
+fn batch_with_invalid_welcome_stops_without_sending_events() {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    let requests = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let seen = Arc::clone(&requests);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
+            Mock::given(method("POST")).respond_with(move |request: &wiremock::Request| {
+                seen.lock().unwrap().push(serde_json::from_slice(&request.body).unwrap());
+                ResponseTemplate::new(200).set_body_json(json!({"frames":[{"op":"welcome", "protocol":99,
+                    "connection_id":"00000000-0000-0000-0000-000000000001", "epoch":1, "committed_through":0,
+                    "resume":"new", "limits":{"max_inflight_events":512,"max_frame_bytes":1_048_576,"heartbeat_interval_ms":10_000}}]}))
+            }).mount(&server).await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "fail",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let requests = requests.lock().unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "invalid welcome must stop batch transport"
+    );
+    assert!(requests[0]["events"].as_array().unwrap().is_empty());
+}
