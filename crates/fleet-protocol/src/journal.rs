@@ -15,9 +15,11 @@ use crate::event::EventBody;
 ///
 /// Durations come from `mono_ms` differences, never from wall-clock subtraction (research 05 §5.6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClockSample {
     /// Agent wall clock, UTC.
     #[serde(with = "time::serde::rfc3339")]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "crate::schema::rfc3339"))]
     pub wall: OffsetDateTime,
     /// Milliseconds since the agent process started, monotonic.
     pub mono_ms: u64,
@@ -25,6 +27,7 @@ pub struct ClockSample {
 
 /// Where a piece of evidence came from. The claim lattice ranks these (fleet-core).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SourceKind {
     /// Supplied up front: CLI arguments, a manifest.
@@ -50,6 +53,7 @@ pub enum SourceKind {
 
 /// The provenance of one event (invariant I4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Provenance {
     /// Where the evidence came from.
     pub kind: SourceKind,
@@ -89,6 +93,7 @@ impl Provenance {
 
 /// Which execution entities an event is about. All IDs are agent-generated UUIDv7.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Subject {
     /// One Maestro invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -117,6 +122,7 @@ impl Subject {
 
 /// A step inside a flow execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StepRef {
     /// 0-based position in the flow's steps as they were observed (nested steps included).
     pub index: u32,
@@ -124,6 +130,7 @@ pub struct StepRef {
 
 /// One journal event as it travels and is stored.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EventEnvelope {
     /// Sequence number within the agent run, from 1. Gap-free except for a hole the agent
     /// reports with a `journal.gap` sequenced at the hole's last `seq`.

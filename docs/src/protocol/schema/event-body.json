@@ -1,0 +1,1241 @@
+{
+  "$defs": {
+    "AdbState": {
+      "description": "adb's view of a device.",
+      "oneOf": [
+        {
+          "const": "device",
+          "description": "Online and usable.",
+          "type": "string"
+        },
+        {
+          "const": "offline",
+          "description": "Connected but not responding.",
+          "type": "string"
+        },
+        {
+          "const": "unauthorized",
+          "description": "Needs authorization on the device.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "Gone from adb's list.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "Another state adb reported.",
+          "type": "string"
+        }
+      ]
+    },
+    "AgentWarning": {
+      "description": "`agent.warning`.",
+      "properties": {
+        "code": {
+          "description": "A stable code, for example `report_absent`.",
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-readable detail, redacted.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "ArtifactRegistered": {
+      "description": "`artifact.registered`: a file worth keeping appeared.",
+      "properties": {
+        "class": {
+          "description": "What kind of file.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path relative to the run's output directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "path"
+      ],
+      "type": "object"
+    },
+    "ArtifactRejected": {
+      "description": "`artifact.rejected`: a file was not uploaded, and why. The agent journals it when the server\nrefuses the file, and when the agent itself decides not to send it (for example a log it\ncannot redact reliably: invariant I6).",
+      "properties": {
+        "class": {
+          "description": "The artifact class.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path relative to the run's output directory.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "A stable code: a [`crate::artifact::RejectReason`] code from the server, or an agent code\nsuch as `not_redactable`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "path",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ArtifactUploaded": {
+      "description": "`artifact.uploaded`: the server verified and stored a file (the agent journals the server's\nanswer to `upload_complete`, or to an `exists` grant).",
+      "properties": {
+        "artifact_id": {
+          "description": "The server's artifact id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "class": {
+          "description": "The artifact class (see [`crate::artifact::ArtifactClass`]).",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path relative to the run's output directory, as in `artifact.registered`.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class",
+        "path",
+        "artifact_id",
+        "size"
+      ],
+      "type": "object"
+    },
+    "DeviceStateObserved": {
+      "description": "`device.state_observed`: adb reported a device's state (research 02 §4).",
+      "properties": {
+        "serial": {
+          "description": "The serial.",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/AdbState",
+          "description": "Its state."
+        }
+      },
+      "required": [
+        "serial",
+        "state"
+      ],
+      "type": "object"
+    },
+    "EvidenceSources": {
+      "description": "The evidence sources a run will have, so \"no report\" can be told from \"report missing\".",
+      "properties": {
+        "debug_output": {
+          "description": "The debug output directory (session log and flow bundles), when it is known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maestro_log": {
+          "description": "Whether Maestro's log is made machine-readable by the agent.",
+          "type": "boolean"
+        },
+        "report": {
+          "$ref": "#/$defs/ReportSource",
+          "description": "The JUnit report."
+        }
+      },
+      "required": [
+        "report",
+        "maestro_log"
+      ],
+      "type": "object"
+    },
+    "ExitClass": {
+      "description": "How a Maestro exit status reads (research 08 §7).",
+      "oneOf": [
+        {
+          "const": "passed",
+          "description": "Exit 0.",
+          "type": "string"
+        },
+        {
+          "const": "test_failures",
+          "description": "Exit 1 with a report, or with a flow seen to fail (stdout, bundle or log): test failures.",
+          "type": "string"
+        },
+        {
+          "const": "maestro_error",
+          "description": "Exit 1 with no failed flow seen and an expected report missing: Maestro or infrastructure\nerror. With no report requested, exit 1 is `Other` instead.",
+          "type": "string"
+        },
+        {
+          "const": "usage_error",
+          "description": "Exit 2: bad usage.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "Killed by a signal, or 130/143.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "Anything else.",
+          "type": "string"
+        }
+      ]
+    },
+    "FailureInfo": {
+      "description": "Why a flow failed, as Maestro said it.",
+      "properties": {
+        "message": {
+          "description": "The message, redacted and truncated.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "type": "object"
+    },
+    "FlowEnded": {
+      "description": "`flow.ended`: a claim about a flow's outcome from a live source.",
+      "properties": {
+        "duration_ms": {
+          "description": "Maestro's own duration, when it printed one.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailureInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why it failed."
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlowRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which flow, set when no `flow.started` named it first (a planned flow Maestro skipped), so\nthe server can create the flow execution from the claim alone."
+        },
+        "outcome": {
+          "$ref": "#/$defs/FlowOutcome",
+          "description": "The claimed outcome."
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "FlowOutcome": {
+      "description": "A flow outcome as claimed by one source.",
+      "oneOf": [
+        {
+          "const": "passed",
+          "description": "The flow passed.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "The flow failed.",
+          "type": "string"
+        },
+        {
+          "const": "skipped",
+          "description": "The flow was deliberately not run (for example an aborted `executionOrder` sequence).",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "The flow was cut short by a signal, a crash or a lost device.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Nothing reliable is known.",
+          "type": "string"
+        },
+        {
+          "const": "unrecognized",
+          "description": "A value this build doesn't know: treated as unknown, never as passed.",
+          "type": "string"
+        }
+      ]
+    },
+    "FlowRef": {
+      "description": "A flow as Maestro names it.",
+      "properties": {
+        "name": {
+          "description": "The flow's name (`name:` in the YAML, or the file name).",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path of the flow file relative to the repository, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "FlowReported": {
+      "description": "`flow.reported`: the final report's claim about one flow execution.",
+      "properties": {
+        "junit": {
+          "$ref": "#/$defs/JunitTestcase",
+          "description": "The test case as written."
+        },
+        "matched": {
+          "$ref": "#/$defs/MatchMethod",
+          "description": "How it was matched to a live flow."
+        },
+        "outcome": {
+          "$ref": "#/$defs/FlowOutcome",
+          "description": "Outcome mapped from Maestro's status."
+        },
+        "testcase_index": {
+          "description": "0-based `<testcase>` index within that suite.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "testsuite_index": {
+          "description": "0-based `<testsuite>` index (= shard order).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "testsuite_index",
+        "testcase_index",
+        "matched",
+        "junit",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "FlowStarted": {
+      "description": "`flow.started`.",
+      "properties": {
+        "flow": {
+          "$ref": "#/$defs/FlowRef",
+          "description": "Which flow."
+        },
+        "ordinal": {
+          "description": "0-based execution order within the shard.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shard_number": {
+          "description": "1-based shard number.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "flow",
+        "shard_number",
+        "ordinal"
+      ],
+      "type": "object"
+    },
+    "JournalGap": {
+      "description": "`journal.gap`: events the agent had to drop, so the loss is explicit (invariant I5).\n\nThe agent sequences the marker in the hole it reports: its own `seq` is `to_seq`, so\n`from_seq..=to_seq` covers the dropped events and the marker's own slot, and the journal\nstays contiguous for the server (ADR-0005, amendment 2026-11-04).",
+      "properties": {
+        "from_seq": {
+          "description": "First missing sequence number.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reason": {
+          "description": "Why.",
+          "type": "string"
+        },
+        "to_seq": {
+          "description": "Last missing sequence number; the marker's own `seq` when it covers a hole.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_seq",
+        "to_seq",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "JunitTestcase": {
+      "description": "One `<testcase>` of the final report.",
+      "properties": {
+        "failure": {
+          "description": "`<failure>` text, redacted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "description": "`file` attribute.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "`id` attribute.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "`name` attribute.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Maestro's non-standard `status` attribute.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time_ms": {
+          "description": "`time`, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "timestamp_local": {
+          "description": "`timestamp`: a local date-time without a zone, as written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "MatchMethod": {
+      "description": "How a report test case was matched to a live flow execution.",
+      "oneOf": [
+        {
+          "const": "positional",
+          "description": "Same position and same flow, the normal case.",
+          "type": "string"
+        },
+        {
+          "const": "aligned",
+          "description": "Matched by alignment on path and name.",
+          "type": "string"
+        },
+        {
+          "const": "name",
+          "description": "Matched by name only.",
+          "type": "string"
+        },
+        {
+          "const": "unmatched",
+          "description": "No live flow: created from the report.",
+          "type": "string"
+        }
+      ]
+    },
+    "ParserUnrecognized": {
+      "description": "`parser.unrecognized`: lines a parser couldn't read (Maestro output drift).",
+      "properties": {
+        "count": {
+          "description": "How many lines.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parser": {
+          "description": "Which parser.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parser",
+        "count"
+      ],
+      "type": "object"
+    },
+    "PlanAssigned": {
+      "description": "`plan.assigned`: this run executes one shard of a Fleet plan (ADR-0013).",
+      "properties": {
+        "flows": {
+          "description": "Flow files assigned to it, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "plan_id": {
+          "description": "The plan.",
+          "type": "string"
+        },
+        "shard_id": {
+          "description": "The shard of the plan this run executes.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "plan_id",
+        "shard_id",
+        "flows"
+      ],
+      "type": "object"
+    },
+    "ProcessExited": {
+      "description": "`process.exited`: how Maestro ended.",
+      "properties": {
+        "class": {
+          "$ref": "#/$defs/ExitClass",
+          "description": "What that means."
+        },
+        "code": {
+          "description": "Exit code, if it exited normally.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "signal": {
+          "description": "Signal, if one killed it.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "type": "object"
+    },
+    "ReportParsed": {
+      "description": "`report.parsed`: what the final report said overall.",
+      "properties": {
+        "failures": {
+          "description": "Test cases with status `ERROR`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/ReportStatus",
+          "description": "Whether it could be read."
+        },
+        "suites": {
+          "description": "Number of `<testsuite>` elements.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tests": {
+          "description": "Total test cases.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "suites",
+        "tests",
+        "failures"
+      ],
+      "type": "object"
+    },
+    "ReportReason": {
+      "description": "Why the run has, or has not, a JUnit report.",
+      "oneOf": [
+        {
+          "const": "injected",
+          "description": "The agent added `--format junit` (and `--output` unless the user gave one).",
+          "type": "string"
+        },
+        {
+          "const": "user_junit",
+          "description": "The user asked for `--format junit`.",
+          "type": "string"
+        },
+        {
+          "const": "user_format",
+          "description": "The user chose another `--format`: no JUnit report by choice.",
+          "type": "string"
+        },
+        {
+          "const": "skipped_single_flow",
+          "description": "Not added: a single flow, where `--format` would change Maestro's execution mode.",
+          "type": "string"
+        },
+        {
+          "const": "skipped_continuous",
+          "description": "Not added: `-c`/`--continuous`, which the report path rejects.",
+          "type": "string"
+        },
+        {
+          "const": "skipped_unclassified",
+          "description": "Not added: the flow paths couldn't be classified.",
+          "type": "string"
+        },
+        {
+          "const": "rewrite_disabled",
+          "description": "Not added: the agent doesn't rewrite commands (`--fleet-rewrite` off).",
+          "type": "string"
+        },
+        {
+          "const": "unrecognized",
+          "description": "A value this build doesn't know: the report is treated as not expected.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReportSource": {
+      "description": "Where the JUnit report will be, if anywhere, and why.",
+      "properties": {
+        "path": {
+          "description": "The report file, redacted. `None`: no report is expected.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/ReportReason",
+          "description": "Why."
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ReportStatus": {
+      "description": "Whether and how the final report could be read.",
+      "oneOf": [
+        {
+          "const": "complete",
+          "description": "Parsed completely.",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "description": "Truncated; complete test cases were salvaged.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "Present but unreadable.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "Not written (normal after a signal or crash).",
+          "type": "string"
+        }
+      ]
+    },
+    "RunEnded": {
+      "description": "`run.ended`: the agent is done with this run.",
+      "properties": {
+        "interrupted": {
+          "description": "Whether a signal cut the run short.",
+          "type": "boolean"
+        },
+        "output_bytes_dropped": {
+          "description": "Output bytes the observer didn't see because it fell behind (invariant I5).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "interrupted",
+        "output_bytes_dropped"
+      ],
+      "type": "object"
+    },
+    "RunSignal": {
+      "description": "`run.signal`: the agent received a signal and forwarded it.",
+      "properties": {
+        "signal": {
+          "description": "Signal number.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "signal"
+      ],
+      "type": "object"
+    },
+    "RunStarted": {
+      "description": "`run.started`: the agent began supervising a command.",
+      "properties": {
+        "agent_version": {
+          "description": "Agent version.",
+          "type": "string"
+        },
+        "argv": {
+          "description": "The command line, redacted.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceSources"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which evidence sources the prepared command will produce. Absent from older agents."
+        }
+      },
+      "required": [
+        "argv",
+        "agent_version"
+      ],
+      "type": "object"
+    },
+    "ShardAssigned": {
+      "description": "`shard.assigned`: Maestro picked a device for a shard and planned its flows.",
+      "properties": {
+        "device_serial": {
+          "description": "The device serial (`emulator-5554`, `127.0.0.1:5555`, a USB serial).",
+          "type": "string"
+        },
+        "planned": {
+          "description": "The flows planned for this shard, in order.",
+          "items": {
+            "$ref": "#/$defs/FlowRef"
+          },
+          "type": "array"
+        },
+        "shard_number": {
+          "description": "1-based shard number as Maestro prints it.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shard_number",
+        "device_serial",
+        "planned"
+      ],
+      "type": "object"
+    },
+    "ShardMode": {
+      "description": "How a suite is sharded.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "One shard.",
+          "type": "string"
+        },
+        {
+          "const": "split",
+          "description": "`--shard-split N`: flows spread across shards.",
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "description": "`--shard-all N`: every flow on every shard.",
+          "type": "string"
+        }
+      ]
+    },
+    "StepEnded": {
+      "description": "`step.ended`.",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/StepStatus",
+          "description": "The step's final status."
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
+    "StepStarted": {
+      "description": "`step.started`.",
+      "properties": {
+        "description": {
+          "description": "Maestro's description of the step, redacted.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "type": "object"
+    },
+    "StepStatus": {
+      "description": "A step's state as Maestro reported it.",
+      "oneOf": [
+        {
+          "const": "running",
+          "description": "Started and not finished.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "Finished successfully.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Failed.",
+          "type": "string"
+        },
+        {
+          "const": "warned",
+          "description": "Failed an optional check: a warning.",
+          "type": "string"
+        },
+        {
+          "const": "skipped",
+          "description": "Not run (a condition was false).",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A value this build doesn't know.",
+          "type": "string"
+        }
+      ]
+    },
+    "SuiteStarted": {
+      "description": "`suite.started`: one Maestro invocation began.",
+      "properties": {
+        "shard_mode": {
+          "$ref": "#/$defs/ShardMode",
+          "description": "Sharding mode, from the command line."
+        },
+        "shards": {
+          "description": "Number of shards requested.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shard_mode",
+        "shards"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every event type this build knows.",
+  "oneOf": [
+    {
+      "description": "See [`RunStarted`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RunStarted"
+        },
+        "type": {
+          "const": "run.started",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`SuiteStarted`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SuiteStarted"
+        },
+        "type": {
+          "const": "suite.started",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ShardAssigned`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ShardAssigned"
+        },
+        "type": {
+          "const": "shard.assigned",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`FlowStarted`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/FlowStarted"
+        },
+        "type": {
+          "const": "flow.started",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`StepStarted`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StepStarted"
+        },
+        "type": {
+          "const": "step.started",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`StepEnded`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StepEnded"
+        },
+        "type": {
+          "const": "step.ended",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`FlowEnded`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/FlowEnded"
+        },
+        "type": {
+          "const": "flow.ended",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`FlowReported`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/FlowReported"
+        },
+        "type": {
+          "const": "flow.reported",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ReportParsed`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ReportParsed"
+        },
+        "type": {
+          "const": "report.parsed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ProcessExited`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ProcessExited"
+        },
+        "type": {
+          "const": "process.exited",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ArtifactRegistered`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ArtifactRegistered"
+        },
+        "type": {
+          "const": "artifact.registered",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ArtifactUploaded`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ArtifactUploaded"
+        },
+        "type": {
+          "const": "artifact.uploaded",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ArtifactRejected`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ArtifactRejected"
+        },
+        "type": {
+          "const": "artifact.rejected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`RunSignal`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RunSignal"
+        },
+        "type": {
+          "const": "run.signal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "`run.finalizing`: Maestro exited; the agent is reconciling and flushing.",
+      "properties": {
+        "type": {
+          "const": "run.finalizing",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`RunEnded`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/RunEnded"
+        },
+        "type": {
+          "const": "run.ended",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`PlanAssigned`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/PlanAssigned"
+        },
+        "type": {
+          "const": "plan.assigned",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`DeviceStateObserved`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/DeviceStateObserved"
+        },
+        "type": {
+          "const": "device.state_observed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`AgentWarning`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/AgentWarning"
+        },
+        "type": {
+          "const": "agent.warning",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`JournalGap`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/JournalGap"
+        },
+        "type": {
+          "const": "journal.gap",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`ParserUnrecognized`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/ParserUnrecognized"
+        },
+        "type": {
+          "const": "parser.unrecognized",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "EventBody"
+}

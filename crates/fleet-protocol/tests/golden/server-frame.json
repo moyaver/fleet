@@ -1,0 +1,9 @@
+[
+  {"op":"welcome","protocol":1,"connection_id":"018f0000-0000-7000-8000-000000000002","epoch":1,"committed_through":0,"resume":"new","limits":{"max_inflight_events":512,"max_frame_bytes":1048576,"heartbeat_interval_ms":10000}},
+  {"op":"reject","code":"unauthorized","message":"denied","retry_after_ms":null,"fatal":true},
+  {"op":"ack","through":10,"epoch":1,"duplicates":0},
+  {"op":"telemetry_ack","through":4},
+  {"op":"event_rejected","seq":2,"code":"invalid","permanent":true,"message":"invalid"},
+  {"op":"error","code":"seq_gap","fatal":false,"message":"gap","expected_seq":2},
+  {"op":"goaway","reason":"shutdown","reconnect_after_ms":100}
+]

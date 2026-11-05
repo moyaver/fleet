@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the browser socket accepts.",
+  "oneOf": [
+    {
+      "description": "Subscribe to a project, and to one attempt's snapshot.",
+      "properties": {
+        "attempt": {
+          "description": "The attempt to snapshot.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "op": {
+          "const": "subscribe",
+          "type": "string"
+        },
+        "project": {
+          "description": "The project's slug.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "project"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "LiveRequest"
+}

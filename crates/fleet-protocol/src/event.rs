@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 /// A flow outcome as claimed by one source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum FlowOutcome {
     /// The flow passed.
@@ -29,6 +30,7 @@ pub enum FlowOutcome {
 
 /// A step's state as Maestro reported it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum StepStatus {
     /// Started and not finished.
@@ -48,6 +50,7 @@ pub enum StepStatus {
 
 /// A flow as Maestro names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlowRef {
     /// The flow's name (`name:` in the YAML, or the file name).
     pub name: String,
@@ -58,6 +61,7 @@ pub struct FlowRef {
 
 /// How a suite is sharded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ShardMode {
     /// One shard.
@@ -70,6 +74,7 @@ pub enum ShardMode {
 
 /// How a Maestro exit status reads (research 08 §7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ExitClass {
     /// Exit 0.
@@ -89,6 +94,7 @@ pub enum ExitClass {
 
 /// Whether and how the final report could be read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReportStatus {
     /// Parsed completely.
@@ -103,6 +109,7 @@ pub enum ReportStatus {
 
 /// How a report test case was matched to a live flow execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum MatchMethod {
     /// Same position and same flow, the normal case.
@@ -117,6 +124,7 @@ pub enum MatchMethod {
 
 /// `run.started`: the agent began supervising a command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunStarted {
     /// The command line, redacted.
     pub argv: Vec<String>,
@@ -129,6 +137,7 @@ pub struct RunStarted {
 
 /// Why the run has, or has not, a JUnit report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReportReason {
     /// The agent added `--format junit` (and `--output` unless the user gave one).
@@ -152,6 +161,7 @@ pub enum ReportReason {
 
 /// Where the JUnit report will be, if anywhere, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ReportSource {
     /// The report file, redacted. `None`: no report is expected.
     pub path: Option<String>,
@@ -161,6 +171,7 @@ pub struct ReportSource {
 
 /// The evidence sources a run will have, so "no report" can be told from "report missing".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EvidenceSources {
     /// The JUnit report.
     pub report: ReportSource,
@@ -172,6 +183,7 @@ pub struct EvidenceSources {
 
 /// `suite.started`: one Maestro invocation began.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SuiteStarted {
     /// Sharding mode, from the command line.
     pub shard_mode: ShardMode,
@@ -181,6 +193,7 @@ pub struct SuiteStarted {
 
 /// `shard.assigned`: Maestro picked a device for a shard and planned its flows.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ShardAssigned {
     /// 1-based shard number as Maestro prints it.
     pub shard_number: u32,
@@ -192,6 +205,7 @@ pub struct ShardAssigned {
 
 /// `flow.started`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlowStarted {
     /// Which flow.
     pub flow: FlowRef,
@@ -203,6 +217,7 @@ pub struct FlowStarted {
 
 /// `step.started`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StepStarted {
     /// Maestro's description of the step, redacted.
     pub description: String,
@@ -210,6 +225,7 @@ pub struct StepStarted {
 
 /// `step.ended`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StepEnded {
     /// The step's final status.
     pub status: StepStatus,
@@ -217,6 +233,7 @@ pub struct StepEnded {
 
 /// Why a flow failed, as Maestro said it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FailureInfo {
     /// The message, redacted and truncated.
     pub message: String,
@@ -224,6 +241,7 @@ pub struct FailureInfo {
 
 /// `flow.ended`: a claim about a flow's outcome from a live source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlowEnded {
     /// The claimed outcome.
     pub outcome: FlowOutcome,
@@ -241,6 +259,7 @@ pub struct FlowEnded {
 
 /// One `<testcase>` of the final report.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct JunitTestcase {
     /// `id` attribute.
     pub id: Option<String>,
@@ -260,6 +279,7 @@ pub struct JunitTestcase {
 
 /// `flow.reported`: the final report's claim about one flow execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlowReported {
     /// 0-based `<testsuite>` index (= shard order).
     pub testsuite_index: u32,
@@ -278,6 +298,7 @@ pub struct FlowReported {
 
 /// `report.parsed`: what the final report said overall.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ReportParsed {
     /// Whether it could be read.
     pub status: ReportStatus,
@@ -291,6 +312,7 @@ pub struct ReportParsed {
 
 /// `process.exited`: how Maestro ended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProcessExited {
     /// Exit code, if it exited normally.
     pub code: Option<i32>,
@@ -302,6 +324,7 @@ pub struct ProcessExited {
 
 /// `run.signal`: the agent received a signal and forwarded it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunSignal {
     /// Signal number.
     pub signal: i32,
@@ -309,6 +332,7 @@ pub struct RunSignal {
 
 /// `run.ended`: the agent is done with this run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunEnded {
     /// Whether a signal cut the run short.
     pub interrupted: bool,
@@ -318,6 +342,7 @@ pub struct RunEnded {
 
 /// `artifact.registered`: a file worth keeping appeared.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArtifactRegistered {
     /// What kind of file.
     pub class: String,
@@ -328,6 +353,7 @@ pub struct ArtifactRegistered {
 /// `artifact.uploaded`: the server verified and stored a file (the agent journals the server's
 /// answer to `upload_complete`, or to an `exists` grant).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArtifactUploaded {
     /// The artifact class (see [`crate::artifact::ArtifactClass`]).
     pub class: String,
@@ -343,6 +369,7 @@ pub struct ArtifactUploaded {
 /// refuses the file, and when the agent itself decides not to send it (for example a log it
 /// cannot redact reliably: invariant I6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArtifactRejected {
     /// The artifact class.
     pub class: String,
@@ -355,6 +382,7 @@ pub struct ArtifactRejected {
 
 /// `plan.assigned`: this run executes one shard of a Fleet plan (ADR-0013).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlanAssigned {
     /// The plan.
     pub plan_id: String,
@@ -366,6 +394,7 @@ pub struct PlanAssigned {
 
 /// adb's view of a device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum AdbState {
     /// Online and usable.
@@ -383,6 +412,7 @@ pub enum AdbState {
 
 /// `device.state_observed`: adb reported a device's state (research 02 §4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DeviceStateObserved {
     /// The serial.
     pub serial: String,
@@ -392,6 +422,7 @@ pub struct DeviceStateObserved {
 
 /// `agent.warning`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AgentWarning {
     /// A stable code, for example `report_absent`.
     pub code: String,
@@ -405,6 +436,7 @@ pub struct AgentWarning {
 /// `from_seq..=to_seq` covers the dropped events and the marker's own slot, and the journal
 /// stays contiguous for the server (ADR-0005, amendment 2026-11-04).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct JournalGap {
     /// First missing sequence number.
     pub from_seq: u64,
@@ -416,6 +448,7 @@ pub struct JournalGap {
 
 /// `parser.unrecognized`: lines a parser couldn't read (Maestro output drift).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ParserUnrecognized {
     /// Which parser.
     pub parser: String,
@@ -425,6 +458,7 @@ pub struct ParserUnrecognized {
 
 /// Every event type this build knows.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", content = "data")]
 pub enum EventBody {
     /// See [`RunStarted`].

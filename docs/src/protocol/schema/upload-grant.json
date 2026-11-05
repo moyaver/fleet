@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "RejectReason": {
+      "description": "Why an artifact was refused, with a stable code (`snake_case`) an agent can journal.",
+      "oneOf": [
+        {
+          "const": "class_not_allowed",
+          "description": "The class isn't on the allowlist.",
+          "type": "string"
+        },
+        {
+          "const": "content_type_not_allowed",
+          "description": "The declared `Content-Type` isn't one this class accepts.",
+          "type": "string"
+        },
+        {
+          "const": "too_large",
+          "description": "Bigger than the class's size limit.",
+          "type": "string"
+        },
+        {
+          "const": "run_quota_exceeded",
+          "description": "The run already uploaded as many bytes or files as one run may.",
+          "type": "string"
+        },
+        {
+          "const": "size_mismatch",
+          "description": "The bytes sent are not the declared size.",
+          "type": "string"
+        },
+        {
+          "const": "digest_mismatch",
+          "description": "The bytes' SHA-256 is not the declared one.",
+          "type": "string"
+        },
+        {
+          "const": "type_not_allowed",
+          "description": "The content (magic bytes) isn't a type this class accepts.",
+          "type": "string"
+        },
+        {
+          "const": "not_text",
+          "description": "A text artifact that isn't UTF-8 without NUL bytes.",
+          "type": "string"
+        },
+        {
+          "const": "unsafe_archive",
+          "description": "An archive that is a bomb, escapes its directory, or holds links or nested archives.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The server's answer to an [`UploadRequest`].",
+  "oneOf": [
+    {
+      "description": "Send the bytes: `PUT` them to `url` (relative to the server's address) with the same\nbearer credential, then call [`UploadGrant::Upload::complete_url`]. The grant is\nshort-lived and accepts the bytes once.",
+      "properties": {
+        "artifact_id": {
+          "description": "The artifact being uploaded.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "complete_url": {
+          "description": "Where to `POST` once the bytes are sent.",
+          "type": "string"
+        },
+        "disposition": {
+          "const": "upload",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The grant is void after this.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "size": {
+          "description": "The bytes to send, exactly.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "Where to `PUT` the bytes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "disposition",
+        "artifact_id",
+        "url",
+        "complete_url",
+        "expires_at",
+        "size"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "The project already has these bytes for this class: nothing to send.",
+      "properties": {
+        "artifact_id": {
+          "description": "The artifact.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "disposition": {
+          "const": "exists",
+          "type": "string"
+        }
+      },
+      "required": [
+        "disposition",
+        "artifact_id"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Refused; sending the bytes would not help.",
+      "properties": {
+        "disposition": {
+          "const": "rejected",
+          "type": "string"
+        },
+        "message": {
+          "description": "A sentence for the agent's log.",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/RejectReason",
+          "description": "Why."
+        }
+      },
+      "required": [
+        "disposition",
+        "reason",
+        "message"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "UploadGrant"
+}

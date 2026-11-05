@@ -1,0 +1,915 @@
+{
+  "$defs": {
+    "AgentRunView": {
+      "description": "One agent process.",
+      "properties": {
+        "committed_seq": {
+          "description": "Highest committed `seq`.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "gaps": {
+          "description": "Explicitly recorded gaps (I5): journal and telemetry ranges known to be missing.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "job_id": {
+          "description": "Job.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "last_frame_at": {
+          "description": "Last persisted contact.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "late_resume": {
+          "description": "It came back after it had been abandoned.",
+          "type": "boolean"
+        },
+        "liveness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Liveness"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set by the server from live contact (heartbeats never touch the database)."
+        },
+        "maestro_exit_code": {
+          "description": "Maestro's exit code.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "plan_id": {
+          "description": "The Fleet plan it runs a shard of.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan_shard_id": {
+          "description": "That shard.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rev": {
+          "description": "Revision.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "runner_name": {
+          "description": "Runner name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "description": "`active`, `detached`, `finalizing`, `ended`, `abandoned`.",
+          "type": "string"
+        },
+        "trust_level": {
+          "description": "`trusted`, `pr`, `untrusted`.",
+          "type": "string"
+        },
+        "worker_id": {
+          "description": "Worker.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "job_id",
+        "state",
+        "trust_level",
+        "committed_seq",
+        "gaps",
+        "last_frame_at",
+        "late_resume",
+        "rev"
+      ],
+      "type": "object"
+    },
+    "AttemptView": {
+      "description": "A pipeline attempt (one CI run attempt) and its live version.",
+      "properties": {
+        "attempt": {
+          "description": "Re-run attempt, from 1.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "commit_sha": {
+          "description": "Commit.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "first_seen_at": {
+          "description": "First seen.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "git_ref": {
+          "description": "Git ref.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "jobs": {
+          "description": "Jobs seen.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "open_jobs": {
+          "description": "Jobs not closed yet.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "planned_total": {
+          "description": "Flows planned by Fleet plans linked to this attempt; `None` when no plan is known.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "project_id": {
+          "description": "Project.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "provider": {
+          "description": "CI provider (`github_actions`, `generic`).",
+          "type": "string"
+        },
+        "repository": {
+          "description": "`owner/name`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run_key": {
+          "description": "The CI run's natural key (`<repository>:<run_id>`).",
+          "type": "string"
+        },
+        "version": {
+          "description": "Live version: deltas carry the version they produce.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "provider",
+        "run_key",
+        "attempt",
+        "version",
+        "jobs",
+        "open_jobs",
+        "first_seen_at"
+      ],
+      "type": "object"
+    },
+    "DeviceView": {
+      "description": "A device as seen by one agent run.",
+      "properties": {
+        "agent_run_id": {
+          "description": "Agent run.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "rev": {
+          "description": "Revision.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "serial": {
+          "description": "adb serial.",
+          "type": "string"
+        },
+        "state": {
+          "description": "`discovered`, `booting`, `ready`, `busy`, `offline`, `released`, `lost`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "agent_run_id",
+        "serial",
+        "state",
+        "rev"
+      ],
+      "type": "object"
+    },
+    "EntityView": {
+      "description": "One changed entity, as a delta carries it.",
+      "oneOf": [
+        {
+          "description": "A job.",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/JobView"
+            },
+            "kind": {
+              "const": "job",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An agent run.",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/AgentRunView"
+            },
+            "kind": {
+              "const": "agent_run",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A suite.",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/SuiteView"
+            },
+            "kind": {
+              "const": "suite",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A flow execution.",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/FlowView"
+            },
+            "kind": {
+              "const": "flow",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A device.",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/DeviceView"
+            },
+            "kind": {
+              "const": "device",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FlowView": {
+      "description": "One flow execution: state, provenance and finality together (I4).",
+      "properties": {
+        "agent_run_id": {
+          "description": "Agent run.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "device_session_id": {
+          "description": "Device.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "description": "Maestro's or the report's duration.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failure_message": {
+          "description": "Why it failed, redacted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finality": {
+          "description": "`provisional`, `verified`, `unverified_final`, `inferred`.",
+          "type": "string"
+        },
+        "has_conflict": {
+          "description": "Two parsed sources disagreed (a Maestro compatibility alarm).",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "job_id": {
+          "description": "Job.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "description": "Flow name.",
+          "type": "string"
+        },
+        "ordinal": {
+          "description": "Order within the shard.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "outcome_source": {
+          "description": "The winning claim's source.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "Flow file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rev": {
+          "description": "Revision.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "shard_number": {
+          "description": "1-based shard.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "state": {
+          "description": "`pending`, `running`, `passed`, `failed`, `skipped`, `interrupted`, `unknown`.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Steps seen.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "suite_execution_id": {
+          "description": "Suite.",
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "job_id",
+        "suite_execution_id",
+        "agent_run_id",
+        "name",
+        "state",
+        "finality",
+        "has_conflict",
+        "steps",
+        "rev"
+      ],
+      "type": "object"
+    },
+    "JobView": {
+      "description": "A CI job. The outcome is the Maestro result, with its source; `None` until closed.",
+      "properties": {
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "job_key": {
+          "description": "Stable key within the attempt.",
+          "type": "string"
+        },
+        "lifecycle": {
+          "description": "`starting`, `running`, `finalizing`, `closed`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "description": "`completed`, `failed`, `cancelled`, `interrupted`, `unknown`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome_source": {
+          "description": "The evidence the outcome rests on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pipeline_attempt_id": {
+          "description": "Attempt.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "reopened_count": {
+          "description": "Times a new agent run reopened it.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "rev": {
+          "description": "Revision, bumped on every change.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "pipeline_attempt_id",
+        "job_key",
+        "lifecycle",
+        "reopened_count",
+        "rev"
+      ],
+      "type": "object"
+    },
+    "Liveness": {
+      "description": "A run's display liveness. Heartbeats never touch the database, so the server derives it.",
+      "oneOf": [
+        {
+          "const": "online",
+          "description": "Frames are arriving.",
+          "type": "string"
+        },
+        {
+          "const": "stale",
+          "description": "Nothing heard for longer than the stale threshold; the run may still be alive.",
+          "type": "string"
+        },
+        {
+          "const": "disconnected",
+          "description": "The agent's socket is closed and the run has not ended.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "The agent said goodbye.",
+          "type": "string"
+        }
+      ]
+    },
+    "PlanShardView": {
+      "description": "One shard of a Fleet plan: planned against actual.",
+      "properties": {
+        "agent_runs": {
+          "description": "Agent runs that ran it.",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "estimate_ms": {
+          "description": "The planner's estimate.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "executed": {
+          "description": "Flow executions those runs reported.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "flows": {
+          "description": "Flow files assigned.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "shard_id": {
+          "description": "Shard number.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shard_id",
+        "flows",
+        "agent_runs",
+        "executed"
+      ],
+      "type": "object"
+    },
+    "PlanView": {
+      "description": "A Fleet plan (ADR-0013).",
+      "properties": {
+        "plan_id": {
+          "description": "Plan ID.",
+          "type": "string"
+        },
+        "planned_total": {
+          "description": "Flows planned across shards.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "shards": {
+          "description": "The shards.",
+          "items": {
+            "$ref": "#/$defs/PlanShardView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "plan_id",
+        "planned_total",
+        "shards"
+      ],
+      "type": "object"
+    },
+    "ResyncReason": {
+      "description": "Why the server asks a client to fetch snapshots again.",
+      "oneOf": [
+        {
+          "const": "lagged",
+          "description": "The client's socket fell behind the project's channel.",
+          "type": "string"
+        }
+      ]
+    },
+    "Snapshot": {
+      "description": "Everything about one attempt, at `attempt.version`.",
+      "properties": {
+        "agent_runs": {
+          "description": "Agent runs.",
+          "items": {
+            "$ref": "#/$defs/AgentRunView"
+          },
+          "type": "array"
+        },
+        "attempt": {
+          "$ref": "#/$defs/AttemptView",
+          "description": "The attempt and its version."
+        },
+        "devices": {
+          "description": "Devices.",
+          "items": {
+            "$ref": "#/$defs/DeviceView"
+          },
+          "type": "array"
+        },
+        "flows": {
+          "description": "Flow executions.",
+          "items": {
+            "$ref": "#/$defs/FlowView"
+          },
+          "type": "array"
+        },
+        "jobs": {
+          "description": "Jobs.",
+          "items": {
+            "$ref": "#/$defs/JobView"
+          },
+          "type": "array"
+        },
+        "plans": {
+          "description": "Linked Fleet plans.",
+          "items": {
+            "$ref": "#/$defs/PlanView"
+          },
+          "type": "array"
+        },
+        "suites": {
+          "description": "Suites.",
+          "items": {
+            "$ref": "#/$defs/SuiteView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "attempt",
+        "jobs",
+        "agent_runs",
+        "suites",
+        "devices",
+        "flows",
+        "plans"
+      ],
+      "type": "object"
+    },
+    "SuiteView": {
+      "description": "One Maestro invocation.",
+      "properties": {
+        "agent_run_id": {
+          "description": "Agent run.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "exit_code": {
+          "description": "Maestro's exit code.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "ID.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "job_id": {
+          "description": "Job.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "lifecycle": {
+          "description": "`starting`, `running`, `reporting`, `closed`.",
+          "type": "string"
+        },
+        "outcome": {
+          "description": "`passed`, `failed`, `interrupted`, `unknown`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome_source": {
+          "description": "The evidence the outcome rests on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan_source": {
+          "description": "Where the plan came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "planned_count": {
+          "description": "Flows planned; `None` = unknown (progress is indeterminate, never guessed).",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "report_status": {
+          "description": "`complete`, `partial`, `absent`, `invalid`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rev": {
+          "description": "Revision.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "shard_count": {
+          "description": "Shards requested.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "shard_mode": {
+          "description": "`none`, `split`, `all`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "job_id",
+        "agent_run_id",
+        "shard_mode",
+        "shard_count",
+        "lifecycle",
+        "rev"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the browser socket receives.",
+  "oneOf": [
+    {
+      "description": "Subscribed to a project; deltas follow.",
+      "properties": {
+        "op": {
+          "const": "subscribed",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "The project.",
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "project_id"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "An attempt's full state at `snapshot.attempt.version`.",
+      "properties": {
+        "op": {
+          "const": "snapshot",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/Snapshot",
+          "description": "The snapshot."
+        }
+      },
+      "required": [
+        "op",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Entities that changed at `version`. Apply only `version == last + 1`; on a gap, resync.",
+      "properties": {
+        "attempt_id": {
+          "description": "Attempt.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "entities": {
+          "description": "The changed entities, as they are now.",
+          "items": {
+            "$ref": "#/$defs/EntityView"
+          },
+          "type": "array"
+        },
+        "op": {
+          "const": "delta",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Project.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "version": {
+          "description": "The attempt's version after this change.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "project_id",
+        "attempt_id",
+        "version",
+        "entities"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "A run's liveness crossed a threshold (display only, not versioned).",
+      "properties": {
+        "agent_run_id": {
+          "description": "Agent run.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "attempt_id": {
+          "description": "Attempt.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "liveness": {
+          "$ref": "#/$defs/Liveness",
+          "description": "The new liveness."
+        },
+        "op": {
+          "const": "liveness",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "attempt_id",
+        "agent_run_id",
+        "liveness"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "This subscriber fell behind: fetch snapshots again.",
+      "properties": {
+        "op": {
+          "const": "resync",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/ResyncReason",
+          "description": "Why."
+        }
+      },
+      "required": [
+        "op",
+        "reason"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "A subscription request was refused.",
+      "properties": {
+        "message": {
+          "description": "Why.",
+          "type": "string"
+        },
+        "op": {
+          "const": "error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "message"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "LiveFrame"
+}

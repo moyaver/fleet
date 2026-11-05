@@ -1,0 +1,212 @@
+{
+  "$defs": {
+    "ClockSample": {
+      "description": "When something happened: the agent's wall clock and its monotonic clock since process start.\n\nDurations come from `mono_ms` differences, never from wall-clock subtraction (research 05 §5.6).",
+      "properties": {
+        "mono_ms": {
+          "description": "Milliseconds since the agent process started, monotonic.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wall": {
+          "description": "Agent wall clock, UTC.",
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "wall",
+        "mono_ms"
+      ],
+      "type": "object"
+    },
+    "Provenance": {
+      "description": "The provenance of one event (invariant I4).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SourceKind",
+          "description": "Where the evidence came from."
+        },
+        "locator": {
+          "description": "Where in the source: a line number or a file path relative to the run directory.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parser": {
+          "description": "Our parser and the Maestro version profile it used, for example `maestro-log@2.12`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "SourceKind": {
+      "description": "Where a piece of evidence came from. The claim lattice ranks these (fleet-core).",
+      "oneOf": [
+        {
+          "const": "declared",
+          "description": "Supplied up front: CLI arguments, a manifest.",
+          "type": "string"
+        },
+        {
+          "const": "agent_observed",
+          "description": "The agent's own direct observation: adb, signals, spawn, files existing.",
+          "type": "string"
+        },
+        {
+          "const": "process_exit",
+          "description": "Maestro's exit status.",
+          "type": "string"
+        },
+        {
+          "const": "live_console",
+          "description": "Parsed Maestro stdout/stderr.",
+          "type": "string"
+        },
+        {
+          "const": "debug_log",
+          "description": "Parsed `maestro.log`.",
+          "type": "string"
+        },
+        {
+          "const": "artifact_file",
+          "description": "Structured per-flow artifacts such as `commands.json`.",
+          "type": "string"
+        },
+        {
+          "const": "junit_final",
+          "description": "Maestro's final JUnit report.",
+          "type": "string"
+        },
+        {
+          "const": "server_inferred",
+          "description": "Inferred by the server (for example after an agent disappeared). Agents may not send it.",
+          "type": "string"
+        },
+        {
+          "const": "unrecognized",
+          "description": "A kind this build doesn't know. Never ranks as evidence of success.",
+          "type": "string"
+        }
+      ]
+    },
+    "StepRef": {
+      "description": "A step inside a flow execution.",
+      "properties": {
+        "index": {
+          "description": "0-based position in the flow's steps as they were observed (nested steps included).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    },
+    "Subject": {
+      "description": "Which execution entities an event is about. All IDs are agent-generated UUIDv7.",
+      "properties": {
+        "device_session_id": {
+          "description": "One device for the life of this agent run.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flow_execution_id": {
+          "description": "One execution of one flow.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shard_id": {
+          "description": "One shard of that invocation.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "step": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StepRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One step of that flow execution."
+        },
+        "suite_execution_id": {
+          "description": "One Maestro invocation.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One journal event as it travels and is stored.",
+  "properties": {
+    "at": {
+      "$ref": "#/$defs/ClockSample",
+      "description": "When it happened (not when it was sent)."
+    },
+    "data": {
+      "description": "The type-specific payload, kept as JSON so unknown types survive."
+    },
+    "seq": {
+      "description": "Sequence number within the agent run, from 1. Gap-free except for a hole the agent\nreports with a `journal.gap` sequenced at the hole's last `seq`.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "src": {
+      "$ref": "#/$defs/Provenance",
+      "description": "Where the evidence came from."
+    },
+    "subject": {
+      "$ref": "#/$defs/Subject",
+      "description": "The entities it's about."
+    },
+    "type": {
+      "description": "Event type, for example `flow.ended`.",
+      "type": "string"
+    },
+    "v": {
+      "description": "Version of this type's payload.",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "seq",
+    "type",
+    "v",
+    "at",
+    "src",
+    "data"
+  ],
+  "title": "EventEnvelope",
+  "type": "object"
+}

@@ -13,12 +13,22 @@ workspace = true
 
 
 [features]
+# `schemars::JsonSchema` on the wire types, to generate `docs/src/protocol/schema/` (`cargo xtask schema`).
+schema = ["dep:schemars"]
 # `utoipa::ToSchema` on REST DTOs, for the server's OpenAPI document (not for the dashboard).
 openapi = ["dep:utoipa"]
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 time.workspace = true
 utoipa = { workspace = true, optional = true }
 uuid.workspace = true
+
+[dev-dependencies]
+jsonschema.workspace = true
+
+[[test]]
+name = "golden"
+required-features = ["schema"]

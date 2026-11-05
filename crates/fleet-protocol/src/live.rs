@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 /// A project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ProjectView {
     /// ID.
@@ -27,6 +28,7 @@ pub struct ProjectView {
 
 /// A pipeline attempt (one CI run attempt) and its live version.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AttemptView {
     /// ID.
@@ -55,11 +57,13 @@ pub struct AttemptView {
     pub open_jobs: i64,
     /// First seen.
     #[serde(with = "time::serde::rfc3339")]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "crate::schema::rfc3339"))]
     pub first_seen_at: OffsetDateTime,
 }
 
 /// A CI job. The outcome is the Maestro result, with its source; `None` until closed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct JobView {
     /// ID.
@@ -84,6 +88,7 @@ pub struct JobView {
 
 /// One agent process.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentRunView {
     /// ID.
@@ -104,6 +109,7 @@ pub struct AgentRunView {
     pub gaps: i64,
     /// Last persisted contact.
     #[serde(with = "time::serde::rfc3339")]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "crate::schema::rfc3339"))]
     pub last_frame_at: OffsetDateTime,
     /// It came back after it had been abandoned.
     pub late_resume: bool,
@@ -121,6 +127,7 @@ pub struct AgentRunView {
 
 /// One Maestro invocation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SuiteView {
     /// ID.
@@ -153,6 +160,7 @@ pub struct SuiteView {
 
 /// A device as seen by one agent run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeviceView {
     /// ID.
@@ -169,6 +177,7 @@ pub struct DeviceView {
 
 /// One flow execution: state, provenance and finality together (I4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct FlowView {
     /// ID.
@@ -209,6 +218,7 @@ pub struct FlowView {
 
 /// One shard of a Fleet plan: planned against actual.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PlanShardView {
     /// Shard number.
@@ -225,6 +235,7 @@ pub struct PlanShardView {
 
 /// A Fleet plan (ADR-0013).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PlanView {
     /// Plan ID.
@@ -237,6 +248,7 @@ pub struct PlanView {
 
 /// Everything about one attempt, at `attempt.version`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Snapshot {
     /// The attempt and its version.
@@ -257,6 +269,7 @@ pub struct Snapshot {
 
 /// One changed entity, as a delta carries it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "kind", content = "entity", rename_all = "snake_case")]
 pub enum EntityView {
@@ -274,6 +287,7 @@ pub enum EntityView {
 
 /// A run's display liveness. Heartbeats never touch the database, so the server derives it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Liveness {
@@ -289,6 +303,7 @@ pub enum Liveness {
 
 /// Why the server asks a client to fetch snapshots again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ResyncReason {
@@ -298,6 +313,7 @@ pub enum ResyncReason {
 
 /// What the browser socket receives.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum LiveFrame {
     /// Subscribed to a project; deltas follow.
@@ -344,6 +360,7 @@ pub enum LiveFrame {
 
 /// What the browser socket accepts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum LiveRequest {
     /// Subscribe to a project, and to one attempt's snapshot.
