@@ -326,6 +326,23 @@ async fn batch(
     }
 }
 
+/// A server cannot resume before locally acknowledged records, which may already be gone.
+fn validate_welcome(welcome: &Welcome, acked: u64) -> Result<(), &'static str> {
+    if welcome.protocol != PROTOCOL_VERSION {
+        return Err("unsupported server protocol");
+    }
+    if welcome.limits.max_inflight_events == 0
+        || welcome.limits.max_frame_bytes == 0
+        || welcome.limits.heartbeat_interval_ms == 0
+    {
+        return Err("invalid server limits");
+    }
+    if welcome.committed_through < acked {
+        return Err("server commit regressed below acknowledged events");
+    }
+    Ok(())
+}
+
 /// Publishes the credential in use to the uploader.
 fn share(shared: &Shared, token: Option<&String>) {
     if let (Some(t), Ok(mut slot)) = (token, shared.credential.lock()) {
@@ -407,6 +424,12 @@ async fn connection(
         Ok(w) => w,
         Err(end) => return Ok(end),
     };
+    let acked = shared
+        .outbox
+        .lock()
+        .map_err(|_| "outbox lock")?
+        .acked_through();
+    validate_welcome(&welcome, acked)?;
     shared
         .connected
         .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -622,6 +645,26 @@ mod tests {
         )
         .await;
         assert!(matches!(result, Ok(End::Refused(_))), "{result:?}");
+    }
+
+    #[test]
+    fn welcome_rejects_incompatible_limits_and_regressing_commit() {
+        let valid = Welcome {
+            protocol: PROTOCOL_VERSION,
+            connection_id: Uuid::nil(),
+            epoch: 1,
+            committed_through: 2,
+            resume: fleet_protocol::frame::ResumeOutcome::Resumed,
+            limits: Limits::default(),
+        };
+        assert!(validate_welcome(&valid, 2).is_ok());
+        let mut bad = valid.clone();
+        bad.protocol += 1;
+        assert!(validate_welcome(&bad, 0).is_err());
+        bad = valid.clone();
+        bad.limits.max_inflight_events = 0;
+        assert!(validate_welcome(&bad, 0).is_err());
+        assert!(validate_welcome(&valid, 3).is_err());
     }
 
     #[tokio::test]
