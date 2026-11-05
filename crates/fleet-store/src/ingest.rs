@@ -476,7 +476,7 @@ impl Store {
             })
             .collect();
         let expected = (contiguous.len() < fresh.len()).then_some(through + 1);
-        let end_seq = cursor.end_seq.map(to_u64);
+        let mut end_seq = cursor.end_seq.map(to_u64);
 
         let mut ctx = apply::Ctx::new(run, now);
         let mut journal = Vec::with_capacity(contiguous.len());
@@ -485,15 +485,22 @@ impl Store {
                 apply::Effect::Rejected("invalid", "event contains a NUL character".into())
             } else if let Some(end) = end_seq.filter(|end| e.seq > *end) {
                 apply::Effect::Rejected("after_end", format!("the run ended at seq {end}"))
-            } else if savepoints {
+            } else if savepoints || e.kind == "shard.assigned" {
+                let before = ctx.clone();
                 let mut sp = tx.begin().await?;
                 match ctx.apply(&mut sp, e).await {
+                    Ok(effect @ apply::Effect::Rejected(..)) => {
+                        sp.rollback().await?;
+                        ctx = before;
+                        effect
+                    }
                     Ok(effect) => {
                         sp.commit().await?;
                         effect
                     }
-                    Err(err) if is_data_error(&err) => {
+                    Err(err) if savepoints && is_data_error(&err) => {
                         sp.rollback().await?;
+                        ctx = before;
                         apply::Effect::Rejected("invalid", format!("violates a constraint: {err}"))
                     }
                     Err(err) => return Err(err.into()),
@@ -501,6 +508,11 @@ impl Store {
             } else {
                 ctx.apply(&mut tx, e).await?
             };
+            if effect == apply::Effect::Applied
+                && matches!(e.decode(), Ok(Some(EventBody::RunEnded(_))))
+            {
+                end_seq = Some(e.seq);
+            }
             journal.push((*e, effect));
         }
 

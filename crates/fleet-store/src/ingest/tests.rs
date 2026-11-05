@@ -1246,3 +1246,132 @@ async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: P
             .is_empty()
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn rejected_process_exit_does_not_change_the_run(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("bad-exit", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let event = a.event(
+        Subject::default(),
+        SourceKind::ProcessExit,
+        &EventBody::ProcessExited(ProcessExited {
+            code: Some(42),
+            signal: None,
+            class: ExitClass::TestFailures,
+        }),
+    );
+    let result = store.apply_batch(&h, &[event]).await.unwrap();
+    assert_eq!(result.rejected.len(), 1);
+    let snapshot = store
+        .snapshot(p.project_id, h.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.agent_runs[0].maestro_exit_code, None);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn events_after_run_end_in_same_batch_are_rejected(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("same-batch-end", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let end = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunEnded(RunEnded {
+            interrupted: false,
+            output_bytes_dropped: 0,
+        }),
+    );
+    let after = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let result = store.apply_batch(&h, &[end, after]).await.unwrap();
+    assert_eq!(result.rejected.len(), 1);
+    assert!(result.rejected[0].message.starts_with("after_end"));
+    assert_eq!(result.rejected[0].seq, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("rejected-entities", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let ended = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::Declared,
+        &EventBody::FlowEnded(FlowEnded {
+            outcome: FlowOutcome::Passed,
+            duration_ms: None,
+            failure: None,
+            flow: Some(FlowRef {
+                name: "ended".into(),
+                path: None,
+            }),
+        }),
+    );
+    let reported = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::Declared,
+        &EventBody::FlowReported(FlowReported {
+            testsuite_index: 0,
+            testcase_index: 0,
+            matched: MatchMethod::Positional,
+            junit: JunitTestcase {
+                id: None,
+                name: "reported".into(),
+                file: Some("reported.yaml".into()),
+                time_ms: None,
+                timestamp_local: None,
+                status: None,
+                failure: None,
+            },
+            outcome: FlowOutcome::Passed,
+        }),
+    );
+    let foreign = SuiteIds::new();
+    let shard = a.event(
+        foreign.shard(),
+        SourceKind::DebugLog,
+        &EventBody::ShardAssigned(ShardAssigned {
+            shard_number: 1,
+            device_serial: "new-device".into(),
+            planned: Vec::new(),
+        }),
+    );
+    let result = store
+        .apply_batch(&h, &[ended, reported, shard])
+        .await
+        .unwrap();
+    assert_eq!(result.rejected.len(), 3);
+    let snapshot = store
+        .snapshot(p.project_id, h.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(snapshot.flows.is_empty());
+    assert_eq!(snapshot.devices.len(), 1);
+    assert_eq!(snapshot.devices[0].id, ids.device);
+}

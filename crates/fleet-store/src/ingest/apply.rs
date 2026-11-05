@@ -57,7 +57,7 @@ pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
 }
 
 /// What one batch touched, so derivation and broadcasts cover exactly that.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Ctx<'a> {
     run: &'a RunHandle,
     now: OffsetDateTime,
@@ -537,6 +537,9 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &FlowEnded,
     ) -> Result<Effect, sqlx::Error> {
+        if let Err(refused) = Claim::new(e.src.kind, b.outcome, e.seq) {
+            return Ok(reject("invalid", refused.to_string()));
+        }
         let flow = match &b.flow {
             Some(f) => match self.upsert_flow(tx, e, f, None, None, false).await? {
                 Effect::Applied => e.subject.flow_execution_id,
@@ -561,6 +564,9 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &FlowReported,
     ) -> Result<Effect, sqlx::Error> {
+        if let Err(refused) = Claim::new(e.src.kind, b.outcome, e.seq) {
+            return Ok(reject("invalid", refused.to_string()));
+        }
         let flow_ref = FlowRef {
             name: b.junit.name.clone(),
             path: b.junit.file.clone(),
@@ -711,6 +717,10 @@ impl<'a> Ctx<'a> {
         )
         .fetch_optional(&mut *tx)
         .await?;
+        let effect = self.owned_suite_update(e, updated);
+        if effect != Effect::Applied {
+            return Ok(effect);
+        }
         sqlx::query!(
             "UPDATE agent_runs SET maestro_exit_code = $2, maestro_exit_signal = $3, rev = rev + 1
               WHERE id = $1",
@@ -721,7 +731,7 @@ impl<'a> Ctx<'a> {
         .execute(&mut *tx)
         .await?;
         self.run_changed();
-        Ok(self.owned_suite_update(e, updated))
+        Ok(effect)
     }
 
     async fn report_parsed(
