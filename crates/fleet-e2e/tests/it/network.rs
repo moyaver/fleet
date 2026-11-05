@@ -4,6 +4,7 @@
 
 use std::sync::atomic::Ordering;
 
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use serde_json::json;
 
 use crate::support::{Issuer, Stack, connect_proxy, flows, run_agent};
@@ -83,16 +84,48 @@ async fn a_refused_oidc_token_never_affects_maestro() {
 #[tokio::test(flavor = "multi_thread")]
 async fn the_agent_tunnels_through_an_http_proxy() {
     let stack = Stack::start(|_| {}).await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let tls_addr = listener.local_addr().unwrap();
+    let upstream = stack.addr();
+    let cert_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/it/tls/cert.pem");
+    let key_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/it/tls/key.pem");
+    let cert = CertificateDer::from_pem_file(&cert_path).unwrap();
+    let key = PrivateKeyDer::from_pem_file(&key_path).unwrap();
+    let config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert], key)
+        .unwrap();
+    let acceptor = tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(config));
+    let tls = tokio::spawn(async move {
+        loop {
+            let (socket, _) = listener.accept().await.unwrap();
+            let acceptor = acceptor.clone();
+            tokio::spawn(async move {
+                let Ok(mut client) = acceptor.accept(socket).await else {
+                    return;
+                };
+                let mut server = tokio::net::TcpStream::connect(upstream).await.unwrap();
+                let _ = tokio::io::copy_bidirectional(&mut client, &mut server).await;
+            });
+        }
+    });
     let (proxy, tunnels) = connect_proxy().await;
     let proxy_url = format!("http://{proxy}");
-    let (ws, key) = (stack.ws_url(), stack.key.clone());
+    let ws = format!("wss://localhost:{}", tls_addr.port());
+    let key = stack.key.clone();
+    let ca = cert_path
+        .with_file_name("ca.pem")
+        .to_str()
+        .unwrap()
+        .to_owned();
     let out = tokio::task::spawn_blocking(move || {
         run_agent(
             "pass",
             &[
                 ("FLEET_SERVER", &ws),
                 ("FLEET_TOKEN", &key),
-                ("HTTP_PROXY", &proxy_url),
+                ("HTTPS_PROXY", &proxy_url),
+                ("FLEET_CA_FILE", &ca),
             ],
         )
     })
@@ -101,8 +134,9 @@ async fn the_agent_tunnels_through_an_http_proxy() {
     assert_eq!(out.status.code(), Some(0));
     assert!(
         tunnels.load(Ordering::SeqCst) >= 1,
-        "the WebSocket went through CONNECT"
+        "the secure WebSocket went through CONNECT"
     );
+    tls.abort();
     let snap = stack.latest_snapshot().await;
     assert_eq!(
         snap["agent_runs"][0]["state"], "ended",
@@ -181,7 +215,7 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
     assert_eq!(out.status.code(), Some(0));
     let snapshot = stack.latest_snapshot().await;
     assert_eq!(snapshot["agent_runs"][0]["state"], "ended");
-    assert!(!flows(&snapshot).is_empty());
+    assert_ne!(flows(&snapshot), vec![]);
     assert!(
         telemetry_acks.load(Ordering::SeqCst) > 0,
         "server acknowledged telemetry"
