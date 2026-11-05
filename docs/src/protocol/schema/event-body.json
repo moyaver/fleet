@@ -325,6 +325,13 @@
           "$ref": "#/$defs/FlowOutcome",
           "description": "Outcome mapped from Maestro's status."
         },
+        "repo_path": {
+          "description": "Repository-relative identity, when the agent can establish one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "testcase_index": {
           "description": "0-based `<testcase>` index within that suite.",
           "format": "uint32",
