@@ -669,3 +669,30 @@ fn relative_parent_path_from_subdirectory_uses_git_root() {
         .unwrap();
     assert_eq!(event["data"]["repo_path"], "pass.yaml");
 }
+
+#[test]
+fn unreachable_server_gets_a_short_finalization_budget() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let (out, elapsed, run_dir) = run_agent(
+        "fail",
+        Some(&format!("ws://{closed}")),
+        &[],
+        &[
+            ("FLEET_FLUSH_TIMEOUT", "15"),
+            ("FLEET_UPLOAD_ARTIFACTS", "off"),
+        ],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("fail/stdout.bin")).unwrap()
+    );
+    assert!(
+        elapsed < Duration::from_secs(9),
+        "unreachable server took {elapsed:?}"
+    );
+    assert!(run_dir.join("spool.bin").exists());
+}

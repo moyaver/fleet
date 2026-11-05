@@ -79,6 +79,8 @@ pub(crate) struct Shared {
     pub(crate) wake: Notify,
     /// The run is over: flush what's left, then say `bye`.
     pub(crate) finishing: std::sync::atomic::AtomicBool,
+    /// A welcome was received during this run.
+    pub(crate) connected: std::sync::atomic::AtomicBool,
     /// The bearer credential in use (`FLEET_TOKEN`, or the token the OIDC exchange returned),
     /// for the artifact uploader, which speaks as the same agent.
     pub(crate) credential: Arc<Mutex<Option<String>>>,
@@ -271,6 +273,9 @@ async fn batch(
             match frame {
                 ServerFrame::Welcome(welcome) => {
                     seen_welcome = true;
+                    shared
+                        .connected
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     max_events =
                         BATCH.min(usize::try_from(welcome.limits.max_inflight_events).unwrap_or(0));
                     sent = welcome.committed_through;
@@ -402,6 +407,9 @@ async fn connection(
         Ok(w) => w,
         Err(end) => return Ok(end),
     };
+    shared
+        .connected
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     tracing::info!(
         committed = welcome.committed_through,
         epoch = welcome.epoch,

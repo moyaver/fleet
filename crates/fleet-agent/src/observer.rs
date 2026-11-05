@@ -620,10 +620,15 @@ async fn finalize(
     // Everything after Maestro exits (uploads, then the transport's flush) shares one budget, so
     // an unreachable server can't stretch the end of the job (I2).
     let started = Instant::now();
-    let flush_budget = std::env::var("FLEET_FLUSH_TIMEOUT")
+    let configured_budget = std::env::var("FLEET_FLUSH_TIMEOUT")
         .ok()
         .and_then(|s| s.parse().ok())
         .map_or(Duration::from_secs(20), Duration::from_secs);
+    let flush_budget = if l.shared.connected.load(Ordering::SeqCst) {
+        configured_budget
+    } else {
+        configured_budget.min(Duration::from_secs(3))
+    };
     let upload_budget = std::env::var("FLEET_UPLOAD_TIMEOUT")
         .ok()
         .and_then(|s| s.parse().ok())
