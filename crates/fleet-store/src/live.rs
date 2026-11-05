@@ -20,14 +20,14 @@ use crate::{Result, Store, ingest::EntityRef};
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Scope<'a> {
     Attempt(Uuid),
-    Ids(&'a [Uuid]),
+    Ids(Uuid, &'a [Uuid]),
 }
 
 impl Scope<'_> {
-    fn parts(&self) -> (Option<Uuid>, Option<Vec<Uuid>>) {
+    fn parts(&self) -> (Option<Uuid>, Option<Vec<Uuid>>, Option<Uuid>) {
         match self {
-            Self::Attempt(a) => (Some(*a), None),
-            Self::Ids(ids) => (None, Some(ids.to_vec())),
+            Self::Attempt(a) => (Some(*a), None, None),
+            Self::Ids(project, ids) => (None, Some(ids.to_vec()), Some(*project)),
         }
     }
 }
@@ -77,7 +77,7 @@ impl Store {
     }
 
     /// The current state of changed entities, for a live delta.
-    pub async fn entities(&self, refs: &[EntityRef]) -> Result<Vec<EntityView>> {
+    pub async fn entities(&self, project: Uuid, refs: &[EntityRef]) -> Result<Vec<EntityView>> {
         let mut by_kind: BTreeMap<u8, Vec<Uuid>> = BTreeMap::new();
         for r in refs {
             let (k, id) = match *r {
@@ -92,7 +92,7 @@ impl Store {
         let mut conn = self.pool().acquire().await?;
         let mut out = Vec::new();
         for (k, ids) in by_kind {
-            let scope = Scope::Ids(&ids);
+            let scope = Scope::Ids(project, &ids);
             match k {
                 0 => out.extend(
                     jobs(&mut conn, scope)
@@ -172,16 +172,17 @@ pub(crate) async fn attempts<'e, E: sqlx::PgExecutor<'e>>(
 }
 
 pub(crate) async fn jobs(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<JobView>> {
-    let (attempt, ids) = scope.parts();
+    let (attempt, ids, project) = scope.parts();
     Ok(sqlx::query_as!(
         JobView,
         "SELECT id, pipeline_attempt_id, job_key, name, lifecycle, outcome,
                 outcome_source::text AS outcome_source, reopened_count, rev
            FROM jobs
-          WHERE ($1::uuid IS NULL OR pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR id = ANY($2))
+          WHERE ($1::uuid IS NULL OR pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR id = ANY($2)) AND ($3::uuid IS NULL OR project_id = $3)
           ORDER BY started_at, job_key",
         attempt,
-        ids.as_deref()
+        ids.as_deref(),
+        project
     )
     .fetch_all(c)
     .await?)
@@ -191,7 +192,7 @@ pub(crate) async fn agent_runs(
     c: &mut sqlx::PgConnection,
     scope: Scope<'_>,
 ) -> Result<Vec<AgentRunView>> {
-    let (attempt, ids) = scope.parts();
+    let (attempt, ids, project) = scope.parts();
     let rows = sqlx::query!(
         "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,
                 r.trust_level::text AS \"trust_level!\", r.committed_seq,
@@ -200,10 +201,11 @@ pub(crate) async fn agent_runs(
                 r.rev, NULL::text AS liveness
            FROM agent_runs r JOIN jobs j ON j.id = r.job_id
            LEFT JOIN workers w ON w.id = r.worker_id
-          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2))
+          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)
           ORDER BY r.started_at",
         attempt,
-        ids.as_deref()
+        ids.as_deref(),
+        project
     )
     .fetch_all(c)
     .await?;
@@ -231,17 +233,18 @@ pub(crate) async fn agent_runs(
 }
 
 pub(crate) async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<SuiteView>> {
-    let (attempt, ids) = scope.parts();
+    let (attempt, ids, project) = scope.parts();
     Ok(sqlx::query_as!(
         SuiteView,
         "SELECT s.id, s.job_id, s.agent_run_id, s.shard_mode, s.shard_count, s.planned_count,
                 s.plan_source::text AS plan_source, s.lifecycle, s.outcome,
                 s.outcome_source::text AS outcome_source, s.report_status, s.exit_code, s.rev
            FROM suite_executions s JOIN jobs j ON j.id = s.job_id
-          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR s.id = ANY($2))
+          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR s.id = ANY($2)) AND ($3::uuid IS NULL OR s.project_id = $3)
           ORDER BY s.started_at NULLS LAST, s.id",
         attempt,
-        ids.as_deref()
+        ids.as_deref(),
+        project
     )
     .fetch_all(c)
     .await?)
@@ -251,23 +254,24 @@ pub(crate) async fn devices(
     c: &mut sqlx::PgConnection,
     scope: Scope<'_>,
 ) -> Result<Vec<DeviceView>> {
-    let (attempt, ids) = scope.parts();
+    let (attempt, ids, project) = scope.parts();
     Ok(sqlx::query_as!(
         DeviceView,
         "SELECT d.id, d.agent_run_id, d.serial, d.state, d.rev
            FROM device_sessions d JOIN agent_runs r ON r.id = d.agent_run_id
            JOIN jobs j ON j.id = r.job_id
-          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR d.id = ANY($2))
+          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR d.id = ANY($2)) AND ($3::uuid IS NULL OR d.project_id = $3)
           ORDER BY d.first_seen_at, d.id",
         attempt,
-        ids.as_deref()
+        ids.as_deref(),
+        project
     )
     .fetch_all(c)
     .await?)
 }
 
 pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<FlowView>> {
-    let (attempt, ids) = scope.parts();
+    let (attempt, ids, project) = scope.parts();
     Ok(sqlx::query_as!(
         FlowView,
         "SELECT f.id, f.job_id, f.suite_execution_id, f.agent_run_id, f.device_session_id,
@@ -277,10 +281,11 @@ pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Resul
                 (SELECT count(*) FROM step_executions st
                   WHERE st.run_day = r.run_day AND st.flow_execution_id = f.id) AS \"steps!\"
            FROM flow_executions f JOIN agent_runs r ON r.id = f.agent_run_id
-          WHERE ($1::uuid IS NULL OR f.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR f.id = ANY($2))
+          WHERE ($1::uuid IS NULL OR f.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR f.id = ANY($2)) AND ($3::uuid IS NULL OR f.project_id = $3)
           ORDER BY f.shard_number NULLS LAST, f.ordinal NULLS LAST, f.id",
         attempt,
-        ids.as_deref()
+        ids.as_deref(),
+        project
     )
     .fetch_all(c)
     .await?)

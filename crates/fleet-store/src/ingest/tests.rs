@@ -1013,3 +1013,152 @@ async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
     batch.commit().await.unwrap();
     assert!(second.await.unwrap().is_ok());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn foreign_device_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("foreign-device-a", "a");
+    let ha = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let a_ids = SuiteIds::new();
+    let events = suite_run(&mut a, a_ids, &[]);
+    store.apply_batch(&ha, &events[..3]).await.unwrap();
+    let before = store
+        .snapshot(p.project_id, ha.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .devices;
+
+    let mut b = Agent::new("foreign-device-b", "b");
+    let hb = store
+        .open_run(&p, &b.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let b_ids = SuiteIds::new();
+    let events = suite_run(&mut b, b_ids, &[]);
+    store.apply_batch(&hb, &events[..3]).await.unwrap();
+    b.seq = 3;
+    let subject = Subject {
+        device_session_id: Some(a_ids.device),
+        ..b_ids.flow(Uuid::now_v7())
+    };
+    let event = b.event(
+        subject,
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "foreign".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let result = store.apply_batch(&hb, &[event]).await.unwrap();
+    assert!(result.rejected[0].message.starts_with("foreign_entity"));
+    assert_eq!(
+        store
+            .snapshot(p.project_id, ha.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .devices,
+        before
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn foreign_shard_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("foreign-device-a", "a");
+    let ha = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let a_ids = SuiteIds::new();
+    let events = suite_run(&mut a, a_ids, &[]);
+    store.apply_batch(&ha, &events[..3]).await.unwrap();
+    let before = store
+        .snapshot(p.project_id, ha.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .devices;
+
+    let mut b = Agent::new("foreign-device-b", "b");
+    let hb = store
+        .open_run(&p, &b.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let b_ids = SuiteIds::new();
+    let events = suite_run(&mut b, b_ids, &[]);
+    store.apply_batch(&hb, &events[..3]).await.unwrap();
+    b.seq = 3;
+    let subject = Subject {
+        shard_id: Some(a_ids.shard),
+        ..b_ids.flow(Uuid::now_v7())
+    };
+    let event = b.event(
+        subject,
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "foreign".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let result = store.apply_batch(&hb, &[event]).await.unwrap();
+    assert!(result.rejected[0].message.starts_with("foreign_entity"));
+    assert_eq!(
+        store
+            .snapshot(p.project_id, ha.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .devices,
+        before
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let other = store.upsert_project("other", "Other").await.unwrap();
+    let mut a = Agent::new("live-scope", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let events = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &events[..3]).await.unwrap();
+    assert!(
+        store
+            .entities(other, &[EntityRef::Device(ids.device)])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store
+            .entities(p.project_id, &[EntityRef::Device(ids.device)])
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+}

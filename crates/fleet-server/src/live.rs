@@ -110,7 +110,7 @@ impl Hub {
 
     /// Broadcasts a committed change, in version order per attempt.
     pub(crate) async fn publish(&self, store: &Store, change: Change) {
-        let entities = match store.entities(&change.entities).await {
+        let entities = match store.entities(change.project_id, &change.entities).await {
             Ok(mut e) => {
                 self.overlay(&mut e);
                 e

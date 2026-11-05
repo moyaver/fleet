@@ -121,6 +121,28 @@ impl<'a> Ctx<'a> {
             Ok(None) => return Ok(Effect::Unsupported),
             Err(err) => return Ok(reject("invalid", format!("bad {} payload: {err}", e.kind))),
         };
+        if matches!(
+            body,
+            EventBody::FlowStarted(_) | EventBody::FlowEnded(_) | EventBody::FlowReported(_)
+        ) {
+            for (id, query) in [
+                (
+                    s.device_session_id,
+                    "SELECT agent_run_id FROM device_sessions WHERE id = $1",
+                ),
+                (s.shard_id, "SELECT agent_run_id FROM shards WHERE id = $1"),
+            ] {
+                if let Some(id) = id {
+                    let owner = sqlx::query_scalar::<_, Uuid>(query)
+                        .bind(id)
+                        .fetch_optional(&mut *tx)
+                        .await?;
+                    if owner != Some(self.run.agent_run_id) {
+                        return Ok(foreign(id));
+                    }
+                }
+            }
+        }
         match body {
             EventBody::RunStarted(b) => self.run_started(tx, &b).await,
             EventBody::SuiteStarted(b) => self.suite_started(tx, e, &b).await,

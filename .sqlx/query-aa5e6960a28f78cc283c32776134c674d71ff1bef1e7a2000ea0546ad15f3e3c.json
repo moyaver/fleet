@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.job_id, s.agent_run_id, s.shard_mode, s.shard_count, s.planned_count,\n                s.plan_source::text AS plan_source, s.lifecycle, s.outcome,\n                s.outcome_source::text AS outcome_source, s.report_status, s.exit_code, s.rev\n           FROM suite_executions s JOIN jobs j ON j.id = s.job_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR s.id = ANY($2))\n          ORDER BY s.started_at NULLS LAST, s.id",
+  "query": "SELECT s.id, s.job_id, s.agent_run_id, s.shard_mode, s.shard_count, s.planned_count,\n                s.plan_source::text AS plan_source, s.lifecycle, s.outcome,\n                s.outcome_source::text AS outcome_source, s.report_status, s.exit_code, s.rev\n           FROM suite_executions s JOIN jobs j ON j.id = s.job_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR s.id = ANY($2)) AND ($3::uuid IS NULL OR s.project_id = $3)\n          ORDER BY s.started_at NULLS LAST, s.id",
   "describe": {
     "columns": [
       {
@@ -140,7 +140,8 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "UuidArray"
+        "UuidArray",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -159,5 +160,5 @@
       false
     ]
   },
-  "hash": "31f2ae04bf08e42977557c23bb45f3981d5246fa4c46fb28de73259f1bde0725"
+  "hash": "aa5e6960a28f78cc283c32776134c674d71ff1bef1e7a2000ea0546ad15f3e3c"
 }

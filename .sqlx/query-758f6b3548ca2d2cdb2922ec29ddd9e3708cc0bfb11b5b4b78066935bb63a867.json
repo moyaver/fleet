@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT d.id, d.agent_run_id, d.serial, d.state, d.rev\n           FROM device_sessions d JOIN agent_runs r ON r.id = d.agent_run_id\n           JOIN jobs j ON j.id = r.job_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR d.id = ANY($2))\n          ORDER BY d.first_seen_at, d.id",
+  "query": "SELECT d.id, d.agent_run_id, d.serial, d.state, d.rev\n           FROM device_sessions d JOIN agent_runs r ON r.id = d.agent_run_id\n           JOIN jobs j ON j.id = r.job_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR d.id = ANY($2)) AND ($3::uuid IS NULL OR d.project_id = $3)\n          ORDER BY d.first_seen_at, d.id",
   "describe": {
     "columns": [
       {
@@ -62,7 +62,8 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "UuidArray"
+        "UuidArray",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -73,5 +74,5 @@
       false
     ]
   },
-  "hash": "0958d46f3201838e87d072739edc3697857529c21f333adf93ccb9ef5ae4eccb"
+  "hash": "758f6b3548ca2d2cdb2922ec29ddd9e3708cc0bfb11b5b4b78066935bb63a867"
 }

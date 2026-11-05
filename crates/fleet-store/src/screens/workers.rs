@@ -142,11 +142,12 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
-        let mut by_id: HashMap<Uuid, FlowView> = live::flows(&mut tx, live::Scope::Ids(&ids))
-            .await?
-            .into_iter()
-            .map(|f| (f.id, f))
-            .collect();
+        let mut by_id: HashMap<Uuid, FlowView> =
+            live::flows(&mut tx, live::Scope::Ids(project_id, &ids))
+                .await?
+                .into_iter()
+                .map(|f| (f.id, f))
+                .collect();
         let flow_count = sqlx::query_scalar!(
             "SELECT count(*) AS \"n!\" FROM flow_executions
               WHERE device_session_id = $1 AND project_id = $2",
@@ -201,11 +202,12 @@ async fn worker_runs(
         })
         .flatten();
     let ids: Vec<Uuid> = page.iter().map(|r| r.id).collect();
-    let mut runs: HashMap<Uuid, AgentRunView> = live::agent_runs(c, live::Scope::Ids(&ids))
-        .await?
-        .into_iter()
-        .map(|r| (r.id, r))
-        .collect();
+    let mut runs: HashMap<Uuid, AgentRunView> =
+        live::agent_runs(c, live::Scope::Ids(project, &ids))
+            .await?
+            .into_iter()
+            .map(|r| (r.id, r))
+            .collect();
     let items = page
         .into_iter()
         .filter_map(|r| {

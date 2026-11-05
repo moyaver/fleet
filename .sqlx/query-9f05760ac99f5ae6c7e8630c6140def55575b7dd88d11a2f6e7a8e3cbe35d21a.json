@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2))\n          ORDER BY r.started_at",
+  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
   "describe": {
     "columns": [
       {
@@ -157,7 +157,8 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "UuidArray"
+        "UuidArray",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -178,5 +179,5 @@
       null
     ]
   },
-  "hash": "bc6bc9c01f724d085334a05716409b40941715d4a8abd238069a0bdc3e5be009"
+  "hash": "9f05760ac99f5ae6c7e8630c6140def55575b7dd88d11a2f6e7a8e3cbe35d21a"
 }
