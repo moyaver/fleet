@@ -479,6 +479,28 @@ impl Outbox {
             return Vec::new();
         }
         if !self.covers(after) {
+            // A failed writer can leave an unacknowledged suffix only in memory. Read the
+            // earlier on-disk prefix directly without evicting that suffix from the window.
+            if let Some(sp) = self.spool.as_mut()
+                && after < sp.through()
+                && self
+                    .window
+                    .back()
+                    .is_some_and(|slot| slot.event.seq > sp.through())
+            {
+                return match sp.read(
+                    after,
+                    max.min(REFILL_EVENTS),
+                    self.budget.window_bytes,
+                    true,
+                ) {
+                    Ok(events) => events.into_iter().map(|(event, _)| event).collect(),
+                    Err(e) => {
+                        tracing::warn!(error = %e, after, "cannot read the spool back");
+                        Vec::new()
+                    }
+                };
+            }
             self.refill(after);
             if !self.covers(after) {
                 return Vec::new();
@@ -1077,6 +1099,35 @@ mod tests {
         assert_eq!(gaps(&log)[0].reason, "spool_error");
     }
 
+    #[test]
+    fn rewind_after_spool_failure_preserves_the_memory_tail() {
+        let dir = Dir::new("dead-rewind");
+        let budget = Budget {
+            window_events: 3,
+            ..tiny()
+        };
+        let mut o = Outbox::with_spool(&dir.spool(), Uuid::nil(), budget);
+        o.push((1..=7).map(ev).collect());
+        let mut sent = 0;
+        while sent < 7 {
+            let batch = o.after(sent, 3);
+            sent = batch.last().unwrap().seq;
+        }
+        o.spool.as_mut().unwrap().close_writer();
+        o.push(vec![run_ended(8)]);
+        let mut replayed = Vec::new();
+        let mut cursor = 0;
+        for _ in 0..10 {
+            let batch = o.after(cursor, 3);
+            if batch.is_empty() {
+                break;
+            }
+            cursor = batch.last().unwrap().seq;
+            replayed.extend(seqs(&batch));
+        }
+        assert_eq!(replayed, (1..=8).collect::<Vec<_>>());
+    }
+
     /// One step of a randomized run against a model server.
     #[derive(Debug, Clone)]
     enum Op {
@@ -1085,6 +1136,7 @@ mod tests {
         AckAll,
         AckHalf,
         Reconnect,
+        CloseWriter,
         Rewind { back: u64 },
     }
 
@@ -1095,6 +1147,7 @@ mod tests {
             2 => Just(Op::AckAll),
             1 => Just(Op::AckHalf),
             1 => Just(Op::Reconnect),
+            1 => Just(Op::CloseWriter),
             1 => (1u64..30).prop_map(|back| Op::Rewind { back }),
         ];
         proptest::collection::vec(op, 1..80)
@@ -1169,6 +1222,7 @@ mod tests {
                         o.ack(server.committed()); // welcome.committed_through
                         sent = server.committed();
                     }
+                    Op::CloseWriter => { if let Some(sp) = o.spool.as_mut() { sp.close_writer(); } }
                     Op::Rewind { back } => sent = sent.saturating_sub(back).max(o.acked_through()),
                 }
                 check_bounds(&o, &budget, spool.as_ref());
