@@ -15,8 +15,8 @@ use fleet_protocol::{
     PROTOCOL_VERSION,
     brand::WS_SUBPROTOCOL,
     frame::{
-        AgentInfo, CiContext, ClientFrame, ErrorCode, Hello, Limits, ProtocolRange, ResumeState,
-        ServerFrame, Telemetry, Welcome,
+        AgentInfo, BatchRequest, BatchResponse, CiContext, ClientFrame, ErrorCode, Hello, Limits,
+        ProtocolRange, ResumeState, ServerFrame, Telemetry, Welcome,
     },
     journal::ClockSample,
 };
@@ -110,6 +110,7 @@ pub(crate) async fn run(
     clock: impl Fn() -> ClockSample,
 ) -> End {
     let mut attempt: u32 = 0;
+    let mut upgrade_failures = 0_u32;
     let mut cfg = cfg;
     if (cfg.token.is_some() || cfg.oidc.is_some())
         && let Err(reason) = crate::net::credential_url(&cfg.url)
@@ -148,10 +149,175 @@ pub(crate) async fn run(
         }
         match connection(&cfg, &shared, &mut telemetry, &clock).await {
             Ok(end) => return end,
-            Err(e) => tracing::warn!(error = %e, attempt, "agent connection lost"),
+            Err(e) => {
+                if upgrade_refused(e.as_ref()) {
+                    upgrade_failures += 1;
+                    if upgrade_failures >= 3 {
+                        tracing::warn!("websocket upgrades refused; switching to batch transport");
+                        match batch(&cfg, &shared, &mut telemetry, &clock).await {
+                            Ok(end) => return end,
+                            Err(()) => {
+                                upgrade_failures = 0;
+                            }
+                        }
+                    }
+                } else {
+                    upgrade_failures = 0;
+                }
+                tracing::warn!(error = %e, attempt, "agent connection lost");
+            }
         }
         attempt = attempt.saturating_add(1);
         tokio::time::sleep(backoff(attempt)).await;
+    }
+}
+
+/// Only explicit upgrade-incompatible HTTP responses trigger fallback. Authentication failures
+/// and network errors continue on the normal WebSocket path.
+fn upgrade_refused(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    matches!(error.downcast_ref::<tokio_tungstenite::tungstenite::Error>(),
+        Some(tokio_tungstenite::tungstenite::Error::Http(response))
+            if matches!(response.status().as_u16(), 400 | 404 | 405 | 426 | 501))
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "the batch loop keeps retry and response state together"
+)]
+async fn batch(
+    cfg: &Config,
+    shared: &Shared,
+    telemetry: &mut mpsc::Receiver<Telemetry>,
+    clock: &impl Fn() -> ClockSample,
+) -> Result<End, ()> {
+    let url = format!("{}/api/v1/agent/batch", crate::net::http_base(&cfg.url));
+    if cfg.token.is_some()
+        && let Err(reason) = crate::net::credential_url(&url)
+    {
+        return Ok(End::Refused(reason.into()));
+    }
+    let direct = crate::net::direct_loopback(&url);
+    let mut builder = reqwest::Client::builder()
+        .timeout(CONNECT_TIMEOUT)
+        .redirect(crate::net::credential_redirects(direct))
+        .tls_backend_preconfigured((*cfg.tls).clone());
+    if direct {
+        builder = builder.no_proxy();
+    }
+    let Ok(client) = builder.build() else {
+        return Ok(End::Refused("cannot build batch client".into()));
+    };
+    let mut cursor: Option<u64> = None;
+    let mut max_events = BATCH;
+    let mut failures = 0_u32;
+    let mut samples: Vec<Telemetry> = Vec::new();
+    loop {
+        if failures >= 5 {
+            return Err(());
+        }
+        let hello = match hello_frame(cfg, shared, clock) {
+            Ok(ClientFrame::Hello(hello)) => *hello,
+            _ => return Ok(End::Refused("cannot build batch hello".into())),
+        };
+        let events = if let Some(after) = cursor {
+            match shared.outbox.lock() {
+                Ok(mut o) => o.after(after, max_events),
+                Err(_) => return Ok(End::Refused("outbox lock".into())),
+            }
+        } else {
+            Vec::new()
+        };
+        while samples.len() < BATCH {
+            match telemetry.try_recv() {
+                Ok(sample) => samples.push(sample),
+                Err(_) => break,
+            }
+        }
+        let sent_events = !events.is_empty();
+        let before_ack = shared.outbox.lock().map_or(0, |o| o.acked_through());
+        let mut post = client.post(&url).json(&BatchRequest {
+            hello,
+            events,
+            telemetry: samples.clone(),
+        });
+        if let Some(token) = &cfg.token {
+            post = post.bearer_auth(token);
+        }
+        let response = match post.send().await {
+            Ok(response)
+                if response.status() == reqwest::StatusCode::UNAUTHORIZED
+                    || response.status() == reqwest::StatusCode::FORBIDDEN =>
+            {
+                return Ok(End::Refused("batch authentication refused".into()));
+            }
+            Ok(response) if response.status().is_success() => {
+                response.json::<BatchResponse>().await
+            }
+            Ok(_) | Err(_) => {
+                failures = failures.saturating_add(1);
+                tokio::time::sleep(backoff(failures)).await;
+                continue;
+            }
+        };
+        let Ok(response) = response else {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        };
+        let mut seen_welcome = false;
+        let mut sent = cursor.unwrap_or(0);
+        let mut failed = false;
+        for frame in response.frames {
+            match frame {
+                ServerFrame::Welcome(welcome) => {
+                    seen_welcome = true;
+                    max_events =
+                        BATCH.min(usize::try_from(welcome.limits.max_inflight_events).unwrap_or(0));
+                    sent = welcome.committed_through;
+                    if let Ok(mut o) = shared.outbox.lock() {
+                        o.ack(sent);
+                    }
+                }
+                ServerFrame::Reject {
+                    fatal: true,
+                    code,
+                    message,
+                    ..
+                } => return Ok(End::Refused(format!("{code:?}: {message}"))),
+                ServerFrame::Reject { .. } => failed = true,
+                ServerFrame::TelemetryAck { through } => {
+                    samples.retain(|sample| sample.tseq_to > through);
+                }
+                other => match on_frame(Some(other), shared, &mut sent).await {
+                    Ok(Some(end)) => return Ok(end),
+                    Err(_) => failed = true,
+                    Ok(None) => {}
+                },
+            }
+        }
+        if failed {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        }
+        if !seen_welcome {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        }
+        cursor = Some(sent.max(shared.outbox.lock().map_or(0, |o| o.acked_through())));
+        if sent_events && shared.outbox.lock().map_or(0, |o| o.acked_through()) <= before_ack {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+        } else {
+            failures = 0;
+        }
+        if shared.finishing.load(std::sync::atomic::Ordering::SeqCst)
+            && shared.outbox.lock().is_ok_and(|o| o.drained())
+        {
+            return Ok(End::Flushed);
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
@@ -469,7 +635,7 @@ mod tests {
                 serde_json::json!({ "op": "welcome", "protocol": 1,
                 "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
                 "committed_through": 0, "resume": "new", "limits": { "max_inflight_events": 512,
-                "max_frame_bytes": 1048576, "heartbeat_interval_ms": 10000 } })
+                "max_frame_bytes": 1_048_576, "heartbeat_interval_ms": 10_000 } })
                 .to_string(),
             ))
             .await

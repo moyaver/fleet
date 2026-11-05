@@ -481,3 +481,108 @@ fn a_failing_single_flow_is_test_failures_without_a_report() {
         "no report was read"
     );
 }
+
+#[test]
+fn refused_upgrades_fall_back_to_batch_and_resume() {
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+    let state = Arc::new(Mutex::new((0_u64, Vec::<u64>::new(), 0_u32)));
+    let server_state = Arc::clone(&state);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
+            Mock::given(method("POST")).and(path("/api/v1/agent/batch"))
+                .respond_with(move |request: &wiremock::Request| {
+                    let body: Value = serde_json::from_slice(&request.body).unwrap();
+                    let mut state = server_state.lock().unwrap();
+                    state.2 += 1;
+                    // Pretend an earlier connection committed the first two events.
+                    if state.2 == 1 { state.0 = 2; }
+                    let before = state.0;
+                    for event in body["events"].as_array().unwrap() {
+                        let seq = event["seq"].as_u64().unwrap();
+                        if seq > state.0 {
+                            assert_eq!(seq, state.0 + 1);
+                            state.0 = seq;
+                            state.1.push(seq);
+                        }
+                    }
+                    ResponseTemplate::new(200).set_body_json(json!({"frames": [
+                        {"op":"welcome", "protocol":1, "connection_id":"00000000-0000-0000-0000-000000000001",
+                         "epoch":state.2, "committed_through":before, "resume":"resumed",
+                         "limits":{"max_inflight_events":512,"max_frame_bytes":1_048_576,"heartbeat_interval_ms":10_000}},
+                        {"op":"ack", "through":state.0,"epoch":state.2,"duplicates":0}
+                    ]}))
+                }).mount(&server).await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let state = state.lock().unwrap();
+    assert!(state.2 >= 2, "expected batch requests");
+    assert_eq!(
+        state.1.first(),
+        Some(&3),
+        "server resume point is authoritative"
+    );
+    assert!(state.0 > 3, "journal was acknowledged");
+}
+
+#[test]
+fn unauthorized_upgrade_does_not_trigger_batch() {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    let posts = Arc::new(Mutex::new(0_u32));
+    let observed = Arc::clone(&posts);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .respond_with(ResponseTemplate::new(401))
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .respond_with(move |_: &wiremock::Request| {
+                    *observed.lock().unwrap() += 1;
+                    ResponseTemplate::new(200)
+                })
+                .mount(&server)
+                .await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "fail",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(*posts.lock().unwrap(), 0);
+}
