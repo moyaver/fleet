@@ -77,14 +77,13 @@ async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
         .await;
         return;
     };
-    let Ok(Some(project_id)) = state.store.project_id(&project).await else {
-        let _ = send(
-            &mut socket,
-            &LiveFrame::Error {
-                message: format!("no such project {project}"),
-            },
-        )
-        .await;
+    let Some(project_id) = lookup(
+        &mut socket,
+        state.store.project_id(&project).await,
+        format!("no such project {project}"),
+    )
+    .await
+    else {
         return;
     };
     // A project the caller has no role on answers like one that doesn't exist.
@@ -102,14 +101,13 @@ async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
     let mut rx = state.hub.subscribe(project_id);
     let mut floor = None;
     if let Some(attempt) = attempt {
-        let Ok(Some(mut snapshot)) = state.store.snapshot(project_id, attempt).await else {
-            let _ = send(
-                &mut socket,
-                &LiveFrame::Error {
-                    message: "no such attempt".into(),
-                },
-            )
-            .await;
+        let Some(mut snapshot) = lookup(
+            &mut socket,
+            state.store.snapshot(project_id, attempt).await,
+            "no such attempt".into(),
+        )
+        .await
+        else {
             return;
         };
         state.hub.overlay_snapshot(&mut snapshot);
@@ -155,6 +153,28 @@ async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
                     .await;
                 return;
             }
+        }
+    }
+}
+
+/// Distinguishes absent resources from transient database failures.
+async fn lookup<T>(
+    socket: &mut WebSocket,
+    result: fleet_store::Result<Option<T>>,
+    missing: String,
+) -> Option<T> {
+    match result {
+        Ok(Some(value)) => Some(value),
+        other => {
+            let message = match other {
+                Err(err) => {
+                    tracing::warn!(error = %err, "loading live subscription");
+                    "live data temporarily unavailable; retry".into()
+                }
+                Ok(_) => missing,
+            };
+            let _ = send(socket, &LiveFrame::Error { message }).await;
+            None
         }
     }
 }

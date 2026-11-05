@@ -48,6 +48,7 @@ utoipa.workspace = true
 uuid = { workspace = true, features = ["v7"] }
 
 [dev-dependencies]
+sqlx.workspace = true
 aws-lc-rs.workspace = true
 axum-test.workspace = true
 fleet-loadgen.workspace = true

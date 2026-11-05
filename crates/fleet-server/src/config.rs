@@ -799,6 +799,10 @@ impl Config {
             i.telemetry_flush_ms >= 100,
             "ingest.telemetry_flush_ms must be at least 100"
         );
+        anyhow::ensure!(
+            i.ping_interval_ms > 0 && i.ping_interval_ms < i.idle_timeout_ms,
+            "ingest.ping_interval_ms must be positive and less than ingest.idle_timeout_ms"
+        );
         if !(10_000..=30_000).contains(&i.telemetry_flush_ms) {
             tracing::warn!(
                 telemetry_flush_ms = i.telemetry_flush_ms,
@@ -988,6 +992,15 @@ mod tests {
             "{shown}"
         );
         assert!(!format!("{c:?}").contains("u:p@db"));
+    }
+
+    #[test]
+    fn ping_interval_must_be_positive_and_below_the_idle_timeout() {
+        for ping in ["0", "45000", "45001"] {
+            let result = Config::load(None, &env(&[("FLEET_INGEST__PING_INTERVAL_MS", ping)]));
+            assert!(result.is_err(), "ping interval {ping} must be rejected");
+        }
+        assert!(Config::load(None, &env(&[("FLEET_INGEST__PING_INTERVAL_MS", "44999")])).is_ok());
     }
 
     #[test]
