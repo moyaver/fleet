@@ -155,12 +155,16 @@ impl Limiter {
 impl Uploader {
     /// `None` if the HTTP client can't be built (then nothing is uploaded).
     pub(crate) fn new(cfg: Config) -> Option<Self> {
-        let client = reqwest::Client::builder()
+        let direct = crate::net::direct_loopback(&cfg.base);
+        let mut builder = reqwest::Client::builder()
+            .redirect(crate::net::credential_redirects(direct))
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(30))
-            .tls_backend_preconfigured((*cfg.tls).clone())
-            .build()
-            .ok()?;
+            .tls_backend_preconfigured((*cfg.tls).clone());
+        if direct {
+            builder = builder.no_proxy();
+        }
+        let client = builder.build().ok()?;
         Some(Self {
             inner: Arc::new(Inner {
                 limiter: Arc::new(Limiter {
@@ -309,6 +313,9 @@ impl Inner {
         let Some(base) = self.url("/api/v1/agent/artifacts") else {
             return Step::Done(Outcome::Failed("no server URL".into()));
         };
+        if let Err(reason) = crate::net::credential_url(&base) {
+            return Step::Done(Outcome::Failed(reason.into()));
+        }
         let res = match self
             .client
             .post(base)
@@ -599,6 +606,17 @@ mod tests {
 
     async fn run(up: &Uploader) -> Vec<Done> {
         up.finish(Duration::from_secs(10)).await
+    }
+
+    #[tokio::test]
+    async fn remote_cleartext_artifact_upload_is_refused() {
+        let up = Uploader::new(config_for("http://192.0.2.1".into())).unwrap();
+        up.submit(item(b"hello"));
+        let done = run(&up).await;
+        assert!(
+            matches!(&done[0].outcome, Outcome::Failed(reason) if reason.contains("credentials require")),
+            "{done:?}"
+        );
     }
 
     #[tokio::test]

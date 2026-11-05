@@ -109,6 +109,22 @@ pub(crate) async fn run(
 ) -> End {
     let mut attempt: u32 = 0;
     let mut cfg = cfg;
+    if (cfg.token.is_some() || cfg.oidc.is_some())
+        && let Err(reason) = crate::net::credential_url(&cfg.url)
+    {
+        tracing::warn!(
+            reason,
+            "telemetry disabled; configure a secure FLEET_SERVER URL"
+        );
+        return End::Refused(reason.into());
+    }
+    if cfg.token.is_none()
+        && let Some(req) = &cfg.oidc
+        && let Err(reason) = crate::net::credential_url(&req.url)
+    {
+        tracing::warn!(reason, "telemetry disabled; configure a secure OIDC URL");
+        return End::Refused(reason.into());
+    }
     share(&shared, cfg.token.as_ref());
     loop {
         if cfg.token.is_none()
@@ -177,7 +193,12 @@ async fn open(
     }
     let target = crate::net::Target::parse(&cfg.url).ok_or("FLEET_SERVER is not a ws(s):// URL")?;
     let (ws, _) = tokio::time::timeout(CONNECT_TIMEOUT, async {
-        let tcp = crate::net::tcp(&target, cfg.proxy.as_ref()).await?;
+        let proxy = if cfg.token.is_some() && crate::net::direct_loopback(&cfg.url) {
+            None
+        } else {
+            cfg.proxy.as_ref()
+        };
+        let tcp = crate::net::tcp(&target, proxy).await?;
         tokio_tungstenite::client_async_tls_with_config(
             request,
             tcp,
@@ -388,6 +409,76 @@ fn decode(msg: &Message) -> Option<ServerFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn remote_cleartext_token_is_refused_without_retrying() {
+        let cfg = Config::from_env(
+            "ws://example.com/api/v1/agent/ws".into(),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        let (_tx, rx) = mpsc::channel(1);
+        let result = tokio::time::timeout(
+            Duration::from_millis(100),
+            run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+                wall: time::OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            }),
+        )
+        .await;
+        assert!(matches!(result, Ok(End::Refused(_))), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn cleartext_loopback_bypasses_a_configured_proxy() {
+        let target = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut cfg = Config::from_env(
+            format!("ws://{}", target.local_addr().unwrap()),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        cfg.proxy = Some(crate::net::Proxy {
+            host: "127.0.0.1".into(),
+            port: proxy.local_addr().unwrap().port(),
+            auth: None,
+        });
+        let connection = tokio::spawn(async move {
+            let _ = open(&cfg).await;
+        });
+        let direct = tokio::time::timeout(Duration::from_secs(1), target.accept()).await;
+        connection.abort();
+        assert!(direct.is_ok(), "connection did not reach loopback directly");
+    }
+
+    #[tokio::test]
+    async fn loopback_and_secure_connections_are_not_refused() {
+        for url in [
+            "ws://localhost:9",
+            "ws://127.2.3.4:9",
+            "ws://[::1]:9",
+            "wss://192.0.2.1",
+        ] {
+            let cfg = Config::from_env(
+                url.into(),
+                Uuid::now_v7(),
+                crate::ci::context(|_| None),
+                |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+            );
+            let (_tx, rx) = mpsc::channel(1);
+            let result = tokio::time::timeout(
+                Duration::from_millis(100),
+                run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+                    wall: time::OffsetDateTime::UNIX_EPOCH,
+                    mono_ms: 0,
+                }),
+            )
+            .await;
+            assert!(result.is_err(), "{url}: {result:?}");
+        }
+    }
 
     #[test]
     fn backoff_stays_under_the_cap() {

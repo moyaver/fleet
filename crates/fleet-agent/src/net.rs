@@ -67,6 +67,46 @@ impl Target {
     }
 }
 
+/// Rejects cleartext credential transport except to a loopback host.
+pub(crate) fn credential_url(url: &str) -> Result<(), &'static str> {
+    let url = reqwest::Url::parse(url).map_err(|_| "invalid credential URL")?;
+    let secure = matches!(url.scheme(), "https" | "wss");
+    let loopback = url.host_str().is_some_and(|host| {
+        host.eq_ignore_ascii_case("localhost")
+            || host
+                .trim_matches(['[', ']'])
+                .parse::<std::net::IpAddr>()
+                .is_ok_and(|ip| ip.is_loopback())
+    });
+    if matches!(url.scheme(), "http" | "ws" | "https" | "wss") && (secure || loopback) {
+        Ok(())
+    } else {
+        Err("credentials require https:// or wss:// for remote hosts")
+    }
+}
+
+/// A cleartext loopback destination must be reached without a proxy.
+pub(crate) fn direct_loopback(url: &str) -> bool {
+    reqwest::Url::parse(url).is_ok_and(|url| {
+        matches!(url.scheme(), "ws" | "http") && credential_url(url.as_str()).is_ok()
+    })
+}
+
+/// Redirects retain the same credential transport policy and a finite limit.
+pub(crate) fn credential_redirects(direct: bool) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        if let Err(reason) = credential_url(attempt.url().as_str()) {
+            attempt.error(reason)
+        } else if !direct && direct_loopback(attempt.url().as_str()) {
+            attempt.error("cleartext loopback redirect requires a direct connection")
+        } else if attempt.previous().len() >= 10 {
+            attempt.error("too many redirects")
+        } else {
+            attempt.follow()
+        }
+    })
+}
+
 /// An HTTP proxy.
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct Proxy {
@@ -298,10 +338,21 @@ pub(crate) async fn exchange(
     struct AgentToken {
         token: String,
     }
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .tls_backend_preconfigured((*tls).clone())
-        .build()?;
+    credential_url(&req.url)?;
+    credential_url(&token_url(server_ws_url))?;
+    let client_for = |url: &str| {
+        let direct = direct_loopback(url);
+        let mut builder = reqwest::Client::builder()
+            .redirect(credential_redirects(direct))
+            .timeout(Duration::from_secs(10))
+            .tls_backend_preconfigured((*tls).clone());
+        if direct {
+            builder = builder.no_proxy();
+        }
+        builder.build()
+    };
+    let client = client_for(&req.url)?;
+    let server_client = client_for(&token_url(server_ws_url))?;
     let sep = if req.url.contains('?') { '&' } else { '?' };
     let id: IdToken = client
         .get(format!("{}{sep}audience={}", req.url, req.audience))
@@ -311,7 +362,7 @@ pub(crate) async fn exchange(
         .error_for_status()?
         .json()
         .await?;
-    let res = client
+    let res = server_client
         .post(token_url(server_ws_url))
         .json(&serde_json::json!({ "id_token": id.value }))
         .send()
@@ -386,6 +437,43 @@ mod tests {
             "suffixes match on a dot boundary"
         );
         assert!(proxy_for(&secure, env(&[])).is_none());
+    }
+
+    #[tokio::test]
+    async fn oidc_rejects_remote_cleartext_endpoints() {
+        let req = OidcRequest {
+            url: "http://192.0.2.1/token".into(),
+            bearer: "test".into(),
+            audience: "fleet".into(),
+        };
+        let error = exchange(&req, "wss://example.com/api/v1/agent/ws", tls(None))
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("credentials require"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn oidc_refuses_a_redirect_to_remote_cleartext() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(307)
+                    .insert_header("Location", "http://192.0.2.1/token"),
+            )
+            .mount(&server)
+            .await;
+        let req = OidcRequest {
+            url: server.uri(),
+            bearer: "test".into(),
+            audience: "fleet".into(),
+        };
+        let error = exchange(&req, "wss://example.com/api/v1/agent/ws", tls(None))
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("error following redirect"),
+            "{error:#}"
+        );
     }
 
     #[test]
