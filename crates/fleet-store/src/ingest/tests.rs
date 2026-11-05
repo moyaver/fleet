@@ -1162,3 +1162,87 @@ async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
         1
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nul_in_event_data_is_rejected_and_later_sequences_commit(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("nul-data", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let mut bad = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    bad.data = serde_json::json!({"message": "bad\u{0}text"});
+    let good = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let applied = store.apply_batch(&h, &[bad, good]).await.unwrap();
+    assert_eq!(applied.through, 2);
+    assert_eq!(applied.rejected.len(), 1);
+    assert_eq!(applied.rejected[0].seq, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("nul-flow", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let bad_flow = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "bad\u{0}name".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let mut bad_source = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    bad_source.src.parser = Some("bad\u{0}parser".into());
+    let good = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let result = store
+        .apply_batch(&h, &[bad_flow, bad_source, good])
+        .await
+        .unwrap();
+    assert_eq!(result.through, 6);
+    assert_eq!(
+        result.rejected.iter().map(|r| r.seq).collect::<Vec<_>>(),
+        [4, 5]
+    );
+    assert!(
+        store
+            .snapshot(p.project_id, h.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .flows
+            .is_empty()
+    );
+}
