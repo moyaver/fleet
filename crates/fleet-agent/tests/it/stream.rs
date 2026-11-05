@@ -586,3 +586,28 @@ fn unauthorized_upgrade_does_not_trigger_batch() {
     assert_eq!(out.status.code(), Some(1));
     assert_eq!(*posts.lock().unwrap(), 0);
 }
+
+#[test]
+fn absolute_junit_path_emits_repository_relative_identity() {
+    let (out, _, run_dir) = run_agent(
+        "absolute-path",
+        None,
+        &[],
+        &[("GITHUB_WORKSPACE", "/fixture/checkout")],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let journal = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let event: serde_json::Value = journal
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .find(|event| event["type"] == "flow.reported")
+        .unwrap();
+    assert_eq!(
+        event["data"]["repo_path"],
+        "examples/flows/phase0/pass.yaml"
+    );
+    assert_eq!(
+        event["data"]["junit"]["file"],
+        "/fixture/checkout/examples/flows/phase0/pass.yaml"
+    );
+}

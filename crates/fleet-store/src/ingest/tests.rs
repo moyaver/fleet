@@ -278,6 +278,7 @@ pub(crate) fn suite_run_scripted(
             ids.flow(*f),
             SourceKind::JunitFinal,
             &EventBody::FlowReported(FlowReported {
+                repo_path: None,
                 testsuite_index: 0,
                 testcase_index: u32::try_from(i).unwrap(),
                 matched: MatchMethod::Positional,
@@ -1336,6 +1337,7 @@ async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
         ids.flow(Uuid::now_v7()),
         SourceKind::Declared,
         &EventBody::FlowReported(FlowReported {
+            repo_path: None,
             testsuite_index: 0,
             testcase_index: 0,
             matched: MatchMethod::Positional,
@@ -1374,4 +1376,75 @@ async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
     assert_eq!(snapshot.flows, []);
     assert_eq!(snapshot.devices.len(), 1);
     assert_eq!(snapshot.devices[0].id, ids.device);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn absolute_and_relative_report_paths_share_history_identity(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("identity", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let make = |file: &str, repo_path: Option<&str>| {
+        EventBody::FlowReported(FlowReported {
+            testsuite_index: 0,
+            testcase_index: 0,
+            matched: MatchMethod::Positional,
+            junit: JunitTestcase {
+                id: None,
+                name: "pass".into(),
+                file: Some(file.into()),
+                time_ms: None,
+                timestamp_local: None,
+                status: Some("SUCCESS".into()),
+                failure: None,
+            },
+            repo_path: repo_path.map(str::to_owned),
+            outcome: FlowOutcome::Passed,
+        })
+    };
+    let absolute = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::JunitFinal,
+        &make(
+            "/fixture/checkout/examples/pass.yaml",
+            Some("examples/pass.yaml"),
+        ),
+    );
+    let relative = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::JunitFinal,
+        &make("examples/pass.yaml", None),
+    );
+    store.apply_batch(&h, &[absolute, relative]).await.unwrap();
+    let history = store
+        .history(
+            p.project_id,
+            &crate::screens::HistoryQuery {
+                flow: None,
+                branch: None,
+                outcome: None,
+                from: OffsetDateTime::UNIX_EPOCH,
+                to: OffsetDateTime::now_utc() + time::Duration::days(1),
+                after: None,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        history
+            .items
+            .iter()
+            .map(|item| item.flow.as_str())
+            .collect::<Vec<_>>(),
+        ["examples/pass.yaml", "examples/pass.yaml"]
+    );
 }

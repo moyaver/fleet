@@ -269,6 +269,9 @@ pub struct FlowReported {
     pub matched: MatchMethod,
     /// The test case as written.
     pub junit: JunitTestcase,
+    /// Repository-relative identity, when the agent can establish one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_path: Option<String>,
     /// Outcome mapped from Maestro's status.
     pub outcome: FlowOutcome,
 }

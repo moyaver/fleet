@@ -582,8 +582,19 @@ impl<'a> Ctx<'a> {
         let Some(flow) = e.subject.flow_execution_id else {
             return Ok(reject("invalid", "flow.reported needs a flow_execution_id"));
         };
-        if let Some(file) = &b.junit.file {
-            // The JUnit `file` is repository-relative: the flow's stable identity.
+        let relative = |p: &&str| {
+            !p.contains(['\\', ':'])
+                && std::path::Path::new(p)
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_)))
+                && !p.is_empty()
+        };
+        let identity = b
+            .repo_path
+            .as_deref()
+            .filter(relative)
+            .or_else(|| b.junit.file.as_deref().filter(relative));
+        if let Some(file) = identity {
             let def = sqlx::query_scalar!(
                 "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)
                  ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name

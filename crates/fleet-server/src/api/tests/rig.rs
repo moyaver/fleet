@@ -531,6 +531,7 @@ impl Agent {
             flow.subject.clone(),
             SourceKind::JunitFinal,
             &EventBody::FlowReported(FlowReported {
+                repo_path: None,
                 testsuite_index: 0,
                 testcase_index: 0,
                 matched: MatchMethod::Positional,

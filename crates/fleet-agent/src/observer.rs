@@ -276,7 +276,23 @@ fn start(
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str())),
     );
-    let session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
+    let mut session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
+    let cwd = std::env::current_dir().ok();
+    let git_root = |path: &Path| {
+        path.ancestors()
+            .find(|p| p.join(".git").exists())
+            .map(Path::to_path_buf)
+    };
+    let workspace = std::env::var_os("GITHUB_WORKSPACE")
+        .map(PathBuf::from)
+        .or_else(|| {
+            argv.iter()
+                .map(Path::new)
+                .filter(|p| p.is_absolute())
+                .find_map(git_root)
+        })
+        .or_else(|| cwd.as_deref().and_then(git_root));
+    session.set_workspace(workspace, cwd);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
         Outbox::with_spool(&d.join("spool.bin"), agent_run_id, Budget::default())
     });
