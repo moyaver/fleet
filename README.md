@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Pre-release.** The agent and server core work end to end (**M2–M3 complete**). The browser dashboard is **next (M4)**, not available as a finished product yet. There are no published GitHub releases; build from source for now. See the [full roadmap](docs/ROADMAP.md).
+> **Pre-release.** The agent, server and browser dashboard work end to end: **M2–M3 complete**, **M4 and M5 exit criteria proven by browser tests**. Still open in those milestones: the Fleet Planner, the agent's HTTPS batch fallback and the generated protocol schema. There are no published GitHub releases; build from source for now. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -31,7 +31,7 @@ Fleet adds that missing observability layer. **It does not replace Maestro, sche
 - **Recover from interruption.** A bounded local journal/spool and server-authoritative acknowledgments let agents reconnect and replay; gaps are recorded rather than hidden.
 - **Keep your data on your infrastructure.** The server and Postgres are self-hosted. Sensitive values are redacted at the runner before telemetry is sent.
 
-The agent, server, and planned web UI are written in **Rust**. Fleet starts with Maestro; the underlying protocol and domain model are designed to accommodate other test runners later.
+The agent, server, and web dashboard are written in **Rust** (the dashboard is Leptos compiled to WebAssembly; no JavaScript). Fleet starts with Maestro; the underlying protocol and domain model are designed to accommodate other test runners later.
 
 ## Get started
 
@@ -68,7 +68,7 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 The [GitHub Actions example](examples/github-actions/fleet-agent.yml) shows the intended integration pattern; **its release-installer step requires a future published release**. Until then, use a source-built agent.
 
 > [!NOTE]
-> The live API and server-side event pipeline work today. The **interactive dashboard, browser sign-in, artifact viewers, and flaky-test history are still roadmap items**. Until M4, the server's live state can be consumed through its API rather than a complete UI.
+> The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots and logs, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).
 
 ## How it works
 
@@ -78,8 +78,8 @@ Fleet separates running a test from observing it:
 | --- | --- | --- |
 | **`fleet-agent`** | Supervises `maestro test` without changing its result; observes logs, flow evidence, adb devices, and host metrics; buffers and sends events. | Implemented (M2) |
 | **`fleet` server** | Authenticates agents, ingests and acknowledges journals, resolves evidence-backed outcomes, stores runs in Postgres, and publishes live snapshots/deltas. | Implemented (M3) |
-| **Web dashboard** | Follow runs, jobs and devices from a browser and drill into failures without navigating CI logs. | Next (M4) |
-| **Evidence & history** | Artifact viewers, failure fingerprints, flaky-test analysis, and duration-aware CI shard planning. | Planned (M5) |
+| **Web dashboard** | Follow runs, jobs and devices from a browser and drill into failures without navigating CI logs; OIDC sign-in. | Implemented (M4) |
+| **Evidence & history** | Artifact upload and viewers, failure fingerprints, flaky-test analysis, history and compare, retention. Duration-aware shard planning is in progress. | Implemented (M5), planner in progress |
 
 The supervisor is **fail-open**, the event stream is **resumable**, and the server never labels a failed or interrupted job successful simply because evidence is absent. See the [architecture decisions](docs/decisions/README.md), [protocol reference](docs/src/protocol.md), and [design invariants](docs/PLAN.md#3-invariants-non-negotiable).
 
@@ -89,20 +89,20 @@ In the [Maestro phase-0 validation](research/08-phase0-results.md), a real emula
 
 ## Roadmap
 
-Fleet is being developed in milestones with tested exit criteria. The agent/server integration is implemented; the product-facing experience is the next major step.
+Fleet is being developed in milestones with tested exit criteria. The agent, server and dashboard are implemented; hardening and the v1.0 release come next.
 
 | Milestone | Deliverable | Status |
 | --- | --- | --- |
 | **M0–M1** | Bootstrap and real-emulator Maestro research | Complete |
 | **M2** | Observability agent, parsers, metrics, local spool, transport | Complete |
 | **M3** | Durable ingest, authentication, live API, Postgres, reference deployment | Complete |
-| **M4** | Usable browser dashboard and end-to-end UI tests | Next |
-| **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Planned |
+| **M4** | Usable browser dashboard and end-to-end UI tests | Exit criteria met; 2 issues open |
+| **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Exit criteria met; Fleet Planner in progress |
 | **M6** | Security hardening, RBAC, load tests, v1.0 release | Planned |
 
 [Milestone checklists and acceptance evidence](docs/ROADMAP.md) · [GitHub milestones](https://github.com/moyaver/fleet/milestones) · [Changelog](CHANGELOG.md)
 
-The M2 agent already accepts **plan manifests and shard assignments**, and the M3 server stores plans; the **duration-aware `fleet-planner` CLI is planned for M5**, not shipped. [Read the decision](docs/decisions/0013-fleet-planner.md).
+The M2 agent already accepts **plan manifests and shard assignments**, and the M3 server stores plans; the **duration-aware `fleet-planner` CLI is in progress** ([#22](https://github.com/moyaver/fleet/issues/22)), not shipped. [Read the decision](docs/decisions/0013-fleet-planner.md).
 
 ## Documentation
 

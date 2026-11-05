@@ -13,8 +13,8 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
 | ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
 | ✅ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
-| ⏭️ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
-| ⬜ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
+| 🚧 | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
+| 🚧 | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
 | ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
 | ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
 
@@ -71,7 +71,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 
 ### M3 exit criteria
 
-Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). Next, before M4 builds on the agent's evidence: the integration-boundary hardening tracked in [#39](https://github.com/moyaver/fleet/issues/39).
+Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). The integration-boundary hardening that had to land before M4 is tracked in [#39](https://github.com/moyaver/fleet/issues/39): all P0 and P1 findings except #34 are fixed.
 
 | Criterion | Proven by |
 |---|---|
@@ -84,6 +84,51 @@ Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). Next,
 | The real agent's stored outcomes match `fleet-agent inspect` | `fleet-e2e` `stored_outcomes_match_inspect_for_every_fixture` |
 | I3, I5, I8 | DB `CHECK`s + claim lattice; `ingest_gaps` for every loss (asserted zero where nothing was lost); `xtask lint` keeps provider crates out (the OIDC verifier runs on `ring`) |
 
+### M4 checklist
+
+Exit criteria are proven by tests ([below](#m4-exit-criteria)); the milestone stays 🚧 until its remaining issues land. Tracking: [#89](https://github.com/moyaver/fleet/issues/89).
+
+- [x] Live read models and frames shared by server and SPA (`fleet_protocol::live`), `LiveStore` with resync on a version gap ([#59](https://github.com/moyaver/fleet/pull/59))
+- [x] Browser sign-in: OIDC code + PKCE, Postgres sessions, CSRF, group → role mapping, `authorize` policy ([#61](https://github.com/moyaver/fleet/pull/61))
+- [x] `fleet-ui` kit orders 1–8: tokens and themes (Tailwind standalone), layout, table, virtual list, provenance badges, overlays and forms, charts with LTTB, swimlane timeline, log viewer, step tree, screenshots ([#63](https://github.com/moyaver/fleet/pull/63), [#66](https://github.com/moyaver/fleet/pull/66), [#65](https://github.com/moyaver/fleet/pull/65), [#64](https://github.com/moyaver/fleet/pull/64))
+- [x] REST for screens A–D ([#67](https://github.com/moyaver/fleet/pull/67)); screens A, B ([#73](https://github.com/moyaver/fleet/pull/73)) and C, D ([#70](https://github.com/moyaver/fleet/pull/70))
+- [x] Browser E2E harness (chromedriver + headless Chrome, zero CSP violations asserted) ([#60](https://github.com/moyaver/fleet/pull/60)) and the M4 exit suite ([#76](https://github.com/moyaver/fleet/pull/76))
+- [ ] Agent HTTPS batch fallback when WebSocket upgrades keep failing ([#44](https://github.com/moyaver/fleet/issues/44))
+- [ ] Generated protocol JSON Schema and golden frame tests ([#49](https://github.com/moyaver/fleet/issues/49))
+
+### M4 exit criteria
+
+Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/tests/it/` (run by `cargo xtask ci`).
+
+| Criterion | Proven by |
+|---|---|
+| Follow a full run without CI logs (Phase 3 gate) | `m4_exit::ac02_a_real_agents_failing_run_is_followed_live_from_the_overview_to_the_failed_flow` (real agent, captured fixture: overview → pipeline → failed flow, no reload) |
+| 2. The browser updates during execution, without manual refresh | the walkthrough above; `dashboard_ab::a_run_appears_on_the_overview_and_its_counts_move_without_a_reload`, `dashboard_ab::after_a_server_restart_the_page_resubscribes_and_keeps_updating` |
+| 4. Host and device metrics have accurate labels and units | `dashboard_cd::the_worker_page_labels_metrics_with_units_and_shows_missing_thermal_as_unavailable` |
+| 5. Missing thermal sensors show unavailable, never fake values | the same test; `dashboard_cd::a_device_page_lists_its_flows_with_links_and_shows_missing_sensors_as_unavailable` |
+| 6. Flow progress is accurate or explicitly marked uncertain | `m4_exit::ac06_progress_counts_toward_the_planned_total_while_the_run_goes`, `m4_exit::ac06_a_real_agent_running_a_plan_shows_its_count_while_maestro_runs`; `dashboard_ab::pipeline_detail_shows_flows_with_provenance_and_says_when_progress_is_uncertain` |
+| 14. Usable with multiple simultaneous active runs | `m4_exit::ac14_ten_simultaneous_runs_stay_correct_and_the_page_stays_responsive` |
+| 12. Private test data is protected by company authentication | `m4_exit::ac12_signing_in_with_the_company_identity_provider_works_in_the_browser` and the sign-in HTTP tests in `fleet-server` |
+
+### M5 checklist
+
+- [x] Failure and condition fingerprints, flaky v1 (ADR-0009), migration 0007 ([#71](https://github.com/moyaver/fleet/pull/71), [#79](https://github.com/moyaver/fleet/pull/79)); thresholds await the owner ([#86](https://github.com/moyaver/fleet/issues/86))
+- [x] `BlobStore` (filesystem and S3/Garage, one contract suite) and artifact verification (magic bytes, zip/tar.zst safety) ([#72](https://github.com/moyaver/fleet/pull/72))
+- [x] Artifact upload protocol, agent uploader (redacted, fail-open), usercontent origin with signed links and `CSP: sandbox` (I7), migration 0008 ([#75](https://github.com/moyaver/fleet/pull/75))
+- [x] Retention, rollups (1 min, 1 h), partition drops, failure-evidence promotion, blob GC with a grace period, migration 0009 ([#78](https://github.com/moyaver/fleet/pull/78), closes [#45](https://github.com/moyaver/fleet/issues/45))
+- [x] Screens E (History) and F (Compare) with evidence-only mismatch explanations ([#77](https://github.com/moyaver/fleet/pull/77))
+- [x] Evidence on screen D (screenshots, log at the failing step, step timings, sandboxed HTML report) and the M5 exit suite ([#80](https://github.com/moyaver/fleet/pull/80))
+- [ ] **Fleet Planner**: duration-aware CI sharding ([#22](https://github.com/moyaver/fleet/issues/22), [ADR-0013](decisions/0013-fleet-planner.md))
+
+### M5 exit criteria
+
+| Criterion | Proven by |
+|---|---|
+| 7. Final results reconcile with Maestro's JUnit output | `m5_exit::ac07_final_outcomes_equal_the_junit_report` |
+| 8. Failures link to actionable debugging evidence | `m5_exit::ac08_a_failed_flow_links_its_screenshot_and_log_lines` |
+| 9. Test history remains accessible after the runner disappears | `m5_exit::ac09_history_and_evidence_outlive_the_runner_and_a_server_restart` |
+| I7. User-uploaded HTML never runs on the app origin | `m5_exit::i7_an_uploaded_html_report_never_runs_on_the_app_origin` |
+
 ### Owner actions
 
 Things only the owner can do. Each one has an issue labelled [`owner-action`](https://github.com/moyaver/fleet/labels/owner-action).
@@ -92,6 +137,7 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 - [x] Decide the final product name: **Fleet** ([#5](https://github.com/moyaver/fleet/issues/5), [ADR-0011](decisions/0011-name-and-runner-scope.md))
 - [ ] Ask a lawyer to review the AGPL + commercial-license model, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/fleet/issues/6))
 - [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/fleet/issues/2))
+- [ ] Decide the flaky v1 thresholds ([#86](https://github.com/moyaver/fleet/issues/86))
 - [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/fleet/issues/3))
 - [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/fleet/issues/4))
 
