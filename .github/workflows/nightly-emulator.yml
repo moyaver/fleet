@@ -1,0 +1,141 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Nightly Maestro emulator
+
+on:
+  schedule:
+    - cron: '21 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-emulator-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  maestro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install pinned Maestro
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 -o maestro.zip https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.1/maestro.zip
+          echo '54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7  maestro.zip' | sha256sum --check
+          unzip -q maestro.zip
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+      - name: Build agent
+        run: |
+          rustup toolchain install
+          cargo build --locked -p fleet-agent
+      - name: Start reference deployment
+        working-directory: deploy/compose
+        run: |
+          mkdir -p secrets
+          openssl rand -hex 24 > secrets/postgres_password
+          printf 'postgres://fleet:%s@postgres:5432/fleet\n' "$(cat secrets/postgres_password)" > secrets/database_url
+          openssl rand -hex 32 > secrets/viewer_token
+          openssl rand -base64 48 > secrets/usercontent_key
+          {
+            echo 'FLEET_IMAGE=fleet:nightly-ci'
+            printf 'GARAGE_RPC_SECRET=%s\n' "$(openssl rand -hex 32)"
+            printf 'GARAGE_ACCESS_KEY=GK%s\n' "$(openssl rand -hex 12)"
+            printf 'GARAGE_SECRET_KEY=%s\n' "$(openssl rand -hex 32)"
+          } > .env
+          docker compose up -d --build --wait --wait-timeout 180
+          docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt "$RUNNER_TEMP/fleet-ca.crt"
+          token=$(docker compose exec -T fleet /usr/local/bin/fleet api-key create --project mobile-app --name nightly)
+          echo "::add-mask::$token"
+          echo "FLEET_TOKEN=$token" >> "$GITHUB_ENV"
+      - name: Prepare regression assertions
+        run: |
+          cat > "$RUNNER_TEMP/fleet-maestro-regression.sh" <<'BASH'
+          set -euo pipefail
+          out="$RUNNER_TEMP/fleet-nightly"
+          mkdir -p "$out"
+          export FLEET_SERVER=https://localhost
+          export FLEET_CA_FILE="$RUNNER_TEMP/fleet-ca.crt"
+          flow=examples/flows/phase0/pass.yaml
+
+          # These flows exercise Settings on the same API as the captured Phase 0 fixtures.
+          FLEET_RUN_DIR="$out/single" FLEET_JOB_KEY=nightly-single \
+            timeout 180 target/debug/fleet-agent run -- maestro --no-ansi test "$flow" > "$out/single.log" 2>&1
+          grep -F 'Press back... COMPLETED' "$out/single.log"
+          test ! -e "$out/single/report.xml"
+
+          status=0
+          FLEET_RUN_DIR="$out/suite" FLEET_JOB_KEY=nightly-suite \
+            timeout 180 target/debug/fleet-agent run -- maestro --no-ansi test examples/flows/phase0/suite > "$out/suite.log" 2>&1 || status=$?
+          test "$status" -eq 1
+          test -s "$out/suite/report.xml"
+          viewer=$(cat deploy/compose/secrets/viewer_token)
+          attempt=$(curl -fsS --max-time 20 --cacert "$FLEET_CA_FILE" -H "Authorization: Bearer $viewer" \
+            "$FLEET_SERVER/api/v1/projects/mobile-app/attempts?limit=1" | jq -er '.[0].id')
+          curl -fsS --max-time 20 --cacert "$FLEET_CA_FILE" -H "Authorization: Bearer $viewer" \
+            "$FLEET_SERVER/api/v1/projects/mobile-app/attempts/$attempt" > "$out/snapshot.json"
+          jq -e '[.flows[] | select(.finality == "verified") | [.name, .state]] | sort ==
+            [["alpha", "passed"], ["bravo", "passed"], ["charlie", "passed"], ["delta-fails", "failed"]]' "$out/snapshot.json"
+
+          # Continuous mode owns a terminal. Keep its input open while waiting on the log.
+          export FLEET_RUN_DIR="$out/continuous" FLEET_JOB_KEY=nightly-continuous
+          export FLEET_NIGHTLY_AGENT_PID="$out/continuous.pid"
+          mkfifo "$out/continuous.stdin"
+          exec 3<> "$out/continuous.stdin"
+          script --quiet --return --command \
+            'echo $$ > "$FLEET_NIGHTLY_AGENT_PID"; exec target/debug/fleet-agent run -- maestro --no-ansi test -c examples/flows/phase0/pass.yaml' \
+            "$out/continuous.log" < "$out/continuous.stdin" > /dev/null 2>&1 &
+          terminal=$!
+          trap 'test ! -f "$FLEET_NIGHTLY_AGENT_PID" || kill -TERM "$(cat "$FLEET_NIGHTLY_AGENT_PID")" 2>/dev/null || true; kill -TERM "$terminal" 2>/dev/null || true' EXIT
+          deadline=$((SECONDS + 150))
+          until grep -Fq 'Press back COMPLETED' "$out/continuous/artifacts/maestro.log" 2>/dev/null; do
+            if ! kill -0 "$terminal" 2>/dev/null || (( SECONDS >= deadline )); then
+              cat "$out/continuous.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          kill -INT "$(cat "$FLEET_NIGHTLY_AGENT_PID")"
+          status=0
+          wait "$terminal" || status=$?
+          trap - EXIT
+          exec 3>&-
+          test "$status" -eq 130
+          test ! -e "$out/continuous/report.xml"
+          BASH
+          bash -n "$RUNNER_TEMP/fleet-maestro-regression.sh"
+      - name: Test against the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: '37.1'
+          target: google_apis_playstore_ps16k
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          script: bash "$RUNNER_TEMP/fleet-maestro-regression.sh"
+      - name: Collect the fixture and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: maestro-2.12.1-regression
+          path: ${{ runner.temp }}/fleet-nightly
+          retention-days: 7
+      - name: Stop reference deployment
+        if: always()
+        working-directory: deploy/compose
+        run: |
+          if test -f .env; then
+            docker compose down -v
+          fi
