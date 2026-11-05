@@ -1287,6 +1287,7 @@ dependencies = [
 name = "fleet-core"
 version = "0.0.0"
 dependencies = [
+ "base64 0.23.1",
  "fleet-protocol",
  "proptest",
  "regex",

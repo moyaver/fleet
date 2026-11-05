@@ -130,7 +130,7 @@ Licensing the project's own code under PolyForm is compatible with permissive de
 | I3 | **Nothing is ever falsely successful:** only direct-observation provenance may claim `passed` | `fleet-core` claim lattice + DB `CHECK` constraint + property tests |
 | I4 | **Every displayed result carries a provenance** (observed / provisional / final / derived / inferred / missing / stale) | The type system: every DTO outcome is a `Claimed<T>`; UI badges |
 | I5 | **The journal is never silently lossy:** lifecycle and evidence are gap-free or carry an explicit `journal.gap` | Protocol tests; outbox property tests |
-| I6 | **No secret leaves the runner unredacted:** `-e` values, `MAESTRO_*` values, secret-named env vars, known patterns | Redaction in agent and server; fixtures with planted secrets |
+| I6 | **Export follows the verified redaction policy.** Known values from `-e`, flow-data `MAESTRO_*` and secret-named environment variables are redacted in supported encodings. Resolved command fields are withheld. Unredactable text is refused. Screenshots require authorized, expiring access under the artifact policy. | [Secret export policy](src/security.md#secret-export-policy), captured planted-secret fixtures, uploader and access-control tests |
 | I7 | **The browser never talks to runners, and user-uploaded HTML never runs on the app origin** | Separate usercontent origin + `CSP: sandbox` |
 | I8 | **No provider-specific code** (AWS, GCP, Azure, Cloudflare, Kubernetes) in core crates | Crate dependency rules in `cargo xtask lint` |
 | I9 | **No Node.js, npm or hand-written JS.** Only Rust, SQL, CSS, HTML templates, YAML (CI) and shell snippets in docs | `cargo xtask lint` fails on `package.json`/`*.js`/`*.ts` outside `target/` and `dist/` |
