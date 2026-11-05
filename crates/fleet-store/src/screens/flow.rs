@@ -15,6 +15,10 @@ use crate::{Result, Store, live};
 impl Store {
     /// Screen D for one flow execution. `None` when it doesn't exist or belongs to another
     /// project. The agent run's `liveness` is `None` until the server fills it in.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "assemble the project-scoped flow and its evidence in one read transaction"
+    )]
     pub async fn flow_detail(
         &self,
         project_id: Uuid,

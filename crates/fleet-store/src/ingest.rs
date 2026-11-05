@@ -486,25 +486,7 @@ impl Store {
             } else if let Some(end) = end_seq.filter(|end| e.seq > *end) {
                 apply::Effect::Rejected("after_end", format!("the run ended at seq {end}"))
             } else if savepoints || e.kind == "shard.assigned" {
-                let before = ctx.clone();
-                let mut sp = tx.begin().await?;
-                match ctx.apply(&mut sp, e).await {
-                    Ok(effect @ apply::Effect::Rejected(..)) => {
-                        sp.rollback().await?;
-                        ctx = before;
-                        effect
-                    }
-                    Ok(effect) => {
-                        sp.commit().await?;
-                        effect
-                    }
-                    Err(err) if savepoints && is_data_error(&err) => {
-                        sp.rollback().await?;
-                        ctx = before;
-                        apply::Effect::Rejected("invalid", format!("violates a constraint: {err}"))
-                    }
-                    Err(err) => return Err(err.into()),
-                }
+                apply_under_savepoint(&mut tx, &mut ctx, e, savepoints).await?
             } else {
                 ctx.apply(&mut tx, e).await?
             };
@@ -544,6 +526,31 @@ impl Store {
             change,
         })
     }
+}
+
+// Restore both the transaction and the accumulated projection changes when an event is rejected.
+async fn apply_under_savepoint(
+    tx: &mut PgConnection,
+    ctx: &mut apply::Ctx<'_>,
+    event: &EventEnvelope,
+    reject_data_errors: bool,
+) -> Result<apply::Effect, sqlx::Error> {
+    let before = ctx.clone();
+    let mut sp = tx.begin().await?;
+    let effect = match ctx.apply(&mut sp, event).await {
+        Ok(effect @ apply::Effect::Rejected(..)) => effect,
+        Ok(effect) => {
+            sp.commit().await?;
+            return Ok(effect);
+        }
+        Err(err) if reject_data_errors && is_data_error(&err) => {
+            apply::Effect::Rejected("invalid", format!("violates a constraint: {err}"))
+        }
+        Err(err) => return Err(err),
+    };
+    sp.rollback().await?;
+    *ctx = before;
+    Ok(effect)
 }
 
 /// Whether `e` continues a journal committed through `through`: it is the next `seq`, or it is a

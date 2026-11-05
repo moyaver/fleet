@@ -1146,12 +1146,12 @@ async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
     let ids = SuiteIds::new();
     let events = suite_run(&mut a, ids, &[]);
     store.apply_batch(&h, &events[..3]).await.unwrap();
-    assert!(
+    assert_eq!(
         store
             .entities(other, &[EntityRef::Device(ids.device)])
             .await
-            .unwrap()
-            .is_empty()
+            .unwrap(),
+        []
     );
     assert_eq!(
         store
@@ -1236,14 +1236,14 @@ async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: P
         result.rejected.iter().map(|r| r.seq).collect::<Vec<_>>(),
         [4, 5]
     );
-    assert!(
+    assert_eq!(
         store
             .snapshot(p.project_id, h.pipeline_attempt_id)
             .await
             .unwrap()
             .unwrap()
-            .flows
-            .is_empty()
+            .flows,
+        []
     );
 }
 
@@ -1371,7 +1371,7 @@ async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
         .await
         .unwrap()
         .unwrap();
-    assert!(snapshot.flows.is_empty());
+    assert_eq!(snapshot.flows, []);
     assert_eq!(snapshot.devices.len(), 1);
     assert_eq!(snapshot.devices[0].id, ids.device);
 }
