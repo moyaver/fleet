@@ -406,6 +406,10 @@ async fn open(
     Ok(ws)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "keep the websocket handshake, bounded sends and receive deadlines in one state machine"
+)]
 async fn connection(
     cfg: &Config,
     shared: &Shared,

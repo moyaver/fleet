@@ -735,5 +735,5 @@ fn batch_with_invalid_welcome_stops_without_sending_events() {
         1,
         "invalid welcome must stop batch transport"
     );
-    assert!(requests[0]["events"].as_array().unwrap().is_empty());
+    assert_eq!(requests[0]["events"], serde_json::json!([]));
 }
