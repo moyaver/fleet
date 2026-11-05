@@ -208,6 +208,40 @@ async fn after_a_restart_the_hub_rebuilds_from_postgres() {
 }
 
 #[tokio::test]
+async fn a_new_plan_resyncs_a_subscriber_following_the_attempt() {
+    let h = Harness::start().await;
+    let agent = Agent::new("plan-live", "e2e");
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    let subscribe = json!({"op": "subscribe", "project": "app", "attempt": attempt});
+    ws.send(Message::text(subscribe.to_string())).await.unwrap();
+    let before = live_next(&mut ws).await;
+    assert_eq!(before["snapshot"]["attempt"]["planned_total"], Value::Null);
+    assert_eq!(live_next(&mut ws).await["op"], "subscribed");
+
+    let plan = json!({
+        "manifest": {"planId": "live-plan", "totalFlows": 2,
+                     "shards": [{"id": 0, "flows": ["a.yaml", "b.yaml"]}]},
+        "pipeline": {"repository": "o/r", "run_id": "plan-live", "run_attempt": 1}
+    });
+    let (status, body) =
+        post_json(h.addr(), "/api/v1/plans", Some(&h.key), &plan.to_string()).await;
+    assert_eq!(status, 201, "{body}");
+    assert_eq!(live_next(&mut ws).await["op"], "resync");
+
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    ws.send(Message::text(subscribe.to_string())).await.unwrap();
+    let after = live_next(&mut ws).await;
+    assert_eq!(after["snapshot"]["attempt"]["planned_total"], 2);
+    assert_eq!(
+        after["snapshot"]["plans"][0]["shards"][0]["flows"][1],
+        "b.yaml"
+    );
+}
+
+#[tokio::test]
 async fn plans_give_planned_totals_before_any_job_starts() {
     let h = Harness::start().await;
     let plan = json!({

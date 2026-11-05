@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 
-use fleet_protocol::live::{EntityView, LiveFrame, Liveness, Snapshot};
+use fleet_protocol::live::{EntityView, LiveFrame, Liveness, ResyncReason, Snapshot};
 use fleet_store::{
     Store,
     ingest::{Change, RunHandle},
@@ -58,6 +58,8 @@ pub(crate) struct Hub {
     runs: Mutex<HashMap<Uuid, RunLive>>,
     stale_after: Duration,
     capacity: usize,
+    #[cfg(test)]
+    pub(crate) fail_entity_load: std::sync::atomic::AtomicBool,
 }
 
 fn json(frame: &LiveFrame) -> Arc<str> {
@@ -68,6 +70,8 @@ impl Hub {
     pub(crate) fn new(stale_after: Duration, capacity: usize) -> Self {
         Self {
             capacity: capacity.max(1),
+            #[cfg(test)]
+            fail_entity_load: std::sync::atomic::AtomicBool::new(false),
             channels: Mutex::new(HashMap::new()),
             order: Mutex::new(HashMap::new()),
             runs: Mutex::new(HashMap::new()),
@@ -111,22 +115,42 @@ impl Hub {
 
     /// Broadcasts a committed change, in version order per attempt.
     pub(crate) async fn publish(&self, store: &Store, change: Change) {
-        let entities = match store.entities(change.project_id, &change.entities).await {
-            Ok(mut e) => {
-                self.overlay(&mut e);
-                e
-            }
-            Err(err) => {
-                tracing::warn!(error = %err, "loading a delta; subscribers will resync");
-                Vec::new()
+        let frame = if change.entities.is_empty() {
+            json(&LiveFrame::Resync {
+                reason: ResyncReason::Lagged,
+            })
+        } else {
+            #[cfg(test)]
+            let load = if self
+                .fail_entity_load
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                Err(fleet_store::Error::Corrupt(
+                    "injected entity load failure".into(),
+                ))
+            } else {
+                store.entities(change.project_id, &change.entities).await
+            };
+            #[cfg(not(test))]
+            let load = store.entities(change.project_id, &change.entities).await;
+            match load {
+                Ok(mut entities) => {
+                    self.overlay(&mut entities);
+                    json(&LiveFrame::Delta {
+                        project_id: change.project_id,
+                        attempt_id: change.pipeline_attempt_id,
+                        version: change.version,
+                        entities,
+                    })
+                }
+                Err(err) => {
+                    tracing::warn!(error = %err, "loading a delta; subscribers will resync");
+                    json(&LiveFrame::Resync {
+                        reason: ResyncReason::Lagged,
+                    })
+                }
             }
         };
-        let frame = json(&LiveFrame::Delta {
-            project_id: change.project_id,
-            attempt_id: change.pipeline_attempt_id,
-            version: change.version,
-            entities,
-        });
         let ready = {
             let mut order = self
                 .order
