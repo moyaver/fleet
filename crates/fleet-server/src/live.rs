@@ -31,10 +31,13 @@ use uuid::Uuid;
 
 /// How long a later version waits for an earlier one before it is sent anyway.
 const REORDER_WAIT: Duration = Duration::from_secs(2);
+/// Keep idle order state longer than the run liveness records.
+const ORDER_RETENTION: Duration = Duration::from_secs(3600).saturating_add(REORDER_WAIT);
 
 #[derive(Debug)]
 struct Order {
     published: u64,
+    last_publish: Instant,
     pending: BTreeMap<u64, (Instant, Arc<str>)>,
 }
 
@@ -106,6 +109,7 @@ impl Hub {
                 *attempt,
                 Order {
                     published: *version,
+                    last_publish: Instant::now(),
                     pending: BTreeMap::new(),
                 },
             );
@@ -160,11 +164,13 @@ impl Hub {
                 .entry(change.pipeline_attempt_id)
                 .or_insert_with(|| Order {
                     published: change.version.saturating_sub(1),
+                    last_publish: Instant::now(),
                     pending: BTreeMap::new(),
                 });
             if change.version <= o.published {
                 return;
             }
+            o.last_publish = Instant::now();
             o.pending.insert(change.version, (Instant::now(), frame));
             drain(o, false)
         };
@@ -199,6 +205,8 @@ impl Hub {
                     out.push((*project, drain(o, true)));
                 }
             }
+            order
+                .retain(|_, o| !o.pending.is_empty() || o.last_publish.elapsed() < ORDER_RETENTION);
         }
         for (project, frames) in out {
             self.send(project, frames);
@@ -369,9 +377,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn inactive_attempt_orders_are_pruned_without_dropping_pending_frames() {
+        let hub = Hub::new(Duration::from_secs(5), 16);
+        let pending = Uuid::now_v7();
+        let recent = Uuid::now_v7();
+        {
+            let mut orders = hub.order.lock().unwrap();
+            for _ in 0..100 {
+                orders.insert(
+                    Uuid::now_v7(),
+                    Order {
+                        published: 1,
+                        last_publish: Instant::now() - ORDER_RETENTION,
+                        pending: BTreeMap::new(),
+                    },
+                );
+            }
+            orders.insert(
+                recent,
+                Order {
+                    published: 4,
+                    last_publish: Instant::now(),
+                    pending: BTreeMap::new(),
+                },
+            );
+            orders.insert(
+                pending,
+                Order {
+                    published: 1,
+                    last_publish: Instant::now() - ORDER_RETENTION,
+                    pending: BTreeMap::from([(3, (Instant::now(), "three".into()))]),
+                },
+            );
+        }
+        hub.flush_stale(&HashMap::new());
+        let orders = hub.order.lock().unwrap();
+        assert_eq!(orders.len(), 2);
+        assert!(orders.contains_key(&recent));
+        assert!(orders[&pending].pending.contains_key(&3));
+    }
+
+    #[test]
     fn versions_go_out_in_order() {
         let mut o = Order {
             published: 4,
+            last_publish: Instant::now(),
             pending: BTreeMap::new(),
         };
         o.pending.insert(6, (Instant::now(), "six".into()));
