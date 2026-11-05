@@ -117,9 +117,12 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
     let upstream = stack.addr();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let telemetry_acks = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let seen_acks = std::sync::Arc::clone(&telemetry_acks);
     let proxy = tokio::spawn(async move {
         loop {
             let (mut client, _) = listener.accept().await.unwrap();
+            let seen_acks = std::sync::Arc::clone(&seen_acks);
             tokio::spawn(async move {
                 let mut head = Vec::new();
                 while !head.ends_with(b"\r\n\r\n") {
@@ -133,7 +136,28 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
                 } else {
                     let mut server = tokio::net::TcpStream::connect(upstream).await.unwrap();
                     server.write_all(&head).await.unwrap();
-                    let _ = tokio::io::copy_bidirectional(&mut client, &mut server).await;
+                    let (mut client_read, mut client_write) = client.split();
+                    let (mut server_read, mut server_write) = server.split();
+                    let forward = tokio::io::copy(&mut client_read, &mut server_write);
+                    let response = async {
+                        let mut buffer = [0; 8192];
+                        let mut captured = Vec::new();
+                        loop {
+                            let n = server_read.read(&mut buffer).await.unwrap_or(0);
+                            if n == 0 {
+                                break;
+                            }
+                            captured.extend_from_slice(&buffer[..n]);
+                            if String::from_utf8_lossy(&captured).contains("telemetry_ack") {
+                                seen_acks.fetch_add(1, Ordering::SeqCst);
+                                captured.clear();
+                            }
+                            if client_write.write_all(&buffer[..n]).await.is_err() {
+                                break;
+                            }
+                        }
+                    };
+                    tokio::select! { _ = forward => {}, () = response => {} }
                 }
             });
         }
@@ -146,7 +170,7 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
             &[
                 ("FLEET_SERVER", &url),
                 ("FLEET_TOKEN", &key),
-                ("FLEET_FAKE_LINGER", "4"),
+                ("FLEET_FAKE_LINGER", "8"),
                 ("FLEET_FLUSH_TIMEOUT", "15"),
                 ("FLEET_UPLOAD_ARTIFACTS", "off"),
             ],
@@ -158,5 +182,9 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
     let snapshot = stack.latest_snapshot().await;
     assert_eq!(snapshot["agent_runs"][0]["state"], "ended");
     assert!(!flows(&snapshot).is_empty());
+    assert!(
+        telemetry_acks.load(Ordering::SeqCst) > 0,
+        "server acknowledged telemetry"
+    );
     proxy.abort();
 }
