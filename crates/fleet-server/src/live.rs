@@ -42,6 +42,7 @@ struct Order {
 struct RunLive {
     project: Uuid,
     attempt: Uuid,
+    epoch: u32,
     last_seen: Instant,
     last_seen_wall: OffsetDateTime,
     connected: bool,
@@ -199,12 +200,20 @@ impl Hub {
         let e = runs.entry(run.agent_run_id).or_insert(RunLive {
             project: run.project_id,
             attempt: run.pipeline_attempt_id,
+            epoch: run.epoch,
             last_seen: Instant::now(),
             last_seen_wall: OffsetDateTime::now_utc(),
             connected: true,
             ended: false,
             shown: Liveness::Online,
         });
+        if run.epoch < e.epoch {
+            return;
+        }
+        if run.epoch > e.epoch {
+            e.epoch = run.epoch;
+            e.ended = false;
+        }
         e.last_seen = Instant::now();
         e.last_seen_wall = OffsetDateTime::now_utc();
         e.connected = true;
@@ -217,6 +226,7 @@ impl Hub {
             .lock()
             .expect("hub lock should not be poisoned: no code panics while holding it")
             .get_mut(&run.agent_run_id)
+            && r.epoch == run.epoch
         {
             r.connected = false;
             r.ended |= ended;

@@ -139,6 +139,28 @@ async fn a_subscriber_gets_a_snapshot_then_every_version_in_order() {
 }
 
 #[tokio::test]
+async fn a_superseded_socket_closing_does_not_disconnect_the_active_connection() {
+    let h = Harness::start().await;
+    let agent = Agent::new("superseded", "e2e");
+    let mut old = h.connect(None).await;
+    old.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+    let mut new = h.connect(None).await;
+    new.hello(&agent, Some(1)).await;
+
+    drop(old);
+    // The old socket's close is processed asynchronously. Observe the public snapshot over
+    // several liveness sweeps while the replacement stays connected and otherwise silent.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    while tokio::time::Instant::now() < deadline {
+        let snap = snapshot(&h, &attempt).await;
+        assert_eq!(snap["agent_runs"][0]["liveness"], "online");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    drop(new);
+}
+
+#[tokio::test]
 async fn after_a_restart_the_hub_rebuilds_from_postgres() {
     let mut h = Harness::start().await;
     let mut agent = Agent::new("11", "e2e");
