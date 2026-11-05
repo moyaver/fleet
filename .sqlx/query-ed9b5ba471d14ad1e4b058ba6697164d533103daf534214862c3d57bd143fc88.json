@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM sessions WHERE id = $1 RETURNING user_id, data, expires_at > now() AS \"live!\"",
+  "query": "DELETE FROM sessions WHERE id = $1 AND user_id IS NULL RETURNING user_id, data, expires_at > now() AS \"live!\"",
   "describe": {
     "columns": [
       {
@@ -43,5 +43,5 @@
       null
     ]
   },
-  "hash": "4e42590e2205995a22e13f51798e0c7c0055bdaf6f97f1e07a860b9c4f52e5bc"
+  "hash": "ed9b5ba471d14ad1e4b058ba6697164d533103daf534214862c3d57bd143fc88"
 }

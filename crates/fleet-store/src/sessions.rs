@@ -94,10 +94,10 @@ impl Store {
         }))
     }
 
-    /// Deletes and returns a live session in one statement: it can be used once.
+    /// Deletes and returns a live sign-in transaction in one statement: it can be used once.
     pub async fn take_session(&self, cookie: &str) -> Result<Option<SessionRecord>> {
         let row = sqlx::query!(
-            "DELETE FROM sessions WHERE id = $1 RETURNING user_id, data, expires_at > now() AS \"live!\"",
+            "DELETE FROM sessions WHERE id = $1 AND user_id IS NULL RETURNING user_id, data, expires_at > now() AS \"live!\"",
             key(cookie)
         )
         .fetch_optional(self.pool())

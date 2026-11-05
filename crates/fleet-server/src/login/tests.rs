@@ -420,6 +420,28 @@ async fn a_callback_with_a_forged_state_is_refused_and_spends_the_attempt() {
 }
 
 #[tokio::test]
+async fn a_callback_with_a_signed_in_cookie_does_not_end_the_session() {
+    let rig = rig().await;
+    let cookie = sign_in(&rig, &json!({"groups": ["qa"]})).await;
+
+    let response = rig
+        .app
+        .get("/api/v1/auth/callback?code=code&state=attacker-chosen")
+        .add_header("cookie", &cookie)
+        .await;
+    assert_signed_out(&response, 400);
+
+    let session = rig
+        .app
+        .get("/api/v1/auth/session")
+        .add_header("cookie", &cookie)
+        .await;
+    assert_eq!(session.status_code(), 200);
+    let session: Value = session.json();
+    assert_eq!(session["user"]["email"], "ada@example.com");
+}
+
+#[tokio::test]
 async fn a_callback_cannot_be_replayed() {
     let rig = rig().await;
     let flow = start_login(&rig, None).await;
