@@ -159,6 +159,7 @@ impl Idp {
 /// The application under test and its fake provider.
 struct Rig {
     app: TestServer,
+    store: fleet_store::Store,
     idp: Idp,
 }
 
@@ -168,7 +169,7 @@ async fn rig() -> Rig {
 
 async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     let idp = Idp::start().await;
-    let (_store, url) = fleet_store::testing::fresh_database().await.unwrap();
+    let (store, url) = fleet_store::testing::fresh_database().await.unwrap();
     let mut config = Config::default();
     config.database.url = Some(Secret::from(url.as_str()));
     config.api.public_url = Some(PUBLIC.into());
@@ -204,7 +205,7 @@ async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     let app = TestServer::builder()
         .http_transport()
         .build(app::router(&state));
-    Rig { app, idp }
+    Rig { app, store, idp }
 }
 
 fn set_cookie(res: &axum_test::TestResponse) -> String {
@@ -721,11 +722,33 @@ async fn requests_without_a_live_session_are_unauthorized() {
 
 #[tokio::test]
 async fn a_session_stops_working_when_it_expires() {
-    let rig = rig_with(|c| c.login.as_mut().unwrap().session_ttl_minutes = 0).await;
+    let rig = rig().await;
     let cookie = sign_in(&rig, &json!({"groups": ["qa"]})).await;
+    let record = rig
+        .store
+        .session(cookie.split_once('=').unwrap().1)
+        .await
+        .unwrap()
+        .unwrap();
+    let expired = rig
+        .store
+        .create_session(
+            record.user_id,
+            &record.data,
+            OffsetDateTime::now_utc() - time::Duration::hours(1),
+        )
+        .await
+        .unwrap();
+    let expired_cookie = format!("{SESSION_COOKIE}={}", expired.expose());
 
     assert_eq!(
         get_as(&rig, "/api/v1/projects", &cookie)
+            .await
+            .status_code(),
+        200
+    );
+    assert_eq!(
+        get_as(&rig, "/api/v1/projects", &expired_cookie)
             .await
             .status_code(),
         401
