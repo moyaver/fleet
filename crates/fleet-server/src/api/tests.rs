@@ -10,6 +10,7 @@ mod compare;
 mod fleet;
 mod flows;
 mod history;
+mod live_recovery;
 mod metrics;
 mod openapi;
 mod overview;

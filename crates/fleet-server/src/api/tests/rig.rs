@@ -42,6 +42,7 @@ pub(super) const VIEWER: &str = "viewer-secret";
 /// The application under test.
 pub(super) struct Rig {
     pub(super) app: TestServer,
+    pub(super) state: crate::state::AppState,
     pub(super) store: Store,
     /// A publisher key for project `app`.
     pub(super) key: String,
@@ -81,6 +82,7 @@ pub(super) async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
         .build(app::router(&state));
     Rig {
         app,
+        state,
         store,
         key: key.expose().to_owned(),
     }
@@ -529,6 +531,7 @@ impl Agent {
             flow.subject.clone(),
             SourceKind::JunitFinal,
             &EventBody::FlowReported(FlowReported {
+                repo_path: None,
                 testsuite_index: 0,
                 testcase_index: 0,
                 matched: MatchMethod::Positional,

@@ -42,7 +42,7 @@ Without the report, Fleet still follows the run from Maestro's session log, flow
 | `FLEET_RUN_DIR` | The agent's directory for this run (journal, spool, its own log). |
 | `FLEET_GRACE` | Seconds between the first INT/TERM and killing Maestro's process group (default 15). |
 | `FLEET_FINALIZE_TIMEOUT` | Seconds the agent may spend finishing after Maestro exits (default 60). |
-| `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20). |
+| `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20); capped at 3 seconds if no connection was established during the run. |
 | `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
 | `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. Uploads and the final flush share the `FLEET_FLUSH_TIMEOUT` budget. |
 | `FLEET_UPLOAD_RATE` | Upload rate cap in bytes per second, shared by all uploads (default 4 MiB/s). |
@@ -123,7 +123,7 @@ A failed flow's page (open it from the pipeline page, from the pipeline's list o
 
 ## History and compare
 
-**History** (`/history?project=<slug>`) lists finished flow executions, newest first, within a window of at most 90 days (30 by default). Filter by flow (text in its path or name), branch, outcome and time; the filters live in the address, so a reload or a shared link shows the same table. Every row carries its provenance, its failure fingerprint (failures with the same fingerprint are the same failure) and the first digits of its condition fingerprint (runs with the same one ran under comparable conditions). A flow is marked **Flaky (confirmed)** when it passed and failed on one commit under one condition, and **Suspected flaky** when its latest default-branch runs flip often; both name the runs behind the verdict as links. An inferred outcome never counts as a pass. *Stats* on a row opens the flow's panel: counts of settled passes and failures, the median and 90th-percentile duration of its passes, a duration chart and its recent failures grouped by fingerprint.
+**History** (`/history?project=<slug>`) lists finished flow executions, newest first, within a window of at most 90 days (30 by default). Filter by flow (text in its path or name), branch, outcome and time; the filters live in the address, so a reload or a shared link shows the same table. Every row carries its provenance, its failure fingerprint (failures with the same fingerprint are the same failure) and the first digits of its condition fingerprint (runs with the same one ran under comparable conditions). A flow is marked **Flaky (confirmed)** when it passed and failed on one commit under one condition, and **Suspected flaky** when at least five eligible default-branch runs share a condition and at least 20% of adjacent run pairs switch between pass and fail in the latest 20 eligible runs. Both verdicts link to the runs that support them. An inferred outcome never counts as a pass. *Stats* on a row opens the flow's panel: counts of settled passes and failures, the median and 90th-percentile duration of its passes, a duration chart and its recent failures grouped by fingerprint.
 
 **Compare** (`/compare?project=<slug>&a=<attempt>&b=<attempt>`) sets two attempts side by side: newly failing, recovered, changed, only in A, only in B and unchanged flows. A difference is explained only from what the evidence says: the conditions differ (and in which facts), the two failed differently, the flow is missing on one side, or one outcome rests on weaker evidence (provisional, inferred). A duration change is shown, never called a regression, and carries a note when the conditions differ. When the evidence says nothing differs, the row has no explanation.
 
@@ -147,7 +147,7 @@ If the runner kills the agent before everything reached the server, an `if: alwa
 fleet-agent flush "$FLEET_RUN_DIR/spool.bin"
 ```
 
-The server ignores events it already has, so flushing twice is safe.
+The server ignores events it already has, so flushing twice is safe. On ephemeral CI runners, add `fleet-agent flush` in an `if: always()` cleanup step before the runner is discarded; the local spool is otherwise lost.
 
 ## Fleet Planner shards
 

@@ -102,7 +102,7 @@ Fleet is being developed in milestones with tested exit criteria. The agent, ser
 
 [Milestone checklists and acceptance evidence](docs/ROADMAP.md) · [GitHub milestones](https://github.com/moyaver/fleet/milestones) · [Changelog](CHANGELOG.md)
 
-The M2 agent already accepts **plan manifests and shard assignments**, and the M3 server stores plans; the **duration-aware `fleet-planner` CLI is in progress** ([#22](https://github.com/moyaver/fleet/issues/22)), not shipped. [Read the decision](docs/decisions/0013-fleet-planner.md).
+The M2 agent already accepts **plan manifests and shard assignments**, and the M3 server stores plans; the **duration-aware `fleet-planner` CLI is in progress** ([#15](https://github.com/moyaver/fleet/issues/15)), not shipped. [Read the decision](docs/decisions/0013-fleet-planner.md).
 
 ## Documentation
 

@@ -1,0 +1,616 @@
+{
+  "$defs": {
+    "AgentInfo": {
+      "description": "The agent build.",
+      "properties": {
+        "arch": {
+          "description": "`std::env::consts::ARCH`.",
+          "type": "string"
+        },
+        "os": {
+          "description": "`std::env::consts::OS`.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Agent version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "os",
+        "arch"
+      ],
+      "type": "object"
+    },
+    "CiContext": {
+      "description": "CI identity as claimed by the agent (research 06 §1).",
+      "properties": {
+        "git_ref": {
+          "description": "Git ref.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job_key": {
+          "description": "Stable job identity within the attempt (PLAN §6.7).",
+          "type": "string"
+        },
+        "job_name": {
+          "description": "Job display name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "$ref": "#/$defs/CiProvider",
+          "description": "Which CI."
+        },
+        "repository": {
+          "description": "`owner/name`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run_attempt": {
+          "description": "Re-run attempt, from 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "run_id": {
+          "description": "Workflow run ID.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner": {
+          "description": "Runner name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha": {
+          "description": "Commit SHA.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "provider",
+        "job_key"
+      ],
+      "type": "object"
+    },
+    "CiProvider": {
+      "description": "CI provider.",
+      "oneOf": [
+        {
+          "const": "github_actions",
+          "description": "GitHub Actions.",
+          "type": "string"
+        },
+        {
+          "const": "generic",
+          "description": "Anything else, described by `FLEET_*` variables.",
+          "type": "string"
+        }
+      ]
+    },
+    "ClockSample": {
+      "description": "When something happened: the agent's wall clock and its monotonic clock since process start.\n\nDurations come from `mono_ms` differences, never from wall-clock subtraction (research 05 §5.6).",
+      "properties": {
+        "mono_ms": {
+          "description": "Milliseconds since the agent process started, monotonic.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wall": {
+          "description": "Agent wall clock, UTC.",
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "wall",
+        "mono_ms"
+      ],
+      "type": "object"
+    },
+    "EventEnvelope": {
+      "description": "One journal event as it travels and is stored.",
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/ClockSample",
+          "description": "When it happened (not when it was sent)."
+        },
+        "data": {
+          "description": "The type-specific payload, kept as JSON so unknown types survive."
+        },
+        "seq": {
+          "description": "Sequence number within the agent run, from 1. Gap-free except for a hole the agent\nreports with a `journal.gap` sequenced at the hole's last `seq`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "src": {
+          "$ref": "#/$defs/Provenance",
+          "description": "Where the evidence came from."
+        },
+        "subject": {
+          "$ref": "#/$defs/Subject",
+          "description": "The entities it's about."
+        },
+        "type": {
+          "description": "Event type, for example `flow.ended`.",
+          "type": "string"
+        },
+        "v": {
+          "description": "Version of this type's payload.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq",
+        "type",
+        "v",
+        "at",
+        "src",
+        "data"
+      ],
+      "type": "object"
+    },
+    "Hello": {
+      "description": "The handshake payload.",
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentInfo",
+          "description": "The agent build."
+        },
+        "agent_run_id": {
+          "description": "Generated once per agent process (UUIDv7); owns the `seq` space.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "ci": {
+          "$ref": "#/$defs/CiContext",
+          "description": "CI identity as the agent sees it; the server prefers OIDC claims."
+        },
+        "clock": {
+          "$ref": "#/$defs/ClockSample",
+          "description": "Agent clock at send."
+        },
+        "previous_agent_run_id": {
+          "description": "The run this one replaces after an agent restart in the same job.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protocol": {
+          "$ref": "#/$defs/ProtocolRange",
+          "description": "Protocol versions the agent speaks."
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeState",
+          "description": "What the agent still holds."
+        }
+      },
+      "required": [
+        "protocol",
+        "agent",
+        "agent_run_id",
+        "ci",
+        "resume",
+        "clock"
+      ],
+      "type": "object"
+    },
+    "ProtocolRange": {
+      "description": "A closed range of protocol versions.",
+      "properties": {
+        "max": {
+          "description": "Newest supported.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min": {
+          "description": "Oldest supported.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "Provenance": {
+      "description": "The provenance of one event (invariant I4).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SourceKind",
+          "description": "Where the evidence came from."
+        },
+        "locator": {
+          "description": "Where in the source: a line number or a file path relative to the run directory.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parser": {
+          "description": "Our parser and the Maestro version profile it used, for example `maestro-log@2.12`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ResumeState": {
+      "description": "What the agent can resend.",
+      "properties": {
+        "next_seq": {
+          "description": "The next `seq` the agent will assign.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "oldest_unacked_seq": {
+          "description": "The oldest event it still holds unacked.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "next_seq"
+      ],
+      "type": "object"
+    },
+    "Sample": {
+      "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).",
+      "properties": {
+        "agent_cpu_pct": {
+          "description": "The agent itself (supervisor + observer): CPU percent of one core since the last sample\n(invariant I10).",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "agent_rss_bytes": {
+          "description": "The agent itself (supervisor + observer): current resident memory of both, summed, bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/ClockSample",
+          "description": "When it was taken."
+        },
+        "host_cpu_pct": {
+          "description": "Host CPU use across all cores, percent.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "host_mem_total_bytes": {
+          "description": "Host memory total, bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "host_mem_used_bytes": {
+          "description": "Host memory in use, bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maestro_cpu_pct": {
+          "description": "Maestro's JVM: CPU percent of one core.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maestro_rss_bytes": {
+          "description": "Maestro's JVM: resident memory, bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "type": "object"
+    },
+    "SourceKind": {
+      "description": "Where a piece of evidence came from. The claim lattice ranks these (fleet-core).",
+      "oneOf": [
+        {
+          "const": "declared",
+          "description": "Supplied up front: CLI arguments, a manifest.",
+          "type": "string"
+        },
+        {
+          "const": "agent_observed",
+          "description": "The agent's own direct observation: adb, signals, spawn, files existing.",
+          "type": "string"
+        },
+        {
+          "const": "process_exit",
+          "description": "Maestro's exit status.",
+          "type": "string"
+        },
+        {
+          "const": "live_console",
+          "description": "Parsed Maestro stdout/stderr.",
+          "type": "string"
+        },
+        {
+          "const": "debug_log",
+          "description": "Parsed `maestro.log`.",
+          "type": "string"
+        },
+        {
+          "const": "artifact_file",
+          "description": "Structured per-flow artifacts such as `commands.json`.",
+          "type": "string"
+        },
+        {
+          "const": "junit_final",
+          "description": "Maestro's final JUnit report.",
+          "type": "string"
+        },
+        {
+          "const": "server_inferred",
+          "description": "Inferred by the server (for example after an agent disappeared). Agents may not send it.",
+          "type": "string"
+        },
+        {
+          "const": "unrecognized",
+          "description": "A kind this build doesn't know. Never ranks as evidence of success.",
+          "type": "string"
+        }
+      ]
+    },
+    "StepRef": {
+      "description": "A step inside a flow execution.",
+      "properties": {
+        "index": {
+          "description": "0-based position in the flow's steps as they were observed (nested steps included).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    },
+    "Subject": {
+      "description": "Which execution entities an event is about. All IDs are agent-generated UUIDv7.",
+      "properties": {
+        "device_session_id": {
+          "description": "One device for the life of this agent run.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flow_execution_id": {
+          "description": "One execution of one flow.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shard_id": {
+          "description": "One shard of that invocation.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "step": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StepRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One step of that flow execution."
+        },
+        "suite_execution_id": {
+          "description": "One Maestro invocation.",
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Telemetry": {
+      "description": "A batch of metric samples.",
+      "properties": {
+        "dropped_since_last": {
+          "default": 0,
+          "description": "Samples dropped since the previous batch (the ring was full).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "samples": {
+          "description": "The samples.",
+          "items": {
+            "$ref": "#/$defs/Sample"
+          },
+          "type": "array"
+        },
+        "tseq_from": {
+          "description": "First sample's `tseq`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tseq_to": {
+          "description": "Last sample's `tseq`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tseq_from",
+        "tseq_to",
+        "samples"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Agent → server.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Hello",
+      "description": "Opens or resumes an agent run.",
+      "properties": {
+        "op": {
+          "const": "hello",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Journal events, contiguous in `seq`.",
+      "properties": {
+        "events": {
+          "description": "The batch, in `seq` order.",
+          "items": {
+            "$ref": "#/$defs/EventEnvelope"
+          },
+          "type": "array"
+        },
+        "op": {
+          "const": "events",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "events"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/Telemetry",
+      "description": "Metric samples, a separate stream with its own sequence (gaps allowed, research 05 §3.2).",
+      "properties": {
+        "op": {
+          "const": "telemetry",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Liveness and queue depth.",
+      "properties": {
+        "clock": {
+          "$ref": "#/$defs/ClockSample",
+          "description": "Agent clock at send."
+        },
+        "op": {
+          "const": "heartbeat",
+          "type": "string"
+        },
+        "unacked": {
+          "description": "Events waiting for an ack.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "clock",
+        "unacked"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Graceful end, after `run.ended` was acked.",
+      "properties": {
+        "op": {
+          "const": "bye",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ClientFrame"
+}

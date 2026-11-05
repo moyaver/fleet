@@ -52,7 +52,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] `run`, `inspect`, `flush`, `check`, `version`; planner shards (`--plan`, ADR-0013)
 - [x] Validated on a real emulator: unchanged result, 65 events gap-free, 0.14% of one core (I10)
 - [x] Release pipeline (cargo-dist): musl x86_64/aarch64 + macOS arm64, checksums, attestations, third-party notices
-- [x] HTTPS proxy support and OIDC token exchange (done in M3: [#24](https://github.com/moyaver/fleet/issues/24), [#25](https://github.com/moyaver/fleet/issues/25))
+- [x] HTTPS proxy support and OIDC token exchange (done in M3: [#16](https://github.com/moyaver/fleet/issues/16), [#17](https://github.com/moyaver/fleet/issues/17))
 
 ### M3 checklist
 
@@ -62,16 +62,16 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 - [x] `fleet serve | migrate | check-config | healthcheck | api-key create`, figment config (TOML, `FLEET_*`, `*_FILE`)
 - [x] Live hub, browser WebSocket (snapshot + versioned deltas, `resync`), rebuilt from Postgres after a restart
 - [x] REST snapshots, OpenAPI (utoipa), liveness sweeps under an advisory-lock leader
-- [x] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#25](https://github.com/moyaver/fleet/issues/25))
-- [x] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#24](https://github.com/moyaver/fleet/issues/24))
-- [x] Plan storage and planned totals ([#21](https://github.com/moyaver/fleet/issues/21))
+- [x] Agent auth: API keys (`mf_live_…`) and GitHub OIDC exchange with trust policies; the agent does the exchange ([#17](https://github.com/moyaver/fleet/issues/17))
+- [x] Agent HTTPS proxy (CONNECT) and `FLEET_CA_FILE` ([#16](https://github.com/moyaver/fleet/issues/16))
+- [x] Plan storage and planned totals ([#14](https://github.com/moyaver/fleet/issues/14))
 - [x] Compose: Postgres 18, Garage, Caddy; cargo-chef + distroless image ([deploy/](../deploy/compose/README.md))
 - [x] `fleet-loadgen` scenarios: 50 agents × 4 devices, reconnect storms, duplicates and reordering, server restart, overlapping job names
 - [x] Exit criteria proven by tests: concurrent agents, restart without loss, acceptance criteria 3, 10, 11, 15, fixture replay through the real agent and server ([below](#m3-exit-criteria))
 
 ### M3 exit criteria
 
-Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). The integration-boundary hardening that had to land before M4 is tracked in [#39](https://github.com/moyaver/fleet/issues/39): all P0 and P1 findings except #34 are fixed.
+Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). The integration-boundary hardening that had to land before M4 is tracked in [#30](https://github.com/moyaver/fleet/issues/30): all P0 and P1 findings except [#24](https://github.com/moyaver/fleet/issues/24) are fixed.
 
 | Criterion | Proven by |
 |---|---|
@@ -86,15 +86,15 @@ Each is an automated test that runs in CI (`cargo xtask ci`, Postgres 18). The i
 
 ### M4 checklist
 
-Exit criteria are proven by tests ([below](#m4-exit-criteria)); the milestone stays 🚧 until its remaining issues land. Tracking: [#89](https://github.com/moyaver/fleet/issues/89).
+Exit criteria are proven by tests ([below](#m4-exit-criteria)); the milestone stays 🚧 until its remaining issues land. Tracking: [#47](https://github.com/moyaver/fleet/issues/47).
 
-- [x] Live read models and frames shared by server and SPA (`fleet_protocol::live`), `LiveStore` with resync on a version gap ([#59](https://github.com/moyaver/fleet/pull/59))
-- [x] Browser sign-in: OIDC code + PKCE, Postgres sessions, CSRF, group → role mapping, `authorize` policy ([#61](https://github.com/moyaver/fleet/pull/61))
-- [x] `fleet-ui` kit orders 1–8: tokens and themes (Tailwind standalone), layout, table, virtual list, provenance badges, overlays and forms, charts with LTTB, swimlane timeline, log viewer, step tree, screenshots ([#63](https://github.com/moyaver/fleet/pull/63), [#66](https://github.com/moyaver/fleet/pull/66), [#65](https://github.com/moyaver/fleet/pull/65), [#64](https://github.com/moyaver/fleet/pull/64))
-- [x] REST for screens A–D ([#67](https://github.com/moyaver/fleet/pull/67)); screens A, B ([#73](https://github.com/moyaver/fleet/pull/73)) and C, D ([#70](https://github.com/moyaver/fleet/pull/70))
-- [x] Browser E2E harness (chromedriver + headless Chrome, zero CSP violations asserted) ([#60](https://github.com/moyaver/fleet/pull/60)) and the M4 exit suite ([#76](https://github.com/moyaver/fleet/pull/76))
-- [ ] Agent HTTPS batch fallback when WebSocket upgrades keep failing ([#44](https://github.com/moyaver/fleet/issues/44))
-- [ ] Generated protocol JSON Schema and golden frame tests ([#49](https://github.com/moyaver/fleet/issues/49))
+- [x] Live read models and frames shared by server and SPA (`fleet_protocol::live`), `LiveStore` with resync on a version gap ([19c380b](https://github.com/moyaver/fleet/commit/19c380b38eb1f267645a047cdeb48db682e0eaf6))
+- [x] Browser sign-in: OIDC code + PKCE, Postgres sessions, CSRF, group → role mapping, `authorize` policy ([f3ec40c](https://github.com/moyaver/fleet/commit/f3ec40c7ea0625f4f80adaafcbc23008330665f3))
+- [x] `fleet-ui` kit orders 1–8: tokens and themes (Tailwind standalone), layout, table, virtual list, provenance badges, overlays and forms, charts with LTTB, swimlane timeline, log viewer, step tree, screenshots ([b2ed1bf](https://github.com/moyaver/fleet/commit/b2ed1bf402464874d972b28dffdc01f6d2d8134d), [102b213](https://github.com/moyaver/fleet/commit/102b213b93970342dff64be9fba57ba7d4f7db60), [52fc584](https://github.com/moyaver/fleet/commit/52fc5842ee85d3a539e63460b75be950eb163995), [04735c4](https://github.com/moyaver/fleet/commit/04735c4e096af898e5d55a849f7a65d92a4cc337))
+- [x] REST for screens A–D ([e99df65](https://github.com/moyaver/fleet/commit/e99df65695df8b099c8fa0869498a4074fbaf9e2)); screens A, B ([f48dbaf](https://github.com/moyaver/fleet/commit/f48dbaf3a0b5ef99e0d2840214db35b6ef0d4314)) and C, D ([6e7e1f1](https://github.com/moyaver/fleet/commit/6e7e1f17d7ba961a5837575cac914369542ca0f6))
+- [x] Browser E2E harness (chromedriver + headless Chrome, zero CSP violations asserted) ([16129c1](https://github.com/moyaver/fleet/commit/16129c1d4ced91e2d9a96fa7e2f8eebcac77b2df)) and the M4 exit suite ([eee9e1c](https://github.com/moyaver/fleet/commit/eee9e1cc2bbd538c8709b8c699b83cea2021ea3f))
+- [ ] Agent HTTPS batch fallback when WebSocket upgrades keep failing ([#31](https://github.com/moyaver/fleet/issues/31))
+- [ ] Generated protocol JSON Schema and golden frame tests ([#36](https://github.com/moyaver/fleet/issues/36))
 
 ### M4 exit criteria
 
@@ -112,13 +112,13 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 
 ### M5 checklist
 
-- [x] Failure and condition fingerprints, flaky v1 (ADR-0009), migration 0007 ([#71](https://github.com/moyaver/fleet/pull/71), [#79](https://github.com/moyaver/fleet/pull/79)); thresholds await the owner ([#86](https://github.com/moyaver/fleet/issues/86))
-- [x] `BlobStore` (filesystem and S3/Garage, one contract suite) and artifact verification (magic bytes, zip/tar.zst safety) ([#72](https://github.com/moyaver/fleet/pull/72))
-- [x] Artifact upload protocol, agent uploader (redacted, fail-open), usercontent origin with signed links and `CSP: sandbox` (I7), migration 0008 ([#75](https://github.com/moyaver/fleet/pull/75))
-- [x] Retention, rollups (1 min, 1 h), partition drops, failure-evidence promotion, blob GC with a grace period, migration 0009 ([#78](https://github.com/moyaver/fleet/pull/78), closes [#45](https://github.com/moyaver/fleet/issues/45))
-- [x] Screens E (History) and F (Compare) with evidence-only mismatch explanations ([#77](https://github.com/moyaver/fleet/pull/77))
-- [x] Evidence on screen D (screenshots, log at the failing step, step timings, sandboxed HTML report) and the M5 exit suite ([#80](https://github.com/moyaver/fleet/pull/80))
-- [ ] **Fleet Planner**: duration-aware CI sharding ([#22](https://github.com/moyaver/fleet/issues/22), [ADR-0013](decisions/0013-fleet-planner.md))
+- [x] Failure and condition fingerprints, flaky v1 (ADR-0009), migration 0007 ([bef75c4](https://github.com/moyaver/fleet/commit/bef75c48a4f9c6b2b3c6c5c6289696af64af5d8d), [a03dd06](https://github.com/moyaver/fleet/commit/a03dd063d26dc452456b531b9fb02eeee33d7076)); thresholds await the owner ([#44](https://github.com/moyaver/fleet/issues/44))
+- [x] `BlobStore` (filesystem and S3/Garage, one contract suite) and artifact verification (magic bytes, zip/tar.zst safety) ([01775c4](https://github.com/moyaver/fleet/commit/01775c4799ae8e4269bf79f4144d9b8230338f9a))
+- [x] Artifact upload protocol, agent uploader (redacted, fail-open), usercontent origin with signed links and `CSP: sandbox` (I7), migration 0008 ([db4eb13](https://github.com/moyaver/fleet/commit/db4eb130a020611104957611bfc95cfb744fb747))
+- [x] Retention, rollups (1 min, 1 h), partition drops, failure-evidence promotion, blob GC with a grace period, migration 0009 ([587df25](https://github.com/moyaver/fleet/commit/587df250e146fdeb995dae27bcbee1262fbb3e50), closes [#32](https://github.com/moyaver/fleet/issues/32))
+- [x] Screens E (History) and F (Compare) with evidence-only mismatch explanations ([f127d20](https://github.com/moyaver/fleet/commit/f127d209fedb59f6a04a01e94f9d5b19a2dd8c67))
+- [x] Evidence on screen D (screenshots, log at the failing step, step timings, sandboxed HTML report) and the M5 exit suite ([b64e7db](https://github.com/moyaver/fleet/commit/b64e7db81bd81e771eb7106753c930b635bf786c))
+- [ ] **Fleet Planner**: duration-aware CI sharding ([#15](https://github.com/moyaver/fleet/issues/15), [ADR-0013](decisions/0013-fleet-planner.md))
 
 ### M5 exit criteria
 
@@ -137,7 +137,7 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 - [x] Decide the final product name: **Fleet** ([#5](https://github.com/moyaver/fleet/issues/5), [ADR-0011](decisions/0011-name-and-runner-scope.md))
 - [ ] Ask a lawyer to review the AGPL + commercial-license model, the CLA adaptations and the employer letter ([#6](https://github.com/moyaver/fleet/issues/6))
 - [x] Add a public contact email for Code of Conduct reports and Corporate CLA delivery ([#2](https://github.com/moyaver/fleet/issues/2))
-- [ ] Decide the flaky v1 thresholds ([#86](https://github.com/moyaver/fleet/issues/86))
+- [ ] Decide the flaky v1 thresholds ([#44](https://github.com/moyaver/fleet/issues/44))
 - [ ] Set up a GitHub Sponsors profile ([#3](https://github.com/moyaver/fleet/issues/3))
 - [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/fleet/issues/4))
 

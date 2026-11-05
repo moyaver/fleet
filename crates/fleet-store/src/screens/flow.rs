@@ -15,6 +15,10 @@ use crate::{Result, Store, live};
 impl Store {
     /// Screen D for one flow execution. `None` when it doesn't exist or belongs to another
     /// project. The agent run's `liveness` is `None` until the server fills it in.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "assemble the project-scoped flow and its evidence in one read transaction"
+    )]
     pub async fn flow_detail(
         &self,
         project_id: Uuid,
@@ -38,7 +42,7 @@ impl Store {
         };
         let ids = |id: Uuid| [id];
         let corrupt = |what: &str| crate::Error::Corrupt(format!("flow {flow_id} has no {what}"));
-        let flow = live::flows(&mut tx, live::Scope::Ids(&ids(flow_id)))
+        let flow = live::flows(&mut tx, live::Scope::Ids(project_id, &ids(flow_id)))
             .await?
             .pop()
             .ok_or_else(|| corrupt("view"))?;
@@ -51,18 +55,24 @@ impl Store {
         .await?
         .pop()
         .ok_or_else(|| corrupt("attempt"))?;
-        let job = live::jobs(&mut tx, live::Scope::Ids(&ids(head.job_id)))
+        let job = live::jobs(&mut tx, live::Scope::Ids(project_id, &ids(head.job_id)))
             .await?
             .pop()
             .ok_or_else(|| corrupt("job"))?;
-        let suite = live::suites(&mut tx, live::Scope::Ids(&ids(head.suite_execution_id)))
-            .await?
-            .pop()
-            .ok_or_else(|| corrupt("suite"))?;
-        let agent_run = live::agent_runs(&mut tx, live::Scope::Ids(&ids(head.agent_run_id)))
-            .await?
-            .pop()
-            .ok_or_else(|| corrupt("agent run"))?;
+        let suite = live::suites(
+            &mut tx,
+            live::Scope::Ids(project_id, &ids(head.suite_execution_id)),
+        )
+        .await?
+        .pop()
+        .ok_or_else(|| corrupt("suite"))?;
+        let agent_run = live::agent_runs(
+            &mut tx,
+            live::Scope::Ids(project_id, &ids(head.agent_run_id)),
+        )
+        .await?
+        .pop()
+        .ok_or_else(|| corrupt("agent run"))?;
         let device = match head.device_session_id {
             Some(d) => device_sessions(&mut tx, project_id, None, Some(d), 1)
                 .await?

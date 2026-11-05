@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Credential-bearing agent requests require TLS for remote hosts, and cleartext loopback traffic bypasses proxies. The sign-in callback preserves authenticated sessions.
+- Ingest checks device and shard ownership, contains invalid NUL characters, rolls back rejected event effects, and rejects events after `run.ended` within the same batch.
+- Agents reconnect silent sockets and replay spool records after disk-write failures. Live clients resnapshot missing changes, ignore superseded socket disconnects, and release idle ordering state.
+- Flow history uses repository-relative report identities when the workspace is known. Running flows without a device display stale provenance, and history scans have a supporting index.
+
 - Dashboard: the "Sign in" links were taken over by the client-side router and landed on "Page not found"; they now leave the single-page app (`rel="external"`) so the browser follows the redirect to the identity provider (found by the M4 exit tests).
 - Agent: the outbox kept every unacked event in memory, so a long run with no server (offline mode) or an unreachable one grew without bound (I10). The spool file is now the source of truth, read back into a small send window; when the 64 MiB spool (or the window, with no spool) is exhausted the agent stops storing event bodies and sequences a `journal.gap` instead (I5), and the spool starts over once everything in it is acked. `fleet-agent flush` streams the spool instead of loading it.
 - Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
@@ -15,10 +20,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- Suspected flakiness requires five eligible runs. I6 now specifies supported redaction sources and encodings, withholds resolved command fields, and documents binary evidence access controls.
+- Finalization uses a shorter flush budget when the agent never connected.
+
 - Relicensed from PolyForm Internal Use 1.0.0 to the GNU AGPL v3 (`AGPL-3.0-only`); a commercial license is available on request (ADR-0012).
 - Renamed the product to Fleet; the agent binary is `fleet-agent` (ADR-0011).
 
 ### Added
+
+- The agent falls back to HTTPS batch transport after repeated blocked WebSocket upgrades, with server-authoritative resume and telemetry acknowledgments.
+- Generated protocol JSON Schemas, golden wire frames and a CI freshness check.
+- A pinned Maestro nightly emulator workflow and a captured absolute-path regression fixture.
 
 - M5 exit: screen D shows a failed flow's evidence from the usercontent origin: the failure screenshot in the screenshot viewer (tied to the step named in its file name), the Maestro log in the log viewer opened at the failing step of that flow (the step tree moves it; "Jump to the failing step" returns), command timings from `commands.json`, a link to the Maestro HTML report that opens sandboxed on the usercontent origin, downloads, refused uploads with their reasons, and honest empty states (nothing uploaded, no usercontent origin). The dashboard's CSP allows exactly the configured usercontent origin in `img-src` and `connect-src`. `fleet-e2e` proves acceptance criteria 7, 8 and 9 and invariant I7 in a real browser with the real agent. The step tree now sets `aria-level`, `aria-posinset` and `aria-setsize` (they were being written as `attr:aria-level`). User guide: "Investigating a failure".
 - M5: retention (issue #45). The leader runs telemetry rollups (one-minute and one-hour, idempotent, late-data aware; unavailable readings stay unavailable), drops expired partitions of raw samples, the journal and steps (raw samples only once rolled up), deletes expired rollups and audit events, expires artifacts by retention class (failure evidence is promoted when its flow finalizes as failed; legal hold keeps an artifact), and deletes blob objects only when no artifact refers to them and after a grace period; leftover temp files of crashed local uploads are swept (`BlobStore::sweep_stale_uploads`). Migration 0009; `[retention]` server settings; operator guide section. The metrics endpoints serve ranges over 24 hours from the rollups.

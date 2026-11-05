@@ -1,0 +1,386 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "description": "Machine-readable error codes.",
+      "oneOf": [
+        {
+          "const": "unauthorized",
+          "description": "Credentials missing or invalid.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_protocol",
+          "description": "No protocol version in common.",
+          "type": "string"
+        },
+        {
+          "const": "seq_regression",
+          "description": "The agent reused a run ID with an older sequence.",
+          "type": "string"
+        },
+        {
+          "const": "seq_gap",
+          "description": "A batch skipped sequence numbers.",
+          "type": "string"
+        },
+        {
+          "const": "superseded",
+          "description": "A newer connection took over this run.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "The event broke a validation rule.",
+          "type": "string"
+        },
+        {
+          "const": "too_large",
+          "description": "The frame was too large.",
+          "type": "string"
+        },
+        {
+          "const": "overloaded",
+          "description": "Overloaded; retry later.",
+          "type": "string"
+        },
+        {
+          "const": "internal",
+          "description": "Anything else.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A code this build doesn't know.",
+          "type": "string"
+        }
+      ]
+    },
+    "GoawayReason": {
+      "description": "Why the server sent `goaway`.",
+      "oneOf": [
+        {
+          "const": "shutdown",
+          "description": "The server is restarting.",
+          "type": "string"
+        },
+        {
+          "const": "rebalance",
+          "description": "Load balancing.",
+          "type": "string"
+        },
+        {
+          "const": "credential_expiring",
+          "description": "The agent's token expires soon.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "A reason this build doesn't know.",
+          "type": "string"
+        }
+      ]
+    },
+    "Limits": {
+      "description": "Flow-control limits from the server.",
+      "properties": {
+        "heartbeat_interval_ms": {
+          "description": "How often the agent sends a heartbeat.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_frame_bytes": {
+          "description": "Largest frame accepted.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_inflight_events": {
+          "description": "Events in flight (sent, not acked) at most.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_inflight_events",
+        "max_frame_bytes",
+        "heartbeat_interval_ms"
+      ],
+      "type": "object"
+    },
+    "ResumeOutcome": {
+      "description": "Outcome of the resume negotiation.",
+      "oneOf": [
+        {
+          "const": "new",
+          "description": "The server had never seen this run.",
+          "type": "string"
+        },
+        {
+          "const": "resumed",
+          "description": "The run continues.",
+          "type": "string"
+        },
+        {
+          "const": "reopened",
+          "description": "The run had been abandoned and is open again.",
+          "type": "string"
+        }
+      ]
+    },
+    "Welcome": {
+      "description": "The server's answer to `hello`.",
+      "properties": {
+        "committed_through": {
+          "description": "Highest `seq` the server has committed for this run.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "connection_id": {
+          "description": "This connection.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "epoch": {
+          "description": "Fencing epoch: older connections for the same run are superseded.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits",
+          "description": "Flow-control limits."
+        },
+        "protocol": {
+          "description": "The version chosen.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeOutcome",
+          "description": "Whether the run is new, resumed or reopened after the grace period."
+        }
+      },
+      "required": [
+        "protocol",
+        "connection_id",
+        "epoch",
+        "committed_through",
+        "resume",
+        "limits"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Server → agent.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Welcome",
+      "description": "The handshake succeeded.",
+      "properties": {
+        "op": {
+          "const": "welcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "The handshake was refused.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode",
+          "description": "Why."
+        },
+        "fatal": {
+          "description": "Don't retry with the same credentials or run.",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "Detail.",
+          "type": "string"
+        },
+        "op": {
+          "const": "reject",
+          "type": "string"
+        },
+        "retry_after_ms": {
+          "description": "When to try again, if at all.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "code",
+        "message",
+        "fatal"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Everything up to and including `through` is committed.",
+      "properties": {
+        "duplicates": {
+          "default": 0,
+          "description": "Events in the batch that were already committed.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "epoch": {
+          "description": "The connection epoch the commit happened under.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "op": {
+          "const": "ack",
+          "type": "string"
+        },
+        "through": {
+          "description": "Highest committed `seq`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "through",
+        "epoch"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Telemetry up to and including `through` is stored.",
+      "properties": {
+        "op": {
+          "const": "telemetry_ack",
+          "type": "string"
+        },
+        "through": {
+          "description": "Highest stored `tseq`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "through"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "One event was refused for good; the cursor moved past it. Don't resend it.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode",
+          "description": "Why."
+        },
+        "message": {
+          "description": "Detail.",
+          "type": "string"
+        },
+        "op": {
+          "const": "event_rejected",
+          "type": "string"
+        },
+        "permanent": {
+          "description": "Always true today.",
+          "type": "boolean"
+        },
+        "seq": {
+          "description": "Which event.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "seq",
+        "code",
+        "permanent",
+        "message"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Something went wrong. `fatal` errors are followed by a close.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode",
+          "description": "Why."
+        },
+        "expected_seq": {
+          "description": "For `seq_gap`: the `seq` the server expects next.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fatal": {
+          "description": "Whether the server will close.",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "Detail.",
+          "type": "string"
+        },
+        "op": {
+          "const": "error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "code",
+        "fatal",
+        "message"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "The server is going away; reconnect after the given delay.",
+      "properties": {
+        "op": {
+          "const": "goaway",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/GoawayReason",
+          "description": "Why."
+        },
+        "reconnect_after_ms": {
+          "description": "Delay before reconnecting.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "op",
+        "reason",
+        "reconnect_after_ms"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ServerFrame"
+}

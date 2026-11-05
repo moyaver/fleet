@@ -11,6 +11,7 @@
 //! - [`live`]: the browser's live socket: snapshots, deltas and their read models.
 //! - [`rest`]: REST read models of the dashboard's screens A–D (overview, timeline, worker and
 //!   device detail, metric series, flow investigation).
+//! - `schema` (feature `schema`): the JSON Schema documents generated from these types.
 //! - [`plan`]: Fleet Planner manifests (ADR-0013).
 
 pub mod artifact;
@@ -21,6 +22,8 @@ pub mod journal;
 pub mod live;
 pub mod plan;
 pub mod rest;
+#[cfg(feature = "schema")]
+pub mod schema;
 
 /// The protocol version this build speaks.
 pub const PROTOCOL_VERSION: u16 = 1;

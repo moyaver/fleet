@@ -7,6 +7,10 @@
 
 use std::{borrow::Cow, fmt::Write as _};
 
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
+};
 use regex::Regex;
 
 /// What a redacted value becomes.
@@ -53,7 +57,7 @@ pub struct Redactor {
 
 impl Redactor {
     /// Builds a redactor from secret values. Short values are ignored (see `MIN_SECRET_LEN`);
-    /// each value is also matched in its JSON-escaped form.
+    /// each value is also matched in its JSON, percent-encoded and base64 forms.
     #[must_use]
     pub fn new(values: impl IntoIterator<Item = String>) -> Self {
         let mut all: Vec<String> = Vec::new();
@@ -61,11 +65,16 @@ impl Redactor {
             if v.chars().count() < MIN_SECRET_LEN {
                 continue;
             }
-            let escaped = json_escaped(&v);
-            if escaped != v {
-                all.push(escaped);
-            }
-            all.push(v);
+            all.extend([
+                json_escaped(&v),
+                percent_encoded(&v, true),
+                percent_encoded(&v, false),
+                STANDARD.encode(v.as_bytes()),
+                STANDARD_NO_PAD.encode(v.as_bytes()),
+                URL_SAFE.encode(v.as_bytes()),
+                URL_SAFE_NO_PAD.encode(v.as_bytes()),
+                v,
+            ]);
         }
         all.sort_by_key(|v| std::cmp::Reverse(v.len()));
         all.dedup();
@@ -133,6 +142,20 @@ fn is_maestro_setting(upper: &str) -> bool {
     upper.starts_with("MAESTRO_CLI_")
         || upper == "MAESTRO_DISABLE_UPDATE_CHECK"
         || upper == "MAESTRO_DRIVER_STARTUP_TIMEOUT"
+}
+
+fn percent_encoded(value: &str, uppercase: bool) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(byte));
+        } else if uppercase {
+            let _ = write!(out, "%{byte:02X}");
+        } else {
+            let _ = write!(out, "%{byte:02x}");
+        }
+    }
+    out
 }
 
 fn json_escaped(v: &str) -> String {
@@ -217,6 +240,19 @@ mod tests {
             matches!(r.redact("nothing here"), Cow::Borrowed(_)),
             "no allocation when clean"
         );
+    }
+
+    #[test]
+    fn known_secret_is_redacted_in_percent_and_base64_encodings() {
+        let redactor = Redactor::new(["fleet-secret+/=?".to_owned()]);
+        for text in [
+            "fleet-secret%2B%2F%3D%3F",
+            "fleet-secret%2b%2f%3d%3f",
+            "ZmxlZXQtc2VjcmV0Ky89Pw==",
+            "ZmxlZXQtc2VjcmV0Ky89Pw",
+        ] {
+            assert_eq!(redactor.redact(text), MARKER, "{text}");
+        }
     }
 
     #[test]

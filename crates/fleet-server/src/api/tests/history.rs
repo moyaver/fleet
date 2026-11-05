@@ -239,9 +239,9 @@ fn verdict<'a>(page: &'a Value, flow: &str) -> &'a Value {
 #[tokio::test]
 async fn alternating_default_branch_results_are_suspected_flaky_and_steady_ones_are_not() {
     let rig = rig().await;
-    // Four default-branch runs on four commits flip pass, fail, pass, fail: 3 flips over 3 pairs.
+    // Five default-branch runs on distinct commits produce four flips over four pairs.
     let mut login = Vec::new();
-    for i in 0..4 {
+    for i in 0..5 {
         let (run, commit) = (format!("91{i}"), format!("c{i}"));
         let run = if i % 2 == 0 {
             Run::passed(&run, &commit, "login")
@@ -249,8 +249,12 @@ async fn alternating_default_branch_results_are_suspected_flaky_and_steady_ones_
             Run::failed(&run, &commit, "login", "Element not found")
         };
         login.push(run.on(MAIN).publish(&rig).await);
+        if i == 3 {
+            let page = rig.json("/api/v1/projects/app/history").await;
+            assert_eq!(verdict(&page, "flows/login.yaml")["flakiness"], "not_flaky");
+        }
     }
-    for i in 0..4 {
+    for i in 0..5 {
         let (run, commit) = (format!("92{i}"), format!("d{i}"));
         Run::passed(&run, &commit, "search")
             .on(MAIN)
@@ -264,7 +268,7 @@ async fn alternating_default_branch_results_are_suspected_flaky_and_steady_ones_
     assert_eq!(suspected["flakiness"], "suspected");
     let evidence = &suspected["evidence"][0];
     assert_eq!(evidence["kind"], "flips");
-    assert_eq!(evidence["flips"], 3);
+    assert_eq!(evidence["flips"], 4);
     assert_eq!(
         evidence["runs"],
         json!(login),

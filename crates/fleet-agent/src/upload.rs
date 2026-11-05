@@ -155,12 +155,16 @@ impl Limiter {
 impl Uploader {
     /// `None` if the HTTP client can't be built (then nothing is uploaded).
     pub(crate) fn new(cfg: Config) -> Option<Self> {
-        let client = reqwest::Client::builder()
+        let direct = crate::net::direct_loopback(&cfg.base);
+        let mut builder = reqwest::Client::builder()
+            .redirect(crate::net::credential_redirects(direct))
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(30))
-            .tls_backend_preconfigured((*cfg.tls).clone())
-            .build()
-            .ok()?;
+            .tls_backend_preconfigured((*cfg.tls).clone());
+        if direct {
+            builder = builder.no_proxy();
+        }
+        let client = builder.build().ok()?;
         Some(Self {
             inner: Arc::new(Inner {
                 limiter: Arc::new(Limiter {
@@ -257,6 +261,17 @@ impl Inner {
             },
             other => other.clone(),
         };
+        let source = if item.class == ArtifactClass::Commands {
+            let Source::Bytes(bytes) = &source else {
+                return Outcome::Rejected(NOT_REDACTABLE.into());
+            };
+            match redact_commands(bytes) {
+                Ok(bytes) => Source::Bytes(bytes.into()),
+                Err(reason) => return Outcome::Rejected(reason.into()),
+            }
+        } else {
+            source
+        };
         let item = &Item {
             class: item.class,
             path: item.path.clone(),
@@ -309,6 +324,9 @@ impl Inner {
         let Some(base) = self.url("/api/v1/agent/artifacts") else {
             return Step::Done(Outcome::Failed("no server URL".into()));
         };
+        if let Err(reason) = crate::net::credential_url(&base) {
+            return Step::Done(Outcome::Failed(reason.into()));
+        }
         let res = match self
             .client
             .post(base)
@@ -533,6 +551,40 @@ async fn read_text(path: &PathBuf, redactor: &Redactor) -> Result<Vec<u8>, Outco
     prepare_text(&bytes, redactor).map_err(|code| Outcome::Rejected(code.into()))
 }
 
+// Keep the captured command metadata useful without exporting resolved values from a flow.
+fn redact_commands(bytes: &[u8]) -> Result<Vec<u8>, &'static str> {
+    let mut commands: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| NOT_REDACTABLE)?;
+    if !commands.is_array() {
+        return Err(NOT_REDACTABLE);
+    }
+    hide_command_values(&mut commands);
+    serde_json::to_vec(&commands).map_err(|_| NOT_REDACTABLE)
+}
+
+fn hide_command_values(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                if matches!(
+                    key.as_str(),
+                    "evaluatedCommand" | "env" | "inputTextCommand"
+                ) {
+                    *value = fleet_core::redact::MARKER.into();
+                } else {
+                    hide_command_values(value);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                hide_command_values(value);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// The reason code for a text the agent will not upload.
 pub(crate) const NOT_REDACTABLE: &str = "not_redactable";
 
@@ -599,6 +651,17 @@ mod tests {
 
     async fn run(up: &Uploader) -> Vec<Done> {
         up.finish(Duration::from_secs(10)).await
+    }
+
+    #[tokio::test]
+    async fn remote_cleartext_artifact_upload_is_refused() {
+        let up = Uploader::new(config_for("http://192.0.2.1".into())).unwrap();
+        up.submit(item(b"hello"));
+        let done = run(&up).await;
+        assert!(
+            matches!(&done[0].outcome, Outcome::Failed(reason) if reason.contains("credentials require")),
+            "{done:?}"
+        );
     }
 
     #[tokio::test]
@@ -1026,6 +1089,29 @@ mod tests {
         for r in &seen {
             assert!(!String::from_utf8_lossy(&r.body).contains("hunter2-secret"));
         }
+    }
+
+    #[tokio::test]
+    async fn captured_commands_hide_resolved_values_without_knowing_their_secrets() {
+        let (server, _) = accepting().await;
+        let fixture = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/features/run/debug/features/commands.json"
+        );
+        let up = Uploader::new(config(&server)).unwrap();
+        let mut item = text_item(text_file(fixture), Redactor::new([]));
+        item.class = ArtifactClass::Commands;
+        item.path = "commands.json".into();
+        item.content_type = "application/json";
+        up.submit(item);
+        let done = run(&up).await;
+        assert!(matches!(done[0].outcome, Outcome::Uploaded { .. }));
+        let requests = server.received_requests().await.unwrap();
+        let sent = String::from_utf8(requests[1].body.clone()).unwrap();
+        assert!(!sent.contains("fleet-planted-e-secret-7f3a"));
+        assert!(!sent.contains("fleet-planted-maestro-secret-91c2"));
+        let rows: serde_json::Value = serde_json::from_str(&sent).unwrap();
+        assert_eq!(rows[0]["metadata"]["status"], "COMPLETED");
+        assert_eq!(rows[0]["metadata"]["sequenceNumber"], 0);
     }
 
     #[tokio::test]

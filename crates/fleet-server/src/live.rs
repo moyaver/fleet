@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 
-use fleet_protocol::live::{EntityView, LiveFrame, Liveness, Snapshot};
+use fleet_protocol::live::{EntityView, LiveFrame, Liveness, ResyncReason, Snapshot};
 use fleet_store::{
     Store,
     ingest::{Change, RunHandle},
@@ -31,10 +31,13 @@ use uuid::Uuid;
 
 /// How long a later version waits for an earlier one before it is sent anyway.
 const REORDER_WAIT: Duration = Duration::from_secs(2);
+/// Keep idle order state longer than the run liveness records.
+const ORDER_RETENTION: Duration = Duration::from_secs(3600).saturating_add(REORDER_WAIT);
 
 #[derive(Debug)]
 struct Order {
     published: u64,
+    last_publish: Instant,
     pending: BTreeMap<u64, (Instant, Arc<str>)>,
 }
 
@@ -42,6 +45,7 @@ struct Order {
 struct RunLive {
     project: Uuid,
     attempt: Uuid,
+    epoch: u32,
     last_seen: Instant,
     last_seen_wall: OffsetDateTime,
     connected: bool,
@@ -57,6 +61,8 @@ pub(crate) struct Hub {
     runs: Mutex<HashMap<Uuid, RunLive>>,
     stale_after: Duration,
     capacity: usize,
+    #[cfg(test)]
+    pub(crate) fail_entity_load: std::sync::atomic::AtomicBool,
 }
 
 fn json(frame: &LiveFrame) -> Arc<str> {
@@ -67,6 +73,8 @@ impl Hub {
     pub(crate) fn new(stale_after: Duration, capacity: usize) -> Self {
         Self {
             capacity: capacity.max(1),
+            #[cfg(test)]
+            fail_entity_load: std::sync::atomic::AtomicBool::new(false),
             channels: Mutex::new(HashMap::new()),
             order: Mutex::new(HashMap::new()),
             runs: Mutex::new(HashMap::new()),
@@ -101,6 +109,7 @@ impl Hub {
                 *attempt,
                 Order {
                     published: *version,
+                    last_publish: Instant::now(),
                     pending: BTreeMap::new(),
                 },
             );
@@ -110,22 +119,42 @@ impl Hub {
 
     /// Broadcasts a committed change, in version order per attempt.
     pub(crate) async fn publish(&self, store: &Store, change: Change) {
-        let entities = match store.entities(&change.entities).await {
-            Ok(mut e) => {
-                self.overlay(&mut e);
-                e
-            }
-            Err(err) => {
-                tracing::warn!(error = %err, "loading a delta; subscribers will resync");
-                Vec::new()
+        let frame = if change.entities.is_empty() {
+            json(&LiveFrame::Resync {
+                reason: ResyncReason::Lagged,
+            })
+        } else {
+            #[cfg(test)]
+            let load = if self
+                .fail_entity_load
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                Err(fleet_store::Error::Corrupt(
+                    "injected entity load failure".into(),
+                ))
+            } else {
+                store.entities(change.project_id, &change.entities).await
+            };
+            #[cfg(not(test))]
+            let load = store.entities(change.project_id, &change.entities).await;
+            match load {
+                Ok(mut entities) => {
+                    self.overlay(&mut entities);
+                    json(&LiveFrame::Delta {
+                        project_id: change.project_id,
+                        attempt_id: change.pipeline_attempt_id,
+                        version: change.version,
+                        entities,
+                    })
+                }
+                Err(err) => {
+                    tracing::warn!(error = %err, "loading a delta; subscribers will resync");
+                    json(&LiveFrame::Resync {
+                        reason: ResyncReason::Lagged,
+                    })
+                }
             }
         };
-        let frame = json(&LiveFrame::Delta {
-            project_id: change.project_id,
-            attempt_id: change.pipeline_attempt_id,
-            version: change.version,
-            entities,
-        });
         let ready = {
             let mut order = self
                 .order
@@ -135,11 +164,13 @@ impl Hub {
                 .entry(change.pipeline_attempt_id)
                 .or_insert_with(|| Order {
                     published: change.version.saturating_sub(1),
+                    last_publish: Instant::now(),
                     pending: BTreeMap::new(),
                 });
             if change.version <= o.published {
                 return;
             }
+            o.last_publish = Instant::now();
             o.pending.insert(change.version, (Instant::now(), frame));
             drain(o, false)
         };
@@ -174,6 +205,8 @@ impl Hub {
                     out.push((*project, drain(o, true)));
                 }
             }
+            order
+                .retain(|_, o| !o.pending.is_empty() || o.last_publish.elapsed() < ORDER_RETENTION);
         }
         for (project, frames) in out {
             self.send(project, frames);
@@ -199,12 +232,20 @@ impl Hub {
         let e = runs.entry(run.agent_run_id).or_insert(RunLive {
             project: run.project_id,
             attempt: run.pipeline_attempt_id,
+            epoch: run.epoch,
             last_seen: Instant::now(),
             last_seen_wall: OffsetDateTime::now_utc(),
             connected: true,
             ended: false,
             shown: Liveness::Online,
         });
+        if run.epoch < e.epoch {
+            return;
+        }
+        if run.epoch > e.epoch {
+            e.epoch = run.epoch;
+            e.ended = false;
+        }
         e.last_seen = Instant::now();
         e.last_seen_wall = OffsetDateTime::now_utc();
         e.connected = true;
@@ -217,6 +258,7 @@ impl Hub {
             .lock()
             .expect("hub lock should not be poisoned: no code panics while holding it")
             .get_mut(&run.agent_run_id)
+            && r.epoch == run.epoch
         {
             r.connected = false;
             r.ended |= ended;
@@ -335,9 +377,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn inactive_attempt_orders_are_pruned_without_dropping_pending_frames() {
+        let hub = Hub::new(Duration::from_secs(5), 16);
+        let pending = Uuid::now_v7();
+        let recent = Uuid::now_v7();
+        {
+            let mut orders = hub.order.lock().unwrap();
+            for _ in 0..100 {
+                orders.insert(
+                    Uuid::now_v7(),
+                    Order {
+                        published: 1,
+                        last_publish: Instant::now() - ORDER_RETENTION,
+                        pending: BTreeMap::new(),
+                    },
+                );
+            }
+            orders.insert(
+                recent,
+                Order {
+                    published: 4,
+                    last_publish: Instant::now(),
+                    pending: BTreeMap::new(),
+                },
+            );
+            orders.insert(
+                pending,
+                Order {
+                    published: 1,
+                    last_publish: Instant::now() - ORDER_RETENTION,
+                    pending: BTreeMap::from([(3, (Instant::now(), "three".into()))]),
+                },
+            );
+        }
+        hub.flush_stale(&HashMap::new());
+        let orders = hub.order.lock().unwrap();
+        assert_eq!(orders.len(), 2);
+        assert!(orders.contains_key(&recent));
+        assert!(orders[&pending].pending.contains_key(&3));
+    }
+
+    #[test]
     fn versions_go_out_in_order() {
         let mut o = Order {
             published: 4,
+            last_publish: Instant::now(),
             pending: BTreeMap::new(),
         };
         o.pending.insert(6, (Instant::now(), "six".into()));

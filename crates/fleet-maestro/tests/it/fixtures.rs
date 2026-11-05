@@ -195,7 +195,7 @@ fn every_fixture_parses() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();
-    assert_eq!(names.len(), 24, "{names:?}");
+    assert_eq!(names.len(), 25, "{names:?}");
     for name in names {
         let dir = fixtures_root().join(&name);
         let debug = dir.join("run/debug");

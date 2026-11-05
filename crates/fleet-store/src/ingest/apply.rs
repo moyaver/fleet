@@ -57,7 +57,7 @@ pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
 }
 
 /// What one batch touched, so derivation and broadcasts cover exactly that.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Ctx<'a> {
     run: &'a RunHandle,
     now: OffsetDateTime,
@@ -121,6 +121,28 @@ impl<'a> Ctx<'a> {
             Ok(None) => return Ok(Effect::Unsupported),
             Err(err) => return Ok(reject("invalid", format!("bad {} payload: {err}", e.kind))),
         };
+        if matches!(
+            body,
+            EventBody::FlowStarted(_) | EventBody::FlowEnded(_) | EventBody::FlowReported(_)
+        ) {
+            for (id, query) in [
+                (
+                    s.device_session_id,
+                    "SELECT agent_run_id FROM device_sessions WHERE id = $1",
+                ),
+                (s.shard_id, "SELECT agent_run_id FROM shards WHERE id = $1"),
+            ] {
+                if let Some(id) = id {
+                    let owner = sqlx::query_scalar::<_, Uuid>(query)
+                        .bind(id)
+                        .fetch_optional(&mut *tx)
+                        .await?;
+                    if owner != Some(self.run.agent_run_id) {
+                        return Ok(foreign(id));
+                    }
+                }
+            }
+        }
         match body {
             EventBody::RunStarted(b) => self.run_started(tx, &b).await,
             EventBody::SuiteStarted(b) => self.suite_started(tx, e, &b).await,
@@ -515,6 +537,9 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &FlowEnded,
     ) -> Result<Effect, sqlx::Error> {
+        if let Err(refused) = Claim::new(e.src.kind, b.outcome, e.seq) {
+            return Ok(reject("invalid", refused.to_string()));
+        }
         let flow = match &b.flow {
             Some(f) => match self.upsert_flow(tx, e, f, None, None, false).await? {
                 Effect::Applied => e.subject.flow_execution_id,
@@ -539,6 +564,9 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &FlowReported,
     ) -> Result<Effect, sqlx::Error> {
+        if let Err(refused) = Claim::new(e.src.kind, b.outcome, e.seq) {
+            return Ok(reject("invalid", refused.to_string()));
+        }
         let flow_ref = FlowRef {
             name: b.junit.name.clone(),
             path: b.junit.file.clone(),
@@ -554,8 +582,19 @@ impl<'a> Ctx<'a> {
         let Some(flow) = e.subject.flow_execution_id else {
             return Ok(reject("invalid", "flow.reported needs a flow_execution_id"));
         };
-        if let Some(file) = &b.junit.file {
-            // The JUnit `file` is repository-relative: the flow's stable identity.
+        let relative = |p: &&str| {
+            !p.contains(['\\', ':'])
+                && std::path::Path::new(p)
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_)))
+                && !p.is_empty()
+        };
+        let identity = b
+            .repo_path
+            .as_deref()
+            .filter(relative)
+            .or_else(|| b.junit.file.as_deref().filter(relative));
+        if let Some(file) = identity {
             let def = sqlx::query_scalar!(
                 "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)
                  ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name
@@ -689,6 +728,10 @@ impl<'a> Ctx<'a> {
         )
         .fetch_optional(&mut *tx)
         .await?;
+        let effect = self.owned_suite_update(e, updated);
+        if effect != Effect::Applied {
+            return Ok(effect);
+        }
         sqlx::query!(
             "UPDATE agent_runs SET maestro_exit_code = $2, maestro_exit_signal = $3, rev = rev + 1
               WHERE id = $1",
@@ -699,7 +742,7 @@ impl<'a> Ctx<'a> {
         .execute(&mut *tx)
         .await?;
         self.run_changed();
-        Ok(self.owned_suite_update(e, updated))
+        Ok(effect)
     }
 
     async fn report_parsed(

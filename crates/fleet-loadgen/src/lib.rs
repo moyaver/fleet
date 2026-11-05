@@ -398,6 +398,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
             flow,
             SourceKind::JunitFinal,
             &EventBody::FlowReported(FlowReported {
+                repo_path: None,
                 testsuite_index: d,
                 testcase_index: f,
                 matched: MatchMethod::Positional,

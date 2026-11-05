@@ -476,29 +476,25 @@ impl Store {
             })
             .collect();
         let expected = (contiguous.len() < fresh.len()).then_some(through + 1);
-        let end_seq = cursor.end_seq.map(to_u64);
+        let mut end_seq = cursor.end_seq.map(to_u64);
 
         let mut ctx = apply::Ctx::new(run, now);
         let mut journal = Vec::with_capacity(contiguous.len());
         for e in &contiguous {
-            let effect = if let Some(end) = end_seq.filter(|end| e.seq > *end) {
+            let effect = if contains_nul(&serde_json::to_value(e).unwrap_or_default()) {
+                apply::Effect::Rejected("invalid", "event contains a NUL character".into())
+            } else if let Some(end) = end_seq.filter(|end| e.seq > *end) {
                 apply::Effect::Rejected("after_end", format!("the run ended at seq {end}"))
-            } else if savepoints {
-                let mut sp = tx.begin().await?;
-                match ctx.apply(&mut sp, e).await {
-                    Ok(effect) => {
-                        sp.commit().await?;
-                        effect
-                    }
-                    Err(err) if is_data_error(&err) => {
-                        sp.rollback().await?;
-                        apply::Effect::Rejected("invalid", format!("violates a constraint: {err}"))
-                    }
-                    Err(err) => return Err(err.into()),
-                }
+            } else if savepoints || e.kind == "shard.assigned" {
+                apply_under_savepoint(&mut tx, &mut ctx, e, savepoints).await?
             } else {
                 ctx.apply(&mut tx, e).await?
             };
+            if effect == apply::Effect::Applied
+                && matches!(e.decode(), Ok(Some(EventBody::RunEnded(_))))
+            {
+                end_seq = Some(e.seq);
+            }
             journal.push((*e, effect));
         }
 
@@ -530,6 +526,31 @@ impl Store {
             change,
         })
     }
+}
+
+// Restore both the transaction and the accumulated projection changes when an event is rejected.
+async fn apply_under_savepoint(
+    tx: &mut PgConnection,
+    ctx: &mut apply::Ctx<'_>,
+    event: &EventEnvelope,
+    reject_data_errors: bool,
+) -> Result<apply::Effect, sqlx::Error> {
+    let before = ctx.clone();
+    let mut sp = tx.begin().await?;
+    let effect = match ctx.apply(&mut sp, event).await {
+        Ok(effect @ apply::Effect::Rejected(..)) => effect,
+        Ok(effect) => {
+            sp.commit().await?;
+            return Ok(effect);
+        }
+        Err(err) if reject_data_errors && is_data_error(&err) => {
+            apply::Effect::Rejected("invalid", format!("violates a constraint: {err}"))
+        }
+        Err(err) => return Err(err),
+    };
+    sp.rollback().await?;
+    *ctx = before;
+    Ok(effect)
 }
 
 /// Whether `e` continues a journal committed through `through`: it is the next `seq`, or it is a
@@ -746,6 +767,33 @@ async fn upsert_hierarchy(
     Ok((job_id, worker_id))
 }
 
+fn contains_nul(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::String(s) => s.contains('\0'),
+        serde_json::Value::Array(values) => values.iter().any(contains_nul),
+        serde_json::Value::Object(values) => values
+            .iter()
+            .any(|(k, v)| k.contains('\0') || contains_nul(v)),
+        _ => false,
+    }
+}
+
+fn safe_json(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(s) => serde_json::Value::String(s.replace('\0', "\\u0000")),
+        serde_json::Value::Array(values) => {
+            serde_json::Value::Array(values.into_iter().map(safe_json).collect())
+        }
+        serde_json::Value::Object(values) => serde_json::Value::Object(
+            values
+                .into_iter()
+                .map(|(k, v)| (k.replace('\0', "\\u0000"), safe_json(v)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 /// Stores refused events in `ingest_rejections` (and audits ID reuse across runs).
 async fn record_rejections(
     tx: &mut PgConnection,
@@ -764,7 +812,7 @@ async fn record_rejections(
             to_i64(e.seq),
             code,
             message,
-            serde_json::to_value(e).unwrap_or_default()
+            safe_json(serde_json::to_value(e).unwrap_or_default())
         )
         .execute(&mut *tx)
         .await?;
@@ -811,7 +859,7 @@ async fn write_journal(
     let mut data = Vec::with_capacity(journal.len());
     for (e, effect) in journal {
         seq.push(to_i64(e.seq));
-        kind.push(e.kind.clone());
+        kind.push(e.kind.replace('\0', "\\u0000"));
         v.push(i16::try_from(e.v).unwrap_or(i16::MAX));
         src_kind.push(
             serde_json::to_value(e.src.kind)
@@ -819,13 +867,15 @@ async fn write_journal(
                 .and_then(|k| k.as_str().map(str::to_owned))
                 .unwrap_or_else(|| "unrecognized".into()),
         );
-        src_parser.push(e.src.parser.clone());
+        src_parser.push(e.src.parser.as_ref().map(|s| s.replace('\0', "\\u0000")));
         occurred.push(e.at.wall);
         mono.push(to_i64(e.at.mono_ms));
-        subject.push(serde_json::to_value(&e.subject).unwrap_or_default());
+        subject.push(safe_json(
+            serde_json::to_value(&e.subject).unwrap_or_default(),
+        ));
         flow.push(e.subject.flow_execution_id);
         status.push(effect.status().to_owned());
-        data.push(e.data.clone());
+        data.push(safe_json(e.data.clone()));
     }
     sqlx::query!(
         "INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser,

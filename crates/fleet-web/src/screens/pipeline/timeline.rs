@@ -18,6 +18,7 @@ pub const UNASSIGNED_LANE: &str = "unassigned";
 #[must_use]
 pub fn timeline_data(
     view: &TimelineView,
+    run_of_flow: impl Fn(Uuid) -> Option<Uuid>,
     liveness_of: impl Fn(Uuid) -> Option<Liveness>,
 ) -> TimelineData {
     let run_of: HashMap<Uuid, Uuid> = view.lanes.iter().map(|l| (l.id, l.agent_run_id)).collect();
@@ -46,8 +47,9 @@ pub fn timeline_data(
             let start_ms = unix_ms(b.started_at);
             let liveness = b
                 .lane_id
-                .and_then(|lane| run_of.get(&lane))
-                .and_then(|run| liveness_of(*run));
+                .and_then(|lane| run_of.get(&lane).copied())
+                .or_else(|| run_of_flow(b.flow_id))
+                .and_then(&liveness_of);
             FlowBar {
                 id: b.flow_id.to_string(),
                 lane_id: b
@@ -133,7 +135,9 @@ mod tests {
     }
 
     fn bars(liveness: Option<Liveness>) -> Vec<FlowBar> {
-        timeline_data(&view(), |_| liveness).bars().to_vec()
+        timeline_data(&view(), |_| None, |_| liveness)
+            .bars()
+            .to_vec()
     }
 
     fn by_name<'a>(bars: &'a [FlowBar], name: &str) -> &'a FlowBar {
@@ -142,7 +146,7 @@ mod tests {
 
     #[test]
     fn a_lane_is_a_device_labelled_with_its_runner() {
-        let data = timeline_data(&view(), |_| None);
+        let data = timeline_data(&view(), |_| None, |_| None);
         assert_eq!(data.lanes()[0].label, "emulator-5554 · runner-1");
     }
 
@@ -189,8 +193,21 @@ mod tests {
     }
 
     #[test]
+    fn an_unassigned_running_bar_follows_its_agents_liveness() {
+        let mut v = view();
+        v.bars[3].state = "running".into();
+        v.bars[3].finality = "provisional".into();
+        let data = timeline_data(
+            &v,
+            |_| Some(Uuid::parse_str(RUN_A).unwrap()),
+            |_| Some(Liveness::Stale),
+        );
+        assert_eq!(by_name(data.bars(), "orphan").provenance, Provenance::Stale);
+    }
+
+    #[test]
     fn a_bar_without_a_device_gets_a_lane_of_its_own_instead_of_vanishing() {
-        let data = timeline_data(&view(), |_| None);
+        let data = timeline_data(&view(), |_| None, |_| None);
         let orphan = by_name(data.bars(), "orphan");
         assert_eq!(orphan.lane_id, UNASSIGNED_LANE);
         assert!(

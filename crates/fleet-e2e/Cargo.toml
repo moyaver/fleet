@@ -23,6 +23,8 @@ fleet-store = { workspace = true, features = ["test-util"] }
 http.workspace = true
 hyper-util.workspace = true
 serde_json.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "time", "process"] }
 url.workspace = true

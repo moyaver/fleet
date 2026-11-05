@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, pipeline_attempt_id, job_key, name, lifecycle, outcome,\n                outcome_source::text AS outcome_source, reopened_count, rev\n           FROM jobs\n          WHERE ($1::uuid IS NULL OR pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR id = ANY($2))\n          ORDER BY started_at, job_key",
+  "query": "SELECT id, pipeline_attempt_id, job_key, name, lifecycle, outcome,\n                outcome_source::text AS outcome_source, reopened_count, rev\n           FROM jobs\n          WHERE ($1::uuid IS NULL OR pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR id = ANY($2)) AND ($3::uuid IS NULL OR project_id = $3)\n          ORDER BY started_at, job_key",
   "describe": {
     "columns": [
       {
@@ -101,7 +101,8 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "UuidArray"
+        "UuidArray",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -116,5 +117,5 @@
       false
     ]
   },
-  "hash": "c46c257c404e2c1f88f2cbf449687396a919673176b034f11cfc071dd031d447"
+  "hash": "3c10b12e77a184db88717ff4eeaa2bdc1a2730e8629ffb1663273c8bda9b8356"
 }

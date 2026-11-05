@@ -97,6 +97,8 @@ pub(crate) type IdGen = Box<dyn FnMut() -> Uuid + Send>;
 /// The session.
 pub(crate) struct Session {
     redactor: Redactor,
+    workspace: Option<std::path::PathBuf>,
+    cwd: Option<std::path::PathBuf>,
     new_id: IdGen,
     suite_id: Uuid,
     shards: Vec<Shard>,
@@ -132,6 +134,49 @@ impl std::fmt::Debug for Session {
 }
 
 impl Session {
+    pub(crate) fn set_workspace(
+        &mut self,
+        workspace: Option<std::path::PathBuf>,
+        cwd: Option<std::path::PathBuf>,
+    ) {
+        self.workspace = workspace;
+        self.cwd = cwd;
+    }
+
+    fn repo_path(&self, file: Option<&str>) -> Option<String> {
+        use std::path::{Component, Path};
+        let path = Path::new(file?);
+        let absolute = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.cwd.as_ref()?.join(path)
+        };
+        let mut normalized = std::path::PathBuf::new();
+        for component in absolute.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    if !normalized.pop() {
+                        return None;
+                    }
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+        }
+        let root = self.workspace.as_ref()?;
+        let relative = normalized.strip_prefix(root).ok()?;
+        if relative
+            .components()
+            .any(|c| !matches!(c, Component::Normal(_)))
+        {
+            return None;
+        }
+        relative
+            .to_str()
+            .map(str::to_owned)
+            .filter(|s| !s.is_empty())
+    }
+
     /// Starts a session for a Maestro command line.
     pub(crate) fn new(
         argv: &[String],
@@ -143,6 +188,8 @@ impl Session {
         let suite_id = new_id();
         let mut s = Self {
             redactor,
+            workspace: None,
+            cwd: None,
             new_id,
             suite_id,
             shards: Vec::new(),
@@ -739,7 +786,13 @@ impl Session {
             }
             .unwrap_or_else(|| self.start_flow_unstarted(shard, &case.name, case.file.clone()));
             let outcome = junit::outcome(case.status.as_deref());
+            let repo_path = self
+                .repo_path(case.file.as_deref())
+                .map(|p| self.redactor.redact(&p).into_owned());
             let mut junit_case = case.clone();
+            junit_case.file = junit_case
+                .file
+                .map(|p| self.redactor.redact(&p).into_owned());
             junit_case.failure = junit_case.failure.map(|f| self.clip(&f));
             if let Ok(c) = Claim::new(SourceKind::JunitFinal, outcome, self.seq + 1)
                 && let Some(f) = self.flows.get_mut(idx)
@@ -756,6 +809,7 @@ impl Session {
                 SourceKind::JunitFinal,
                 Some(parser.to_owned()),
                 &EventBody::FlowReported(FlowReported {
+                    repo_path,
                     testsuite_index: u32::try_from(m.suite).unwrap_or(u32::MAX),
                     testcase_index: u32::try_from(m.case).unwrap_or(u32::MAX),
                     matched: m.method,

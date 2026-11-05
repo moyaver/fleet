@@ -278,6 +278,7 @@ pub(crate) fn suite_run_scripted(
             ids.flow(*f),
             SourceKind::JunitFinal,
             &EventBody::FlowReported(FlowReported {
+                repo_path: None,
                 testsuite_index: 0,
                 testcase_index: u32::try_from(i).unwrap(),
                 matched: MatchMethod::Positional,
@@ -1012,4 +1013,438 @@ async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
     .unwrap();
     batch.commit().await.unwrap();
     assert!(second.await.unwrap().is_ok());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn foreign_device_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("foreign-device-a", "a");
+    let ha = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let a_ids = SuiteIds::new();
+    let events = suite_run(&mut a, a_ids, &[]);
+    store.apply_batch(&ha, &events[..3]).await.unwrap();
+    let before = store
+        .snapshot(p.project_id, ha.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .devices;
+
+    let mut b = Agent::new("foreign-device-b", "b");
+    let hb = store
+        .open_run(&p, &b.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let b_ids = SuiteIds::new();
+    let events = suite_run(&mut b, b_ids, &[]);
+    store.apply_batch(&hb, &events[..3]).await.unwrap();
+    b.seq = 3;
+    let subject = Subject {
+        device_session_id: Some(a_ids.device),
+        ..b_ids.flow(Uuid::now_v7())
+    };
+    let event = b.event(
+        subject,
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "foreign".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let result = store.apply_batch(&hb, &[event]).await.unwrap();
+    assert!(result.rejected[0].message.starts_with("foreign_entity"));
+    assert_eq!(
+        store
+            .snapshot(p.project_id, ha.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .devices,
+        before
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn foreign_shard_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("foreign-device-a", "a");
+    let ha = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let a_ids = SuiteIds::new();
+    let events = suite_run(&mut a, a_ids, &[]);
+    store.apply_batch(&ha, &events[..3]).await.unwrap();
+    let before = store
+        .snapshot(p.project_id, ha.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .devices;
+
+    let mut b = Agent::new("foreign-device-b", "b");
+    let hb = store
+        .open_run(&p, &b.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let b_ids = SuiteIds::new();
+    let events = suite_run(&mut b, b_ids, &[]);
+    store.apply_batch(&hb, &events[..3]).await.unwrap();
+    b.seq = 3;
+    let subject = Subject {
+        shard_id: Some(a_ids.shard),
+        ..b_ids.flow(Uuid::now_v7())
+    };
+    let event = b.event(
+        subject,
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "foreign".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let result = store.apply_batch(&hb, &[event]).await.unwrap();
+    assert!(result.rejected[0].message.starts_with("foreign_entity"));
+    assert_eq!(
+        store
+            .snapshot(p.project_id, ha.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .devices,
+        before
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let other = store.upsert_project("other", "Other").await.unwrap();
+    let mut a = Agent::new("live-scope", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let events = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &events[..3]).await.unwrap();
+    assert_eq!(
+        store
+            .entities(other, &[EntityRef::Device(ids.device)])
+            .await
+            .unwrap(),
+        []
+    );
+    assert_eq!(
+        store
+            .entities(p.project_id, &[EntityRef::Device(ids.device)])
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nul_in_event_data_is_rejected_and_later_sequences_commit(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("nul-data", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let mut bad = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    bad.data = serde_json::json!({"message": "bad\u{0}text"});
+    let good = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let applied = store.apply_batch(&h, &[bad, good]).await.unwrap();
+    assert_eq!(applied.through, 2);
+    assert_eq!(applied.rejected.len(), 1);
+    assert_eq!(applied.rejected[0].seq, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("nul-flow", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let bad_flow = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::DebugLog,
+        &EventBody::FlowStarted(FlowStarted {
+            flow: FlowRef {
+                name: "bad\u{0}name".into(),
+                path: None,
+            },
+            shard_number: 1,
+            ordinal: 0,
+        }),
+    );
+    let mut bad_source = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    bad_source.src.parser = Some("bad\u{0}parser".into());
+    let good = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let result = store
+        .apply_batch(&h, &[bad_flow, bad_source, good])
+        .await
+        .unwrap();
+    assert_eq!(result.through, 6);
+    assert_eq!(
+        result.rejected.iter().map(|r| r.seq).collect::<Vec<_>>(),
+        [4, 5]
+    );
+    assert_eq!(
+        store
+            .snapshot(p.project_id, h.pipeline_attempt_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .flows,
+        []
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn rejected_process_exit_does_not_change_the_run(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("bad-exit", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let event = a.event(
+        Subject::default(),
+        SourceKind::ProcessExit,
+        &EventBody::ProcessExited(ProcessExited {
+            code: Some(42),
+            signal: None,
+            class: ExitClass::TestFailures,
+        }),
+    );
+    let result = store.apply_batch(&h, &[event]).await.unwrap();
+    assert_eq!(result.rejected.len(), 1);
+    let snapshot = store
+        .snapshot(p.project_id, h.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.agent_runs[0].maestro_exit_code, None);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn events_after_run_end_in_same_batch_are_rejected(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("same-batch-end", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let end = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunEnded(RunEnded {
+            interrupted: false,
+            output_bytes_dropped: 0,
+        }),
+    );
+    let after = a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunFinalizing,
+    );
+    let result = store.apply_batch(&h, &[end, after]).await.unwrap();
+    assert_eq!(result.rejected.len(), 1);
+    assert!(result.rejected[0].message.starts_with("after_end"));
+    assert_eq!(result.rejected[0].seq, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("rejected-entities", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let ended = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::Declared,
+        &EventBody::FlowEnded(FlowEnded {
+            outcome: FlowOutcome::Passed,
+            duration_ms: None,
+            failure: None,
+            flow: Some(FlowRef {
+                name: "ended".into(),
+                path: None,
+            }),
+        }),
+    );
+    let reported = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::Declared,
+        &EventBody::FlowReported(FlowReported {
+            repo_path: None,
+            testsuite_index: 0,
+            testcase_index: 0,
+            matched: MatchMethod::Positional,
+            junit: JunitTestcase {
+                id: None,
+                name: "reported".into(),
+                file: Some("reported.yaml".into()),
+                time_ms: None,
+                timestamp_local: None,
+                status: None,
+                failure: None,
+            },
+            outcome: FlowOutcome::Passed,
+        }),
+    );
+    let foreign = SuiteIds::new();
+    let shard = a.event(
+        foreign.shard(),
+        SourceKind::DebugLog,
+        &EventBody::ShardAssigned(ShardAssigned {
+            shard_number: 1,
+            device_serial: "new-device".into(),
+            planned: Vec::new(),
+        }),
+    );
+    let result = store
+        .apply_batch(&h, &[ended, reported, shard])
+        .await
+        .unwrap();
+    assert_eq!(result.rejected.len(), 3);
+    let snapshot = store
+        .snapshot(p.project_id, h.pipeline_attempt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.flows, []);
+    assert_eq!(snapshot.devices.len(), 1);
+    assert_eq!(snapshot.devices[0].id, ids.device);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn absolute_and_relative_report_paths_share_history_identity(pool: PgPool) {
+    let store = Store { pool };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("identity", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let initial = suite_run(&mut a, ids, &[]);
+    store.apply_batch(&h, &initial[..3]).await.unwrap();
+    a.seq = 3;
+    let make = |file: &str, repo_path: Option<&str>| {
+        EventBody::FlowReported(FlowReported {
+            testsuite_index: 0,
+            testcase_index: 0,
+            matched: MatchMethod::Positional,
+            junit: JunitTestcase {
+                id: None,
+                name: "pass".into(),
+                file: Some(file.into()),
+                time_ms: None,
+                timestamp_local: None,
+                status: Some("SUCCESS".into()),
+                failure: None,
+            },
+            repo_path: repo_path.map(str::to_owned),
+            outcome: FlowOutcome::Passed,
+        })
+    };
+    let absolute = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::JunitFinal,
+        &make(
+            "/fixture/checkout/examples/pass.yaml",
+            Some("examples/pass.yaml"),
+        ),
+    );
+    let relative = a.event(
+        ids.flow(Uuid::now_v7()),
+        SourceKind::JunitFinal,
+        &make("examples/pass.yaml", None),
+    );
+    store.apply_batch(&h, &[absolute, relative]).await.unwrap();
+    let history = store
+        .history(
+            p.project_id,
+            &crate::screens::HistoryQuery {
+                flow: None,
+                branch: None,
+                outcome: None,
+                from: OffsetDateTime::UNIX_EPOCH,
+                to: OffsetDateTime::now_utc() + time::Duration::days(1),
+                after: None,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        history
+            .items
+            .iter()
+            .map(|item| item.flow.as_str())
+            .collect::<Vec<_>>(),
+        ["examples/pass.yaml", "examples/pass.yaml"]
+    );
 }

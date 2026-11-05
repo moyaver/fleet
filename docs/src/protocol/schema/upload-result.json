@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "RejectReason": {
+      "description": "Why an artifact was refused, with a stable code (`snake_case`) an agent can journal.",
+      "oneOf": [
+        {
+          "const": "class_not_allowed",
+          "description": "The class isn't on the allowlist.",
+          "type": "string"
+        },
+        {
+          "const": "content_type_not_allowed",
+          "description": "The declared `Content-Type` isn't one this class accepts.",
+          "type": "string"
+        },
+        {
+          "const": "too_large",
+          "description": "Bigger than the class's size limit.",
+          "type": "string"
+        },
+        {
+          "const": "run_quota_exceeded",
+          "description": "The run already uploaded as many bytes or files as one run may.",
+          "type": "string"
+        },
+        {
+          "const": "size_mismatch",
+          "description": "The bytes sent are not the declared size.",
+          "type": "string"
+        },
+        {
+          "const": "digest_mismatch",
+          "description": "The bytes' SHA-256 is not the declared one.",
+          "type": "string"
+        },
+        {
+          "const": "type_not_allowed",
+          "description": "The content (magic bytes) isn't a type this class accepts.",
+          "type": "string"
+        },
+        {
+          "const": "not_text",
+          "description": "A text artifact that isn't UTF-8 without NUL bytes.",
+          "type": "string"
+        },
+        {
+          "const": "unsafe_archive",
+          "description": "An archive that is a bomb, escapes its directory, or holds links or nested archives.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The final state of an upload.",
+  "oneOf": [
+    {
+      "description": "Verified and stored.",
+      "properties": {
+        "artifact_id": {
+          "description": "The artifact.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "const": "available",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "artifact_id"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Verification refused the bytes; nothing was kept.",
+      "properties": {
+        "artifact_id": {
+          "description": "The artifact row that records the refusal.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "message": {
+          "description": "A sentence for the agent's log.",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/RejectReason",
+          "description": "Why."
+        },
+        "status": {
+          "const": "rejected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "artifact_id",
+        "reason",
+        "message"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "UploadResult"
+}

@@ -1,0 +1,7 @@
+[
+  {"op":"hello","protocol":{"min":1,"max":1},"agent":{"version":"1.0.0","os":"linux","arch":"x86_64"},"agent_run_id":"018f0000-0000-7000-8000-000000000001","ci":{"provider":"generic","repository":"o/r","run_id":"42","run_attempt":1,"job_key":"test","job_name":null,"sha":null,"git_ref":null,"runner":null},"resume":{"next_seq":1,"oldest_unacked_seq":null},"clock":{"wall":"2025-01-01T00:00:00Z","mono_ms":0}},
+  {"op":"events","events":[]},
+  {"op":"telemetry","tseq_from":1,"tseq_to":1,"dropped_since_last":0,"samples":[]},
+  {"op":"heartbeat","clock":{"wall":"2025-01-01T00:00:00Z","mono_ms":1000},"unacked":0},
+  {"op":"bye"}
+]

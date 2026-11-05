@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "PlanShard": {
+      "description": "One shard of a plan: the flows one CI job runs, in order.",
+      "properties": {
+        "estimatedSeconds": {
+          "description": "The planner's duration estimate.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "flows": {
+          "description": "Flow files, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Shard number, from 0.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "flows"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A plan.",
+  "properties": {
+    "planId": {
+      "description": "Stable identifier, unique per project.",
+      "type": "string"
+    },
+    "shards": {
+      "description": "The shards.",
+      "items": {
+        "$ref": "#/$defs/PlanShard"
+      },
+      "type": "array"
+    },
+    "totalFlows": {
+      "description": "Total flows across shards, as the planner counted them.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "planId",
+    "shards"
+  ],
+  "title": "PlanManifest",
+  "type": "object"
+}

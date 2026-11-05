@@ -1,6 +1,6 @@
 # ADR-0013: Fleet Planner: static, duration-aware CI sharding
 
-**Status:** Accepted (owner decision) · **Date:** 2026-11-04 · **Issues:** [#20](https://github.com/moyaver/fleet/issues/20) (agent), [#21](https://github.com/moyaver/fleet/issues/21) (server), [#22](https://github.com/moyaver/fleet/issues/22) (planner)
+**Status:** Accepted (owner decision) · **Date:** 2026-11-04 · **Issues:** [#13](https://github.com/moyaver/fleet/issues/13) (agent), [#14](https://github.com/moyaver/fleet/issues/14) (server), [#15](https://github.com/moyaver/fleet/issues/15) (planner)
 
 ## Context
 Maestro's `--shard-split` spreads flows across emulators on **one machine**. Spreading a suite across **several CI jobs or machines** is left to each team's own scripts, and a naive equal-count split leaves the pipeline waiting on the slowest job. Fleet already stores per-flow durations, so it can plan better than a count split. Spec v1.0 §17 rules out "CI orchestration or job scheduling"; static planning stays on the right side of that line because the CI still launches every job and Fleet only computes and records an assignment.

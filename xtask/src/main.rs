@@ -9,6 +9,7 @@
 mod db;
 mod fixtures;
 mod lint;
+mod schema;
 mod tools;
 
 use std::{
@@ -29,8 +30,7 @@ const TOOLS: &[&str] = &[
     "mdbook",
 ];
 
-const USAGE: &str =
-    "usage: cargo xtask <setup | tools | ci | lint | sqlx | web [--release] | fixtures …>";
+const USAGE: &str = "usage: cargo xtask <setup | tools | ci | lint | sqlx | schema [--check] | web [--release] | fixtures …>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -46,6 +46,10 @@ fn main() -> anyhow::Result<()> {
         ["ci"] => ci(&root),
         ["lint"] => lint::run(&root),
         ["sqlx"] => db::prepare(&root),
+        ["schema"] => schema::run(&root.join("docs/src/protocol/schema"), false),
+        ["schema", "--check"] => schema::run(&root.join("docs/src/protocol/schema"), true),
+        ["schema", "--output-dir", dir] => schema::run(Path::new(dir), false),
+        ["schema", "--output-dir", dir, "--check"] => schema::run(Path::new(dir), true),
         ["web"] => web(&root, false),
         ["web", "--release"] => web(&root, true),
         ["fixtures", rest @ ..] => fixtures::run(&root, rest),
@@ -71,6 +75,7 @@ fn setup(root: &Path) -> anyhow::Result<()> {
 }
 
 fn ci(root: &Path) -> anyhow::Result<()> {
+    schema::run(&root.join("docs/src/protocol/schema"), true)?;
     // The sqlx tests need Postgres 18: CI's service container, or a throwaway one locally.
     let throwaway;
     let url = if let Ok(url) = std::env::var("DATABASE_URL") {

@@ -107,7 +107,13 @@ async fn connection(
         s.connections
     };
     let mut received_here = 0usize;
-    while let Some(Ok(Message::Text(text))) = ws.next().await {
+    while let Some(Ok(message)) = ws.next().await {
+        let Message::Text(text) = message else {
+            if ws.flush().await.is_err() {
+                return;
+            }
+            continue;
+        };
         let frame: Value = serde_json::from_str(text.as_str()).unwrap();
         st.lock().unwrap().raw.push_str(text.as_str());
         let reply = match frame["op"].as_str().unwrap() {
@@ -474,4 +480,260 @@ fn a_failing_single_flow_is_test_failures_without_a_report() {
             .any(|e| e["type"] == "report.parsed" && e["data"]["status"] != "absent"),
         "no report was read"
     );
+}
+
+#[test]
+fn refused_upgrades_fall_back_to_batch_and_resume() {
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+    let state = Arc::new(Mutex::new((0_u64, Vec::<u64>::new(), 0_u32)));
+    let server_state = Arc::clone(&state);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
+            Mock::given(method("POST")).and(path("/api/v1/agent/batch"))
+                .respond_with(move |request: &wiremock::Request| {
+                    let body: Value = serde_json::from_slice(&request.body).unwrap();
+                    let mut state = server_state.lock().unwrap();
+                    state.2 += 1;
+                    // Pretend an earlier connection committed the first two events.
+                    if state.2 == 1 { state.0 = 2; }
+                    let before = state.0;
+                    for event in body["events"].as_array().unwrap() {
+                        let seq = event["seq"].as_u64().unwrap();
+                        if seq > state.0 {
+                            assert_eq!(seq, state.0 + 1);
+                            state.0 = seq;
+                            state.1.push(seq);
+                        }
+                    }
+                    ResponseTemplate::new(200).set_body_json(json!({"frames": [
+                        {"op":"welcome", "protocol":1, "connection_id":"00000000-0000-0000-0000-000000000001",
+                         "epoch":state.2, "committed_through":before, "resume":"resumed",
+                         "limits":{"max_inflight_events":512,"max_frame_bytes":1_048_576,"heartbeat_interval_ms":10_000}},
+                        {"op":"ack", "through":state.0,"epoch":state.2,"duplicates":0}
+                    ]}))
+                }).mount(&server).await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let state = state.lock().unwrap();
+    assert!(state.2 >= 2, "expected batch requests");
+    assert_eq!(
+        state.1.first(),
+        Some(&3),
+        "server resume point is authoritative"
+    );
+    assert!(state.0 > 3, "journal was acknowledged");
+}
+
+#[test]
+fn unauthorized_upgrade_does_not_trigger_batch() {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    let posts = Arc::new(Mutex::new(0_u32));
+    let observed = Arc::clone(&posts);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .respond_with(ResponseTemplate::new(401))
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .respond_with(move |_: &wiremock::Request| {
+                    *observed.lock().unwrap() += 1;
+                    ResponseTemplate::new(200)
+                })
+                .mount(&server)
+                .await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "fail",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(*posts.lock().unwrap(), 0);
+}
+
+#[test]
+fn absolute_junit_path_emits_repository_relative_identity() {
+    let (out, _, run_dir) = run_agent(
+        "absolute-path",
+        None,
+        &[],
+        &[("GITHUB_WORKSPACE", "/fixture/checkout")],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let journal = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let event: serde_json::Value = journal
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .find(|event| event["type"] == "flow.reported")
+        .unwrap();
+    assert_eq!(
+        event["data"]["repo_path"],
+        "examples/flows/phase0/pass.yaml"
+    );
+    assert_eq!(
+        event["data"]["junit"]["file"],
+        "/fixture/checkout/examples/flows/phase0/pass.yaml"
+    );
+}
+
+#[test]
+fn relative_parent_path_from_subdirectory_uses_git_root() {
+    let bin_dir = fake_maestro_dir();
+    let checkout = bin_dir.join("checkout");
+    let subdir = checkout.join("subdir");
+    std::fs::create_dir_all(checkout.join(".git")).unwrap();
+    std::fs::create_dir_all(&subdir).unwrap();
+    let flow = checkout.join("pass.yaml");
+    std::fs::write(&flow, "captured input").unwrap();
+    let run_dir = bin_dir.join("relative-run");
+    let report = bin_dir.join("relative-report.xml");
+    let custom_fixture = bin_dir.join("relative-fixture");
+    std::fs::create_dir_all(custom_fixture.join("run/debug")).unwrap();
+    for name in ["exit.json", "stdout.bin"] {
+        std::fs::copy(
+            fixture(&format!("absolute-path/{name}")),
+            custom_fixture.join(name),
+        )
+        .unwrap();
+    }
+    std::fs::copy(
+        fixture("absolute-path/run/debug/maestro.log"),
+        custom_fixture.join("run/debug/maestro.log"),
+    )
+    .unwrap();
+    let captured = std::fs::read_to_string(fixture("absolute-path/run/report.xml")).unwrap();
+    std::fs::write(
+        custom_fixture.join("run/report.xml"),
+        captured.replace(
+            "/fixture/checkout/examples/flows/phase0/pass.yaml",
+            "../pass.yaml",
+        ),
+    )
+    .unwrap();
+    let out = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
+        .current_dir(&subdir)
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap())
+        .env("FLEET_FAKE_FIXTURE", custom_fixture)
+        .args(["run", "--finalize-timeout", "30", "--run-dir"])
+        .arg(&run_dir)
+        .arg("--")
+        .arg(bin_dir.join("maestro"))
+        .args(["test", "--format", "junit", "--output"])
+        .arg(&report)
+        .arg("../pass.yaml")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let journal = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let event: serde_json::Value = journal
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .find(|event| event["type"] == "flow.reported")
+        .unwrap();
+    assert_eq!(event["data"]["repo_path"], "pass.yaml");
+}
+
+#[test]
+fn unreachable_server_gets_a_short_finalization_budget() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let (out, elapsed, run_dir) = run_agent(
+        "fail",
+        Some(&format!("ws://{closed}")),
+        &[],
+        &[
+            ("FLEET_FLUSH_TIMEOUT", "15"),
+            ("FLEET_UPLOAD_ARTIFACTS", "off"),
+        ],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("fail/stdout.bin")).unwrap()
+    );
+    assert!(
+        elapsed < Duration::from_secs(9),
+        "unreachable server took {elapsed:?}"
+    );
+    assert!(run_dir.join("spool.bin").exists());
+}
+
+#[test]
+fn batch_with_invalid_welcome_stops_without_sending_events() {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    let requests = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let seen = Arc::clone(&requests);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
+            Mock::given(method("POST")).respond_with(move |request: &wiremock::Request| {
+                seen.lock().unwrap().push(serde_json::from_slice(&request.body).unwrap());
+                ResponseTemplate::new(200).set_body_json(json!({"frames":[{"op":"welcome", "protocol":99,
+                    "connection_id":"00000000-0000-0000-0000-000000000001", "epoch":1, "committed_through":0,
+                    "resume":"new", "limits":{"max_inflight_events":512,"max_frame_bytes":1_048_576,"heartbeat_interval_ms":10_000}}]}))
+            }).mount(&server).await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "fail",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let requests = requests.lock().unwrap();
+    assert_eq!(
+        requests.len(),
+        1,
+        "invalid welcome must stop batch transport"
+    );
+    assert_eq!(requests[0]["events"], serde_json::json!([]));
 }

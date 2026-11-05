@@ -12,6 +12,7 @@ use crate::journal::{ClockSample, EventEnvelope};
 
 /// Agent → server.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum ClientFrame {
     /// Opens or resumes an agent run.
@@ -36,6 +37,7 @@ pub enum ClientFrame {
 
 /// Server → agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum ServerFrame {
     /// The handshake succeeded.
@@ -100,6 +102,7 @@ pub enum ServerFrame {
 /// The HTTPS batch fallback (`POST /api/v1/agent/batch`) for networks that block web sockets:
 /// one `hello`, then what a socket would have carried. Each request is a connection of its own.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BatchRequest {
     /// Opens or resumes the run, exactly as on the socket.
     pub hello: Hello,
@@ -114,6 +117,7 @@ pub struct BatchRequest {
 /// The frames the server would have sent on a socket, in order (`welcome`, `event_rejected`,
 /// `ack`, `telemetry_ack`, `error`, or a lone `reject`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BatchResponse {
     /// The frames.
     pub frames: Vec<ServerFrame>,
@@ -121,6 +125,7 @@ pub struct BatchResponse {
 
 /// A batch of metric samples.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Telemetry {
     /// First sample's `tseq`.
     pub tseq_from: u64,
@@ -135,6 +140,7 @@ pub struct Telemetry {
 
 /// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Sample {
     /// When it was taken.
     pub at: ClockSample,
@@ -157,6 +163,7 @@ pub struct Sample {
 
 /// The handshake payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Hello {
     /// Protocol versions the agent speaks.
     pub protocol: ProtocolRange,
@@ -177,6 +184,7 @@ pub struct Hello {
 
 /// A closed range of protocol versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProtocolRange {
     /// Oldest supported.
     pub min: u16,
@@ -186,6 +194,7 @@ pub struct ProtocolRange {
 
 /// The agent build.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AgentInfo {
     /// Agent version.
     pub version: String,
@@ -197,6 +206,7 @@ pub struct AgentInfo {
 
 /// What the agent can resend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResumeState {
     /// The next `seq` the agent will assign.
     pub next_seq: u64,
@@ -206,6 +216,7 @@ pub struct ResumeState {
 
 /// CI provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CiProvider {
     /// GitHub Actions.
@@ -216,6 +227,7 @@ pub enum CiProvider {
 
 /// CI identity as claimed by the agent (research 06 §1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CiContext {
     /// Which CI.
     pub provider: CiProvider,
@@ -239,6 +251,7 @@ pub struct CiContext {
 
 /// The server's answer to `hello`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Welcome {
     /// The version chosen.
     pub protocol: u16,
@@ -256,6 +269,7 @@ pub struct Welcome {
 
 /// Outcome of the resume negotiation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ResumeOutcome {
     /// The server had never seen this run.
@@ -268,6 +282,7 @@ pub enum ResumeOutcome {
 
 /// Flow-control limits from the server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Limits {
     /// Events in flight (sent, not acked) at most.
     pub max_inflight_events: u32,
@@ -289,6 +304,7 @@ impl Default for Limits {
 
 /// Machine-readable error codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     /// Credentials missing or invalid.
@@ -316,6 +332,7 @@ pub enum ErrorCode {
 
 /// Why the server sent `goaway`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum GoawayReason {
     /// The server is restarting.

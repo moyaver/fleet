@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "`POST /api/v1/agent/artifacts`: \"I have this file; may I upload it?\"\n\nIdempotent on `(agent_run_id, class, sha256)`: asking again returns the same artifact.",
+  "properties": {
+    "agent_run_id": {
+      "description": "The agent run that produced the file. It must belong to the caller's project.",
+      "format": "uuid",
+      "type": "string"
+    },
+    "class": {
+      "description": "The class, one of [`ArtifactClass::as_str`]. A string, so an older server answers an\nunknown class with [`RejectReason::ClassNotAllowed`] instead of failing to parse.",
+      "type": "string"
+    },
+    "content_type": {
+      "description": "The declared `Content-Type`; see [`ArtifactClass::content_types`]. The server serves what\nthe bytes are, not what is declared.",
+      "type": "string"
+    },
+    "flow_execution_id": {
+      "description": "The flow execution it is evidence for, if any. It must belong to the same run.",
+      "format": "uuid",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The path relative to the run's output directory, redacted. A label for people; it never\nnames where the server stores the bytes.",
+      "type": "string"
+    },
+    "sha256": {
+      "description": "SHA-256 of the content: 64 lowercase hex digits.",
+      "type": "string"
+    },
+    "size": {
+      "description": "Size in bytes.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "agent_run_id",
+    "class",
+    "path",
+    "content_type",
+    "size",
+    "sha256"
+  ],
+  "title": "UploadRequest",
+  "type": "object"
+}

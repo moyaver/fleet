@@ -15,8 +15,8 @@ use fleet_protocol::{
     PROTOCOL_VERSION,
     brand::WS_SUBPROTOCOL,
     frame::{
-        AgentInfo, CiContext, ClientFrame, ErrorCode, Hello, Limits, ProtocolRange, ResumeState,
-        ServerFrame, Telemetry, Welcome,
+        AgentInfo, BatchRequest, BatchResponse, CiContext, ClientFrame, ErrorCode, Hello, Limits,
+        ProtocolRange, ResumeState, ServerFrame, Telemetry, Welcome,
     },
     journal::ClockSample,
 };
@@ -79,6 +79,8 @@ pub(crate) struct Shared {
     pub(crate) wake: Notify,
     /// The run is over: flush what's left, then say `bye`.
     pub(crate) finishing: std::sync::atomic::AtomicBool,
+    /// A welcome was received during this run.
+    pub(crate) connected: std::sync::atomic::AtomicBool,
     /// The bearer credential in use (`FLEET_TOKEN`, or the token the OIDC exchange returned),
     /// for the artifact uploader, which speaks as the same agent.
     pub(crate) credential: Arc<Mutex<Option<String>>>,
@@ -95,6 +97,8 @@ pub(crate) enum End {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+const SILENCE_TIMEOUT: Duration = Duration::from_secs(30);
+const PING_INTERVAL: Duration = Duration::from_secs(10);
 const BATCH: usize = 64;
 const BACKOFF_BASE: Duration = Duration::from_millis(250);
 const BACKOFF_CAP: Duration = Duration::from_secs(30);
@@ -108,7 +112,24 @@ pub(crate) async fn run(
     clock: impl Fn() -> ClockSample,
 ) -> End {
     let mut attempt: u32 = 0;
+    let mut upgrade_failures = 0_u32;
     let mut cfg = cfg;
+    if (cfg.token.is_some() || cfg.oidc.is_some())
+        && let Err(reason) = crate::net::credential_url(&cfg.url)
+    {
+        tracing::warn!(
+            reason,
+            "telemetry disabled; configure a secure FLEET_SERVER URL"
+        );
+        return End::Refused(reason.into());
+    }
+    if cfg.token.is_none()
+        && let Some(req) = &cfg.oidc
+        && let Err(reason) = crate::net::credential_url(&req.url)
+    {
+        tracing::warn!(reason, "telemetry disabled; configure a secure OIDC URL");
+        return End::Refused(reason.into());
+    }
     share(&shared, cfg.token.as_ref());
     loop {
         if cfg.token.is_none()
@@ -130,11 +151,200 @@ pub(crate) async fn run(
         }
         match connection(&cfg, &shared, &mut telemetry, &clock).await {
             Ok(end) => return end,
-            Err(e) => tracing::warn!(error = %e, attempt, "agent connection lost"),
+            Err(e) => {
+                if upgrade_refused(e.as_ref()) {
+                    upgrade_failures += 1;
+                    if upgrade_failures >= 3 {
+                        tracing::warn!("websocket upgrades refused; switching to batch transport");
+                        match batch(&cfg, &shared, &mut telemetry, &clock).await {
+                            Ok(end) => return end,
+                            Err(()) => {
+                                upgrade_failures = 0;
+                            }
+                        }
+                    }
+                } else {
+                    upgrade_failures = 0;
+                }
+                tracing::warn!(error = %e, attempt, "agent connection lost");
+            }
         }
         attempt = attempt.saturating_add(1);
         tokio::time::sleep(backoff(attempt)).await;
     }
+}
+
+/// Only explicit upgrade-incompatible HTTP responses trigger fallback. Authentication failures
+/// and network errors continue on the normal WebSocket path.
+fn upgrade_refused(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    matches!(error.downcast_ref::<tokio_tungstenite::tungstenite::Error>(),
+        Some(tokio_tungstenite::tungstenite::Error::Http(response))
+            if matches!(response.status().as_u16(), 400 | 404 | 405 | 426 | 501))
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "the batch loop keeps retry and response state together"
+)]
+async fn batch(
+    cfg: &Config,
+    shared: &Shared,
+    telemetry: &mut mpsc::Receiver<Telemetry>,
+    clock: &impl Fn() -> ClockSample,
+) -> Result<End, ()> {
+    let url = format!("{}/api/v1/agent/batch", crate::net::http_base(&cfg.url));
+    if cfg.token.is_some()
+        && let Err(reason) = crate::net::credential_url(&url)
+    {
+        return Ok(End::Refused(reason.into()));
+    }
+    let direct = crate::net::direct_loopback(&url);
+    let mut builder = reqwest::Client::builder()
+        .timeout(CONNECT_TIMEOUT)
+        .redirect(crate::net::credential_redirects(direct))
+        .tls_backend_preconfigured((*cfg.tls).clone());
+    if direct {
+        builder = builder.no_proxy();
+    }
+    let Ok(client) = builder.build() else {
+        return Ok(End::Refused("cannot build batch client".into()));
+    };
+    let mut cursor: Option<u64> = None;
+    let mut max_events = BATCH;
+    let mut failures = 0_u32;
+    let mut samples: Vec<Telemetry> = Vec::new();
+    loop {
+        if failures >= 5 {
+            return Err(());
+        }
+        let hello = match hello_frame(cfg, shared, clock) {
+            Ok(ClientFrame::Hello(hello)) => *hello,
+            _ => return Ok(End::Refused("cannot build batch hello".into())),
+        };
+        let events = if let Some(after) = cursor {
+            match shared.outbox.lock() {
+                Ok(mut o) => o.after(after, max_events),
+                Err(_) => return Ok(End::Refused("outbox lock".into())),
+            }
+        } else {
+            Vec::new()
+        };
+        while samples.len() < BATCH {
+            match telemetry.try_recv() {
+                Ok(sample) => samples.push(sample),
+                Err(_) => break,
+            }
+        }
+        let sent_events = !events.is_empty();
+        let before_ack = shared.outbox.lock().map_or(0, |o| o.acked_through());
+        let mut post = client.post(&url).json(&BatchRequest {
+            hello,
+            events,
+            telemetry: samples.clone(),
+        });
+        if let Some(token) = &cfg.token {
+            post = post.bearer_auth(token);
+        }
+        let response = match post.send().await {
+            Ok(response)
+                if response.status() == reqwest::StatusCode::UNAUTHORIZED
+                    || response.status() == reqwest::StatusCode::FORBIDDEN =>
+            {
+                return Ok(End::Refused("batch authentication refused".into()));
+            }
+            Ok(response) if response.status().is_success() => {
+                response.json::<BatchResponse>().await
+            }
+            Ok(_) | Err(_) => {
+                failures = failures.saturating_add(1);
+                tokio::time::sleep(backoff(failures)).await;
+                continue;
+            }
+        };
+        let Ok(response) = response else {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        };
+        let mut seen_welcome = false;
+        let mut sent = cursor.unwrap_or(0);
+        let mut failed = false;
+        for frame in response.frames {
+            match frame {
+                ServerFrame::Welcome(welcome) => {
+                    let acked = shared.outbox.lock().map_or(0, |o| o.acked_through());
+                    if let Err(reason) = validate_welcome(&welcome, acked) {
+                        return Ok(End::Refused(reason.into()));
+                    }
+                    seen_welcome = true;
+                    shared
+                        .connected
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    max_events =
+                        BATCH.min(usize::try_from(welcome.limits.max_inflight_events).unwrap_or(0));
+                    sent = welcome.committed_through;
+                    if let Ok(mut o) = shared.outbox.lock() {
+                        o.ack(sent);
+                    }
+                }
+                ServerFrame::Reject {
+                    fatal: true,
+                    code,
+                    message,
+                    ..
+                } => return Ok(End::Refused(format!("{code:?}: {message}"))),
+                ServerFrame::Reject { .. } => failed = true,
+                ServerFrame::TelemetryAck { through } => {
+                    samples.retain(|sample| sample.tseq_to > through);
+                }
+                other => match on_frame(Some(other), shared, &mut sent).await {
+                    Ok(Some(end)) => return Ok(end),
+                    Err(_) => failed = true,
+                    Ok(None) => {}
+                },
+            }
+        }
+        if failed {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        }
+        if !seen_welcome {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+            continue;
+        }
+        cursor = Some(sent.max(shared.outbox.lock().map_or(0, |o| o.acked_through())));
+        if sent_events && shared.outbox.lock().map_or(0, |o| o.acked_through()) <= before_ack {
+            failures = failures.saturating_add(1);
+            tokio::time::sleep(backoff(failures)).await;
+        } else {
+            failures = 0;
+        }
+        if shared.finishing.load(std::sync::atomic::Ordering::SeqCst)
+            && shared.outbox.lock().is_ok_and(|o| o.drained())
+        {
+            return Ok(End::Flushed);
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+}
+
+/// A server cannot resume before locally acknowledged records, which may already be gone.
+fn validate_welcome(welcome: &Welcome, acked: u64) -> Result<(), &'static str> {
+    if welcome.protocol != PROTOCOL_VERSION {
+        return Err("unsupported server protocol");
+    }
+    if welcome.limits.max_inflight_events == 0
+        || welcome.limits.max_frame_bytes == 0
+        || welcome.limits.heartbeat_interval_ms == 0
+    {
+        return Err("invalid server limits");
+    }
+    if welcome.committed_through < acked {
+        return Err("server commit regressed below acknowledged events");
+    }
+    Ok(())
 }
 
 /// Publishes the credential in use to the uploader.
@@ -177,7 +387,12 @@ async fn open(
     }
     let target = crate::net::Target::parse(&cfg.url).ok_or("FLEET_SERVER is not a ws(s):// URL")?;
     let (ws, _) = tokio::time::timeout(CONNECT_TIMEOUT, async {
-        let tcp = crate::net::tcp(&target, cfg.proxy.as_ref()).await?;
+        let proxy = if cfg.token.is_some() && crate::net::direct_loopback(&cfg.url) {
+            None
+        } else {
+            cfg.proxy.as_ref()
+        };
+        let tcp = crate::net::tcp(&target, proxy).await?;
         tokio_tungstenite::client_async_tls_with_config(
             request,
             tcp,
@@ -191,6 +406,10 @@ async fn open(
     Ok(ws)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "keep the websocket handshake, bounded sends and receive deadlines in one state machine"
+)]
 async fn connection(
     cfg: &Config,
     shared: &Shared,
@@ -200,16 +419,28 @@ async fn connection(
     let ws = open(cfg).await?;
     let (mut tx, mut rx) = ws.split();
 
-    tx.send(Message::text(serde_json::to_string(&hello_frame(
-        cfg, shared, clock,
-    )?)?))
-    .await?;
+    tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        tx.send(Message::text(serde_json::to_string(&hello_frame(
+            cfg, shared, clock,
+        )?)?)),
+    )
+    .await??;
 
     let welcome = tokio::time::timeout(HELLO_TIMEOUT, await_welcome(&mut rx)).await??;
     let welcome = match welcome {
         Ok(w) => w,
         Err(end) => return Ok(end),
     };
+    let acked = shared
+        .outbox
+        .lock()
+        .map_err(|_| "outbox lock")?
+        .acked_through();
+    validate_welcome(&welcome, acked)?;
+    shared
+        .connected
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     tracing::info!(
         committed = welcome.committed_through,
         epoch = welcome.epoch,
@@ -227,7 +458,12 @@ async fn connection(
         limits.heartbeat_interval_ms.max(1000),
     ));
     let mut tick = tokio::time::interval(Duration::from_millis(250));
+    let mut ping = tokio::time::interval(PING_INTERVAL);
+    let mut last_frame = tokio::time::Instant::now();
     loop {
+        if last_frame.elapsed() >= SILENCE_TIMEOUT {
+            return Err("server stopped sending frames".into());
+        }
         // Send what the window allows.
         let batch = {
             let mut o = shared.outbox.lock().map_err(|_| "outbox lock")?;
@@ -239,10 +475,13 @@ async fn connection(
         };
         if let Some(last) = batch.last() {
             sent = last.seq;
-            tx.send(Message::text(serde_json::to_string(
-                &ClientFrame::Events { events: batch },
-            )?))
-            .await?;
+            tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                tx.send(Message::text(serde_json::to_string(
+                    &ClientFrame::Events { events: batch },
+                )?)),
+            )
+            .await??;
             continue;
         }
         let (drained, finishing) = {
@@ -253,27 +492,34 @@ async fn connection(
             )
         };
         if finishing && drained {
-            tx.send(Message::text(serde_json::to_string(&ClientFrame::Bye)?))
-                .await?;
-            let _ = tx.close().await;
+            tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                tx.send(Message::text(serde_json::to_string(&ClientFrame::Bye)?)),
+            )
+            .await??;
+            let _ = tokio::time::timeout(CONNECT_TIMEOUT, tx.close()).await;
             return Ok(End::Flushed);
         }
         tokio::select! {
             msg = rx.next() => {
                 let Some(msg) = msg else { return Err("connection closed".into()) };
+                last_frame = tokio::time::Instant::now();
                 if let Some(end) = on_frame(decode(&msg?), shared, &mut sent).await? {
                     return Ok(end);
                 }
             }
             t = telemetry.recv() => {
                 if let Some(t) = t {
-                    tx.send(Message::text(serde_json::to_string(&ClientFrame::Telemetry(t))?)).await?;
+                    tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::text(serde_json::to_string(&ClientFrame::Telemetry(t))?))).await??;
                 }
             }
             () = shared.wake.notified() => {}
             _ = heartbeat.tick() => {
                 let unacked = { let o = shared.outbox.lock().map_err(|_| "outbox lock")?; o.last_seq().saturating_sub(o.acked_through()) };
-                tx.send(Message::text(serde_json::to_string(&ClientFrame::Heartbeat { clock: clock(), unacked })?)).await?;
+                tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::text(serde_json::to_string(&ClientFrame::Heartbeat { clock: clock(), unacked })?))).await??;
+            }
+            _ = ping.tick() => {
+                tokio::time::timeout(CONNECT_TIMEOUT, tx.send(Message::Ping(Vec::new().into()))).await??;
             }
             _ = tick.tick() => {}
         }
@@ -388,6 +634,139 @@ fn decode(msg: &Message) -> Option<ServerFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn remote_cleartext_token_is_refused_without_retrying() {
+        let cfg = Config::from_env(
+            "ws://example.com/api/v1/agent/ws".into(),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        let (_tx, rx) = mpsc::channel(1);
+        let result = tokio::time::timeout(
+            Duration::from_millis(100),
+            run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+                wall: time::OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            }),
+        )
+        .await;
+        assert!(matches!(result, Ok(End::Refused(_))), "{result:?}");
+    }
+
+    #[test]
+    fn welcome_rejects_incompatible_limits_and_regressing_commit() {
+        let valid = Welcome {
+            protocol: PROTOCOL_VERSION,
+            connection_id: Uuid::nil(),
+            epoch: 1,
+            committed_through: 2,
+            resume: fleet_protocol::frame::ResumeOutcome::Resumed,
+            limits: Limits::default(),
+        };
+        assert!(validate_welcome(&valid, 2).is_ok());
+        let mut bad = valid.clone();
+        bad.protocol += 1;
+        assert!(validate_welcome(&bad, 0).is_err());
+        bad = valid.clone();
+        bad.limits.max_inflight_events = 0;
+        assert!(validate_welcome(&bad, 0).is_err());
+        assert!(validate_welcome(&valid, 3).is_err());
+    }
+
+    #[tokio::test]
+    async fn silent_server_is_reconnected() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            #[expect(clippy::result_large_err, reason = "tungstenite callback signature")]
+            let callback = |_req: &tokio_tungstenite::tungstenite::handshake::server::Request, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                response.headers_mut().insert("Sec-WebSocket-Protocol", HeaderValue::from_static(WS_SUBPROTOCOL));
+                Ok(response)
+            };
+            let mut ws = tokio_tungstenite::accept_hdr_async(socket, callback)
+                .await
+                .unwrap();
+            let _ = ws.next().await.unwrap().unwrap();
+            ws.send(Message::text(
+                serde_json::json!({ "op": "welcome", "protocol": 1,
+                "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
+                "committed_through": 0, "resume": "new", "limits": { "max_inflight_events": 512,
+                "max_frame_bytes": 1_048_576, "heartbeat_interval_ms": 10_000 } })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            let second = tokio::time::timeout(Duration::from_secs(35), listener.accept()).await;
+            drop(ws);
+            assert!(second.is_ok(), "agent did not reconnect to silent server");
+        });
+        let cfg = Config::from_env(
+            format!("ws://{addr}"),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |_| None,
+        );
+        let (_tx, rx) = mpsc::channel(1);
+        let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+            wall: time::OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }));
+        server.await.unwrap();
+        agent.abort();
+    }
+
+    #[tokio::test]
+    async fn cleartext_loopback_bypasses_a_configured_proxy() {
+        let target = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut cfg = Config::from_env(
+            format!("ws://{}", target.local_addr().unwrap()),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        cfg.proxy = Some(crate::net::Proxy {
+            host: "127.0.0.1".into(),
+            port: proxy.local_addr().unwrap().port(),
+            auth: None,
+        });
+        let connection = tokio::spawn(async move {
+            let _ = open(&cfg).await;
+        });
+        let direct = tokio::time::timeout(Duration::from_secs(1), target.accept()).await;
+        connection.abort();
+        assert!(direct.is_ok(), "connection did not reach loopback directly");
+    }
+
+    #[tokio::test]
+    async fn loopback_and_secure_connections_are_not_refused() {
+        for url in [
+            "ws://localhost:9",
+            "ws://127.2.3.4:9",
+            "ws://[::1]:9",
+            "wss://192.0.2.1",
+        ] {
+            let cfg = Config::from_env(
+                url.into(),
+                Uuid::now_v7(),
+                crate::ci::context(|_| None),
+                |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+            );
+            let (_tx, rx) = mpsc::channel(1);
+            let result = tokio::time::timeout(
+                Duration::from_millis(100),
+                run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+                    wall: time::OffsetDateTime::UNIX_EPOCH,
+                    mono_ms: 0,
+                }),
+            )
+            .await;
+            assert!(result.is_err(), "{url}: {result:?}");
+        }
+    }
 
     #[test]
     fn backoff_stays_under_the_cap() {

@@ -56,7 +56,7 @@ pub fn timeline_data(views: &[TimelineView], lanes: &[Uuid]) -> TimelineData {
         mine.lanes.retain(|l| lanes.contains(&l.id));
         mine.bars
             .retain(|b| b.lane_id.is_some_and(|l| lanes.contains(&l)));
-        let data = attempt_timeline::timeline_data(&mine, |_| None);
+        let data = attempt_timeline::timeline_data(&mine, |_| None, |_| None);
         for lane in data.lanes() {
             if !out_lanes
                 .iter()

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// A plan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PlanManifest {
     /// Stable identifier, unique per project.
@@ -22,6 +23,7 @@ pub struct PlanManifest {
 
 /// One shard of a plan: the flows one CI job runs, in order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PlanShard {
     /// Shard number, from 0.

@@ -24,6 +24,7 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | Scenario | Capture options | Maestro arguments |
 |---|---|---|
 | `pass` | | `--device A test CANON pass.yaml` |
+| `absolute-path` | captured from outside the checkout with timeline and flow bundles; checkout normalized to `/fixture/checkout` | `--device A --no-ansi test CANON /fixture/checkout/examples/flows/phase0/pass.yaml` |
 | `pass-machine-log` | `MP` | `--device A test CANON pass.yaml` |
 | `fail` | `MP` | `--device A test CANON fail.yaml` |
 | `suite` | `MP` | `--device A test CANON suite` |
@@ -56,3 +57,6 @@ cargo xtask fixtures import /tmp/cap/pass 2.13.0/pass
 ```
 
 A new Maestro minor needs fixtures before Fleet claims support for it (PLAN §13).
+
+Older reports that contain absolute paths without a known checkout root cannot be safely
+merged into repository-relative history; Fleet leaves their identity unresolved.

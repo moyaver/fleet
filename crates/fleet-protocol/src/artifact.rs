@@ -20,6 +20,7 @@ use uuid::Uuid;
 /// The kinds of file the server accepts: an allowlist, never "everything in the output
 /// directory" (spec §7). A request for any other class is [`RejectReason::ClassNotAllowed`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactClass {
@@ -78,6 +79,7 @@ impl ArtifactClass {
 
 /// Why an artifact was refused, with a stable code (`snake_case`) an agent can journal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum RejectReason {
@@ -141,6 +143,7 @@ impl RejectReason {
 ///
 /// Idempotent on `(agent_run_id, class, sha256)`: asking again returns the same artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UploadRequest {
     /// The agent run that produced the file. It must belong to the caller's project.
@@ -165,6 +168,7 @@ pub struct UploadRequest {
 
 /// The server's answer to an [`UploadRequest`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "disposition", rename_all = "snake_case")]
 pub enum UploadGrant {
@@ -180,6 +184,7 @@ pub enum UploadGrant {
         complete_url: String,
         /// The grant is void after this.
         #[serde(with = "time::serde::rfc3339")]
+        #[cfg_attr(feature = "schema", schemars(schema_with = "crate::schema::rfc3339"))]
         expires_at: OffsetDateTime,
         /// The bytes to send, exactly.
         size: u64,
@@ -200,6 +205,7 @@ pub enum UploadGrant {
 
 /// The final state of an upload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum UploadResult {

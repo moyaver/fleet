@@ -102,6 +102,8 @@ nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
 # aws-lc-rs and a second TLS backend; Fleet runs rustls on ring (the workspace reqwest above).
 object_store = { version = "0.14.2", default-features = false, features = ["aws-base", "reqwest", "ring"] }
 predicates = "3.1.4"
+# Validates golden frames against the generated schema (dev-dependency only).
+jsonschema = { version = "0.60.2", default-features = false }
 proptest = "1.12.0"
 quick-xml = "0.42.0"
 regex = "1.13.1"
@@ -112,6 +114,8 @@ rust-embed = { version = "8.13.0", features = ["mime-guess"] }
 ring = "0.17.14"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 rustls-native-certs = "0.8.5"
+# JSON Schema of the wire types (`fleet-protocol` `schema` feature, PLAN §5.3).
+schemars = { version = "1.2.3", default-features = false, features = ["derive", "std", "uuid1"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
@@ -127,6 +131,7 @@ thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
 # Members add the features they need: features unify across the graph.
 tokio = "1.54.1"
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
 tokio-util = { version = "0.7.20", features = ["rt"] }
 tower = "0.5.3"

@@ -73,7 +73,7 @@ impl Default for FlakyConfig {
         Self {
             window: 20,
             threshold: (1, 5),
-            min_runs: 2,
+            min_runs: 5,
         }
     }
 }
@@ -395,6 +395,26 @@ mod tests {
                 r
             })
             .collect()
+    }
+
+    #[test]
+    fn suspected_flakiness_requires_five_eligible_default_branch_runs() {
+        let mut history = trail("login", "PPPF", 1);
+        let mut excluded = run(5, "login", "c5", FlowOutcome::Failed);
+        excluded.default_branch = true;
+        excluded.exclusion = Some(Exclusion::Infrastructure);
+        history.push(excluded);
+        assert_eq!(flakiness(&history, "login"), Flakiness::NotFlaky);
+
+        let mut eligible = run(6, "login", "c6", FlowOutcome::Failed);
+        eligible.default_branch = true;
+        history.push(eligible);
+        let verdict = verdict(&history, "login");
+        assert_eq!(verdict.flakiness, Flakiness::Suspected);
+        let [Evidence::Flips { flips, runs, .. }] = verdict.evidence.as_slice() else {
+            panic!("expected one flip evidence, got {:?}", verdict.evidence);
+        };
+        assert_eq!((*flips, runs.len()), (1, 5));
     }
 
     #[test]

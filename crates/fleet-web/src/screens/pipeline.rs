@@ -114,9 +114,11 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     }
     let timeline_view = timeline.data;
     let data = Memo::new(move |_| match timeline_view.get() {
-        Some(view) => timeline_data(&view, |run| {
-            model.runs.cell(run).and_then(|c| c.get().liveness)
-        }),
+        Some(view) => timeline_data(
+            &view,
+            |flow| model.flows.cell(flow).map(|c| c.get().agent_run_id),
+            |run| model.runs.cell(run).and_then(|c| c.get().liveness),
+        ),
         None => TimelineData::new(Vec::new(), Vec::new()),
     });
     let not_started = move || timeline_view.with(|t| t.as_ref().map_or(0, |t| t.not_started));
