@@ -375,3 +375,33 @@ pub(super) async fn classifiable_runs(
         })
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use sqlx::PgPool;
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn history_page_can_use_its_project_and_time_index(pool: PgPool) {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL enable_seqscan = off")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let plan: Vec<String> = sqlx::query_scalar(
+            "EXPLAIN SELECT id FROM flow_executions
+              WHERE project_id = '00000000-0000-0000-0000-000000000001'
+                AND state NOT IN ('pending', 'running')
+                AND coalesce(ended_at, started_at) >= '2026-01-01'::timestamptz
+                AND coalesce(ended_at, started_at) < '2027-01-01'::timestamptz
+              ORDER BY coalesce(ended_at, started_at) DESC, id DESC LIMIT 50",
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap();
+        assert!(
+            plan.iter()
+                .any(|line| line.contains("flow_executions_history")),
+            "{plan:?}"
+        );
+    }
+}
