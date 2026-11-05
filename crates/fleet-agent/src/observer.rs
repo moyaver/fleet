@@ -252,6 +252,27 @@ async fn observe() -> io::Result<()> {
     }
 }
 
+fn configure_workspace(session: &mut Session, argv: &[String]) {
+    let cwd = std::env::current_dir().ok();
+    let git_root = |path: &Path| {
+        path.ancestors()
+            .find(|p| p.join(".git").exists())
+            .map(Path::to_path_buf)
+    };
+    let workspace = std::env::var_os("GITHUB_WORKSPACE")
+        .map(PathBuf::from)
+        .or_else(|| {
+            fleet_maestro::invocation::parse(argv)
+                .positionals
+                .iter()
+                .map(Path::new)
+                .filter(|p| p.is_absolute())
+                .find_map(git_root)
+        })
+        .or_else(|| cwd.as_deref().and_then(git_root));
+    session.set_workspace(workspace, cwd);
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "everything ChildStarted carries, unpacked once"
@@ -277,22 +298,7 @@ fn start(
             .map(|(k, v)| (k.as_str(), v.as_str())),
     );
     let mut session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
-    let cwd = std::env::current_dir().ok();
-    let git_root = |path: &Path| {
-        path.ancestors()
-            .find(|p| p.join(".git").exists())
-            .map(Path::to_path_buf)
-    };
-    let workspace = std::env::var_os("GITHUB_WORKSPACE")
-        .map(PathBuf::from)
-        .or_else(|| {
-            argv.iter()
-                .map(Path::new)
-                .filter(|p| p.is_absolute())
-                .find_map(git_root)
-        })
-        .or_else(|| cwd.as_deref().and_then(git_root));
-    session.set_workspace(workspace, cwd);
+    configure_workspace(&mut session, argv);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
         Outbox::with_spool(&d.join("spool.bin"), agent_run_id, Budget::default())
     });

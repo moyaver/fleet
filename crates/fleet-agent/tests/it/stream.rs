@@ -611,3 +611,61 @@ fn absolute_junit_path_emits_repository_relative_identity() {
         "/fixture/checkout/examples/flows/phase0/pass.yaml"
     );
 }
+
+#[test]
+fn relative_parent_path_from_subdirectory_uses_git_root() {
+    let bin_dir = fake_maestro_dir();
+    let checkout = bin_dir.join("checkout");
+    let subdir = checkout.join("subdir");
+    std::fs::create_dir_all(checkout.join(".git")).unwrap();
+    std::fs::create_dir_all(&subdir).unwrap();
+    let flow = checkout.join("pass.yaml");
+    std::fs::write(&flow, "captured input").unwrap();
+    let run_dir = bin_dir.join("relative-run");
+    let report = bin_dir.join("relative-report.xml");
+    let custom_fixture = bin_dir.join("relative-fixture");
+    std::fs::create_dir_all(custom_fixture.join("run/debug")).unwrap();
+    for name in ["exit.json", "stdout.bin"] {
+        std::fs::copy(
+            fixture(&format!("absolute-path/{name}")),
+            custom_fixture.join(name),
+        )
+        .unwrap();
+    }
+    std::fs::copy(
+        fixture("absolute-path/run/debug/maestro.log"),
+        custom_fixture.join("run/debug/maestro.log"),
+    )
+    .unwrap();
+    let captured = std::fs::read_to_string(fixture("absolute-path/run/report.xml")).unwrap();
+    std::fs::write(
+        custom_fixture.join("run/report.xml"),
+        captured.replace(
+            "/fixture/checkout/examples/flows/phase0/pass.yaml",
+            "../pass.yaml",
+        ),
+    )
+    .unwrap();
+    let out = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
+        .current_dir(&subdir)
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap())
+        .env("FLEET_FAKE_FIXTURE", custom_fixture)
+        .args(["run", "--finalize-timeout", "30", "--run-dir"])
+        .arg(&run_dir)
+        .arg("--")
+        .arg(bin_dir.join("maestro"))
+        .args(["test", "--format", "junit", "--output"])
+        .arg(&report)
+        .arg("../pass.yaml")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let journal = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let event: serde_json::Value = journal
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .find(|event| event["type"] == "flow.reported")
+        .unwrap();
+    assert_eq!(event["data"]["repo_path"], "pass.yaml");
+}

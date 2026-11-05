@@ -57,3 +57,6 @@ cargo xtask fixtures import /tmp/cap/pass 2.13.0/pass
 ```
 
 A new Maestro minor needs fixtures before Fleet claims support for it (PLAN §13).
+
+Older reports that contain absolute paths without a known checkout root cannot be safely
+merged into repository-relative history; Fleet leaves their identity unresolved.

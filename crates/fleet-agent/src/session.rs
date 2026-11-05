@@ -151,8 +151,20 @@ impl Session {
         } else {
             self.cwd.as_ref()?.join(path)
         };
+        let mut normalized = std::path::PathBuf::new();
+        for component in absolute.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    if !normalized.pop() {
+                        return None;
+                    }
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+        }
         let root = self.workspace.as_ref()?;
-        let relative = absolute.strip_prefix(root).ok()?;
+        let relative = normalized.strip_prefix(root).ok()?;
         if relative
             .components()
             .any(|c| !matches!(c, Component::Normal(_)))
