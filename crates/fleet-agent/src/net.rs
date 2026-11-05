@@ -161,13 +161,16 @@ pub(crate) fn proxy_for(target: &Target, env: impl Fn(&str) -> Option<String>) -
         "http://{}",
         authority.rsplit_once('@').map_or(authority, |(_, h)| h)
     ))?;
+    let host_port = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    let explicit_port = if let Some(v6) = host_port.strip_prefix('[') {
+        v6.split_once(']')
+            .is_some_and(|(_, suffix)| suffix.starts_with(':'))
+    } else {
+        host_port.contains(':')
+    };
     Some(Proxy {
         host: t.host,
-        port: if authority.contains(':') {
-            t.port
-        } else {
-            3128
-        },
+        port: if explicit_port { t.port } else { 3128 },
         auth,
     })
 }
@@ -474,6 +477,15 @@ mod tests {
             error.to_string().contains("error following redirect"),
             "{error:#}"
         );
+    }
+
+    #[test]
+    fn proxy_credentials_and_ipv6_do_not_count_as_an_explicit_port() {
+        let target = Target::parse("wss://fleet.corp").unwrap();
+        for proxy in ["http://user:pass@proxy.corp", "http://[::1]"] {
+            let e = env(&[("HTTPS_PROXY", proxy)]);
+            assert_eq!(proxy_for(&target, e).unwrap().port, 3128, "{proxy}");
+        }
     }
 
     #[test]
