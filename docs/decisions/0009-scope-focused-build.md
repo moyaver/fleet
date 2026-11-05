@@ -12,7 +12,7 @@
 
 **Build thin:**
 - history and trends (SQL over Fleet tables);
-- flakiness: *confirmed* = pass and fail on the same commit under the same condition fingerprint; *suspected* = flip rate ≥ 0.2 over the last 20 default-branch runs; infrastructure failures and failures during host anomalies excluded;
+- flakiness: *confirmed* = pass and fail on the same commit under the same condition fingerprint; *suspected* = at least five eligible default-branch runs under one condition and a flip rate ≥ 0.2 over the latest 20 eligible runs. Divide pass/fail transitions by the number of adjacent run pairs. Exclude infrastructure failures and failures during host anomalies;
 - failure fingerprinting: exception type + step identity + normalized message, versioned, with user override rules.
 
 **Don't build:** ML triage, a time-series DB, quality gates, test management, a report generator.
