@@ -287,7 +287,8 @@ pub(super) async fn workers(
     Ok(rows)
 }
 
-/// Each worker's newest host sample from the last hour.
+/// Each worker's newest host sample from the last hour. Only the machine's readings: a process
+/// reading belongs to one run, and a worker with several runs has no one of them to stand for it.
 async fn latest_host_samples(
     c: &mut sqlx::PgConnection,
     project: Uuid,
@@ -298,10 +299,6 @@ async fn latest_host_samples(
                 host_cpu_pct::float8 AS host_cpu_pct,
                 host_mem_used_bytes::float8 AS host_mem_used_bytes,
                 host_mem_total_bytes::float8 AS host_mem_total_bytes,
-                maestro_cpu_pct::float8 AS maestro_cpu_pct,
-                maestro_rss_bytes::float8 AS maestro_rss_bytes,
-                agent_cpu_pct::float8 AS agent_cpu_pct,
-                agent_rss_bytes::float8 AS agent_rss_bytes,
                 host_load_1m::float8 AS host_load_1m,
                 host_cpu_cores::float8 AS host_cpu_cores,
                 host_swap_used_bytes::float8 AS host_swap_used_bytes,
@@ -326,10 +323,6 @@ async fn latest_host_samples(
                 host_cpu_pct: r.host_cpu_pct,
                 host_mem_used_bytes: r.host_mem_used_bytes,
                 host_mem_total_bytes: r.host_mem_total_bytes,
-                maestro_cpu_pct: r.maestro_cpu_pct,
-                maestro_rss_bytes: r.maestro_rss_bytes,
-                agent_cpu_pct: r.agent_cpu_pct,
-                agent_rss_bytes: r.agent_rss_bytes,
                 host_load_1m: r.host_load_1m,
                 host_cpu_cores: r.host_cpu_cores,
                 host_swap_used_bytes: r.host_swap_used_bytes,

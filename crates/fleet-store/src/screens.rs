@@ -18,5 +18,5 @@ mod workers;
 pub use compare::{CompareSide, SIDE_LIMIT, SideFlow};
 pub use history::{FlowStatsData, HistoryCursor, HistoryData, HistoryQuery, LOOKBACK};
 pub use overview::{Overview, RunState, WorkerRow};
-pub use samples::{DeviceRow, HostRow, SAMPLE_LIMIT, Samples};
+pub use samples::{DeviceRow, HostRow, ProcessRow, SAMPLE_LIMIT, Samples};
 pub use workers::{RunCursor, WorkerDetail};

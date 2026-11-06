@@ -403,7 +403,7 @@ mod tests {
     use fleet_protocol::rest::MetricResolution;
 
     use super::*;
-    use crate::screens::HostRow;
+    use crate::screens::{HostRow, ProcessRow};
 
     /// The test's timeline, anchored in the previous hour so that it is always in the past of the
     /// database clock (late-data marking compares against it) and inside the partitions the
@@ -490,28 +490,38 @@ mod tests {
             .unwrap();
         }
 
+        /// The worker's host CPU and the run's Maestro CPU per bucket. There is one run here, so
+        /// its Maestro rows line up one to one with the host rows.
         async fn host(
             &self,
             clock: &Clock,
             resolution: MetricResolution,
         ) -> Vec<(OffsetDateTime, Option<f64>, Option<f64>)> {
+            let range = (
+                clock.hour - Duration::days(2),
+                clock.hour + Duration::days(1),
+            );
             let rows: Vec<HostRow> = self
                 .store
-                .host_samples(
-                    self.project,
-                    self.worker,
-                    (
-                        clock.hour - Duration::days(2),
-                        clock.hour + Duration::days(1),
-                    ),
-                    resolution,
-                )
+                .host_samples(self.project, self.worker, range, resolution)
                 .await
                 .unwrap()
                 .unwrap()
                 .rows;
+            let maestro: Vec<ProcessRow> = self
+                .store
+                .process_samples(self.project, self.worker, range, resolution)
+                .await
+                .unwrap()
+                .unwrap()
+                .rows;
+            assert_eq!(rows.len(), maestro.len());
             rows.into_iter()
-                .map(|r| (r.at, r.host_cpu_pct, r.maestro_cpu_pct))
+                .zip(maestro)
+                .map(|(r, m)| {
+                    assert_eq!(r.at, m.at);
+                    (r.at, r.host_cpu_pct, m.maestro_cpu_pct)
+                })
                 .collect()
         }
 

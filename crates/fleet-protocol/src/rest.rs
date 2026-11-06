@@ -460,6 +460,10 @@ pub struct SeriesView {
     pub unit: MetricUnit,
     /// What it is about.
     pub scope: MetricScope,
+    /// The agent run a process series is about. A worker that ran several runs at once has one
+    /// Maestro series per run; `None` for series about the worker or device as a whole.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<Uuid>,
     /// How points were aggregated; `None` for raw samples.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate: Option<MetricAggregate>,

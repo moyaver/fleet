@@ -19,8 +19,9 @@ use fleet_protocol::rest::{
     LatestReadings, MetricAggregate, MetricPoint, MetricReading, MetricResolution, MetricScope,
     MetricSubject, MetricSubjectKind, MetricUnit, MetricsView, SeriesView,
 };
-use fleet_store::screens::{DeviceRow, HostRow};
+use fleet_store::screens::{DeviceRow, HostRow, ProcessRow};
 use serde::Deserialize;
+use std::collections::HashMap;
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
 
@@ -57,10 +58,6 @@ enum HostCol {
     CpuPct,
     MemUsed,
     MemTotal,
-    MaestroCpu,
-    MaestroRss,
-    AgentCpu,
-    AgentRss,
     Load1m,
     CpuCores,
     SwapUsed,
@@ -68,6 +65,14 @@ enum HostCol {
     PsiCpu,
     PsiMemory,
     PsiIo,
+}
+
+#[derive(Clone, Copy)]
+enum ProcessCol {
+    MaestroCpu,
+    MaestroRss,
+    AgentCpu,
+    AgentRss,
 }
 
 #[derive(Clone, Copy)]
@@ -100,7 +105,7 @@ use MetricAggregate::{Avg, Max};
 use MetricScope::{Agent, Device, Emulator, Guest, Host, Maestro};
 use MetricUnit::{Bytes, Celsius, Number, Percent};
 
-const HOST: [Def<HostCol>; 15] = [
+const HOST: [Def<HostCol>; 11] = [
     def(
         "host_cpu_pct",
         "Host CPU",
@@ -123,38 +128,6 @@ const HOST: [Def<HostCol>; 15] = [
         Bytes,
         Host,
         Some(HostCol::MemTotal),
-        None,
-    ),
-    def(
-        "maestro_cpu_pct",
-        "Maestro CPU",
-        Percent,
-        Maestro,
-        Some(HostCol::MaestroCpu),
-        Some(Avg),
-    ),
-    def(
-        "maestro_rss_bytes",
-        "Maestro memory",
-        Bytes,
-        Maestro,
-        Some(HostCol::MaestroRss),
-        Some(Max),
-    ),
-    def(
-        "agent_cpu_pct",
-        "Agent CPU",
-        Percent,
-        Agent,
-        Some(HostCol::AgentCpu),
-        None,
-    ),
-    def(
-        "agent_rss_bytes",
-        "Agent memory",
-        Bytes,
-        Agent,
-        Some(HostCol::AgentRss),
         None,
     ),
     def(
@@ -223,6 +196,43 @@ const HOST: [Def<HostCol>; 15] = [
     ),
 ];
 
+/// The processes of each agent run, so a worker that ran several runs at once has one series per
+/// run for each of them: Maestro's, and the agent's own.
+const PROCESS: [Def<ProcessCol>; 4] = [
+    def(
+        "maestro_cpu_pct",
+        "Maestro CPU",
+        Percent,
+        Maestro,
+        Some(ProcessCol::MaestroCpu),
+        Some(Avg),
+    ),
+    def(
+        "maestro_rss_bytes",
+        "Maestro memory",
+        Bytes,
+        Maestro,
+        Some(ProcessCol::MaestroRss),
+        Some(Max),
+    ),
+    def(
+        "agent_cpu_pct",
+        "Agent CPU",
+        Percent,
+        Agent,
+        Some(ProcessCol::AgentCpu),
+        None,
+    ),
+    def(
+        "agent_rss_bytes",
+        "Agent memory",
+        Bytes,
+        Agent,
+        Some(ProcessCol::AgentRss),
+        None,
+    ),
+];
+
 const DEVICE: [Def<DeviceCol>; 5] = [
     def(
         "emu_cpu_pct",
@@ -271,10 +281,6 @@ fn host_value(c: HostCol, r: &HostRow) -> Option<f64> {
         HostCol::CpuPct => r.host_cpu_pct,
         HostCol::MemUsed => r.host_mem_used_bytes,
         HostCol::MemTotal => r.host_mem_total_bytes,
-        HostCol::MaestroCpu => r.maestro_cpu_pct,
-        HostCol::MaestroRss => r.maestro_rss_bytes,
-        HostCol::AgentCpu => r.agent_cpu_pct,
-        HostCol::AgentRss => r.agent_rss_bytes,
         HostCol::Load1m => r.host_load_1m,
         HostCol::CpuCores => r.host_cpu_cores,
         HostCol::SwapUsed => r.host_swap_used_bytes,
@@ -282,6 +288,15 @@ fn host_value(c: HostCol, r: &HostRow) -> Option<f64> {
         HostCol::PsiCpu => r.host_psi_cpu_pct,
         HostCol::PsiMemory => r.host_psi_memory_pct,
         HostCol::PsiIo => r.host_psi_io_pct,
+    }
+}
+
+fn process_value(c: ProcessCol, r: &ProcessRow) -> Option<f64> {
+    match c {
+        ProcessCol::MaestroCpu => r.maestro_cpu_pct,
+        ProcessCol::MaestroRss => r.maestro_rss_bytes,
+        ProcessCol::AgentCpu => r.agent_cpu_pct,
+        ProcessCol::AgentRss => r.agent_rss_bytes,
     }
 }
 
@@ -372,12 +387,14 @@ fn parse(q: &MetricsQuery, known: &[&'static str]) -> Result<Request, String> {
     })
 }
 
-/// Every host metric of one sample: its value, or why there is none.
+/// The machine's metrics of one sample: its value, or why there is none. Process metrics are
+/// per run and are not part of a worker's latest reading.
 pub(super) fn latest_readings(row: &HostRow) -> LatestReadings {
     LatestReadings {
         at: row.at,
         readings: HOST
             .iter()
+            .filter(|d| d.scope == Host)
             .map(|d| {
                 let value = d.col.and_then(|c| host_value(c, row));
                 MetricReading {
@@ -424,12 +441,16 @@ pub(super) async fn worker_metrics(
         Ok(p) => p,
         Err(r) => return *r,
     };
-    let known: Vec<&'static str> = HOST.iter().map(|d| d.id).collect();
+    let known: Vec<&'static str> = HOST
+        .iter()
+        .map(|d| d.id)
+        .chain(PROCESS.iter().map(|d| d.id))
+        .collect();
     let req = match parse(&q, &known) {
         Ok(r) => r,
         Err(message) => return error(StatusCode::BAD_REQUEST, message),
     };
-    let samples = match state
+    let host = match state
         .store
         .host_samples(project, worker, (req.from, req.to), req.resolution)
         .await
@@ -438,19 +459,38 @@ pub(super) async fn worker_metrics(
         Ok(None) => return error(StatusCode::NOT_FOUND, "no such worker"),
         Err(e) => return internal(&e),
     };
-    let series = req
-        .metrics
-        .iter()
-        .filter_map(|id| HOST.iter().find(|d| d.id == id))
-        .map(|d| {
-            let readings: Vec<(i64, Option<f64>)> = samples
+    let processes = match state
+        .store
+        .process_samples(project, worker, (req.from, req.to), req.resolution)
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "no such worker"),
+        Err(e) => return internal(&e),
+    };
+    let mut series_views = Vec::new();
+    for id in &req.metrics {
+        if let Some(d) = HOST.iter().find(|d| d.id == id) {
+            let readings: Vec<(i64, Option<f64>)> = host
                 .rows
                 .iter()
                 .map(|r| (unix_ms(r.at), d.col.and_then(|c| host_value(c, r))))
                 .collect();
-            series(d, &readings, &req)
-        })
-        .collect();
+            series_views.push(series(d, &readings, &req, None));
+        } else if let Some(d) = PROCESS.iter().find(|d| d.id == id) {
+            let runs = runs_of(&processes.rows);
+            if runs.is_empty() {
+                series_views.push(series(d, &[], &req, None));
+            }
+            for (run, rows) in runs {
+                let readings: Vec<(i64, Option<f64>)> = rows
+                    .iter()
+                    .map(|r| (unix_ms(r.at), d.col.and_then(|c| process_value(c, r))))
+                    .collect();
+                series_views.push(series(d, &readings, &req, Some(run)));
+            }
+        }
+    }
     Json(MetricsView {
         subject: MetricSubject {
             kind: MetricSubjectKind::Worker,
@@ -459,10 +499,26 @@ pub(super) async fn worker_metrics(
         from: req.from,
         to: req.to,
         resolution: req.resolution,
-        truncated: samples.truncated,
-        series,
+        truncated: host.truncated || processes.truncated,
+        series: series_views,
     })
     .into_response()
+}
+
+/// Each run's rows, runs in the order they first appear (rows keep their order).
+fn runs_of(rows: &[ProcessRow]) -> Vec<(Uuid, Vec<&ProcessRow>)> {
+    let mut runs: Vec<(Uuid, Vec<&ProcessRow>)> = Vec::new();
+    let mut at: HashMap<Uuid, usize> = HashMap::new();
+    for r in rows {
+        let i = *at.entry(r.run_id).or_insert(runs.len());
+        if i == runs.len() {
+            runs.push((r.run_id, Vec::new()));
+        }
+        if let Some((_, own)) = runs.get_mut(i) {
+            own.push(r);
+        }
+    }
+    runs
 }
 
 /// Screen C: a device session's emulator and guest metrics over a range.
@@ -509,7 +565,7 @@ pub(super) async fn device_metrics(
                 .iter()
                 .map(|r| (unix_ms(r.at), d.col.and_then(|c| device_value(c, r))))
                 .collect();
-            series(d, &readings, &req)
+            series(d, &readings, &req, None)
         })
         .collect();
     Json(MetricsView {
@@ -526,14 +582,21 @@ pub(super) async fn device_metrics(
     .into_response()
 }
 
-/// One metric's series from its readings (`None` where a sample had no value).
-fn series<C>(d: &Def<C>, readings: &[(i64, Option<f64>)], req: &Request) -> SeriesView {
+/// One metric's series from its readings (`None` where a sample had no value). `run` is set for
+/// a process metric, which is a series per run.
+fn series<C>(
+    d: &Def<C>,
+    readings: &[(i64, Option<f64>)],
+    req: &Request,
+    run: Option<Uuid>,
+) -> SeriesView {
     let raw = req.resolution == MetricResolution::Raw;
     let mut view = SeriesView {
         metric: d.id.to_owned(),
         label: d.label.to_owned(),
         unit: d.unit,
         scope: d.scope,
+        run_id: run,
         aggregate: if raw { None } else { d.rolled },
         available: false,
         reason: None,
