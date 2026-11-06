@@ -1,0 +1,28 @@
+[package]
+name = "fleet-planner"
+description = "Static duration-aware Maestro shard planner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+fleet-protocol.workspace = true
+glob.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }
+rustls = { workspace = true, features = ["ring"] }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+sha2.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+
+[lints]
+workspace = true

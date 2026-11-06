@@ -81,6 +81,7 @@ fantoccini = { version = "0.22.1", default-features = false }
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 getrandom = "0.4.3"
+glob = "0.3.4"
 # REST and the live WebSocket in the browser; members add the features they use.
 gloo-net = { version = "0.7.0", default-features = false }
 gloo-timers = { version = "0.4.0", default-features = false }
@@ -118,6 +119,7 @@ rustls-native-certs = "0.8.5"
 schemars = { version = "1.2.3", default-features = false, features = ["derive", "std", "uuid1"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+serde_yaml_ng = "0.10.0"
 sha2 = "0.11.1"
 # Postgres only (ADR-0006). TLS trusts the OS store, so corporate CAs work (research 03 §4).
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "time", "json", "tls-rustls-ring-native-roots"] }
