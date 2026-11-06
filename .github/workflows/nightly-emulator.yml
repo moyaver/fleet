@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 name: Nightly Maestro emulator
 
+# Runs on the owner's Apple Silicon Mac (the fleet-mac self-hosted runner), like the agent-macos job
+# in ci.yml. Only the schedule and manual dispatch start it, so no untrusted code runs here.
 on:
   schedule:
     - cron: '21 2 * * *'
@@ -15,27 +17,57 @@ concurrency:
 
 jobs:
   maestro:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    name: maestro (macOS arm64)
+    runs-on: [self-hosted, macOS, ARM64, fleet-mac]
+    timeout-minutes: 90
+    env:
+      # The throwaway emulator's serial (console port 5580). The owner's emulator keeps 5554 and 5555
+      # and is never touched.
+      FLEET_EMULATOR_SERIAL: emulator-5580
+      # docker-compose.yml names its project `fleet`. Give this run its own, so `down -v` cannot
+      # remove volumes of another stack on this Mac.
+      COMPOSE_PROJECT_NAME: fleet-nightly
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Start Docker Desktop if it is not running
+        run: |
+          if docker info > /dev/null 2>&1; then
+            exit 0
+          fi
+          open -a Docker
+          deadline=$((SECONDS + 180))
+          until docker info > /dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              echo "::error::Docker Desktop did not answer 'docker info' within 3 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
       - name: Install pinned Maestro
         run: |
-          cd "$RUNNER_TEMP"
-          curl -fsSL --retry 3 -o maestro.zip https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.1/maestro.zip
-          echo '54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7  maestro.zip' | sha256sum --check
-          unzip -q maestro.zip
+          # The Mac's home connection is slow, so the ~200 MB zip is cached across runs outside the
+          # runner workspace. A cached copy is used only if its checksum still matches.
+          sha=54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7
+          cache="$HOME/Library/Caches/fleet-nightly"
+          zip="$cache/maestro-cli-2.12.1.zip"
+          mkdir -p "$cache"
+          if [ ! -f "$zip" ] || ! echo "$sha  $zip" | shasum -a 256 -c > /dev/null 2>&1; then
+            tmp="$cache/maestro-cli-2.12.1.zip.part"
+            rm -f "$tmp"
+            # --retry-all-errors: GitHub's download reset the connection (run 42293032473), which plain --retry skips.
+            curl -fsSL --retry 3 --retry-all-errors -o "$tmp" https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.1/maestro.zip
+            echo "$sha  $tmp" | shasum -a 256 -c
+            mv -f "$tmp" "$zip"
+          fi
+          # Verify again before unzipping, so a damaged cached file is never extracted.
+          echo "$sha  $zip" | shasum -a 256 -c
+          unzip -qo "$zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
       - name: Build agent
         run: |
@@ -44,6 +76,13 @@ jobs:
       - name: Start reference deployment
         working-directory: deploy/compose
         run: |
+          # The stack publishes Caddy on 80 and 443. Fail with a clear reason if the Mac uses them.
+          for port in 80 443; do
+            if lsof -nP -iTCP:"$port" -sTCP:LISTEN > /dev/null 2>&1; then
+              echo "::error::port $port is already in use on this Mac"
+              exit 1
+            fi
+          done
           mkdir -p secrets
           openssl rand -hex 24 > secrets/postgres_password
           printf 'postgres://fleet:%s@postgres:5432/fleet\n' "$(cat secrets/postgres_password)" > secrets/database_url
@@ -55,7 +94,11 @@ jobs:
             printf 'GARAGE_ACCESS_KEY=GK%s\n' "$(openssl rand -hex 12)"
             printf 'GARAGE_SECRET_KEY=%s\n' "$(openssl rand -hex 32)"
           } > .env
-          docker compose up -d --build --wait --wait-timeout 180
+          # Retry once: BuildKit keeps the finished layers, so a download that timed out (trunk's
+          # wasm-opt in the web build) resumes instead of starting over.
+          if ! docker compose up -d --build --wait --wait-timeout 180; then
+            docker compose up -d --build --wait --wait-timeout 180
+          fi
           docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt "$RUNNER_TEMP/fleet-ca.crt"
           token=$(docker compose exec -T fleet /usr/local/bin/fleet api-key create --project mobile-app --name nightly)
           echo "::add-mask::$token"
@@ -64,21 +107,40 @@ jobs:
         run: |
           cat > "$RUNNER_TEMP/fleet-maestro-regression.sh" <<'BASH'
           set -euo pipefail
+          # The emulator runner returns once one `getprop sys.boot_completed` succeeds, but adb can
+          # still flap offline and the package service may not answer yet. Maestro's first driver
+          # install then fails with "cmd: Failure calling service package: Broken pipe" (run
+          # 42181059967). Wait for three consecutive package listings first. Check the output, not
+          # the exit status: "cmd: Can't find service: package" (run 42185620450) still exits 0 here.
+          adb -s "$FLEET_EMULATOR_SERIAL" wait-for-device
+          ready=0
+          for _ in $(seq 60); do
+            pkgs=$(adb -s "$FLEET_EMULATOR_SERIAL" shell cmd package list packages 2>/dev/null || true)
+            if grep -q '^package:' <<< "$pkgs"; then
+              ready=$((ready + 1))
+              if (( ready == 3 )); then break; fi
+            else
+              ready=0
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 3
           out="$RUNNER_TEMP/fleet-nightly"
           mkdir -p "$out"
           export FLEET_SERVER=https://localhost
           export FLEET_CA_FILE="$RUNNER_TEMP/fleet-ca.crt"
           flow=examples/flows/phase0/pass.yaml
 
-          # These flows exercise Settings on the same API as the captured Phase 0 fixtures.
+          # These flows exercise Settings on the same API as the captured Phase 0 fixtures. timeout(1)
+          # is GNU-only, so each run is bounded by perl's alarm, which survives the exec.
           FLEET_RUN_DIR="$out/single" FLEET_JOB_KEY=nightly-single \
-            timeout 180 target/debug/fleet-agent run -- maestro --no-ansi test "$flow" > "$out/single.log" 2>&1
+            perl -e 'alarm shift; exec @ARGV' 180 target/debug/fleet-agent run -- maestro --device "$FLEET_EMULATOR_SERIAL" --no-ansi test "$flow" > "$out/single.log" 2>&1
           grep -F 'Press back... COMPLETED' "$out/single.log"
           test ! -e "$out/single/report.xml"
 
           status=0
           FLEET_RUN_DIR="$out/suite" FLEET_JOB_KEY=nightly-suite \
-            timeout 180 target/debug/fleet-agent run -- maestro --no-ansi test examples/flows/phase0/suite > "$out/suite.log" 2>&1 || status=$?
+            perl -e 'alarm shift; exec @ARGV' 180 target/debug/fleet-agent run -- maestro --device "$FLEET_EMULATOR_SERIAL" --no-ansi test examples/flows/phase0/suite > "$out/suite.log" 2>&1 || status=$?
           test "$status" -eq 1
           test -s "$out/suite/report.xml"
           viewer=$(cat deploy/compose/secrets/viewer_token)
@@ -89,16 +151,20 @@ jobs:
           jq -e '[.flows[] | select(.finality == "verified") | [.name, .state]] | sort ==
             [["alpha", "passed"], ["bravo", "passed"], ["charlie", "passed"], ["delta-fails", "failed"]]' "$out/snapshot.json"
 
-          # Continuous mode owns a terminal. Keep its input open while waiting on the log.
+          # Continuous mode owns a terminal. `script` gives it one and copies its stdin, so a holder
+          # that sleeps keeps that input open while the agent runs. The holder is a process
+          # substitution, not a pipeline: `wait` on a pipeline would also wait for the holder.
           export FLEET_RUN_DIR="$out/continuous" FLEET_JOB_KEY=nightly-continuous
-          export FLEET_NIGHTLY_AGENT_PID="$out/continuous.pid"
-          mkfifo "$out/continuous.stdin"
-          exec 3<> "$out/continuous.stdin"
-          script --quiet --return --command \
-            'echo $$ > "$FLEET_NIGHTLY_AGENT_PID"; exec target/debug/fleet-agent run -- maestro --no-ansi test -c examples/flows/phase0/pass.yaml' \
-            "$out/continuous.log" < "$out/continuous.stdin" > /dev/null 2>&1 &
+          export FLEET_NIGHTLY_AGENT_PID="$out/continuous.pid" FLEET_NIGHTLY_HOLDER_PID="$out/continuous.holder"
+          # `set -m`: bash starts background jobs with SIGINT ignored unless job control is on, and
+          # the SIGINT below must reach the agent. `script` returns its child's exit status on macOS,
+          # so `wait` gives the agent's status (130 after SIGINT). `exec` keeps the pid.
+          set -m
+          script -q "$out/continuous.log" sh -c \
+            'echo $$ > "$FLEET_NIGHTLY_AGENT_PID"; exec target/debug/fleet-agent run -- maestro --device "$FLEET_EMULATOR_SERIAL" --no-ansi test -c examples/flows/phase0/pass.yaml' \
+            < <(sh -c 'echo $$ > "$FLEET_NIGHTLY_HOLDER_PID"; exec sleep 86400') > /dev/null 2>&1 &
           terminal=$!
-          trap 'test ! -f "$FLEET_NIGHTLY_AGENT_PID" || kill -TERM "$(cat "$FLEET_NIGHTLY_AGENT_PID")" 2>/dev/null || true; kill -TERM "$terminal" 2>/dev/null || true' EXIT
+          trap 'test ! -f "$FLEET_NIGHTLY_AGENT_PID" || kill -TERM "$(cat "$FLEET_NIGHTLY_AGENT_PID")" 2>/dev/null || true; test ! -f "$FLEET_NIGHTLY_HOLDER_PID" || kill -TERM "$(cat "$FLEET_NIGHTLY_HOLDER_PID")" 2>/dev/null || true; kill -TERM "$terminal" 2>/dev/null || true' EXIT
           deadline=$((SECONDS + 150))
           until grep -Fq 'Press back COMPLETED' "$out/continuous/artifacts/maestro.log" 2>/dev/null; do
             if ! kill -0 "$terminal" 2>/dev/null || (( SECONDS >= deadline )); then
@@ -110,21 +176,59 @@ jobs:
           kill -INT "$(cat "$FLEET_NIGHTLY_AGENT_PID")"
           status=0
           wait "$terminal" || status=$?
+          kill -TERM "$(cat "$FLEET_NIGHTLY_HOLDER_PID")" 2>/dev/null || true
           trap - EXIT
-          exec 3>&-
           test "$status" -eq 130
           test ! -e "$out/continuous/report.xml"
           BASH
           bash -n "$RUNNER_TEMP/fleet-maestro-regression.sh"
+      - name: Start a throwaway emulator on port 5580
+        run: |
+          # Its AVD lives under $RUNNER_TEMP, away from the owner's AVDs, and is deleted in the last step.
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avd"
+          sdk="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+          out="$RUNNER_TEMP/fleet-nightly"
+          mkdir -p "$ANDROID_AVD_HOME" "$out"
+          # avdmanager cannot load device profiles for this image: its devices.xml is missing, so --device
+          # fails for every profile. The AVD takes the image's defaults and the screen and RAM of the device
+          # the Phase 0 fixtures were captured on (Pixel 10, 1080x2424, 420 dpi, 3 GB) are written over them.
+          echo no | "$sdk/cmdline-tools/latest/bin/avdmanager" create avd --force --name fleet-nightly \
+            --package 'system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a'
+          cfg="$ANDROID_AVD_HOME/fleet-nightly.avd/config.ini"
+          for kv in hw.lcd.width=1080 hw.lcd.height=2424 hw.lcd.density=420 hw.ramSize=3072; do
+            sed -i '' "/^${kv%%=*}=/d" "$cfg"
+            echo "$kv" >> "$cfg"
+          done
+          # The image's default AVD turns the GPU off, and a guest without one runs SurfaceFlinger on
+          # software rendering, the path that crashed on GitHub-hosted runners. The Phase 0 fixtures
+          # ran on the host GPU, so use the GPU in auto mode, as Android Studio sets it.
+          sed -i '' 's/^hw.gpu.enabled=.*/hw.gpu.enabled=yes/' "$ANDROID_AVD_HOME/fleet-nightly.avd/config.ini"
+          sed -i '' 's/^hw.gpu.mode=.*/hw.gpu.mode=auto/' "$ANDROID_AVD_HOME/fleet-nightly.avd/config.ini"
+          # Same API and image as the Phase 0 fixtures. No window.
+          adb start-server
+          "$sdk/emulator/emulator" -avd fleet-nightly -port 5580 -no-window -no-snapshot -no-audio \
+            -no-boot-anim -no-metrics -memory 4096 -cores 4 > "$out/emulator.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/emulator.pid"
+          # Keep the logcat for the artifact. The loop survives reconnects and ends with the job.
+          ( while :; do
+              adb -s "$FLEET_EMULATOR_SERIAL" wait-for-device
+              adb -s "$FLEET_EMULATOR_SERIAL" logcat -b all -v threadtime >> "$out/emulator-logcat.txt" 2>&1
+              sleep 1
+            done ) > /dev/null 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/logcat.pid"
+          deadline=$((SECONDS + 900))
+          until [ "$(adb -s "$FLEET_EMULATOR_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
+            if (( SECONDS >= deadline )) || ! kill -0 "$(cat "$RUNNER_TEMP/emulator.pid")" 2>/dev/null; then
+              echo "::error::the emulator did not finish booting"
+              exit 1
+            fi
+            sleep 3
+          done
+          for setting in window_animation_scale transition_animation_scale animator_duration_scale; do
+            adb -s "$FLEET_EMULATOR_SERIAL" shell settings put global "$setting" 0
+          done
       - name: Test against the emulator
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: '37.1'
-          target: google_apis_playstore_ps16k
-          arch: x86_64
-          profile: pixel_7_pro
-          disable-animations: true
-          script: bash "$RUNNER_TEMP/fleet-maestro-regression.sh"
+        run: bash "$RUNNER_TEMP/fleet-maestro-regression.sh"
       - name: Collect the fixture and failure diagnostics
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -132,6 +236,24 @@ jobs:
           name: maestro-2.12.1-regression
           path: ${{ runner.temp }}/fleet-nightly
           retention-days: 7
+      - name: Stop the emulator and delete its AVD
+        if: always()
+        run: |
+          adb -s "$FLEET_EMULATOR_SERIAL" emu kill > /dev/null 2>&1 || true
+          if [ -f "$RUNNER_TEMP/logcat.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/logcat.pid")" 2>/dev/null || true
+          fi
+          if [ -f "$RUNNER_TEMP/emulator.pid" ]; then
+            emu=$(cat "$RUNNER_TEMP/emulator.pid")
+            for _ in $(seq 30); do
+              kill -0 "$emu" 2>/dev/null || break
+              sleep 1
+            done
+            kill "$emu" 2>/dev/null || true
+          fi
+          # The logcat loop's adb children outlive it; they only ever talk to this serial.
+          pkill -f "adb -s emulator-5580 " || true
+          rm -rf "${RUNNER_TEMP:?}/avd"
       - name: Stop reference deployment
         if: always()
         working-directory: deploy/compose
