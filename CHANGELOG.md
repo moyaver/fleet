@@ -5,10 +5,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-### Changed
-
-- Agent: `journal.jsonl` is capped at 256 MiB (`FLEET_JOURNAL_MAX_BYTES`, `--journal-max-bytes`). Past the cap it stops with one `journal.truncated` line, the run ends with one warning, and `fleet-agent inspect` reports the missing events; the server still gets every event (#37).
-
 ## [0.1.0-alpha.1] - 2026-11-06
 
 ### Added
@@ -47,6 +43,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Finalization uses a shorter flush budget when the server never answered the WebSocket upgrade during the run.
 - Relicensed from PolyForm Internal Use 1.0.0 to the GNU AGPL v3 (`AGPL-3.0-only`); a commercial license is available on request (ADR-0012).
 - Renamed the product to Fleet; the agent binary is `fleet-agent` (ADR-0011).
+- Agent: `journal.jsonl` is capped at 256 MiB (`FLEET_JOURNAL_MAX_BYTES`, `--journal-max-bytes`). Past the cap it stops with one `journal.truncated` line, the run ends with one warning, and `fleet-agent inspect` reports the missing events; the server still gets every event (#37).
 
 ### Fixed
 
@@ -70,3 +67,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Agent: at finalize, a server that was still answering `hello` when Maestro exited got the 3-second budget of an unreachable one, and uploads could hold back the journal's tail; the journal's tail is now sent first, and a server that answered the upgrade gets the full flush budget (#90).
 - Server: flaky history no longer counts a failure whose message names a lost device (Maestro's `DeviceServerDiedException`) as flakiness, as ADR-0009 promises; such a run is excluded from the verdict (#72).
 - Server: a flow's failure groups scanned every flow execution (the stats query filtered the project only on failure fingerprints), so they now use the history index; the leader's blob collection also deletes objects that no `blobs` row records once past the blob grace period (orphans a crash leaves behind), hourly.
+- Release: the shipped third-party license notices leave out dev and build dependencies, so a test-only crate with an unaccepted license no longer fails the release build.
