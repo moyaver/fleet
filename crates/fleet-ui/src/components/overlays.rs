@@ -3,7 +3,7 @@
 //! (`<dialog>`, the Popover API, invoker commands); the view-models handle keyboard patterns.
 //! No script, no inline styles, text nodes only.
 
-use leptos::{prelude::*, wasm_bindgen::JsCast};
+use leptos::{ev, prelude::*, wasm_bindgen::JsCast};
 
 use crate::{
     components::controls::{Button, ButtonVariant},
@@ -288,22 +288,64 @@ pub fn Tabs(
     }
 }
 
-const TOOLTIP_BASE: &str = "pointer-events-none invisible absolute left-0 top-full z-10 mt-1 w-max max-w-xs rounded bg-fg px-2 py-1 text-xs text-bg";
-const TOOLTIP_SHOWN: &str = "group-hover:visible group-focus-within:visible";
+const TOOLTIP_BASE: &str = "pointer-events-none absolute left-0 top-full z-10 mt-1 w-max max-w-xs rounded bg-fg px-2 py-1 text-xs text-bg";
 
-/// The tooltip's classes: shown on hover or focus, unless Escape dismissed it.
+/// The tooltip's classes: visible while shown, hidden otherwise.
 #[must_use]
-fn tooltip_class(dismissed: bool) -> String {
-    if dismissed {
-        TOOLTIP_BASE.to_owned()
-    } else {
-        format!("{TOOLTIP_BASE} {TOOLTIP_SHOWN}")
+fn tooltip_class(shown: bool) -> String {
+    let visibility = if shown { "visible" } else { "invisible" };
+    format!("{TOOLTIP_BASE} {visibility}")
+}
+
+/// What a tooltip is doing: whether the pointer or focus is on it, and whether Escape dismissed
+/// it. A dismissal lasts until the tooltip is hidden, so moving the pointer or focus away and
+/// back shows it again.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TooltipState {
+    hovered: bool,
+    focused: bool,
+    dismissed: bool,
+}
+
+impl TooltipState {
+    /// Whether the tooltip is on screen.
+    #[must_use]
+    pub fn shown(self) -> bool {
+        (self.hovered || self.focused) && !self.dismissed
+    }
+
+    /// The pointer came onto (`over`) or left the tooltip's trigger.
+    pub fn pointer(&mut self, over: bool) {
+        self.hovered = over;
+        self.settle();
+    }
+
+    /// Focus came into (`within`) or left the tooltip's trigger.
+    pub fn focus(&mut self, within: bool) {
+        self.focused = within;
+        self.settle();
+    }
+
+    /// Escape: dismisses a shown tooltip. Returns whether it did, so the key is consumed only then.
+    pub fn escape(&mut self) -> bool {
+        let was_shown = self.shown();
+        if was_shown {
+            self.dismissed = true;
+        }
+        was_shown
+    }
+
+    fn settle(&mut self) {
+        if !(self.hovered || self.focused) {
+            self.dismissed = false;
+        }
     }
 }
 
-/// A tooltip shown on hover and keyboard focus of its content, with CSS only. Give the focusable
-/// child `aria-describedby=id` so assistive technology reads the text. Escape hides a shown
-/// tooltip without moving focus (WCAG 1.4.13); moving the pointer or focus away shows it again.
+/// A tooltip shown on hover and keyboard focus of its content. Give the focusable child
+/// `aria-describedby=id` so assistive technology reads the text. While it is shown, Escape
+/// anywhere on the page hides it without moving focus (WCAG 1.4.13), so a mouse-only user can
+/// dismiss it too; moving the pointer or focus away and back shows it again.
 #[component]
 pub fn Tooltip(
     /// The id the focusable child references with `aria-describedby`.
@@ -315,22 +357,41 @@ pub fn Tooltip(
     /// The element the tooltip describes.
     children: Children,
 ) -> impl IntoView {
-    let dismissed = RwSignal::new(false);
+    let state = RwSignal::new(TooltipState::default());
+    // The Escape listener exists only while the tooltip is shown, and is removed with it.
+    let escape = StoredValue::new(None::<WindowListenerHandle>);
+    Effect::new(move |_| {
+        if let Some(handle) = escape.try_update_value(Option::take).flatten() {
+            handle.remove();
+        }
+        if state.with(|s| s.shown()) {
+            let handle = window_event_listener(ev::keydown, move |ev: web_sys::KeyboardEvent| {
+                if Key::from_dom(&ev.key()) == Key::Escape {
+                    let mut consumed = false;
+                    state.update(|s| consumed = s.escape());
+                    if consumed {
+                        ev.prevent_default();
+                    }
+                }
+            });
+            escape.set_value(Some(handle));
+        }
+    });
+    on_cleanup(move || {
+        if let Some(handle) = escape.try_update_value(Option::take).flatten() {
+            handle.remove();
+        }
+    });
     view! {
         <span
-            class="group relative inline-block"
-            on:keydown=move |ev: web_sys::KeyboardEvent| {
-                if Key::from_dom(&ev.key()) == Key::Escape && !dismissed.get_untracked() {
-                    dismissed.set(true);
-                    ev.prevent_default();
-                    ev.stop_propagation();
-                }
-            }
-            on:mouseleave=move |_| dismissed.set(false)
-            on:focusout=move |_| dismissed.set(false)
+            class="relative inline-block"
+            on:mouseenter=move |_| state.update(|s| s.pointer(true))
+            on:mouseleave=move |_| state.update(|s| s.pointer(false))
+            on:focusin=move |_| state.update(|s| s.focus(true))
+            on:focusout=move |_| state.update(|s| s.focus(false))
         >
             {children()}
-            <span role="tooltip" id=id class=move || tooltip_class(dismissed.get())>
+            <span role="tooltip" id=id class=move || tooltip_class(state.with(|s| s.shown()))>
                 {text}
             </span>
         </span>
@@ -428,12 +489,55 @@ pub fn ToastRegion(
 mod tests {
     use super::*;
 
+    fn has_class(class: &str, name: &str) -> bool {
+        class.split_whitespace().any(|c| c == name)
+    }
+
     #[test]
-    fn a_dismissed_tooltip_drops_the_hover_and_focus_rules_so_it_stays_hidden() {
-        assert!(tooltip_class(false).contains("group-hover:visible"));
-        assert!(tooltip_class(false).contains("group-focus-within:visible"));
-        let dismissed = tooltip_class(true);
-        assert!(dismissed.contains("invisible"), "{dismissed}");
-        assert!(!dismissed.contains("group-"), "{dismissed}");
+    fn the_tooltip_class_hides_it_unless_it_is_shown() {
+        assert!(has_class(&tooltip_class(true), "visible"));
+        assert!(has_class(&tooltip_class(false), "invisible"));
+        assert!(!has_class(&tooltip_class(false), "visible"));
+    }
+
+    #[test]
+    fn a_tooltip_shows_on_pointer_or_focus_and_hides_when_both_leave() {
+        let mut s = TooltipState::default();
+        assert!(!s.shown());
+        s.pointer(true);
+        assert!(s.shown());
+        s.focus(true);
+        s.pointer(false);
+        assert!(s.shown(), "focus alone keeps it shown");
+        s.focus(false);
+        assert!(!s.shown());
+    }
+
+    #[test]
+    fn escape_dismisses_a_shown_tooltip_whether_the_pointer_or_focus_showed_it() {
+        let mut by_pointer = TooltipState::default();
+        assert!(!by_pointer.escape(), "nothing shown, nothing consumed");
+        by_pointer.pointer(true);
+        assert!(by_pointer.escape());
+        assert!(!by_pointer.shown());
+        assert!(!by_pointer.escape(), "already dismissed");
+
+        let mut by_focus = TooltipState::default();
+        by_focus.focus(true);
+        assert!(by_focus.escape());
+        assert!(!by_focus.shown());
+    }
+
+    #[test]
+    fn a_dismissed_tooltip_shows_again_once_pointer_and_focus_have_both_left() {
+        let mut s = TooltipState::default();
+        s.pointer(true);
+        assert!(s.escape());
+        s.focus(true);
+        s.pointer(false);
+        assert!(!s.shown(), "still focused, so still dismissed");
+        s.focus(false);
+        s.pointer(true);
+        assert!(s.shown());
     }
 }

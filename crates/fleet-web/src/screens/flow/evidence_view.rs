@@ -16,7 +16,7 @@ use fleet_protocol::rest::FlowDetailView;
 use fleet_ui::{
     components::display::{Card, Skeleton, StatusPill},
     logview::{model::anchored_line, view::LogViewer},
-    screenshots::{ScreenshotViewer, view::ScreenshotViewerView},
+    screenshots::view::ScreenshotViewerView,
     tone::Tone,
 };
 use leptos::prelude::*;
@@ -25,8 +25,8 @@ use leptos_router::hooks::use_location;
 use crate::screens::{
     flow::{
         evidence::{
-            CommandRow, Evidence, EvidenceFiles, EvidenceLink, Load, LogEvidence, LogSource,
-            Refused, command_rows,
+            CommandRow, Evidence, EvidenceFiles, EvidenceLink, Load, LogEvidence, LogMount,
+            LogSource, Refused, command_rows,
         },
         model::evidence_steps,
     },
@@ -46,7 +46,22 @@ pub struct EvidenceFeed {
     pub selected_step: RwSignal<Option<String>>,
 }
 
+impl EvidenceFeed {
+    /// What `f` makes of the flow's files, when its evidence is files (else `None`). Read inside a
+    /// closure, it runs again when the evidence does, which includes every renewal of the links.
+    fn files_with<T>(&self, f: impl FnOnce(&EvidenceFiles) -> T) -> Option<T> {
+        self.evidence.with(|e| match e {
+            Evidence::Files(files) => Some(f(files)),
+            _ => None,
+        })
+    }
+}
+
 /// The evidence card of screen D.
+///
+/// A signed-link renewal rebuilds the evidence, but the card mounts its parts only when what it
+/// shows changes (see [`EvidenceFiles::mounts`]). Each part reads its links from the feed as they
+/// are renewed, so a screenshot's zoom and a log's search survive a renewal.
 #[component]
 pub fn EvidenceCard(
     /// What the route fetched.
@@ -54,66 +69,74 @@ pub fn EvidenceCard(
     /// The flow, for its name and steps.
     flow: Fetched<FlowDetailView>,
 ) -> impl IntoView {
+    let is_files = Memo::new(move |_| feed.evidence.with(|e| matches!(e, Evidence::Files(_))));
     view! {
         <Card title="Evidence">
             <div class="space-y-4" data-testid="evidence">
-                {move || match feed.evidence.get() {
-                    Evidence::Loading => view! { <Skeleton lines=3 /> }.into_any(),
-                    Evidence::Unavailable(why) => {
-                        view! { <Notice tone=Tone::Warning text=format!("The evidence could not be loaded: {why}") /> }
-                            .into_any()
+                {move || {
+                    if is_files.get() {
+                        view! { <FilesView feed flow /> }.into_any()
+                    } else {
+                        match feed.evidence.get() {
+                            Evidence::Loading => view! { <Skeleton lines=3 /> }.into_any(),
+                            Evidence::Unavailable(why) => {
+                                view! { <Notice tone=Tone::Warning text=format!("The evidence could not be loaded: {why}") /> }
+                                    .into_any()
+                            }
+                            Evidence::Nothing(text) => {
+                                view! { <p class="text-muted" data-testid="evidence-empty">{text}</p> }.into_any()
+                            }
+                            Evidence::Unopenable(text) => {
+                                view! { <p class="text-muted" data-testid="evidence-unopenable">{text}</p> }
+                                    .into_any()
+                            }
+                            // `is_files` is true for this one.
+                            Evidence::Files(_) => ().into_any(),
+                        }
                     }
-                    Evidence::Nothing(text) => {
-                        view! { <p class="text-muted" data-testid="evidence-empty">{text}</p> }.into_any()
-                    }
-                    Evidence::Unopenable(text) => {
-                        view! { <p class="text-muted" data-testid="evidence-unopenable">{text}</p> }
-                            .into_any()
-                    }
-                    Evidence::Files(files) => view! { <FilesView files=*files feed flow /> }.into_any(),
                 }}
             </div>
         </Card>
     }
 }
 
+/// The files of a flow. Rebuilt only when [`EvidenceFiles::mounts`] changes; the links inside are
+/// read from the feed, so a renewal updates them in place.
 #[component]
-fn FilesView(
-    files: EvidenceFiles,
-    feed: EvidenceFeed,
-    flow: Fetched<FlowDetailView>,
-) -> impl IntoView {
-    let EvidenceFiles {
-        screenshots,
-        log,
-        commands,
-        report,
-        downloads,
-        refused,
-    } = files;
-    let has_commands = commands.is_some();
-    let screenshots = if screenshots.is_empty() {
-        view! {
-            <p class="text-sm text-muted" data-testid="screenshots-empty">
-                "No failure screenshot was uploaded for this flow."
-            </p>
-        }
-        .into_any()
-    } else {
-        view! {
-            <div data-testid="screenshots">
-                <ScreenshotViewerView viewer=ScreenshotViewer::new(screenshots) />
-            </div>
-        }
-        .into_any()
-    };
-    view! {
-        {screenshots}
-        {report.map(|r| view! { <ReportLink link=r /> })}
-        {log.map(|source| view! { <LogSection source feed flow /> })}
-        {has_commands.then(|| view! { <CommandsSection feed /> })}
-        <Downloads links=downloads />
-        <RefusedList refused />
+fn FilesView(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
+    let mounts = Memo::new(move |_| feed.files_with(EvidenceFiles::mounts));
+    move || {
+        mounts.get().map(|m| {
+            view! {
+                {if m.screenshots {
+                    let shots = Signal::derive(move || {
+                        feed.files_with(|f| f.screenshots.clone()).unwrap_or_default()
+                    });
+                    view! {
+                        <div data-testid="screenshots">
+                            <ScreenshotViewerView shots />
+                        </div>
+                    }
+                    .into_any()
+                } else {
+                    view! {
+                        <p class="text-sm text-muted" data-testid="screenshots-empty">
+                            "No failure screenshot was uploaded for this flow."
+                        </p>
+                    }
+                    .into_any()
+                }}
+                {move || feed.files_with(|f| f.report.clone()).flatten().map(|r| view! { <ReportLink link=r /> })}
+                {match m.log {
+                    LogMount::None => ().into_any(),
+                    LogMount::Viewer => view! { <LogSection feed flow /> }.into_any(),
+                    LogMount::Download => view! { <TooLargeLog feed /> }.into_any(),
+                }}
+                {m.commands.then(|| view! { <CommandsSection feed /> })}
+                {move || feed.files_with(|f| f.downloads.clone()).map(|links| view! { <Downloads links /> })}
+                {move || feed.files_with(|f| f.refused.clone()).map(|refused| view! { <RefusedList refused /> })}
+            }
+        })
     }
 }
 
@@ -139,27 +162,38 @@ fn ReportLink(link: EvidenceLink) -> impl IntoView {
     }
 }
 
+/// The Maestro log, in the viewer.
 #[component]
-fn LogSection(
-    source: LogSource,
-    feed: EvidenceFeed,
-    flow: Fetched<FlowDetailView>,
-) -> impl IntoView {
-    let body = match source {
-        LogSource::TooLarge(link) => view! {
-            <p class="text-sm" data-testid="log-too-large">
-                {format!("The log is {}: too large to show here. ", link.size)}
-                <a class="underline" href=link.href>"Download it"</a>
-            </p>
-        }
-        .into_any(),
-        LogSource::Show(_) => view! { <LogBody feed flow /> }.into_any(),
-    };
+fn LogSection(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
     view! {
         <section aria-labelledby="log-title" class="space-y-2">
             <h3 id="log-title" class="text-sm font-semibold">"Maestro log"</h3>
-            {body}
+            <LogBody feed flow />
         </section>
+    }
+}
+
+/// The Maestro log when it is too big to hold in the browser: a download link, read from the
+/// feed so a renewal updates it.
+#[component]
+fn TooLargeLog(feed: EvidenceFeed) -> impl IntoView {
+    move || {
+        feed.files_with(|f| match &f.log {
+            Some(LogSource::TooLarge(link)) => Some(link.clone()),
+            _ => None,
+        })
+        .flatten()
+        .map(|link| {
+            view! {
+                <section aria-labelledby="log-title" class="space-y-2">
+                    <h3 id="log-title" class="text-sm font-semibold">"Maestro log"</h3>
+                    <p class="text-sm" data-testid="log-too-large">
+                        {format!("The log is {}: too large to show here. ", link.size)}
+                        <a class="underline" href=link.href>"Download it"</a>
+                    </p>
+                </section>
+            }
+        })
     }
 }
 

@@ -35,6 +35,11 @@ const FAILING_STEP: &str = "Assert that \"Fleet never shows this\" is visible";
 /// A stack whose dashboard is `http://127.0.0.1:<port>` and whose usercontent origin is
 /// `http://localhost:<port>`; returns the port.
 async fn evidence_stack() -> (Stack, u16) {
+    evidence_stack_with_link_ttl(300).await
+}
+
+/// [`evidence_stack`] whose signed links last `link_ttl_seconds`.
+async fn evidence_stack_with_link_ttl(link_ttl_seconds: u64) -> (Stack, u16) {
     let port = TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
@@ -45,6 +50,7 @@ async fn evidence_stack() -> (Stack, u16) {
         c.api.public_url = Some(format!("http://127.0.0.1:{port}"));
         c.usercontent.url = Some(format!("http://localhost:{port}"));
         c.usercontent.signing_key = Some(Secret::from("0123456789abcdef0123456789abcdef-m5-exit"));
+        c.usercontent.link_ttl_seconds = link_ttl_seconds;
         c.storage.path = temp("m5-blobs");
         c.artifacts.spool_dir = temp("m5-spool");
     })
@@ -391,6 +397,109 @@ async fn ac08_a_failed_flow_links_its_screenshot_and_log_lines() {
         browser.csp_violations().await,
         Vec::<String>::new(),
         "the image and the log were allowed by the CSP, not worked around"
+    );
+    browser.quit().await;
+}
+
+/// Presses the page's button with this label.
+async fn click_button(page: &Page<'_>, label: &str) {
+    page.eval(
+        &format!(
+            "Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '{label}').click();"
+        ),
+        vec![],
+    )
+    .await;
+}
+
+/// Issue #41: a flow page that stays open keeps its evidence viewers' state when the signed
+/// links are renewed.
+///
+/// With links that last 61 seconds the page renews them about a second after each fetch, so
+/// renewals keep coming while the test works. It zooms the screenshot to 200 %, types into the
+/// log's search, then waits for the screenshot's link to change, which is a renewal that came
+/// after that setup. The zoom, the search text and its count survive the renewal, and the page is
+/// never reloaded.
+#[tokio::test]
+async fn evidence_viewers_keep_their_state_when_the_links_are_renewed() {
+    let (stack, port) = evidence_stack_with_link_ttl(61).await;
+    run_agent_to_the_end(&stack).await;
+    let flow = failing_flow(&stack).await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait("the flow's name", &has_text(&q("flow-title"), FAILING))
+        .await;
+    let shot = format!("document.querySelector('{} img')", q("screenshots"));
+    let search = "document.querySelector('input[aria-label=\"Search log\"]')";
+    let status = "document.querySelector('section[aria-label=\"Log\"] span[aria-live=\"polite\"]')";
+    page.wait(
+        "the screenshot and the log search",
+        &format!("Boolean({shot}) && Boolean({search})"),
+    )
+    .await;
+
+    // Fit, 50, 100, 200 %.
+    for _ in 0..3 {
+        click_button(&page, "Zoom in").await;
+    }
+    page.wait(
+        "the zoom at 200 %",
+        &format!("{shot}.style.width === '200%'"),
+    )
+    .await;
+    page.eval(
+        &format!(
+            "{search}.value = 'Assert'; {search}.dispatchEvent(new Event('input', {{ bubbles: true }}));"
+        ),
+        vec![],
+    )
+    .await;
+    page.wait(
+        "the search to count its matches",
+        &format!("/^[1-9][0-9]* matches$/.test({status}.textContent.trim())"),
+    )
+    .await;
+    let counted = page
+        .eval(&format!("return {status}.textContent;"), vec![])
+        .await;
+
+    // The next renewal is after everything above, so it is the one that is checked.
+    let link = page.eval(&format!("return {shot}.src;"), vec![]).await;
+    page.wait(
+        "a renewed screenshot link",
+        &format!("{shot}.src !== {link}"),
+    )
+    .await;
+
+    page.wait(
+        "the zoom at 200 % after the renewal",
+        &format!("{shot}.style.width === '200%'"),
+    )
+    .await;
+    assert_eq!(
+        page.eval(&format!("return {search}.value;"), vec![]).await,
+        json!("Assert"),
+        "the search text survives the renewal"
+    );
+    assert_eq!(
+        page.eval(&format!("return {status}.textContent;"), vec![])
+            .await,
+        counted,
+        "and so does its count"
+    );
+    assert!(page.never_reloaded().await);
+    assert_eq!(
+        browser.csp_violations().await,
+        Vec::<String>::new(),
+        "the renewed links are allowed by the CSP"
     );
     browser.quit().await;
 }

@@ -59,6 +59,14 @@ impl ScreenshotViewer {
         }
     }
 
+    /// Swaps in the shots of a later fetch (renewed links, or one more capture), keeping the
+    /// selection and the zoom. The selection stays at its position, or moves to the last shot if
+    /// the list got shorter; a renewal keeps the order, so the same shot stays selected.
+    pub fn replace(&mut self, shots: impl IntoIterator<Item = Shot>) {
+        self.shots = shots.into_iter().filter(|s| safe_url(&s.url)).collect();
+        self.selected = self.selected.min(self.shots.len().saturating_sub(1));
+    }
+
     /// The number of shots.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -266,6 +274,29 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["e", "f"]
         );
+    }
+
+    #[test]
+    fn renewed_links_keep_the_selected_shot_and_the_zoom() {
+        let mut v = viewer();
+        v.select(1);
+        v.zoom_in();
+        v.replace([
+            shot("a", "/artifacts/1.png?renewed"),
+            shot("b", "/artifacts/2.png?renewed"),
+            shot("b", "/artifacts/3.png?renewed"),
+        ]);
+        assert_eq!(v.position().as_deref(), Some("2 of 3"));
+        assert_eq!(v.selected().unwrap().url, "/artifacts/2.png?renewed");
+        assert_eq!(v.zoom(), Zoom::Percent(50));
+    }
+
+    #[test]
+    fn a_shorter_list_moves_the_selection_to_its_last_shot() {
+        let mut v = viewer();
+        v.select(2);
+        v.replace([shot("a", "/artifacts/1.png")]);
+        assert_eq!(v.position().as_deref(), Some("1 of 1"));
     }
 
     #[test]
