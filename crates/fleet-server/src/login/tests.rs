@@ -5,6 +5,7 @@
 
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{Arc, Mutex},
 };
 
@@ -204,7 +205,7 @@ async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     // A real socket, so WebSocket upgrades work.
     let app = TestServer::builder()
         .http_transport()
-        .build(app::router(&state));
+        .build(app::router(&state).into_make_service_with_connect_info::<SocketAddr>());
     Rig { app, store, idp }
 }
 

@@ -87,6 +87,13 @@ services:
       - garage_data:/var/lib/garage/data
     expose: ["3900"]                           # S3 API, internal only
 
+# A fixed subnet, so the server can trust the proxy on it (fleet.toml trusted_proxies).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24
+
 volumes:
   fleet_spool: {}
   caddy_data: {}

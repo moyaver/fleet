@@ -252,6 +252,8 @@ enum Step {
     Done(Outcome),
     /// Try the whole upload again after a pause.
     Retry(String),
+    /// Rate limited: try again after at least this long, as the server asked.
+    Limited(String, Duration),
 }
 
 impl Inner {
@@ -297,13 +299,20 @@ impl Inner {
             sha256,
         };
         let mut why = String::new();
+        let mut server_wait = Duration::ZERO;
         for attempt in 0..ATTEMPTS {
             if attempt > 0 {
-                tokio::time::sleep(self.cfg.retry_delay * 2_u32.pow(attempt.min(4))).await;
+                let backoff = self.cfg.retry_delay * 2_u32.pow(attempt.min(4));
+                tokio::time::sleep(backoff.max(server_wait)).await;
+                server_wait = Duration::ZERO;
             }
             match self.attempt(item, &request).await {
                 Step::Done(outcome) => return outcome,
                 Step::Retry(reason) => why = reason,
+                Step::Limited(reason, wait) => {
+                    why = reason;
+                    server_wait = wait;
+                }
             }
         }
         Outcome::Failed(format!("gave up after {ATTEMPTS} tries: {why}"))
@@ -492,6 +501,10 @@ impl Reply {
     async fn step(self, what: &str, res: reqwest::Response) -> Step {
         let status = res.status();
         match self {
+            Self::Later if status == reqwest::StatusCode::TOO_MANY_REQUESTS => Step::Limited(
+                format!("{what}: {status}"),
+                crate::net::retry_after(res.headers()),
+            ),
             Self::Later | Self::Gone => Step::Retry(format!("{what}: {status}")),
             Self::Refused => Step::Done(Outcome::Failed(format!(
                 "{what}: the server did not accept the credential ({status})"
@@ -665,6 +678,51 @@ mod tests {
         let done = run(&up).await;
         assert!(
             matches!(&done[0].outcome, Outcome::Failed(reason) if reason.contains("credentials require")),
+            "{done:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rate_limited_request_waits_for_retry_after_and_then_succeeds() {
+        let server = MockServer::start().await;
+        let artifact = Uuid::now_v7();
+        Mock::given(method("POST"))
+            .and(path("/api/v1/agent/artifacts"))
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "1"))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/agent/artifacts"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(grant(artifact)))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path(format!("/api/v1/agent/artifacts/{artifact}/content")))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path(format!("/api/v1/agent/artifacts/{artifact}/complete")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({"status": "available", "artifact_id": artifact}),
+                ),
+            )
+            .mount(&server)
+            .await;
+        let up = Uploader::new(config(&server)).unwrap();
+
+        up.submit(item(b"hello"));
+        let started = std::time::Instant::now();
+        let done = run(&up).await;
+
+        assert!(
+            started.elapsed() >= Duration::from_secs(1),
+            "the server's Retry-After is honoured, not the 10 ms retry delay"
+        );
+        assert!(
+            matches!(&done[0].outcome, Outcome::Uploaded { artifact_id, .. } if *artifact_id == artifact),
             "{done:?}"
         );
     }

@@ -30,7 +30,10 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 
-use crate::{api::error, config::Oidc, ingest::bearer, state::AppState};
+use crate::{
+    api::error, client_ip::ClientIp, config::Oidc, ingest::bearer, limits::too_many_requests,
+    state::AppState,
+};
 
 mod rs256;
 
@@ -250,9 +253,13 @@ fn level(t: Trust) -> TrustLevel {
 
 pub(crate) async fn token(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
     body: Option<Json<TokenRequest>>,
 ) -> Response {
+    if let Err(wait) = state.limits.ip.check(ip, Instant::now()) {
+        return too_many_requests(wait);
+    }
     let req = body.map(|Json(r)| r).unwrap_or_default();
     let ttl =
         time::Duration::minutes(i64::try_from(state.config.oidc.token_ttl_minutes).unwrap_or(360));

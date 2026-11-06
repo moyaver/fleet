@@ -2,6 +2,10 @@
 # Fleet server configuration. Every key can also be set as FLEET_<SECTION>__<KEY>; secrets as
 # FLEET_<…>_FILE. Check it with: docker compose run --rm fleet check-config
 
+# Caddy is the proxy in front of Fleet, on the Compose network whose subnet docker-compose.yml
+# fixes. Its X-Forwarded-For names the real client, so per-IP limits count clients, not Caddy.
+trusted_proxies = ["10.77.0.0/24"]
+
 [[projects]]
 slug = "mobile-app"
 name = "Mobile app"

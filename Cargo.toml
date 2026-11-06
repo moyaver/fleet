@@ -88,6 +88,8 @@ gloo-timers = { version = "0.4.0", default-features = false }
 # JWT parsing and validation for CI OIDC tokens (ADR-0008). No built-in backend: Fleet installs an
 # RS256 verifier on `ring` (fleet-server oidc), avoiding `rsa`/`crypto-bigint` advisories and aws-lc.
 http = "1.5.0"
+# CIDR blocks for `trusted_proxies` (fleet-server). Already in the tree through hyper.
+ipnet = { version = "2.12.2", features = ["serde"] }
 js-sys = "0.3.107"
 jsonwebtoken = { version = "11.1.0", default-features = false }
 # Plain HTTP connector for fantoccini.

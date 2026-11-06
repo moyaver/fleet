@@ -25,6 +25,37 @@ use tokio::{
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
+/// The longest pause a server's `Retry-After` can ask for. A bigger value is cut to this, so a
+/// misconfigured limit can delay an upload or a reconnect, never stop it.
+pub(crate) const RETRY_AFTER_CAP: Duration = Duration::from_secs(30);
+
+/// The server refused a request with `429 Too Many Requests`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RateLimited {
+    /// From `Retry-After`, capped; zero when the server did not say.
+    pub(crate) retry_after: Duration,
+}
+
+impl std::fmt::Display for RateLimited {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "rate limited; retry after {:?}", self.retry_after)
+    }
+}
+
+impl std::error::Error for RateLimited {}
+
+/// `Retry-After` in whole seconds, as the server sends it, capped at [`RETRY_AFTER_CAP`]. HTTP
+/// dates and anything else are ignored.
+pub(crate) fn retry_after(headers: &reqwest::header::HeaderMap) -> Duration {
+    headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .map_or(Duration::ZERO, |secs| {
+            Duration::from_secs(secs).min(RETRY_AFTER_CAP)
+        })
+}
+
 /// Where a URL points.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Target {
@@ -371,6 +402,11 @@ pub(crate) async fn exchange(
         .send()
         .await?;
     let status = res.status();
+    if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return Err(Box::new(RateLimited {
+            retry_after: retry_after(res.headers()),
+        }));
+    }
     if !status.is_success() {
         let body = res.text().await.unwrap_or_default();
         return Err(format!("the server refused the OIDC token ({status}): {body}").into());
@@ -486,6 +522,24 @@ mod tests {
             let e = env(&[("HTTPS_PROXY", proxy)]);
             assert_eq!(proxy_for(&target, e).unwrap().port, 3128, "{proxy}");
         }
+    }
+
+    #[test]
+    fn retry_after_is_whole_seconds_capped_and_otherwise_ignored() {
+        let with = |v: &str| {
+            let mut h = reqwest::header::HeaderMap::new();
+            h.insert(reqwest::header::RETRY_AFTER, v.parse().unwrap());
+            retry_after(&h)
+        };
+        assert_eq!(with("5"), Duration::from_secs(5));
+        assert_eq!(with(" 2 "), Duration::from_secs(2));
+        assert_eq!(with("3600"), RETRY_AFTER_CAP, "a long wait is cut");
+        assert_eq!(with("Wed, 21 Oct 2026 07:28:00 GMT"), Duration::ZERO);
+        assert_eq!(with("-1"), Duration::ZERO);
+        assert_eq!(
+            retry_after(&reqwest::header::HeaderMap::new()),
+            Duration::ZERO
+        );
     }
 
     #[test]

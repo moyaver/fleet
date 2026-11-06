@@ -22,6 +22,7 @@ base64.workspace = true
 clap.workspace = true
 figment.workspace = true
 futures-util.workspace = true
+ipnet.workspace = true
 fleet-blob.workspace = true
 fleet-core.workspace = true
 fleet-protocol = { workspace = true, features = ["openapi"] }

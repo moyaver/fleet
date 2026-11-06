@@ -27,7 +27,9 @@ use url::Url;
 
 use crate::{
     api::error,
+    client_ip::ClientIp,
     config::Login,
+    limits::too_many_requests,
     login::idp::IdClaims,
     oidc::Refused,
     session::{self, SignedIn, same_secret},
@@ -57,7 +59,14 @@ struct LoginQuery {
     return_to: Option<String>,
 }
 
-async fn login(State(state): State<AppState>, Query(q): Query<LoginQuery>) -> Response {
+async fn login(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Query(q): Query<LoginQuery>,
+) -> Response {
+    if let Err(wait) = state.limits.ip.check(ip, std::time::Instant::now()) {
+        return too_many_requests(wait);
+    }
     let Some(config) = &state.config.login else {
         return error(StatusCode::NOT_FOUND, "browser sign-in is not configured");
     };
@@ -190,9 +199,13 @@ impl Refusal {
 
 async fn callback(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
     Query(q): Query<CallbackQuery>,
 ) -> Response {
+    if let Err(wait) = state.limits.ip.check(ip, std::time::Instant::now()) {
+        return too_many_requests(wait);
+    }
     complete(&state, &headers, q).await.unwrap_or_else(|r| *r.0)
 }
 
