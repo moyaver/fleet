@@ -55,3 +55,4 @@ It exits non-zero unless every event was acked. Run `docker compose restart flee
 - `docker compose run --rm fleet check-config` prints the effective configuration, secrets redacted.
 - `docker stop` sends SIGTERM: agents get `goaway`, their last batch is acked, sockets close with 1012 and agents reconnect when Fleet is back. `stop_grace_period` is 30 s for that drain.
 - Back up Postgres with `pg_dump -Fc`; the image mounts its data at `/var/lib/postgresql` (Postgres 18 layout).
+- Backup and restore (Postgres and the Garage bucket, restored into a fresh stack): [operator guide](../../docs/src/operator-guide.md#backup-and-restore). `backup-restore-check.sh` runs the whole sequence against throwaway stacks.
