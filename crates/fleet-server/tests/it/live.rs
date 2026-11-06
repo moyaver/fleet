@@ -7,7 +7,7 @@ use futures_util::SinkExt;
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::support::{Agent, Harness, VIEWER, Ws, get, live, live_next, post_json};
+use crate::support::{Agent, Client, Harness, VIEWER, Ws, get, live, live_next, post_json};
 
 async fn attempt_of(h: &Harness) -> String {
     let (status, body) = get(h.addr(), "/api/v1/projects/app/attempts", Some(VIEWER)).await;
@@ -387,5 +387,129 @@ async fn a_lost_listener_connection_resyncs_subscribers_and_deltas_resume() {
     let delta = next_within(&mut ws, Duration::from_secs(5)).await;
     assert_eq!(delta["op"], "delta", "{delta}");
     assert_eq!(delta["version"].as_u64().unwrap(), version + 1);
+    other.stop().await.unwrap();
+}
+
+/// The first agent run's display liveness in an attempt's snapshot, as served by `addr`.
+async fn liveness_at(addr: SocketAddr, attempt: &str) -> String {
+    let (status, body) = get(
+        addr,
+        &format!("/api/v1/projects/app/attempts/{attempt}"),
+        Some(VIEWER),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let v: Value = serde_json::from_str(&body).unwrap();
+    v["agent_runs"][0]["liveness"].as_str().unwrap().to_owned()
+}
+
+#[tokio::test]
+async fn a_run_connected_to_one_instance_is_live_on_another_until_it_goes_silent() {
+    // Stale after 3 s without contact. The leader persists contact every 200 ms, so the other
+    // instance judges the run stale 3.2 s after its last persisted contact.
+    let h = Harness::start_with(|c| {
+        c.liveness.stale_after_ms = 3_000;
+        c.liveness.sweep_interval_ms = 200;
+    })
+    .await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("cross-instance", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    // The socket stays open after the batch: the run is silent, not disconnected.
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    c.events(events[..4].to_vec()).await;
+    let attempt = attempt_of(&h).await;
+
+    assert_eq!(liveness_at(h.addr(), &attempt).await, "online");
+    assert_eq!(
+        liveness_at(other.addr(), &attempt).await,
+        "online",
+        "a run connected to the first instance is live on the second"
+    );
+
+    let shown = both_show(h.addr(), other.addr(), &attempt, "stale").await;
+    assert_eq!(
+        shown,
+        ("stale".to_owned(), "stale".to_owned()),
+        "stale on both once the agent goes silent"
+    );
+    drop(c);
+    other.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_run_taken_over_by_another_instance_is_live_on_both() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("takeover", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    c.events(events[..4].to_vec()).await;
+    let attempt = attempt_of(&h).await;
+    drop(c);
+    // Closing the socket detaches the run: both instances show it disconnected.
+    let shown = both_show(h.addr(), other.addr(), &attempt, "disconnected").await;
+    assert_eq!(
+        shown,
+        ("disconnected".to_owned(), "disconnected".to_owned())
+    );
+
+    // The agent reconnects through the second instance. The first instance has no socket for
+    // the run, but the run's persisted state and contact say it is live.
+    let mut c = Client::connect(other.addr(), Some(&h.key), true).await;
+    c.hello(&agent, Some(1)).await;
+    let shown = both_show(h.addr(), other.addr(), &attempt, "online").await;
+    assert_eq!(shown, ("online".to_owned(), "online".to_owned()));
+    drop(c);
+    other.stop().await.unwrap();
+}
+
+/// Waits until both instances show `want` for the attempt's run, or ten seconds pass; returns
+/// what each shows.
+async fn both_show(a: SocketAddr, b: SocketAddr, attempt: &str, want: &str) -> (String, String) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let shown = (liveness_at(a, attempt).await, liveness_at(b, attempt).await);
+        if (shown.0 == want && shown.1 == want) || tokio::time::Instant::now() > deadline {
+            return shown;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test]
+async fn a_socket_closing_on_one_instance_reaches_a_subscriber_on_another() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("close-elsewhere", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    c.events(events[..4].to_vec()).await;
+    let attempt = attempt_of(&h).await;
+    // The subscriber is on the second instance; the agent's socket is on the first.
+    let (mut ws, _) = follow(other.addr(), &attempt).await;
+
+    drop(c);
+    // The close detaches the run; the delta carrying it must reach the subscriber without a
+    // resync, and say the run is disconnected.
+    let liveness = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let m = live_next(&mut ws).await;
+            if m["op"] != "delta" {
+                continue;
+            }
+            for e in m["entities"].as_array().unwrap() {
+                if e["kind"] == "agent_run" && e["entity"]["liveness"] == "disconnected" {
+                    return e["entity"]["liveness"].clone();
+                }
+            }
+        }
+    })
+    .await
+    .expect("a delta showing the run disconnected, within 5 s");
+    assert_eq!(liveness, "disconnected");
     other.stop().await.unwrap();
 }

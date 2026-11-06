@@ -201,7 +201,7 @@ pub(super) async fn device(
 }
 
 fn with_run_liveness(hub: &Hub, mut r: WorkerRunView) -> WorkerRunView {
-    r.run.liveness = Some(hub.run_liveness(r.run.id, &r.run.state));
+    r.run.liveness = Some(hub.run_liveness(r.run.id, &r.run.state, r.run.last_frame_at));
     r
 }
 
@@ -221,7 +221,11 @@ pub(super) async fn flow(
     };
     match state.store.flow_detail(project, flow).await {
         Ok(Some(mut d)) => {
-            d.agent_run.liveness = Some(state.hub.run_liveness(d.agent_run.id, &d.agent_run.state));
+            d.agent_run.liveness = Some(state.hub.run_liveness(
+                d.agent_run.id,
+                &d.agent_run.state,
+                d.agent_run.last_frame_at,
+            ));
             Json(d).into_response()
         }
         Ok(None) => error(StatusCode::NOT_FOUND, "no such flow"),
@@ -241,7 +245,7 @@ fn with_liveness(hub: &Hub, row: WorkerRow) -> WorkerSummaryView {
     let liveness = row
         .runs
         .iter()
-        .map(|r| hub.run_liveness(r.id, &r.state))
+        .map(|r| hub.run_liveness(r.id, &r.state, r.last_frame_at))
         .max_by_key(|l| rank(*l))
         .unwrap_or(Liveness::Completed);
     WorkerSummaryView {

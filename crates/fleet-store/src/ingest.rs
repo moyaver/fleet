@@ -391,24 +391,34 @@ impl Store {
     /// resumes or its grace expires. A newer connection's state is left alone.
     pub async fn detach(&self, run: &RunHandle, reason: &str) -> Result<()> {
         let mut tx = self.pool().begin().await?;
-        sqlx::query!(
-            "UPDATE agent_runs SET state = 'detached', detached_at = now(), rev = rev + 1
-              WHERE id = $1 AND epoch = $2 AND state = 'active'",
-            run.agent_run_id,
-            i32::try_from(run.epoch).unwrap_or(i32::MAX)
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "UPDATE connections SET closed_at = now(), close_reason = $2
-              WHERE id = $1 AND closed_at IS NULL",
-            run.connection_id,
-            reason
-        )
-        .execute(&mut *tx)
-        .await?;
+        detach_run(&mut tx, run, reason).await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    /// [`Self::detach`] for a socket that closed on this instance. When it detaches an active
+    /// run, every instance's view of that run's liveness changes: the attempt's version is
+    /// bumped and the change returned, for [`crate::Store`]'s caller to publish. Otherwise
+    /// nothing changed and nothing is returned.
+    pub async fn detach_closed_socket(
+        &self,
+        run: &RunHandle,
+        reason: &str,
+    ) -> Result<Option<Change>> {
+        let mut tx = self.pool().begin().await?;
+        let change = if detach_run(&mut tx, run, reason).await? {
+            self.bump_version(
+                &mut tx,
+                run.project_id,
+                run.pipeline_attempt_id,
+                BTreeSet::from([EntityRef::AgentRun(run.agent_run_id)]),
+            )
+            .await?
+        } else {
+            None
+        };
+        tx.commit().await?;
+        Ok(change)
     }
 
     /// Applies one `events` frame (research 05 §9.4). See the module docs.
@@ -578,6 +588,30 @@ fn is_data_error(e: &(dyn std::error::Error + 'static)) -> bool {
     };
     db.code()
         .is_some_and(|c| c.starts_with("22") || c.starts_with("23"))
+}
+
+/// Detaches the run if this connection still holds it, and records that the connection closed.
+/// Returns whether the run was active and is now detached.
+async fn detach_run(tx: &mut PgConnection, run: &RunHandle, reason: &str) -> Result<bool> {
+    let flipped = sqlx::query!(
+        "UPDATE agent_runs SET state = 'detached', detached_at = now(), rev = rev + 1
+          WHERE id = $1 AND epoch = $2 AND state = 'active'",
+        run.agent_run_id,
+        i32::try_from(run.epoch).unwrap_or(i32::MAX)
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected()
+        > 0;
+    sqlx::query!(
+        "UPDATE connections SET closed_at = now(), close_reason = $2
+          WHERE id = $1 AND closed_at IS NULL",
+        run.connection_id,
+        reason
+    )
+    .execute(&mut *tx)
+    .await?;
+    Ok(flipped)
 }
 
 /// Takes the run over for this connection: bumps the epoch (fencing older sockets, §3.7) and

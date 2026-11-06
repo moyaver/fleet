@@ -11,8 +11,9 @@
 //! a restart could lose: after a restart it reloads the open attempts' versions and every run's
 //! liveness starts as `stale` (research 03 §5.4) until its agent reconnects.
 //!
-//! Liveness (`online` → `stale` → `disconnected` → `completed`) is in memory: heartbeats never
-//! touch the database. Crossings are pushed as `liveness` frames.
+//! Liveness (`online` → `stale` → `disconnected` → `completed`) is in memory for the runs whose
+//! socket this instance holds: heartbeats never touch the database. Crossings are pushed as
+//! `liveness` frames. Every other run is judged from its persisted contact, so instances agree.
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -63,6 +64,10 @@ pub(crate) struct Hub {
     order: Mutex<HashMap<Uuid, Order>>,
     runs: Mutex<HashMap<Uuid, RunLive>>,
     stale_after: Duration,
+    /// [`Self::stale_after`] plus one sweep interval: the threshold for persisted contact.
+    persisted_stale_after: time::Duration,
+    /// When this instance started. Contact persisted before that does not make a run live.
+    booted: OffsetDateTime,
     capacity: usize,
     #[cfg(test)]
     pub(crate) fail_entity_load: std::sync::atomic::AtomicBool,
@@ -73,7 +78,8 @@ fn json(frame: &LiveFrame) -> Arc<str> {
 }
 
 impl Hub {
-    pub(crate) fn new(stale_after: Duration, capacity: usize) -> Self {
+    /// `sweep_interval` is how often each instance persists its runs' contact.
+    pub(crate) fn new(stale_after: Duration, sweep_interval: Duration, capacity: usize) -> Self {
         Self {
             capacity: capacity.max(1),
             #[cfg(test)]
@@ -82,6 +88,11 @@ impl Hub {
             order: Mutex::new(HashMap::new()),
             runs: Mutex::new(HashMap::new()),
             stale_after,
+            persisted_stale_after: time::Duration::try_from(
+                stale_after.saturating_add(sweep_interval),
+            )
+            .unwrap_or(time::Duration::MAX),
+            booted: OffsetDateTime::now_utc(),
         }
     }
 
@@ -334,7 +345,7 @@ impl Hub {
     }
 
     /// Fills in each agent run's liveness: from live contact when this instance has it, else
-    /// from the stored state (after a restart an active run shows `stale`, never `disconnected`).
+    /// from the stored state and contact (see [`Self::run_liveness_in`]).
     pub(crate) fn overlay(&self, entities: &mut [EntityView]) {
         let runs = self
             .runs
@@ -342,27 +353,55 @@ impl Hub {
             .expect("hub lock should not be poisoned: no code panics while holding it");
         for e in entities {
             if let EntityView::AgentRun(r) = e {
-                r.liveness = Some(self.run_liveness_in(&runs, r.id, &r.state));
+                r.liveness = Some(self.run_liveness_in(&runs, r.id, &r.state, r.last_frame_at));
             }
         }
     }
 
-    fn run_liveness_in(&self, runs: &HashMap<Uuid, RunLive>, id: Uuid, state: &str) -> Liveness {
+    /// A run's display liveness. A socket this instance holds is authoritative, and so is a
+    /// closed one unless the run is `active`: closing a socket detaches its run in Postgres, so
+    /// an `active` run whose socket closed here was taken over by another instance. Any other
+    /// `active` or `finalizing` run is judged from its persisted contact. The instance holding
+    /// its socket persists that contact every sweep, so it is at most one sweep interval old, and
+    /// the threshold allows for that lag. Contact from before this instance booted does not
+    /// count, so after a restart a run stays `stale` until its agent reconnects.
+    fn run_liveness_in(
+        &self,
+        runs: &HashMap<Uuid, RunLive>,
+        id: Uuid,
+        state: &str,
+        last_frame_at: OffsetDateTime,
+    ) -> Liveness {
         match (state, runs.get(&id)) {
             ("ended", _) => Liveness::Completed,
-            (_, Some(live)) => self.state_of(live),
-            ("active" | "finalizing", None) => Liveness::Stale,
+            (_, Some(live)) if live.connected || live.ended || state != "active" => {
+                self.state_of(live)
+            }
+            ("active" | "finalizing", _) => {
+                let fresh = last_frame_at > self.booted
+                    && OffsetDateTime::now_utc() - last_frame_at <= self.persisted_stale_after;
+                if fresh {
+                    Liveness::Online
+                } else {
+                    Liveness::Stale
+                }
+            }
             _ => Liveness::Disconnected,
         }
     }
 
     /// One run's display liveness, as [`Self::overlay`] would set it.
-    pub(crate) fn run_liveness(&self, id: Uuid, state: &str) -> Liveness {
+    pub(crate) fn run_liveness(
+        &self,
+        id: Uuid,
+        state: &str,
+        last_frame_at: OffsetDateTime,
+    ) -> Liveness {
         let runs = self
             .runs
             .lock()
             .expect("hub lock should not be poisoned: no code panics while holding it");
-        self.run_liveness_in(&runs, id, state)
+        self.run_liveness_in(&runs, id, state, last_frame_at)
     }
 
     /// The same overlay for a snapshot.
@@ -441,7 +480,7 @@ mod tests {
 
     #[test]
     fn inactive_attempt_orders_are_pruned_without_dropping_pending_frames() {
-        let hub = Hub::new(Duration::from_secs(5), 16);
+        let hub = Hub::new(Duration::from_secs(5), Duration::from_secs(1), 16);
         let pending = Uuid::now_v7();
         let recent = Uuid::now_v7();
         {
