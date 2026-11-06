@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Agent: nested steps (`runFlow`, `retry`, `repeat`) were paired with the wrong start, so parent steps stayed running and their ends appeared as unnamed steps; each end now closes its own step, and a step whose end arrives after the flow's console result is no longer dropped (#62).
 - Agent: a transient write error to the CI log (a full non-blocking pipe, an interrupted flush) used to stop, or drop output from, Maestro's copy to the log. Output now reaches the log in full and in order: a slow log slows Maestro down (backpressure), and only a closed log stops the copy.
 - Agent: failure screenshots and screen hierarchies are journalled against the step Maestro's `commands.json` says produced them (`artifacts[]`), instead of a step guessed from the file name; the file name is only the fallback for output without `artifacts[]`, and a file still waiting for its `commands.json` at run end keeps that fallback (#76).
+- Server: flaky history no longer counts a failure whose message names a lost device (Maestro's `DeviceServerDiedException`) as flakiness, as ADR-0009 promises; such a run is excluded from the verdict (#72).
 
 ### Changed
 
