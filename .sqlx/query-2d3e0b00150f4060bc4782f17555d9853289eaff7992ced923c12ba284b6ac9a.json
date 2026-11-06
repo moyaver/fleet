@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH runs AS (\n               UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at)\n                 FROM unnest($1::uuid[], $2::timestamptz[]) AS u(id, at)\n                WHERE r.id = u.id\n               RETURNING r.worker_id, u.at\n             )\n             UPDATE workers w SET last_seen_at = greatest(w.last_seen_at, x.at)\n               FROM (SELECT worker_id, max(at) AS at FROM runs\n                      WHERE worker_id IS NOT NULL GROUP BY worker_id) x\n              WHERE w.id = x.worker_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2d3e0b00150f4060bc4782f17555d9853289eaff7992ced923c12ba284b6ac9a"
+}
