@@ -153,6 +153,8 @@ pub struct FlowFlakiness {
     pub flakiness: Flakiness,
     /// What supports it; empty for [`Flakiness::NotFlaky`].
     pub evidence: Vec<Evidence>,
+    /// How many of its failed runs were excluded (ADR-0009), so they never counted.
+    pub excluded: usize,
 }
 
 /// Classifies every flow in `history`, in flow order. Input order doesn't matter.
@@ -166,6 +168,7 @@ pub fn classify(history: &[HistoryRun], config: &FlakyConfig) -> Vec<FlowFlakine
         .into_iter()
         .map(|(flow, mut runs)| {
             runs.sort_by_key(|r| (r.at_unix_ms, r.run));
+            let excluded = runs.iter().filter(|r| excluded_failure(r)).count();
             runs.retain(|r| counts(r));
             let mut evidence = confirmed(&runs);
             let confirmed = !evidence.is_empty();
@@ -182,21 +185,31 @@ pub fn classify(history: &[HistoryRun], config: &FlakyConfig) -> Vec<FlowFlakine
                 flow: flow.to_owned(),
                 flakiness,
                 evidence,
+                excluded,
             }
         })
         .collect()
 }
 
-/// Whether a run is a direct, settled observation of a pass or a failure that counts.
+/// Whether a run is a direct, settled observation of a pass or a failure, exclusion aside.
 ///
 /// A pass needs a source that may claim it (invariant I3): inferred, exit-status and declared
 /// sources never do. Both outcomes need a parsed Maestro source and a final result.
-fn counts(r: &HistoryRun) -> bool {
+fn observed(r: &HistoryRun) -> bool {
     matches!(r.finality, Finality::Verified | Finality::UnverifiedFinal)
         && matches!(r.outcome, FlowOutcome::Passed | FlowOutcome::Failed)
         && claims::may_claim(r.source, r.outcome)
         && claims::rank(r.source) >= PARSED_RANK
-        && !(r.outcome == FlowOutcome::Failed && r.exclusion.is_some())
+}
+
+/// Whether a run is a failure that would count but for its exclusion.
+fn excluded_failure(r: &HistoryRun) -> bool {
+    observed(r) && r.outcome == FlowOutcome::Failed && r.exclusion.is_some()
+}
+
+/// Whether a run counts toward flakiness: observed, and not an excluded failure.
+fn counts(r: &HistoryRun) -> bool {
+    observed(r) && !excluded_failure(r)
 }
 
 /// The lowest rank of a parsed Maestro source (`claims::rank`: live console and debug log).
@@ -426,6 +439,34 @@ mod tests {
             None
         );
         assert_eq!(exclusion_of(FlowOutcome::Failed, None), None);
+    }
+
+    #[test]
+    fn excluded_failures_are_counted_per_flow_and_only_when_they_would_have_counted() {
+        let mut lost = run(2, "login", "abc", FlowOutcome::Failed);
+        lost.exclusion = Some(Exclusion::Infrastructure);
+        // A lost device on a run that is not settled would not have counted anyway.
+        let mut provisional = run(3, "login", "abc", FlowOutcome::Failed);
+        provisional.finality = Finality::Provisional;
+        provisional.exclusion = Some(Exclusion::Infrastructure);
+        let mut other = run(4, "checkout", "abc", FlowOutcome::Failed);
+        other.exclusion = Some(Exclusion::Infrastructure);
+        let h = [
+            run(1, "login", "abc", FlowOutcome::Passed),
+            lost,
+            provisional,
+            run(5, "checkout", "abc", FlowOutcome::Passed),
+            other,
+            run(6, "checkout", "def", FlowOutcome::Failed),
+        ];
+        let login = verdict(&h, "login");
+        assert_eq!((login.excluded, login.flakiness), (1, Flakiness::NotFlaky));
+        let checkout = verdict(&h, "checkout");
+        assert_eq!(checkout.excluded, 1);
+        // A failure on another commit is neither excluded nor a confirmed flake.
+        assert_eq!(checkout.flakiness, Flakiness::NotFlaky);
+        let solo = [run(7, "solo", "abc", FlowOutcome::Passed)];
+        assert_eq!(verdict(&solo, "solo").excluded, 0);
     }
 
     #[test]

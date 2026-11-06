@@ -194,6 +194,7 @@ pub(super) async fn flow_stats(
                     flow: name.clone(),
                     flakiness: FlakinessView::NotFlaky,
                     evidence: Vec::new(),
+                    excluded: 0,
                 });
             let flaky_commits = flakiness
                 .evidence
@@ -233,6 +234,7 @@ pub(super) fn flakiness<'a>(
                     flow: flow.to_owned(),
                     flakiness: FlakinessView::NotFlaky,
                     evidence: Vec::new(),
+                    excluded: 0,
                 },
                 |v| FlowFlakinessView {
                     flow: v.flow.clone(),
@@ -242,6 +244,7 @@ pub(super) fn flakiness<'a>(
                         Flakiness::Confirmed => FlakinessView::Confirmed,
                     },
                     evidence: v.evidence.iter().map(evidence).collect(),
+                    excluded: i64::try_from(v.excluded).unwrap_or(i64::MAX),
                 },
             )
         })

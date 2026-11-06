@@ -482,10 +482,15 @@ mod tests {
                 .into_iter()
                 .find(|f| f.flow == flow)
                 .unwrap_or_else(|| panic!("no verdict for {flow}"))
-                .flakiness
         };
-        assert_eq!(verdict("flows/login.yaml"), Flakiness::NotFlaky);
-        assert_eq!(verdict("flows/checkout.yaml"), Flakiness::Confirmed);
+        // The lost device is counted as excluded, once, and it is the only excluded run.
+        let login = verdict("flows/login.yaml");
+        assert_eq!((login.flakiness, login.excluded), (Flakiness::NotFlaky, 1));
+        let checkout = verdict("flows/checkout.yaml");
+        assert_eq!(
+            (checkout.flakiness, checkout.excluded),
+            (Flakiness::Confirmed, 0)
+        );
     }
 
     #[sqlx::test(migrations = "../../migrations")]

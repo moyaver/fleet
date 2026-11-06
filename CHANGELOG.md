@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).
 - Server: per-IP limits on the pre-auth routes (agent token exchange, browser sign-in and callback) and per-credential limits on agent connections, answered with `429 Too Many Requests` and `Retry-After`; an agent socket's events are paced, never dropped. Client IPs come from `trusted_proxies` (#35).
 
 ### Fixed
