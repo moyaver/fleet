@@ -81,7 +81,7 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 2. Set `FLEET_SERVER` on your CI runner. Use GitHub Actions OIDC with an approved trust policy or a project API key (`FLEET_TOKEN`).
 3. Wrap your existing command with `fleet-agent run --`. Add `fleet-agent flush` as an always-run cleanup step if desired.
 
-The [GitHub Actions example](examples/github-actions/fleet-agent.yml) shows the integration pattern and installs the `v0.1.0-alpha.1` agent from its release.
+The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.1` agent from its checksum-verified release, runs the Maestro command under it and writes a job summary to the run page.
 
 > [!NOTE]
 > The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots and logs, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).

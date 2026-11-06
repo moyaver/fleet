@@ -20,13 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # … build the app, start an emulator, install Maestro …
-      # Pinned to a release: "latest" skips pre-releases, so it would 404.
-      - name: Install the Fleet agent
-        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.1/fleet-agent-installer.sh | sh
-      - name: Check the setup
-        run: fleet-agent check
-      - name: Run Maestro
-        run: fleet-agent run -- maestro test .maestro/
+      # Installs the pinned agent (checksum-verified) and runs the command under it. The job summary
+      # goes to the run page. `@main` until a release includes the action: then pin its tag.
+      - uses: moyaver/fleet/examples/github-actions/fleet-agent@main
+        with:
+          command: maestro test .maestro/
       - name: Send anything the agent couldn't deliver
         if: always()
         run: test ! -f "$FLEET_RUN_DIR/spool.bin" || fleet-agent flush "$FLEET_RUN_DIR/spool.bin" || true

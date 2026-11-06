@@ -212,7 +212,7 @@ async fn connection(
     }
 }
 
-fn fixture(name: &str) -> PathBuf {
+pub(super) fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures/maestro/2.12.1")
         .join(name)
@@ -236,7 +236,7 @@ fn fake_maestro_dir() -> PathBuf {
     dir
 }
 
-fn run_agent(
+pub(super) fn run_agent(
     fixture_name: &str,
     server: Option<&str>,
     extra_args: &[&str],

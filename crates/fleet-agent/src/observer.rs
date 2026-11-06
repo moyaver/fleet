@@ -623,6 +623,29 @@ fn read_report(path: &Path, started: SystemTime) -> ReportRead {
     }
 }
 
+/// Appends the job summary to `$GITHUB_STEP_SUMMARY`, when the job has one. A file that cannot be
+/// written is reported to the supervisor, which prints one notice; the run is unaffected (I1, I2).
+fn write_job_summary(session: &Session) {
+    let Some(path) = std::env::var_os("GITHUB_STEP_SUMMARY").filter(|p| !p.is_empty()) else {
+        return;
+    };
+    let dashboard = server_url().map(|url| format!("{}/", crate::net::http_base(&url)));
+    let text =
+        crate::inspect::job_summary(&crate::inspect::flow_results(session), dashboard.as_deref());
+    let written = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut file| file.write_all(text.as_bytes()));
+    if let Err(e) = written {
+        let _ = writeln!(
+            io::stdout().lock(),
+            "step-summary-failed {}: {e}",
+            path.display()
+        );
+    }
+}
+
 /// Ends the run's session and flushes it. Returns the Maestro version its session log named.
 async fn finalize(
     mut l: Live,
@@ -695,6 +718,7 @@ async fn finalize(
     // Gap sums are a subset of the authoritative total: never under-report or double-count.
     l.session
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
+    write_job_summary(&l.session);
     flush(&mut l);
     if let Some(t) = l.journal.as_ref().and_then(Writer::truncation) {
         // Written before `finalized`, so the supervisor reads it with its end-of-run warnings

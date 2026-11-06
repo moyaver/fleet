@@ -14,6 +14,18 @@ Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS
 gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
 ```
 
+## GitHub Actions
+
+The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent (its archive's checksum is verified, and its build attestation too when the `gh` CLI is on the runner), runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason, and a link to the dashboard when `FLEET_SERVER` is set. Give the job `permissions: id-token: write`:
+
+```yaml
+- uses: moyaver/fleet/examples/github-actions/fleet-agent@main
+  with:
+    command: maestro test .maestro/
+```
+
+The summary needs an agent release that includes it: `v0.1.0-alpha.1` predates it. The example workflow is [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).
+
 ## Check the setup
 
 ```bash

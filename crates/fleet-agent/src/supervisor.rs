@@ -557,6 +557,8 @@ impl Observer {
         let mut maestro = None;
         // `journal-truncated <first missing seq> <reason>`, the reason as the journal records it.
         let mut truncated: Option<(u64, String)> = None;
+        // `step-summary-failed <reason>`: the job summary could not be written (I2).
+        let mut summary_failed: Option<String> = None;
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
             match self.control.recv_timeout(left) {
                 Ok(line) if line == "finalized" => {
@@ -570,6 +572,8 @@ impl Observer {
                         truncated = rest
                             .split_once(' ')
                             .and_then(|(seq, reason)| Some((seq.parse().ok()?, reason.to_owned())));
+                    } else if let Some(reason) = line.strip_prefix("step-summary-failed ") {
+                        summary_failed = Some(reason.to_owned());
                     }
                 }
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
@@ -585,6 +589,11 @@ impl Observer {
                     "journal.jsonl stopped on a write error ({reason}) before seq {seq}, so events from seq {seq} on are not in it; the run is unaffected"
                 )
             });
+        }
+        if let Some(reason) = summary_failed {
+            warnings.push(format!(
+                "could not write the job summary to GITHUB_STEP_SUMMARY ({reason}); the run is unaffected"
+            ));
         }
         if let Some(version) = maestro
             && !fleet_maestro::supports(&version)

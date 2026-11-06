@@ -7,4 +7,5 @@
 
 mod inspect;
 mod stream;
+mod summary;
 mod supervisor;
