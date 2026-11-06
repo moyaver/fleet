@@ -64,6 +64,10 @@ pub struct FlowFlakinessView {
     pub flakiness: Flakiness,
     /// What supports it; empty for [`Flakiness::NotFlaky`].
     pub evidence: Vec<FlakyEvidenceView>,
+    /// How many of its failed runs were excluded because a lost device caused them, so they
+    /// never count (ADR-0009). Older servers don't send it: it reads as 0.
+    #[serde(default)]
+    pub excluded: i64,
 }
 
 /// One finished flow execution in the history.

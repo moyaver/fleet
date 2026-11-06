@@ -385,6 +385,8 @@ pub struct StatsPanel {
     pub failures: Vec<FailureGroup>,
     /// The flow's flaky verdict, when it is flaky.
     pub flaky: Option<FlakyFlow>,
+    /// How many failed runs a lost device excluded from flakiness, in words; `None` when none.
+    pub excluded: Option<String>,
 }
 
 impl StatsPanel {
@@ -463,7 +465,17 @@ impl StatsPanel {
                 .collect(),
             flaky: (view.flakiness.flakiness != Flakiness::NotFlaky)
                 .then(|| flaky_flow(&view.flakiness, ctx)),
+            excluded: excluded_note(view.flakiness.excluded),
         }
+    }
+}
+
+/// The note on runs a lost device excluded, `None` when there are none.
+fn excluded_note(excluded: i64) -> Option<String> {
+    match excluded {
+        n if n <= 0 => None,
+        1 => Some("1 run excluded (device lost)".to_owned()),
+        n => Some(format!("{n} runs excluded (device lost)")),
     }
 }
 
@@ -708,6 +720,22 @@ mod tests {
         assert_eq!(group.last_seen, "2026-01-01 10:30:00");
         assert_eq!(group.links[0].href, format!("/flows/{B}?project=shop"));
         assert_eq!(panel.flaky.expect("suspected").label, "Suspected flaky");
+    }
+
+    #[test]
+    fn the_stats_panel_says_how_many_runs_a_lost_device_excluded_and_hides_a_zero() {
+        let mut view = stats(3, 1, Some(3000));
+        assert_eq!(StatsPanel::build(&view, &ctx()).excluded, None);
+        view.flakiness.excluded = 1;
+        assert_eq!(
+            StatsPanel::build(&view, &ctx()).excluded.as_deref(),
+            Some("1 run excluded (device lost)")
+        );
+        view.flakiness.excluded = 2;
+        assert_eq!(
+            StatsPanel::build(&view, &ctx()).excluded.as_deref(),
+            Some("2 runs excluded (device lost)")
+        );
     }
 
     #[test]

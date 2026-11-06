@@ -222,7 +222,8 @@ async fn history_lists_runs_newest_first_with_their_evidence_and_marks_a_pass_an
                 "condition": condition,
                 "passed": [passed],
                 "failed": [failed],
-            }]
+            }],
+            "excluded": 0,
         }])
     );
 }
@@ -569,6 +570,28 @@ async fn a_flows_stats_count_outcomes_summarize_durations_and_group_failures_by_
     assert_eq!(stats["flaky_commits"], 0);
     assert_eq!(stats["flakiness"]["flakiness"], "not_flaky");
     assert_eq!(stats["flakiness"]["evidence"], json!([]));
+    // Both device deaths are excluded; the assertion failure is the flow's own and is not.
+    assert_eq!(stats["flakiness"]["excluded"], 2);
+}
+
+#[tokio::test]
+async fn a_lost_device_is_reported_as_an_excluded_run_of_its_flow() {
+    let rig = rig().await;
+    Run::passed("990", "x1", "login").publish(&rig).await;
+    // The same commit under the same conditions fails once, because the device died: that is
+    // the device's failure, so it is excluded and the flow is not flaky.
+    Run::failed("991", "x1", "login", DEATH_A)
+        .publish(&rig)
+        .await;
+
+    let stats = rig
+        .json("/api/v1/projects/app/flows/flows%2Flogin.yaml/stats")
+        .await;
+    assert_eq!(stats["flakiness"]["excluded"], 1);
+    assert_eq!(stats["flakiness"]["flakiness"], "not_flaky");
+
+    let page = rig.json("/api/v1/projects/app/history").await;
+    assert_eq!(verdict(&page, "flows/login.yaml")["excluded"], 1);
 }
 
 #[tokio::test]

@@ -245,6 +245,7 @@ pub fn StatsView(
         chart,
         failures,
         flaky,
+        excluded,
     } = panel;
     let (label, hook) = (format!("Stats of {flow}"), flow.clone());
     view! {
@@ -254,12 +255,23 @@ pub fn StatsView(
                 <span class="text-sm text-muted">{window}</span>
                 <Button variant=ButtonVariant::Secondary on_click=on_close>"Close"</Button>
             </div>
-            {flaky
-                .map(|f| {
+            {(flaky.is_some() || excluded.is_some())
+                .then(|| {
                     view! {
                         <p class="flex flex-wrap items-center gap-2 text-sm">
-                            <Badge tone=f.tone>{f.label}</Badge>
-                            {f.reasons.join("; ")}
+                            {flaky
+                                .map(|f| {
+                                    view! {
+                                        <Badge tone=f.tone>{f.label}</Badge>
+                                        {f.reasons.join("; ")}
+                                    }
+                                })}
+                            {excluded
+                                .map(|e| {
+                                    view! {
+                                        <span class="text-muted" data-testid="excluded-runs" title="Failures a lost device caused never count toward flakiness">{e}</span>
+                                    }
+                                })}
                         </p>
                     }
                 })}
