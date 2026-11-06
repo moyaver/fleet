@@ -604,6 +604,10 @@ pub struct ArtifactView {
     /// The flow it is evidence for; `None` for a file of the whole run (the JUnit report, the
     /// Maestro log), which is listed with every flow of the run.
     pub flow_execution_id: Option<Uuid>,
+    /// The 0-based index of the flow step that produced the file, as Maestro names it. `None` when
+    /// no step produced it, and for uploads that predate step links.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u32>,
     /// The class: `failure_screenshot`, `commands`, `junit`, `maestro_log` or `html_report`.
     pub class: String,
     /// File name.

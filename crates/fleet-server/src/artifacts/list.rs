@@ -66,6 +66,7 @@ pub(crate) async fn flow_artifacts(
             ArtifactView {
                 id: a.id,
                 flow_execution_id: a.flow_execution_id,
+                step: a.step,
                 class: a.class,
                 name: a.name,
                 path: a.path,

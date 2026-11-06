@@ -36,6 +36,15 @@
       "format": "uint64",
       "minimum": 0,
       "type": "integer"
+    },
+    "step": {
+      "description": "The 0-based index of the flow step that produced the file, when Maestro's `artifacts[]`\nnames it (the step tree's index). The server keeps it on the artifact; absent when no step\nproduced the file, and from agents that predate it.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
     }
   },
   "required": [

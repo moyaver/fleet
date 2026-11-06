@@ -88,6 +88,7 @@ pub(super) fn request(
     UploadRequest {
         agent_run_id: run.run,
         flow_execution_id: Some(run.flow),
+        step: None,
         class: class.into(),
         path: path.into(),
         content_type: ctype.into(),
@@ -265,6 +266,7 @@ async fn asking_again_is_idempotent_and_the_same_bytes_are_stored_once_per_proje
     let foreign = UploadRequest {
         agent_run_id: hello,
         flow_execution_id: None,
+        step: None,
         class: "failure_screenshot".into(),
         path: "x.png".into(),
         content_type: "image/png".into(),

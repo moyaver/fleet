@@ -70,6 +70,8 @@ pub(crate) struct Item {
     pub(crate) content_type: &'static str,
     /// The flow it is evidence for.
     pub(crate) flow: Option<Uuid>,
+    /// The flow step that produced it, when Maestro names one.
+    pub(crate) step: Option<u32>,
     pub(crate) source: Source,
 }
 
@@ -277,6 +279,7 @@ impl Inner {
             path: item.path.clone(),
             content_type: item.content_type,
             flow: item.flow,
+            step: item.step,
             source,
         };
         let (size, sha256) = match digest(&item.source).await {
@@ -286,6 +289,7 @@ impl Inner {
         let request = UploadRequest {
             agent_run_id: self.cfg.agent_run_id,
             flow_execution_id: item.flow,
+            step: item.step,
             class: item.class.as_str().to_owned(),
             path: item.path.clone(),
             content_type: item.content_type.to_owned(),
@@ -634,6 +638,7 @@ mod tests {
             path: "maestro.log".into(),
             content_type: "text/plain",
             flow: None,
+            step: None,
             source: Source::Bytes(bytes.to_vec().into()),
         }
     }
@@ -1004,6 +1009,7 @@ mod tests {
             path: "login/screenshots/shot.png".into(),
             content_type: "image/png",
             flow: Some(Uuid::now_v7()),
+            step: Some(2),
             source: Source::File(file),
         });
         let done = run(&up).await;
@@ -1017,6 +1023,7 @@ mod tests {
         assert_eq!(request.sha256, hex(&Sha256::digest(&bytes)));
         assert_eq!(seen[1].body, bytes);
         assert!(request.flow_execution_id.is_some());
+        assert_eq!(request.step, Some(2), "the step rides on the request");
     }
 
     /// A server that accepts everything and records what it was sent.

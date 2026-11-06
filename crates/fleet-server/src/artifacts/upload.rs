@@ -210,6 +210,7 @@ pub(super) async fn request(
         credential: publisher.credential,
         agent_run_id: req.agent_run_id,
         flow_execution_id: req.flow_execution_id,
+        step: req.step,
         class: accepted.class,
         path: &accepted.path,
         name: &accepted.name,

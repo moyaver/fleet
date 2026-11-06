@@ -206,7 +206,7 @@ impl Evidence {
             };
             match class {
                 Some(ArtifactClass::FailureScreenshot) => files.screenshots.push(Shot {
-                    step: shot_step(&a.name, failed_step, steps),
+                    step: shot_step(&a.name, a.step, failed_step, steps),
                     label: a.name.clone(),
                     url: link.url.clone(),
                 }),
@@ -307,10 +307,15 @@ fn reject_reason(code: Option<&str>) -> String {
     }
 }
 
-/// The step a screenshot belongs to: Maestro names the file `step-<n>-…` with `n` counting from
-/// one, which is the step whose index is `n - 1`; otherwise the failed step; otherwise none
-/// (an empty id).
-fn shot_step(name: &str, failed: Option<&StepKey>, steps: &[StepKey]) -> String {
+/// The step a screenshot belongs to. The step the agent linked from Maestro's `artifacts[]` is
+/// exact, so it wins. The file name is the fallback only for an artifact without one: uploads
+/// that predate stored step links, and output without `artifacts[]`. Those name the file
+/// `step-<n>-…` with `n` counting from one, the step whose index is `n - 1`. Otherwise the failed
+/// step; otherwise none (an empty id).
+fn shot_step(name: &str, step: Option<u32>, failed: Option<&StepKey>, steps: &[StepKey]) -> String {
+    if let Some(step) = step {
+        return step.to_string();
+    }
     let named = name
         .strip_prefix("step-")
         .and_then(|rest| rest.split_once('-'))
@@ -639,6 +644,30 @@ mod tests {
         // With no failed step either, it is not tied to any step.
         let f = files(Evidence::build(&l, FLOW, None, &steps));
         assert_eq!(f.screenshots[0].step, "");
+    }
+
+    /// The agent's `artifacts[]` link beats the file name: the name says step 3 (index 2), the
+    /// step Maestro named is index 1.
+    #[test]
+    fn a_screenshot_with_a_step_takes_that_step_over_its_file_name() {
+        let mut shot = artifact(
+            1,
+            "failure_screenshot",
+            "step-003-assertCondition-Done.png",
+            "image/png",
+            52_000,
+            Some("https://uc.example.net/u/p/1/1/s/shot.png"),
+        );
+        shot["flow_execution_id"] = serde_json::json!(FLOW);
+        shot["step"] = serde_json::json!(1);
+        let steps = steps();
+        let f = files(Evidence::build(
+            &list(&[shot], Some(UC)),
+            FLOW,
+            steps.last(),
+            &steps,
+        ));
+        assert_eq!(f.screenshots[0].step, "1");
     }
 
     #[test]
