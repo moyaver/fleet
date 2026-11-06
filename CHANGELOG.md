@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
 - `fleet-loadgen`: `wss://` servers panicked for want of a rustls crypto provider; it now installs ring, as the agent does.
 - Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).
+- Server: a worker's "Last seen" and the overview's 24-hour worker filter only moved when an agent connected, so a long-running worker looked stale; the periodic liveness persist now also refreshes the worker's `last_seen_at`.
 
 ### Changed
 

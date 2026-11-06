@@ -72,16 +72,23 @@ impl Store {
         Ok(got.then_some(Leader { conn }))
     }
 
-    /// Records when this instance last heard from its connected runs.
+    /// Records when this instance last heard from its connected runs, and from their workers.
     pub async fn persist_last_seen(&self, seen: &[(Uuid, OffsetDateTime)]) -> Result<()> {
         if seen.is_empty() {
             return Ok(());
         }
         let (ids, at): (Vec<Uuid>, Vec<OffsetDateTime>) = seen.iter().copied().unzip();
         sqlx::query!(
-            "UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at)
-               FROM unnest($1::uuid[], $2::timestamptz[]) AS u(id, at)
-              WHERE r.id = u.id",
+            "WITH runs AS (
+               UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at)
+                 FROM unnest($1::uuid[], $2::timestamptz[]) AS u(id, at)
+                WHERE r.id = u.id
+               RETURNING r.worker_id, u.at
+             )
+             UPDATE workers w SET last_seen_at = greatest(w.last_seen_at, x.at)
+               FROM (SELECT worker_id, max(at) AS at FROM runs
+                      WHERE worker_id IS NOT NULL GROUP BY worker_id) x
+              WHERE w.id = x.worker_id",
             &ids,
             &at
         )
@@ -345,5 +352,56 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(r.detached, 1);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn persisted_contact_refreshes_the_worker_last_seen(pool: PgPool) {
+        let store = Store { pool };
+        let p = publisher(&store).await;
+        let a = Agent::new("902", "e2e");
+        store
+            .open_run(&p, &a.hello(None), Transport::WebSocket)
+            .await
+            .unwrap();
+        let worker = sqlx::query_scalar!(
+            "SELECT worker_id AS \"worker_id!\" FROM agent_runs WHERE id = $1",
+            a.id
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        // The worker connected an hour ago; its run has been talking since.
+        let now = OffsetDateTime::now_utc();
+        sqlx::query!(
+            "UPDATE workers SET last_seen_at = $2 WHERE id = $1",
+            worker,
+            now - time::Duration::hours(1)
+        )
+        .execute(store.pool())
+        .await
+        .unwrap();
+        store
+            .persist_last_seen(&[(a.id, now - time::Duration::minutes(1))])
+            .await
+            .unwrap();
+        let last_seen =
+            sqlx::query_scalar!("SELECT last_seen_at FROM workers WHERE id = $1", worker)
+                .fetch_one(store.pool())
+                .await
+                .unwrap();
+        assert!(
+            last_seen > now - time::Duration::minutes(10),
+            "worker last seen at {last_seen}, not at the run's last contact"
+        );
+        // An older contact (another instance's late sweep) never moves it back.
+        store
+            .persist_last_seen(&[(a.id, now - time::Duration::hours(2))])
+            .await
+            .unwrap();
+        let after = sqlx::query_scalar!("SELECT last_seen_at FROM workers WHERE id = $1", worker)
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+        assert_eq!(after, last_seen);
     }
 }

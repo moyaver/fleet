@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT worker_id AS \"worker_id!\" FROM agent_runs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "worker_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "worker_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "05821dcbdeaa32461ac5c1eb398c21f3a7a6dd32e759ec37bb748270bc5e9330"
+}
