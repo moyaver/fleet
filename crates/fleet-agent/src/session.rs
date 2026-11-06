@@ -68,7 +68,8 @@ pub(crate) struct Flow {
     pub(crate) started: bool,
     pub(crate) claims: Vec<Claim>,
     pub(crate) steps: u32,
-    open_step: Option<u32>,
+    /// Steps Maestro has started and not yet ended, innermost last: `(index, description)`.
+    open_steps: Vec<(u32, String)>,
     pub(crate) failure: Option<String>,
     /// The flow's `manifest.json` appeared: Maestro finished writing the bundle.
     manifest_seen: bool,
@@ -438,10 +439,10 @@ impl Session {
         state: log::StepState,
         parser: String,
     ) {
-        let Some(idx) = self.open_flow(shard, None) else {
+        let description = self.redactor.redact(description).into_owned();
+        let Some(idx) = self.step_flow(shard, &description, state) else {
             return;
         };
-        let description = self.redactor.redact(description).into_owned();
         let Some(f) = self.flows.get_mut(idx) else {
             return;
         };
@@ -450,7 +451,7 @@ impl Session {
             log::StepState::Running => {
                 let index = f.steps;
                 f.steps += 1;
-                f.open_step = Some(index);
+                f.open_steps.push((index, description.clone()));
                 let mut subject = self.flow_subject_at(idx);
                 subject.step = Some(StepRef { index });
                 self.emit(
@@ -467,12 +468,18 @@ impl Session {
             log::StepState::Warned => StepStatus::Warned,
             log::StepState::Skipped => StepStatus::Skipped,
         };
-        // A step that ends without a RUNNING line (SKIPPED, nested blocks) gets its own index.
-        let index = f.open_step.take().unwrap_or_else(|| {
+        // Blocks nest (runFlow, retry, repeat), so the step that ends is the innermost open one with
+        // this description; a step still open above it never got an end and is dropped with it.
+        // A step that ends without a RUNNING line (SKIPPED) gets its own index.
+        let index = if let Some(pos) = f.open_steps.iter().rposition(|(_, d)| *d == description) {
+            let index = f.open_steps[pos].0;
+            f.open_steps.truncate(pos);
+            index
+        } else {
             let i = f.steps;
             f.steps += 1;
             i
-        });
+        };
         let mut subject = self.flow_subject_at(idx);
         subject.step = Some(StepRef { index });
         self.emit(
@@ -482,6 +489,25 @@ impl Session {
             Some(parser),
             &EventBody::StepEnded(StepEnded { status }),
         );
+    }
+
+    /// The flow a step line belongs to. An end can arrive after its flow's stdout result (the log
+    /// lags stdout), so an end goes to the latest flow when that flow still holds the step open.
+    fn step_flow(&self, shard: u32, description: &str, state: log::StepState) -> Option<usize> {
+        if state != log::StepState::Running {
+            let latest = self
+                .flows
+                .iter()
+                .rposition(|f| f.shard == shard && f.started);
+            if let Some(i) = latest.filter(|&i| {
+                self.flows
+                    .get(i)
+                    .is_some_and(|f| f.open_steps.iter().any(|(_, open)| open == description))
+            }) {
+                return Some(i);
+            }
+        }
+        self.open_flow(shard, None)
     }
 
     fn on_stdout(&mut self, at: ClockSample, line: &str) {
@@ -944,7 +970,7 @@ impl Session {
             started: false,
             claims: Vec::new(),
             steps: 0,
-            open_step: None,
+            open_steps: Vec::new(),
             failure: None,
             manifest_seen: false,
             pending_pass: None,

@@ -12,11 +12,11 @@ expression: result
       "finality": "verified",
       "source": "junit_final",
       "conflict": false,
-      "steps": 28,
+      "steps": 25,
       "failure": null
     }
   ],
-  "events": 61,
+  "events": 62,
   "event_types": {
     "artifact.registered": 2,
     "flow.ended": 2,
@@ -27,7 +27,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 24,
+    "step.ended": 25,
     "step.started": 25,
     "suite.started": 1
   },
