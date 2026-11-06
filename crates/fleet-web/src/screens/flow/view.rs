@@ -62,6 +62,9 @@ pub fn FlowPageView(
             .get()
             .map(|f| FlowPage::build(&f, &ctx.read()).header)
     });
+    // The evidence card sits outside the page's `loaded` block, which rebuilds on every refetch
+    // of the flow (a live update); this mounts the card once, when the flow first arrives.
+    let flow_ready = Memo::new(move |_| flow.data.with(Option::is_some));
     view! {
            <article class="space-y-4" aria-labelledby="flow-title" data-testid="flow-page">
                <ErrorNotice error=flow_error />
@@ -80,12 +83,12 @@ pub fn FlowPageView(
                                    <CiCard ci=page.ci />
                                </div>
                                <PreviousCard previous=page.previous />
-                               <EvidenceCard feed=evidence flow />
                            }
                                .into_any()
                        },
                    )
                }}
+               {move || flow_ready.get().then(|| view! { <EvidenceCard feed=evidence flow /> })}
            </article>
        }
 }

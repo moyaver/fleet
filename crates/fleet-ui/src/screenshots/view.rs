@@ -3,19 +3,36 @@
 
 use leptos::prelude::*;
 
-use crate::screenshots::{ScreenshotViewer, Zoom};
+use crate::screenshots::{ScreenshotViewer, Shot, Zoom};
+
+/// The image width for a zoom level.
+fn width_of(zoom: Zoom) -> String {
+    match zoom {
+        Zoom::Fit => "100%".to_owned(),
+        Zoom::Percent(p) => format!("{p}%"),
+    }
+}
 
 /// Screenshot viewer with a step strip and zoom controls.
+///
+/// `shots` may change while the viewer is open (a renewed link is a new URL for the same shot).
+/// The viewer keeps its selection and zoom, and the image element stays in place, so the
+/// browser keeps showing the old picture until the new one loads.
 #[component]
 #[expect(
     clippy::must_use_candidate,
     reason = "the component macro rewrites the signature"
 )]
 pub fn ScreenshotViewerView(
-    /// The model.
-    viewer: ScreenshotViewer,
+    /// The shots in capture order.
+    #[prop(into)]
+    shots: Signal<Vec<Shot>>,
 ) -> impl IntoView {
-    let viewer = RwSignal::new(viewer);
+    let viewer = RwSignal::new(ScreenshotViewer::new(shots.get_untracked()));
+    Effect::new(move |_| {
+        let shots = shots.get();
+        viewer.update(|v| v.replace(shots));
+    });
     view! {
         <section
             class="rounded border border-border bg-surface p-2 text-fg"
@@ -48,21 +65,11 @@ pub fn ScreenshotViewerView(
                     <span aria-live="polite">{move || viewer.with(ScreenshotViewer::position)}</span>
                 </div>
                 <div class="overflow-auto border border-border" tabindex="0">
-                    {move || {
-                        viewer
-                            .with(|v| {
-                                v.selected()
-                                    .map(|s| {
-                                        let width = match v.zoom() {
-                                            Zoom::Fit => "100%".to_owned(),
-                                            Zoom::Percent(p) => format!("{p}%"),
-                                        };
-                                        view! {
-                                            <img src=s.url.clone() alt=s.label.clone() style:width=width />
-                                        }
-                                    })
-                            })
-                    }}
+                    <img
+                        src=move || viewer.with(|v| v.selected().map(|s| s.url.clone()))
+                        alt=move || viewer.with(|v| v.selected().map(|s| s.label.clone()))
+                        style:width=move || viewer.with(|v| width_of(v.zoom()))
+                    />
                 </div>
                 <ol class="flex gap-1 overflow-x-auto">
                     {move || {

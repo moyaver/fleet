@@ -121,6 +121,45 @@ pub struct EvidenceFiles {
     pub refused: Vec<Refused>,
 }
 
+/// How the Maestro log is shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogMount {
+    /// No log was uploaded.
+    None,
+    /// In the log viewer.
+    Viewer,
+    /// Too big for the browser: a download link.
+    Download,
+}
+
+/// Which parts of the evidence card a set of files mounts. A renewed link changes none of it, so
+/// the card's viewers stay mounted, with their state, while the links are renewed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mounts {
+    /// Whether there are failure screenshots for the viewer.
+    pub screenshots: bool,
+    /// How the log is shown.
+    pub log: LogMount,
+    /// Whether there is a `commands.json` to show as timings.
+    pub commands: bool,
+}
+
+impl EvidenceFiles {
+    /// What the card mounts for these files.
+    #[must_use]
+    pub fn mounts(&self) -> Mounts {
+        Mounts {
+            screenshots: !self.screenshots.is_empty(),
+            log: match &self.log {
+                None => LogMount::None,
+                Some(LogSource::Show(_)) => LogMount::Viewer,
+                Some(LogSource::TooLarge(_)) => LogMount::Download,
+            },
+            commands: self.commands.is_some(),
+        }
+    }
+}
+
 /// What screen D says about a flow's evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Evidence {
@@ -677,6 +716,27 @@ mod tests {
         let steps = steps();
         let f = files(Evidence::build(&l, FLOW, None, &steps));
         assert_eq!(f.screenshots, Vec::new());
+    }
+
+    /// Renewing the links changes every URL but none of what the card mounts, so the viewers
+    /// stay mounted across renewals; a file that goes away is a change.
+    #[test]
+    fn renewed_links_leave_what_the_card_mounts_unchanged() {
+        let steps = steps();
+        let before = files(Evidence::build(&full(), FLOW, steps.last(), &steps));
+        let mut renewed = full();
+        for a in &mut renewed.artifacts {
+            if let Some(link) = a.link.as_mut() {
+                link.url.push_str("?renewed");
+            }
+        }
+        let after = files(Evidence::build(&renewed, FLOW, steps.last(), &steps));
+        assert_ne!(before.screenshots, after.screenshots, "the links changed");
+        assert_eq!(before.mounts(), after.mounts());
+
+        renewed.artifacts.retain(|a| a.name != "commands.json");
+        let gone = files(Evidence::build(&renewed, FLOW, steps.last(), &steps));
+        assert_ne!(before.mounts(), gone.mounts());
     }
 
     #[test]
