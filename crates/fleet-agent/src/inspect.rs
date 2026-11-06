@@ -5,6 +5,12 @@
 //! replayed in order — exactly what the observer would have fed the session live. A plain saved
 //! run (a debug output directory with `maestro.log`, flow bundles and `report.xml`) is fed in file
 //! order: log, bundles, report.
+//!
+//! A run directory with a `journal.jsonl` (the agent's own record of the run, see
+//! [`crate::journal`]) also reports what that journal holds. When the directory has no saved
+//! Maestro output to replay, the journal is all there is to inspect, and its events are the
+//! result. A journal that stopped at its size cap says so, and from which `seq` events are
+//! missing.
 
 use std::{
     fs,
@@ -20,7 +26,10 @@ use serde_json::Value;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::session::{Observation, Session};
+use crate::{
+    journal::{self, Truncation},
+    session::{Observation, Session},
+};
 
 /// One flow in the result.
 #[derive(Debug, Clone, Serialize)]
@@ -56,15 +65,32 @@ pub struct Inspection {
     pub event_types: std::collections::BTreeMap<String, usize>,
     /// Stdout lines no parser recognised (Maestro output drift).
     pub unrecognized_stdout: u32,
+    /// What `journal.jsonl` holds, when the directory has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journal: Option<JournalStatus>,
+}
+
+/// What a run directory's `journal.jsonl` holds.
+#[derive(Debug, Clone, Serialize)]
+pub struct JournalStatus {
+    /// Events in the journal, before any truncation marker.
+    pub events: usize,
+    /// Set when the journal reached its size cap: it holds no event from
+    /// `first_missing_seq` on, and those events are missing from it.
+    pub truncated: Option<Truncation>,
 }
 
 /// Inspects a saved run directory.
 ///
 /// # Errors
-/// Returns an error when the directory has neither a capture timeline nor a `maestro.log`.
+/// Returns an error when the directory has neither a capture timeline, a `maestro.log` nor a
+/// `journal.jsonl`, or when a file it should read cannot be read.
 pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
+    let journal = read_journal(dir)?;
     let replay = if dir.join("events.jsonl").exists() {
         Replay::from_capture(dir)?
+    } else if let (Some(journal), None) = (&journal, saved_log(dir)) {
+        return Ok(from_journal(journal));
     } else {
         Replay::from_saved_run(dir)?
     };
@@ -114,8 +140,42 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
         events: events.len(),
         event_types,
         unrecognized_stdout: session.unrecognized_stdout,
+        journal: journal.as_ref().map(journal_status),
     };
     Ok((inspection, events))
+}
+
+/// The directory's `journal.jsonl`, if it has one.
+fn read_journal(dir: &Path) -> anyhow::Result<Option<journal::Journal>> {
+    let path = dir.join("journal.jsonl");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    Ok(Some(journal::parse(&text)))
+}
+
+fn journal_status(journal: &journal::Journal) -> JournalStatus {
+    JournalStatus {
+        events: journal.events.len(),
+        truncated: journal.truncated.clone(),
+    }
+}
+
+/// A directory with only a journal: its events, as they were recorded, are the inspection.
+fn from_journal(journal: &journal::Journal) -> (Inspection, Vec<EventEnvelope>) {
+    let mut event_types = std::collections::BTreeMap::new();
+    for e in &journal.events {
+        *event_types.entry(e.kind.clone()).or_default() += 1;
+    }
+    let inspection = Inspection {
+        flows: Vec::new(),
+        events: journal.events.len(),
+        event_types,
+        unrecognized_stdout: 0,
+        journal: Some(journal_status(journal)),
+    };
+    (inspection, journal.events.clone())
 }
 
 /// A human-readable table of an inspection.
@@ -152,6 +212,20 @@ pub fn table(i: &Inspection) -> String {
         "{} events, {} unrecognized stdout lines",
         i.events, i.unrecognized_stdout
     );
+    if let Some(j) = &i.journal {
+        match &j.truncated {
+            None => {
+                let _ = writeln!(out, "journal.jsonl: {} events, complete", j.events);
+            }
+            Some(t) => {
+                let _ = writeln!(
+                    out,
+                    "journal.jsonl is truncated: it stopped at its size cap ({}) after {} bytes, holding {} events. Events from seq {} on are missing from it.",
+                    t.reason, t.bytes_written, j.events, t.first_missing_seq
+                );
+            }
+        }
+    }
     out
 }
 
@@ -255,10 +329,8 @@ impl Replay {
 
     /// A saved debug output directory.
     fn from_saved_run(dir: &Path) -> anyhow::Result<Self> {
-        let log_path = [dir.join("maestro.log"), dir.join("debug/maestro.log")]
-            .into_iter()
-            .find(|p| p.exists())
-            .with_context(|| format!("{} has no maestro.log", dir.display()))?;
+        let log_path =
+            saved_log(dir).with_context(|| format!("{} has no maestro.log", dir.display()))?;
         let debug = log_path.parent().unwrap_or(dir).to_path_buf();
         let mut timeline = Vec::new();
         let mut asm = log::Assembler::default();
@@ -303,6 +375,13 @@ impl Replay {
             timeline,
         })
     }
+}
+
+/// A saved debug output directory's `maestro.log`, at the top or under `debug/`.
+fn saved_log(dir: &Path) -> Option<PathBuf> {
+    [dir.join("maestro.log"), dir.join("debug/maestro.log")]
+        .into_iter()
+        .find(|p| p.exists())
 }
 
 /// The observations recorded in a capture's `events.jsonl`, and the last timestamp.

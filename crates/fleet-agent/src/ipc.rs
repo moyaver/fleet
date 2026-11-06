@@ -54,6 +54,8 @@ pub(crate) enum Control {
         /// The evidence sources the prepared command will produce.
         #[serde(default)]
         evidence: Option<Box<fleet_protocol::event::EvidenceSources>>,
+        /// Most bytes `journal.jsonl` may take (see [`crate::journal`]).
+        journal_max_bytes: u64,
     },
     /// The supervisor received a signal and forwarded it.
     Signal {
@@ -170,6 +172,7 @@ mod tests {
                 run_dir: None,
                 plan: None,
                 evidence: None,
+                journal_max_bytes: 1024,
             }),
             Frame::Control(Control::Gap {
                 stream: Stream::Stderr,

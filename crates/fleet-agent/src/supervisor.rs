@@ -53,6 +53,8 @@ pub(crate) struct Options {
     pub(crate) run_dir: Option<std::path::PathBuf>,
     /// A Fleet plan manifest and the shard of it to run.
     pub(crate) plan: Option<(std::path::PathBuf, u32)>,
+    /// Most bytes the observer writes to `journal.jsonl` (issue #37).
+    pub(crate) journal_max_bytes: u64,
 }
 
 const CHUNK: usize = 64 * 1024;
@@ -124,6 +126,7 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
                 .map(|d| d.to_string_lossy().into_owned()),
             plan: prepared.plan.clone(),
             evidence: prepared.evidence.clone().map(Box::new),
+            journal_max_bytes: opts.journal_max_bytes,
         }));
     }
 
@@ -549,6 +552,7 @@ impl Observer {
         let deadline = Instant::now() + timeout;
         let mut finalized = false;
         let mut maestro = None;
+        let mut truncated = None;
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
             match self.control.recv_timeout(left) {
                 Ok(line) if line == "finalized" => {
@@ -558,10 +562,17 @@ impl Observer {
                 Ok(line) => {
                     if let Some(version) = line.strip_prefix("maestro-version ") {
                         maestro = Some(version.to_owned());
+                    } else if let Some(seq) = line.strip_prefix("journal-truncated ") {
+                        truncated = seq.parse::<u64>().ok();
                     }
                 }
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
             }
+        }
+        if let Some(seq) = truncated {
+            warnings.push(format!(
+                "journal.jsonl reached its size cap before seq {seq}, so events from seq {seq} on are not in it (raise FLEET_JOURNAL_MAX_BYTES to keep them); the run is unaffected"
+            ));
         }
         if let Some(version) = maestro
             && !fleet_maestro::supports(&version)
