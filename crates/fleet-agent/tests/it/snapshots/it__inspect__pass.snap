@@ -16,7 +16,7 @@ expression: result
       "failure": null
     }
   ],
-  "events": 23,
+  "events": 24,
   "event_types": {
     "flow.ended": 2,
     "flow.reported": 1,
@@ -26,7 +26,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 6,
+    "step.ended": 7,
     "step.started": 7,
     "suite.started": 1
   },
