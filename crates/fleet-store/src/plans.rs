@@ -279,6 +279,8 @@ mod tests {
 
     fn manifest(id: &str, flows: &[&[&str]]) -> PlanManifest {
         PlanManifest {
+            config_path: None,
+            config_sha256: None,
             plan_id: id.into(),
             total_flows: None,
             shards: flows

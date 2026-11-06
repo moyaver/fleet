@@ -118,7 +118,7 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 - [x] Retention, rollups (1 min, 1 h), partition drops, failure-evidence promotion, blob GC with a grace period, migration 0009 ([587df25](https://github.com/moyaver/fleet/commit/587df250e146fdeb995dae27bcbee1262fbb3e50), closes [#32](https://github.com/moyaver/fleet/issues/32))
 - [x] Screens E (History) and F (Compare) with evidence-only mismatch explanations ([f127d20](https://github.com/moyaver/fleet/commit/f127d209fedb59f6a04a01e94f9d5b19a2dd8c67))
 - [x] Evidence on screen D (screenshots, log at the failing step, step timings, sandboxed HTML report) and the M5 exit suite ([b64e7db](https://github.com/moyaver/fleet/commit/b64e7db81bd81e771eb7106753c930b635bf786c))
-- [ ] **Fleet Planner**: duration-aware CI sharding ([#15](https://github.com/moyaver/fleet/issues/15), [ADR-0013](decisions/0013-fleet-planner.md))
+- [x] **Fleet Planner**: duration-aware CI sharding ([#15](https://github.com/moyaver/fleet/issues/15), [ADR-0013](decisions/0013-fleet-planner.md)): `fleet-planner plan` writes the manifest and matrix and publishes the plan; `fleet-agent run --plan` runs one shard with the workspace config
 
 ### M5 exit criteria
 

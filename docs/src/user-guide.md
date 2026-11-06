@@ -151,13 +151,22 @@ The server ignores events it already has, so flushing twice is safe. On ephemera
 
 ## Fleet Planner shards
 
-To run one shard of a [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md), give the manifest and the shard. The shard's flows are the only flows the command runs, so don't name any flow paths yourself:
+A [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md) splits the suite over CI jobs by duration. Run the planner from the repository root in the planning job; it writes the manifest and a matrix with one entry per shard, and publishes the plan to Fleet when it can (a Fleet outage only costs the planned totals, never the run):
+
+```bash
+fleet-planner plan --config .maestro/config.yaml --shards 4 \
+  --manifest plan.json --matrix matrix.json \
+  --server https://fleet.example.com --token "$FLEET_TOKEN" \
+  --history-server https://fleet.example.com --project my-app
+```
+
+Each test job runs one shard. The shard's flows are the only flows the command runs, so don't name any flow paths yourself:
 
 ```bash
 fleet-agent run --plan plan.json --shard 2 -- maestro test
 ```
 
-A plan that can't be read stops the step (exit 2) rather than running the whole suite on every shard. So does a command that already names flow files or directories (`maestro test .maestro/`): Maestro would run those too. Maestro options such as `--device` and `-e` are fine.
+The agent passes the plan's workspace config to Maestro, so `executionOrder` and tag rules keep their meaning. A plan that can't be read stops the step (exit 2) rather than running the whole suite on every shard. So does a shard with no flows, a command that isn't `maestro test`, and a command that names flow files or directories (`maestro test .maestro/`), selects tags with `--include-tags` or `--exclude-tags`, or passes its own `--config` when the plan has one. Maestro options such as `--device` and `-e` are fine.
 
 ## Example workflow
 

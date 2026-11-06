@@ -30,6 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Fleet Planner (ADR-0013): `fleet-planner plan` splits a Maestro suite into CI shards. It finds flows the way Maestro does (`config.yaml` globs, tags, `executionOrder`), balances shards Longest Processing Time first from Fleet history (or an even split without it), writes an immutable manifest and a GitHub Actions matrix, and publishes the plan. `fleet-agent run --plan` runs one shard with the plan's workspace config, and refuses an empty shard or a command that would select flows itself.
 - The agent falls back to HTTPS batch transport after repeated blocked WebSocket upgrades, with server-authoritative resume and telemetry acknowledgments.
 - Generated protocol JSON Schemas, golden wire frames and a CI freshness check.
 - A pinned Maestro nightly emulator workflow and a captured absolute-path regression fixture.

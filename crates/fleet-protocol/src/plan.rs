@@ -17,6 +17,13 @@ pub struct PlanManifest {
     /// Total flows across shards, as the planner counted them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_flows: Option<u32>,
+    /// The workspace `config.yaml`, relative to the repository root. The agent passes it to
+    /// Maestro with `--config`, so `executionOrder` and tag rules still apply to the shard's flows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_path: Option<String>,
+    /// SHA-256 of `config_path` at planning time; the agent refuses to run if it changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_sha256: Option<String>,
     /// The shards.
     pub shards: Vec<PlanShard>,
 }
