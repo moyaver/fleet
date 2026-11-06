@@ -197,14 +197,18 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
     let serving = {
         let (stop, state) = (stop.clone(), state.clone());
         tokio::spawn(async move {
-            axum::serve(listener, router)
-                .with_graceful_shutdown(async move {
-                    stop.cancelled().await;
-                    state.set_ready(false);
-                    // Upgraded sockets are not tracked by hyper: tell them directly.
-                    state.shutdown.cancel();
-                })
-                .await
+            // The peer's address is what the per-IP limits count (see `client_ip`).
+            axum::serve(
+                listener,
+                router.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .with_graceful_shutdown(async move {
+                stop.cancelled().await;
+                state.set_ready(false);
+                // Upgraded sockets are not tracked by hyper: tell them directly.
+                state.shutdown.cancel();
+            })
+            .await
         })
     };
     let usercontent = match state.config.usercontent.listen {

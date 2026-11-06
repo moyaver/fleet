@@ -34,6 +34,8 @@ enum Mode {
     Blackhole,
     /// Upgrades at once, but takes this long to answer `hello` (a server busy under load).
     SlowWelcome(Duration),
+    /// Refuses the first `times` upgrades with `429` and `Retry-After: retry_after` seconds.
+    RateLimited { times: u32, retry_after: u32 },
 }
 
 #[derive(Default)]
@@ -43,6 +45,9 @@ struct State {
     /// Committed events by seq (dedup: a resent seq replaces nothing).
     committed: BTreeMap<u64, Value>,
     connections: u32,
+    /// When each connection was accepted, and each refusal sent.
+    accepted: Vec<Instant>,
+    refusals: Vec<Instant>,
     hellos: Vec<Value>,
     /// Created once the agent has been sent its welcome, to release the fake Maestro's exit.
     gate: Option<PathBuf>,
@@ -78,8 +83,22 @@ fn server(mode: Mode) -> Server {
                         drop(sock);
                         return;
                     }
+                    let st_cb = Arc::clone(&st);
                     #[expect(clippy::result_large_err, reason = "tungstenite's callback signature")]
-                    let cb = |req: &Request, mut resp: Response| {
+                    let cb = move |req: &Request, mut resp: Response| {
+                        if let Mode::RateLimited { times, retry_after } = mode {
+                            let mut s = st_cb.lock().unwrap();
+                            if s.refusals.len() < times as usize {
+                                s.refusals.push(Instant::now());
+                                return Err(
+                                    tokio_tungstenite::tungstenite::http::Response::builder()
+                                        .status(429)
+                                        .header("Retry-After", retry_after.to_string())
+                                        .body(None)
+                                        .unwrap(),
+                                );
+                            }
+                        }
                         assert_eq!(
                             req.headers().get("Sec-WebSocket-Protocol").unwrap(),
                             "fleet.v1+json"
@@ -112,6 +131,7 @@ async fn connection(
     let conn_no = {
         let mut s = st.lock().unwrap();
         s.connections += 1;
+        s.accepted.push(Instant::now());
         s.connections
     };
     let mut received_here = 0usize;
@@ -715,6 +735,70 @@ fn refused_upgrades_fall_back_to_batch_and_resume() {
 }
 
 #[test]
+fn a_rate_limited_batch_waits_for_retry_after_and_the_run_keeps_maestros_status() {
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+    // Requests seen, and when the first (refused) one and the first accepted one arrived.
+    let state = Arc::new(Mutex::new((0_u32, None::<Instant>, None::<Instant>)));
+    let server_state = Arc::clone(&state);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            let server = MockServer::start().await;
+            Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
+            Mock::given(method("POST")).and(path("/api/v1/agent/batch"))
+                .respond_with(move |request: &wiremock::Request| {
+                    let mut state = server_state.lock().unwrap();
+                    state.0 += 1;
+                    if state.0 == 1 {
+                        state.1 = Some(Instant::now());
+                        return ResponseTemplate::new(429).insert_header("Retry-After", "1");
+                    }
+                    state.2.get_or_insert_with(Instant::now);
+                    let body: Value = serde_json::from_slice(&request.body).unwrap();
+                    let through = body["events"].as_array().unwrap().iter()
+                        .map(|e| e["seq"].as_u64().unwrap())
+                        .max()
+                        .unwrap_or(0);
+                    ResponseTemplate::new(200).set_body_json(json!({"frames": [
+                        {"op":"welcome", "protocol":1, "connection_id":"00000000-0000-0000-0000-000000000001",
+                         "epoch":1, "committed_through":0, "resume":"new",
+                         "limits":{"max_inflight_events":512,"max_frame_bytes":1_048_576,"heartbeat_interval_ms":10_000}},
+                        {"op":"ack", "through":through, "epoch":1, "duplicates":0}
+                    ]}))
+                }).mount(&server).await;
+            tx.send(*server.address()).unwrap();
+            std::future::pending::<()>().await;
+        });
+    });
+    let addr = rx.recv().unwrap();
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{addr}/api/v1/agent/ws")),
+        &[],
+        &[],
+    );
+    // I1 and I2: the refusal never reaches Maestro's output or status.
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let state = state.lock().unwrap();
+    let (refused, accepted) = (state.1.unwrap(), state.2.expect("a batch was accepted"));
+    assert!(
+        accepted.duration_since(refused) >= Duration::from_secs(1),
+        "the batch waited for Retry-After"
+    );
+}
+
+#[test]
 fn unauthorized_upgrade_does_not_trigger_batch() {
     use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
     let posts = Arc::new(Mutex::new(0_u32));
@@ -1091,4 +1175,39 @@ fn a_journal_under_the_cap_is_the_whole_run_with_no_marker() {
     let (result, _) = fleet_agent::inspect::inspect(&run_dir).unwrap();
     let json = serde_json::to_value(&result).unwrap();
     assert!(json["journal"]["truncated"].is_null(), "{json}");
+}
+
+#[test]
+fn a_rate_limited_agent_waits_for_retry_after_and_the_run_keeps_maestros_status() {
+    // Two upgrades are refused with `Retry-After: 1`; the third is accepted.
+    let srv = server(Mode::RateLimited {
+        times: 2,
+        retry_after: 1,
+    });
+    let (out, _, _) = run_agent("suite", Some(&format!("ws://{}", srv.addr)), &[], &[]);
+    // I1 and I2: the refusals never reach Maestro, and the run is what Maestro made it.
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let s = srv.state.lock().unwrap();
+    assert_eq!(s.refusals.len(), 2, "both refusals were sent");
+    // Each retry came no sooner than the server's Retry-After (the jittered backoff alone is
+    // under a second at these attempt numbers).
+    let [first, second] = s.refusals[..] else {
+        panic!("two refusals");
+    };
+    assert!(second.duration_since(first) >= Duration::from_secs(1));
+    let last_refusal = s.refusals[1];
+    let accepted = s
+        .accepted
+        .first()
+        .copied()
+        .expect("a connection was accepted");
+    assert!(accepted.duration_since(last_refusal) >= Duration::from_secs(1));
+    assert!(
+        s.committed.values().any(|e| e["type"] == "run.ended"),
+        "the run's events arrived once the server let the agent in"
+    );
 }

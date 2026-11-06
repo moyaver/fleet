@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Server: per-IP limits on the pre-auth routes (agent token exchange, browser sign-in and callback) and per-credential limits on agent connections, answered with `429 Too Many Requests` and `Retry-After`; an agent socket's events are paced, never dropped. Client IPs come from `trusted_proxies` (#35).
+
 ### Fixed
 
 - Agent: a failed write to `journal.jsonl` (disk full, I/O error) stops the journal like the cap does: one `journal.truncated` line names the error, the run's warning names the first missing seq, and `fleet-agent inspect` reports it. Before, the error was dropped silently (#112).

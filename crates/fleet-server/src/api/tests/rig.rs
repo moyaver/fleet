@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A server on a fresh database, and simulated agents that publish through the real ingest path.
 
-use std::time::Duration as StdDuration;
+use std::{net::SocketAddr, time::Duration as StdDuration};
 
 use axum_test::{TestResponse, TestServer};
 use fleet_core::policy::{Grant, Role};
@@ -79,7 +79,7 @@ pub(super) async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     // A real socket, so agent WebSockets work too.
     let app = TestServer::builder()
         .http_transport()
-        .build(app::router(&state));
+        .build(app::router(&state).into_make_service_with_connect_info::<SocketAddr>());
     Rig {
         app,
         state,

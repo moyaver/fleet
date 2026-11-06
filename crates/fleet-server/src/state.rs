@@ -11,8 +11,8 @@ use fleet_store::{Store, ingest::Change};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
-    artifacts::links::Signer, config::Config, ingest::telemetry::TelemetryBuffer, live::Hub,
-    login::idp::Idp, oidc::Jwks,
+    artifacts::links::Signer, config::Config, ingest::telemetry::TelemetryBuffer, limits::Limits,
+    live::Hub, login::idp::Idp, oidc::Jwks,
 };
 
 /// Cheap to clone; everything lives behind one `Arc`.
@@ -28,6 +28,8 @@ pub(crate) struct Inner {
     /// Every socket and background task, so shutdown can wait for them.
     pub(crate) tracker: TaskTracker,
     pub(crate) telemetry: TelemetryBuffer,
+    /// Per-IP and per-credential request limits, and the per-socket event rate.
+    pub(crate) limits: Limits,
     pub(crate) hub: Hub,
     pub(crate) jwks: Jwks,
     /// The browser sign-in identity provider (discovery cache and token calls).
@@ -54,6 +56,7 @@ impl AppState {
             std::time::Duration::from_millis(config.liveness.stale_after_ms),
             config.api.live_buffer,
         );
+        let limits = Limits::new(&config.rate_limits, std::time::Instant::now());
         Ok(Self(Arc::new(Inner {
             hub,
             jwks: Jwks::new()?,
@@ -65,6 +68,7 @@ impl AppState {
             shutdown: CancellationToken::new(),
             tracker: TaskTracker::new(),
             telemetry: TelemetryBuffer::default(),
+            limits,
             ready: AtomicBool::new(false),
         })))
     }

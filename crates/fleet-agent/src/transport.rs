@@ -145,12 +145,12 @@ pub(crate) async fn run(
                 Err(e) => {
                     tracing::warn!(error = %e, attempt, "OIDC token exchange failed");
                     attempt = attempt.saturating_add(1);
-                    tokio::time::sleep(backoff(attempt)).await;
+                    tokio::time::sleep(pause(attempt, retry_after_of(e.as_ref()))).await;
                     continue;
                 }
             }
         }
-        match connection(&cfg, &shared, &mut telemetry, &clock).await {
+        let server_wait = match connection(&cfg, &shared, &mut telemetry, &clock).await {
             Ok(end) => return end,
             Err(e) => {
                 if upgrade_refused(e.as_ref()) {
@@ -168,10 +168,31 @@ pub(crate) async fn run(
                     upgrade_failures = 0;
                 }
                 tracing::warn!(error = %e, attempt, "agent connection lost");
+                retry_after_of(e.as_ref())
             }
-        }
+        };
         attempt = attempt.saturating_add(1);
-        tokio::time::sleep(backoff(attempt)).await;
+        tokio::time::sleep(pause(attempt, server_wait)).await;
+    }
+}
+
+/// How long to wait before trying again: the jittered backoff, or the server's `Retry-After`
+/// when that is longer.
+fn pause(attempt: u32, server: Option<Duration>) -> Duration {
+    backoff(attempt).max(server.unwrap_or_default())
+}
+
+/// The `Retry-After` of a refusal: from the token exchange, or from an upgrade the server
+/// answered with `429`.
+fn retry_after_of(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Option<Duration> {
+    if let Some(limited) = error.downcast_ref::<crate::net::RateLimited>() {
+        return Some(limited.retry_after);
+    }
+    match error.downcast_ref::<tokio_tungstenite::tungstenite::Error>() {
+        Some(tokio_tungstenite::tungstenite::Error::Http(response)) if response.status() == 429 => {
+            Some(crate::net::retry_after(response.headers()))
+        }
+        _ => None,
     }
 }
 
@@ -258,6 +279,14 @@ async fn batch(
                     .connected
                     .store(true, std::sync::atomic::Ordering::SeqCst);
                 response.json::<BatchResponse>().await
+            }
+            // Rate limited: wait as the server asks and send again. Not a failure of the link,
+            // so it does not count towards giving up on batch.
+            Ok(response) if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                let wait = pause(1, Some(crate::net::retry_after(response.headers())));
+                tracing::warn!(wait_ms = wait.as_millis(), "batch rate limited; waiting");
+                tokio::time::sleep(wait).await;
+                continue;
             }
             Ok(_) | Err(_) => {
                 failures = failures.saturating_add(1);

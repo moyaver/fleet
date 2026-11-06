@@ -103,7 +103,7 @@ pub struct CiClaims {
 }
 
 /// Which credential authenticated a publisher.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Credential {
     /// An API key.
     ApiKey(Uuid),

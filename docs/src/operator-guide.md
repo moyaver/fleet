@@ -21,6 +21,8 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | Key | Default | Meaning |
 |---|---|---|
 | `listen` | `127.0.0.1:8080` | Address to listen on (the image sets `0.0.0.0:8080`) |
+| `trusted_proxies` | `[]` | CIDR blocks of reverse proxies; their `X-Forwarded-For` names the client for the limits below. See [Client addresses and limits](#client-addresses-and-limits) |
+| `rate_limits.*` | see below | Per-IP and per-credential request limits and the per-socket event rate |
 | `database.url` | — | `postgres://…` (use `FLEET_DATABASE__URL_FILE`) |
 | `database.migrate` | `auto` | `auto` migrates on start; `manual` refuses an outdated or newer schema |
 | `ingest.heartbeat_interval_ms` | `10000` | Agent heartbeat cadence (sent to agents in `welcome`) |
@@ -84,6 +86,21 @@ role = "admin"
 - **Sessions** are an opaque cookie (`__Host-fleet_session`: `HttpOnly`, `Secure`, `SameSite=Lax`) stored in Postgres by hash. Mutating requests made with the cookie must send the session's CSRF token (`X-CSRF-Token`, from `GET /api/v1/auth/session`) and, when the browser sends an `Origin`, the dashboard's own.
 - **Serve the dashboard over HTTPS.** The session cookie is `Secure` and carries the `__Host-` prefix, which browsers accept only from a secure origin, so sign-in cannot work over plain `http://` (browsers treat `localhost` and `127.0.0.1` as secure, which is how the end-to-end tests run). Put TLS in front of Fleet (the Compose file's Caddy does) and set `api.public_url` to the `https://` address people use.
 - A project the user has no role on looks exactly like a project that does not exist.
+
+## Client addresses and limits
+
+Pre-auth requests (`POST /api/v1/agent/token`, browser sign-in and its callback) are limited per client IP, and each agent credential is limited on its WebSocket upgrades and batch requests. A refused request gets `429 Too Many Requests` with `Retry-After` in seconds, and the agent waits that long and keeps spooling: a limit slows a run's upload, it never fails the run.
+
+`trusted_proxies` says which peers are proxies. Behind a reverse proxy the peer is the proxy, so the client is named by `X-Forwarded-For`; Fleet reads it only when the peer is inside a listed block, and then takes the rightmost address that is not itself a proxy. With the default empty list the header is ignored, which is right when Fleet is exposed directly.
+
+The Compose reference deployment fixes its network to `10.77.0.0/24` and trusts it, so Caddy's address is a proxy and the client is the real browser or agent. If you change the network's subnet, change `trusted_proxies` in [`fleet.toml`](https://github.com/moyaver/fleet/blob/main/deploy/compose/fleet.toml) with it. Listing more than the proxies does harm: any address inside a listed block can write any client address into `X-Forwarded-For`, so it can escape a per-IP limit or borrow another client's. Never list `0.0.0.0/0` or `::/0` (the server refuses to start).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `rate_limits.ip_requests_per_minute`, `rate_limits.ip_burst` | `120`, `60` | Pre-auth requests per client IP: sustained rate, and how many may arrive at once |
+| `rate_limits.credential_requests_per_minute`, `rate_limits.credential_burst` | `1200`, `300` | Agent connections per credential (WebSocket upgrades and batch requests) |
+| `rate_limits.events_per_second`, `rate_limits.event_burst` | `1000`, `5000` | Events per second one agent socket may send on average, and at once. Beyond it the server reads that socket more slowly; no event is dropped |
+| `rate_limits.max_tracked_keys` | `100000` | Clients tracked per limiter; memory stays bounded. A new client beyond this is told to retry in one second until an idle one ages out |
 
 ## Artifact storage
 

@@ -10,5 +10,6 @@
 mod ingest;
 mod live;
 mod oidc;
+mod ratelimit;
 mod support;
 mod usercontent;

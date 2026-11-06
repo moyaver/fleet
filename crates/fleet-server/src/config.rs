@@ -18,6 +18,7 @@ use figment::{
     providers::{Format, Serialized, Toml},
     value::{Dict, Map, Value},
 };
+use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 
 /// A secret setting: deserializes from a string, never prints.
@@ -57,10 +58,17 @@ impl From<&str> for Secret {
 pub struct Config {
     /// Where to listen.
     pub listen: SocketAddr,
+    /// Addresses of reverse proxies in front of Fleet, as CIDR blocks (`10.0.0.0/8`,
+    /// `fd00::/8`). Empty: the socket peer is always the client, and `X-Forwarded-For` is
+    /// ignored. A peer inside one of these blocks is a proxy, and its `X-Forwarded-For` names
+    /// the client. See `docs/src/operator-guide.md`.
+    pub trusted_proxies: Vec<IpNet>,
     /// Postgres.
     pub database: Database,
     /// The agent protocol.
     pub ingest: Ingest,
+    /// Request and event-rate limits (`429 Too Many Requests` with `Retry-After`).
+    pub rate_limits: RateLimits,
     /// Liveness thresholds (research 05 §6.8).
     pub liveness: Liveness,
     /// Read APIs (REST and the browser WebSocket).
@@ -86,8 +94,10 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             listen: SocketAddr::from(([127, 0, 0, 1], 8080)),
+            trusted_proxies: Vec::new(),
             database: Database::default(),
             ingest: Ingest::default(),
+            rate_limits: RateLimits::default(),
             liveness: Liveness::default(),
             api: Api::default(),
             oidc: Oidc::default(),
@@ -549,6 +559,71 @@ impl Default for Ingest {
     }
 }
 
+/// Request and event-rate limits (research 03 §11). A refusal is `429 Too Many Requests` with
+/// `Retry-After` in whole seconds, or `retry_after_ms` on the protocol's `reject` frame.
+///
+/// Each limit is a token bucket: `burst` requests may come at once, then tokens return at the
+/// rate given. Keys that have refilled are forgotten, so memory stays bounded.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RateLimits {
+    /// Pre-auth requests per client IP (`POST /api/v1/agent/token`, browser sign-in and its
+    /// callback), per minute. The client IP comes from `trusted_proxies`.
+    pub ip_requests_per_minute: u32,
+    /// Pre-auth requests per client IP that may arrive at once.
+    pub ip_burst: u32,
+    /// Agent connections per credential (WebSocket upgrades and batch requests), per minute.
+    pub credential_requests_per_minute: u32,
+    /// Agent connections per credential that may arrive at once.
+    pub credential_burst: u32,
+    /// Events per second, on average, that one agent socket may send. Beyond it the server
+    /// reads that socket more slowly, so the agent's own backpressure applies: events are never
+    /// dropped (invariant I5).
+    pub events_per_second: u32,
+    /// Events one agent socket may send at once before it is slowed.
+    pub event_burst: u32,
+    /// Keys tracked by each limiter. A new key beyond this waits one second and is retried,
+    /// until an idle key has aged out.
+    pub max_tracked_keys: usize,
+}
+
+impl Default for RateLimits {
+    fn default() -> Self {
+        Self {
+            ip_requests_per_minute: 120,
+            ip_burst: 60,
+            credential_requests_per_minute: 1_200,
+            credential_burst: 300,
+            events_per_second: 1_000,
+            event_burst: 5_000,
+            max_tracked_keys: 100_000,
+        }
+    }
+}
+
+impl RateLimits {
+    fn validate(&self) -> anyhow::Result<()> {
+        for (key, value) in [
+            ("ip_requests_per_minute", self.ip_requests_per_minute),
+            ("ip_burst", self.ip_burst),
+            (
+                "credential_requests_per_minute",
+                self.credential_requests_per_minute,
+            ),
+            ("credential_burst", self.credential_burst),
+            ("events_per_second", self.events_per_second),
+            ("event_burst", self.event_burst),
+        ] {
+            anyhow::ensure!(value > 0, "rate_limits.{key} must be above 0");
+        }
+        anyhow::ensure!(
+            self.max_tracked_keys > 0,
+            "rate_limits.max_tracked_keys must be above 0"
+        );
+        Ok(())
+    }
+}
+
 /// Liveness thresholds (research 05 §6.8).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -832,6 +907,13 @@ impl Config {
                 );
             }
         }
+        for proxy in &self.trusted_proxies {
+            anyhow::ensure!(
+                proxy.prefix_len() > 0,
+                "trusted_proxies: {proxy} trusts every address, so any client could forge its IP"
+            );
+        }
+        self.rate_limits.validate()?;
         self.storage.validate()?;
         self.retention.validate()?;
         self.usercontent.validate(self.api.public_url.as_deref())?;
@@ -1051,6 +1133,47 @@ mod tests {
             &env(&[("FLEET_RETENTION__ROLLUP_INTERVAL_SECONDS", "0")]),
         );
         assert!(err.is_err(), "a job that never runs is a mistake");
+    }
+
+    #[test]
+    fn trusted_proxies_are_cidr_blocks_and_refuse_everything() {
+        let c = Config::load(
+            None,
+            &env(&[("FLEET_TRUSTED_PROXIES", r#"["10.0.0.0/8", "fd00::/8"]"#)]),
+        )
+        .unwrap();
+        assert_eq!(
+            c.trusted_proxies,
+            [
+                "10.0.0.0/8".parse::<IpNet>().unwrap(),
+                "fd00::/8".parse().unwrap()
+            ]
+        );
+        assert_eq!(Config::load(None, &[]).unwrap().trusted_proxies.len(), 0);
+
+        // A bare address is not a block: the error names the key.
+        let bare =
+            Config::load(None, &env(&[("FLEET_TRUSTED_PROXIES", r#"["10.0.0.1"]"#)])).unwrap_err();
+        assert!(format!("{bare:#}").contains("trusted_proxies"), "{bare:#}");
+
+        let all =
+            Config::load(None, &env(&[("FLEET_TRUSTED_PROXIES", r#"["0.0.0.0/0"]"#)])).unwrap_err();
+        assert!(format!("{all:#}").contains("forge"), "{all:#}");
+    }
+
+    #[test]
+    fn rate_limits_default_generously_and_refuse_zero() {
+        let d = Config::load(None, &[]).unwrap().rate_limits;
+        assert_eq!((d.ip_requests_per_minute, d.ip_burst), (120, 60));
+        assert_eq!((d.events_per_second, d.event_burst), (1_000, 5_000));
+        let tuned = Config::load(None, &env(&[("FLEET_RATE_LIMITS__IP_BURST", "3")])).unwrap();
+        assert_eq!(tuned.rate_limits.ip_burst, 3);
+        let zero =
+            Config::load(None, &env(&[("FLEET_RATE_LIMITS__EVENTS_PER_SECOND", "0")])).unwrap_err();
+        assert!(
+            format!("{zero:#}").contains("rate_limits.events_per_second"),
+            "{zero:#}"
+        );
     }
 
     #[test]

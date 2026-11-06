@@ -10,23 +10,31 @@ use axum::{
     Json,
     extract::State,
     http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use fleet_protocol::frame::{BatchRequest, BatchResponse, ServerFrame};
 use fleet_store::{ingest::Transport, telemetry::TelemetryBatch};
 
 use super::{After, authenticate, bearer, events, open};
-use crate::state::AppState;
+use crate::{limits::too_many_requests, state::AppState};
 
 pub(super) async fn post(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<BatchRequest>,
-) -> (StatusCode, Json<BatchResponse>) {
-    let reply = |status, frames| (status, Json(BatchResponse { frames }));
+) -> Response {
+    let reply = |status, frames| (status, Json(BatchResponse { frames })).into_response();
     let publisher = match authenticate(&state, bearer(&headers).as_deref()).await {
         Ok(p) => p,
         Err(frame) => return reply(StatusCode::UNAUTHORIZED, vec![frame]),
     };
+    if let Err(wait) = state
+        .limits
+        .credential
+        .check(publisher.credential, std::time::Instant::now())
+    {
+        return too_many_requests(wait);
+    }
     let (run, welcome) = match open(&state, &publisher, &req.hello, Transport::Batch).await {
         Ok(ok) => ok,
         Err(frame) => return reply(StatusCode::OK, vec![frame]),

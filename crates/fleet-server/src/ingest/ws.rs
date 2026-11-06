@@ -28,7 +28,10 @@ use fleet_store::{
 use tokio::{sync::mpsc, time::Instant};
 
 use super::{After, authenticate, bearer, events, open, reject};
-use crate::state::AppState;
+use crate::{
+    limits::{Bucket, too_many_requests},
+    state::AppState,
+};
 
 pub(super) async fn upgrade(
     State(state): State<AppState>,
@@ -39,6 +42,14 @@ pub(super) async fn upgrade(
     // Authenticate before upgrading, but report the outcome as a `reject` frame: the agent then
     // stops for good instead of retrying a credential that will never work (fail-open, I2).
     let auth = authenticate(&state, bearer(&headers).as_deref()).await;
+    if let Ok(publisher) = &auth
+        && let Err(wait) = state
+            .limits
+            .credential
+            .check(publisher.credential, std::time::Instant::now())
+    {
+        return too_many_requests(wait);
+    }
     let tracker = state.tracker.clone();
     ws.protocols([WS_SUBPROTOCOL])
         .max_message_size(max)
@@ -178,9 +189,15 @@ async fn stream(state: &AppState, socket: &mut WebSocket, run: &RunHandle) -> En
     tokio::pin!(idle);
     let mut ping = tokio::time::interval(Duration::from_millis(i.ping_interval_ms));
     ping.reset();
+    // Events are paced, never dropped: past the socket's rate the server stops reading until the
+    // debt is repaid, and the agent's window and TCP do the rest (invariant I5).
+    let quota = state.limits.event;
+    let mut events_bucket = Bucket::new(quota, std::time::Instant::now());
+    let mut reads_resume = Instant::now();
     loop {
+        let paused = reads_resume > Instant::now();
         tokio::select! {
-            msg = socket.recv() => {
+            msg = socket.recv(), if !paused => {
                 let Some(Ok(msg)) = msg else { break Ended::Closed };
                 idle.as_mut().reset(Instant::now() + idle_after);
                 state.hub.seen(run);
@@ -206,6 +223,13 @@ async fn stream(state: &AppState, socket: &mut WebSocket, run: &RunHandle) -> En
                             close(socket, code, "fatal").await;
                             break Ended::Fatal;
                         }
+                        let count = u32::try_from(batch.len()).unwrap_or(u32::MAX);
+                        let wait = events_bucket.spend(
+                            quota,
+                            f64::from(count),
+                            std::time::Instant::now(),
+                        );
+                        reads_resume = Instant::now() + wait;
                     }
                     Ok(ClientFrame::Telemetry(t)) => state.telemetry.push(run, t, acks_tx.clone()),
                     Ok(ClientFrame::Heartbeat { .. }) => {}
@@ -231,6 +255,7 @@ async fn stream(state: &AppState, socket: &mut WebSocket, run: &RunHandle) -> En
                     break Ended::Closed;
                 }
             }
+            () = tokio::time::sleep_until(reads_resume), if paused => {}
             () = &mut idle => {
                 close(socket, 1001, "idle timeout").await;
                 break Ended::Idle;
