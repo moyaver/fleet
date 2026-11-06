@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Pre-release.** The agent, server and browser dashboard work end to end: **M2–M3 complete**, **M4 and M5 exit criteria proven by browser tests**. Still open in those milestones: the Fleet Planner, the agent's HTTPS batch fallback and the generated protocol schema. There are no published GitHub releases; build from source for now. See the [full roadmap](docs/ROADMAP.md).
+> **Pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is next.** There are no published GitHub releases; build from source for now. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -79,7 +79,7 @@ Fleet separates running a test from observing it:
 | **`fleet-agent`** | Supervises `maestro test` without changing its result; observes logs, flow evidence, adb devices, and host metrics; buffers and sends events. | Implemented (M2) |
 | **`fleet` server** | Authenticates agents, ingests and acknowledges journals, resolves evidence-backed outcomes, stores runs in Postgres, and publishes live snapshots/deltas. | Implemented (M3) |
 | **Web dashboard** | Follow runs, jobs and devices from a browser and drill into failures without navigating CI logs; OIDC sign-in. | Implemented (M4) |
-| **Evidence & history** | Artifact upload and viewers, failure fingerprints, flaky-test analysis, history and compare, retention. Duration-aware shard planning is in progress. | Implemented (M5), planner in progress |
+| **Evidence & history** | Artifact upload and viewers, failure fingerprints, flaky-test analysis, history and compare, retention, duration-aware shard planning (Fleet Planner). | Implemented (M5) |
 
 The supervisor is **fail-open**, the event stream is **resumable**, and the server never labels a failed or interrupted job successful simply because evidence is absent. See the [architecture decisions](docs/decisions/README.md), [protocol reference](docs/src/protocol.md), and [design invariants](docs/PLAN.md#3-invariants-non-negotiable).
 
@@ -97,7 +97,7 @@ Fleet is being developed in milestones with tested exit criteria. The agent, ser
 | **M2** | Observability agent, parsers, metrics, local spool, transport | Complete |
 | **M3** | Durable ingest, authentication, live API, Postgres, reference deployment | Complete |
 | **M4** | Usable browser dashboard and end-to-end UI tests | Complete |
-| **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Exit criteria met; Fleet Planner in progress |
+| **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Complete |
 | **M6** | Security hardening, RBAC, load tests, v1.0 release | Planned |
 
 [Milestone checklists and acceptance evidence](docs/ROADMAP.md) · [GitHub milestones](https://github.com/moyaver/fleet/milestones) · [Changelog](CHANGELOG.md)
