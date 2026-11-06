@@ -14,7 +14,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
 | ✅ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
 | ✅ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
-| 🚧 | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
+| ✅ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
 | ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
 | ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
 
@@ -118,7 +118,7 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 - [x] Retention, rollups (1 min, 1 h), partition drops, failure-evidence promotion, blob GC with a grace period, migration 0009 ([587df25](https://github.com/moyaver/fleet/commit/587df250e146fdeb995dae27bcbee1262fbb3e50), closes [#32](https://github.com/moyaver/fleet/issues/32))
 - [x] Screens E (History) and F (Compare) with evidence-only mismatch explanations ([f127d20](https://github.com/moyaver/fleet/commit/f127d209fedb59f6a04a01e94f9d5b19a2dd8c67))
 - [x] Evidence on screen D (screenshots, log at the failing step, step timings, sandboxed HTML report) and the M5 exit suite ([b64e7db](https://github.com/moyaver/fleet/commit/b64e7db81bd81e771eb7106753c930b635bf786c))
-- [x] **Fleet Planner**: duration-aware CI sharding ([#15](https://github.com/moyaver/fleet/issues/15), [ADR-0013](decisions/0013-fleet-planner.md)): `fleet-planner plan` writes the manifest and matrix and publishes the plan; `fleet-agent run --plan` runs one shard with the workspace config
+- [x] **Fleet Planner**: duration-aware CI sharding ([#15](https://github.com/moyaver/fleet/issues/15), [#69](https://github.com/moyaver/fleet/pull/69), [ADR-0013](decisions/0013-fleet-planner.md)): `fleet-planner plan` writes the manifest and matrix and publishes the plan; `fleet-agent run --plan` runs one shard with the workspace config
 
 ### M5 exit criteria
 
