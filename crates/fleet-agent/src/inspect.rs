@@ -9,8 +9,8 @@
 //! A run directory with a `journal.jsonl` (the agent's own record of the run, see
 //! [`crate::journal`]) also reports what that journal holds. When the directory has no saved
 //! Maestro output to replay, the journal is all there is to inspect, and its events are the
-//! result. A journal that stopped at its size cap says so, and from which `seq` events are
-//! missing.
+//! result. A journal that stopped early (at its size cap, or on a failed write) says so, and from
+//! which `seq` events are missing.
 
 use std::{
     fs,
@@ -75,8 +75,8 @@ pub struct Inspection {
 pub struct JournalStatus {
     /// Events in the journal, before any truncation marker.
     pub events: usize,
-    /// Set when the journal reached its size cap: it holds no event from
-    /// `first_missing_seq` on, and those events are missing from it.
+    /// Set when the journal stopped early (its size cap, or a failed write): it holds no event
+    /// from `first_missing_seq` on, and those events are missing from it.
     pub truncated: Option<Truncation>,
 }
 
@@ -218,9 +218,14 @@ pub fn table(i: &Inspection) -> String {
                 let _ = writeln!(out, "journal.jsonl: {} events, complete", j.events);
             }
             Some(t) => {
+                let why = if t.reason == journal::REASON_BUDGET {
+                    "at its size cap"
+                } else {
+                    "on a write error"
+                };
                 let _ = writeln!(
                     out,
-                    "journal.jsonl is truncated: it stopped at its size cap ({}) after {} bytes, holding {} events. Events from seq {} on are missing from it.",
+                    "journal.jsonl is truncated: it stopped {why} ({}) after {} bytes, holding {} events. Events from seq {} on are missing from it.",
                     t.reason, t.bytes_written, j.events, t.first_missing_seq
                 );
             }

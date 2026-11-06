@@ -589,7 +589,6 @@ fn flush(l: &mut Live) {
         for e in &events {
             j.append(e);
         }
-        j.flush();
     }
     if let Ok(mut o) = l.shared.outbox.lock() {
         o.push(events);
@@ -699,11 +698,13 @@ async fn finalize(
     flush(&mut l);
     if let Some(t) = l.journal.as_ref().and_then(Writer::truncation) {
         // Written before `finalized`, so the supervisor reads it with its end-of-run warnings
-        // (issue #37). Last, because `run.ended` can be the event that crosses the cap.
+        // (issue #37). Last, because `run.ended` can be the event that crosses the cap. The reason
+        // comes last and may hold spaces (`io: <kind>`).
         let _ = writeln!(
             io::stdout().lock(),
-            "journal-truncated {}",
-            t.first_missing_seq
+            "journal-truncated {} {}",
+            t.first_missing_seq,
+            t.reason
         );
     }
     let maestro = l.session.maestro().map(|b| b.version.clone());
