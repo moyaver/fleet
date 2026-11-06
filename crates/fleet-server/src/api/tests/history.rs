@@ -564,17 +564,11 @@ async fn a_flows_stats_count_outcomes_summarize_durations_and_group_failures_by_
         .unwrap();
     assert_eq!(death["fingerprint"], entry["failure_fingerprint"]);
 
-    // The first pass and the first device death share commit `s0` and conditions: flaky.
-    assert_eq!(stats["flaky_commits"], 1);
-    assert_eq!(stats["flakiness"]["flakiness"], "confirmed");
-    assert_eq!(
-        stats["flakiness"]["evidence"][0]["passed"],
-        json!([passes[0]])
-    );
-    assert_eq!(
-        stats["flakiness"]["evidence"][0]["failed"],
-        json!([death_a])
-    );
+    // The first pass and the first device death share commit `s0` and conditions, but the death
+    // is the device's, not the flow's: it is excluded (ADR-0009), so nothing makes the flow flaky.
+    assert_eq!(stats["flaky_commits"], 0);
+    assert_eq!(stats["flakiness"]["flakiness"], "not_flaky");
+    assert_eq!(stats["flakiness"]["evidence"], json!([]));
 }
 
 #[tokio::test]

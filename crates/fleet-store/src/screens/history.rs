@@ -5,7 +5,11 @@
 
 use std::collections::BTreeSet;
 
-use fleet_core::{claims::Finality, fingerprint::ConditionFingerprint, flaky::HistoryRun};
+use fleet_core::{
+    claims::Finality,
+    fingerprint::ConditionFingerprint,
+    flaky::{HistoryRun, exclusion_of},
+};
 use fleet_protocol::{
     event::FlowOutcome,
     journal::SourceKind,
@@ -332,10 +336,12 @@ pub(super) async fn classifiable_runs(
         "SELECT flow AS \"flow!\", flow_execution_id AS \"run!\", commit_sha,
                 condition_fingerprint AS \"condition!\", state AS \"state!\",
                 outcome_source::text AS outcome_source, finality::text AS \"finality!\",
-                is_default_branch AS \"default_branch!\", ended_at AS \"ended_at!\"
-           FROM (SELECT h.*, row_number() OVER (PARTITION BY h.flow
+                is_default_branch AS \"default_branch!\", ended_at AS \"ended_at!\",
+                failure_message
+           FROM (SELECT h.*, fe.failure_message, row_number() OVER (PARTITION BY h.flow
                                                 ORDER BY h.ended_at DESC, h.flow_execution_id DESC) AS n
                    FROM flaky_history h
+                   JOIN flow_executions fe ON fe.id = h.flow_execution_id
                   WHERE h.project_id = $1 AND h.flow = ANY($2)
                     AND h.ended_at < $3 AND h.ended_at >= $4) x
           WHERE n <= $5",
@@ -350,16 +356,17 @@ pub(super) async fn classifiable_runs(
     Ok(rows
         .into_iter()
         .filter_map(|r| {
+            let outcome = match r.state.as_str() {
+                "passed" => FlowOutcome::Passed,
+                "failed" => FlowOutcome::Failed,
+                _ => return None,
+            };
             Some(HistoryRun {
                 run: r.run,
                 flow: r.flow,
                 commit: r.commit_sha,
                 condition: ConditionFingerprint::from_bytes(r.condition.try_into().ok()?),
-                outcome: match r.state.as_str() {
-                    "passed" => FlowOutcome::Passed,
-                    "failed" => FlowOutcome::Failed,
-                    _ => return None,
-                },
+                outcome,
                 source: serde_json::from_value::<SourceKind>(r.outcome_source?.into()).ok()?,
                 finality: match r.finality.as_str() {
                     "verified" => Finality::Verified,
@@ -370,7 +377,7 @@ pub(super) async fn classifiable_runs(
                 default_branch: r.default_branch,
                 at_unix_ms: i64::try_from(r.ended_at.unix_timestamp_nanos() / 1_000_000)
                     .unwrap_or(i64::MAX),
-                exclusion: None,
+                exclusion: exclusion_of(outcome, r.failure_message.as_deref()),
             })
         })
         .collect())
@@ -378,7 +385,100 @@ pub(super) async fn classifiable_runs(
 
 #[cfg(test)]
 mod tests {
+    use fleet_core::flaky::{self, Flakiness, FlakyConfig};
     use sqlx::PgPool;
+    use time::{Duration, OffsetDateTime};
+
+    use super::HistoryQuery;
+    use crate::{
+        Store,
+        auth::Publisher,
+        ingest::{
+            Transport,
+            tests::{Agent, Script, SuiteIds, publisher, suite_run_scripted},
+        },
+    };
+
+    /// Maestro's failure when the device's driver server died mid-flow (fixture `device-killed`).
+    const DEVICE_DEATH: &str = "maestro.android.DeviceServerDiedException: Device server died \
+        during 'viewHierarchy' on emulator-5602 (2267ms since last byte, connection age 34368ms): \
+        StatusRuntimeException: UNAVAILABLE";
+    const ASSERTION: &str = r#"Assertion is false: "Order confirmed" is visible"#;
+
+    /// One run of `flows` on `commit`, under the same conditions every time.
+    async fn run(store: &Store, p: &Publisher, run_id: &str, commit: &str, flows: &[Script<'_>]) {
+        let mut a = Agent::new(run_id, "e2e");
+        let mut hello = a.hello(None);
+        hello.ci.sha = Some(commit.into());
+        let opened = store
+            .open_run(p, &hello, Transport::WebSocket)
+            .await
+            .unwrap();
+        let events = suite_run_scripted(&mut a, SuiteIds::new(), flows);
+        let applied = store.apply_batch(&opened.handle, &events).await.unwrap();
+        assert!(applied.rejected.is_empty(), "{:?}", applied.rejected);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_flow_whose_only_failure_is_infrastructure_is_not_flaky(pool: PgPool) {
+        let store = Store { pool };
+        let p = publisher(&store).await;
+        // Both flows pass on `abc`, then fail on `abc` under the same conditions. The login's
+        // failure is the device dying, which says nothing about the test; the checkout's is the
+        // app's, so it still counts.
+        let pass = [
+            Script {
+                name: "login",
+                failure: None,
+                failed_step: None,
+            },
+            Script {
+                name: "checkout",
+                failure: None,
+                failed_step: None,
+            },
+        ];
+        let fail = [
+            Script {
+                name: "login",
+                failure: Some(DEVICE_DEATH),
+                failed_step: None,
+            },
+            Script {
+                name: "checkout",
+                failure: Some(ASSERTION),
+                failed_step: None,
+            },
+        ];
+        run(&store, &p, "400", "abc", &pass).await;
+        run(&store, &p, "401", "abc", &fail).await;
+        let now = OffsetDateTime::now_utc();
+        let runs = store
+            .history(
+                p.project_id,
+                &HistoryQuery {
+                    flow: None,
+                    branch: None,
+                    outcome: None,
+                    from: now - Duration::days(1),
+                    to: now + Duration::hours(1),
+                    after: None,
+                    limit: 50,
+                },
+            )
+            .await
+            .unwrap()
+            .runs;
+        let verdict = |flow: &str| {
+            flaky::classify(&runs, &FlakyConfig::default())
+                .into_iter()
+                .find(|f| f.flow == flow)
+                .unwrap_or_else(|| panic!("no verdict for {flow}"))
+                .flakiness
+        };
+        assert_eq!(verdict("flows/login.yaml"), Flakiness::NotFlaky);
+        assert_eq!(verdict("flows/checkout.yaml"), Flakiness::Confirmed);
+    }
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn history_page_can_use_its_project_and_time_index(pool: PgPool) {

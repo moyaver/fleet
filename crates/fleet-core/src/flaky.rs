@@ -32,6 +32,20 @@ pub enum Exclusion {
     HostAnomaly,
 }
 
+/// The exception Maestro raises when the device's driver server dies mid-flow (fixture
+/// `device-killed`): the failure is the device's, not the flow's.
+const DEVICE_LOST: &str = "maestro.android.DeviceServerDiedException";
+
+/// The exclusion a stored run carries, judged from its outcome and failure message (ADR-0009).
+///
+/// Only a failure can be excluded, and only one whose message names a lost device counts as
+/// infrastructure. This reads what ingest already stores, so it needs no schema.
+#[must_use]
+pub fn exclusion_of(outcome: FlowOutcome, failure_message: Option<&str>) -> Option<Exclusion> {
+    let lost_device = failure_message.is_some_and(|m| m.contains(DEVICE_LOST));
+    (outcome == FlowOutcome::Failed && lost_device).then_some(Exclusion::Infrastructure)
+}
+
 /// One finished flow execution, as the history holds it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HistoryRun {
@@ -377,6 +391,52 @@ mod tests {
             let h = [run(1, "login", "abc", FlowOutcome::Passed), failed];
             assert_eq!(flakiness(&h, "login"), Flakiness::NotFlaky, "{exclusion:?}");
         }
+    }
+
+    /// The `<failure>` text of a captured Maestro 2.12.1 JUnit report.
+    fn failure_text(report: &str) -> &str {
+        let (_, rest) = report.split_once("<failure>").unwrap();
+        rest.split_once("</failure>").unwrap().0
+    }
+
+    const DEVICE_KILLED: &str =
+        include_str!("../../../fixtures/maestro/2.12.1/device-killed/run/report.xml");
+    const FAIL: &str = include_str!("../../../fixtures/maestro/2.12.1/fail/run/report.xml");
+
+    #[test]
+    fn a_failure_of_a_lost_device_is_infrastructure_and_excluded() {
+        assert_eq!(
+            exclusion_of(FlowOutcome::Failed, Some(failure_text(DEVICE_KILLED))),
+            Some(Exclusion::Infrastructure)
+        );
+    }
+
+    #[test]
+    fn an_assertion_failure_is_the_flows_own_and_is_not_excluded() {
+        assert_eq!(
+            exclusion_of(FlowOutcome::Failed, Some(failure_text(FAIL))),
+            None
+        );
+    }
+
+    #[test]
+    fn only_a_failure_with_a_lost_device_message_is_excluded() {
+        assert_eq!(
+            exclusion_of(FlowOutcome::Passed, Some(failure_text(DEVICE_KILLED))),
+            None
+        );
+        assert_eq!(exclusion_of(FlowOutcome::Failed, None), None);
+    }
+
+    #[test]
+    fn a_lost_device_failure_does_not_make_its_flow_flaky() {
+        let mut lost = run(2, "login", "abc", FlowOutcome::Failed);
+        // Without the exclusion the same pair is confirmed flaky.
+        let h = [run(1, "login", "abc", FlowOutcome::Passed), lost.clone()];
+        assert_eq!(flakiness(&h, "login"), Flakiness::Confirmed);
+        lost.exclusion = exclusion_of(lost.outcome, Some(failure_text(DEVICE_KILLED)));
+        let h = [run(1, "login", "abc", FlowOutcome::Passed), lost];
+        assert_eq!(flakiness(&h, "login"), Flakiness::NotFlaky);
     }
 
     /// Default-branch runs under one condition, oldest first, from a `P`/`F` string.
