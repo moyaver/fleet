@@ -1,6 +1,6 @@
 # ADR-0005: Wire protocol
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [05 §3–8](../../research/05-protocol-and-data-model.md)
+**Status:** Accepted (shipped in M2 and M3, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [05 §3–8](../../research/05-protocol-and-data-model.md)
 
 ## Decision
 - **Identities:** job (CI natural key, `check_run_id` on GitHub) ⊃ agent run (UUIDv7 made by the agent, owns `seq`) ⊃ connection (server-fenced `epoch`) ⊃ event `(agent_run_id, seq)`. A job may have several agent runs.
