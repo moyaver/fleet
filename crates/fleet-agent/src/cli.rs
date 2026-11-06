@@ -40,6 +40,10 @@ enum Cmd {
         /// The agent's directory for this run (spool, journal).
         #[arg(long, env = "FLEET_RUN_DIR")]
         run_dir: Option<std::path::PathBuf>,
+        /// Most bytes `journal.jsonl` may take. Past it the file stops, ending in a
+        /// `journal.truncated` line; the events still reach the server (issue #37).
+        #[arg(long, env = "FLEET_JOURNAL_MAX_BYTES", default_value_t = crate::journal::DEFAULT_MAX_BYTES)]
+        journal_max_bytes: u64,
         /// A Fleet plan manifest (ADR-0013); runs the flows of `--shard`.
         #[arg(long, requires = "shard")]
         plan: Option<std::path::PathBuf>,
@@ -88,6 +92,7 @@ pub fn main() -> ! {
             no_observer,
             fleet_rewrite,
             run_dir,
+            journal_max_bytes,
             plan,
             shard,
             command,
@@ -99,6 +104,7 @@ pub fn main() -> ! {
                 rewrite: fleet_rewrite == "auto",
                 run_dir,
                 plan: plan.zip(shard),
+                journal_max_bytes,
             };
             exit(supervisor::run(&command, &opts))
         }

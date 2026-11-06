@@ -949,3 +949,115 @@ fn planned_empty_shard_runs_nothing_and_exits_2() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("nothing to run"), "{stderr}");
 }
+
+/// A journal at its cap stops with one `journal.truncated` line that says where it stopped. The
+/// server still gets every event, numbered as before, and Maestro's output and status are the same
+/// (I1, I5). Issue #37.
+#[test]
+fn a_journal_at_its_cap_stops_with_one_marker_and_the_run_is_unchanged() {
+    const CAP: u64 = 2048;
+    let srv = server(Mode::Normal);
+    let (out, _, run_dir) = run_agent(
+        "suite",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_JOURNAL_MAX_BYTES", &CAP.to_string())],
+    );
+    // I1: Maestro's exit status and output are untouched.
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+
+    let text = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let marker: Value = serde_json::from_str(lines.last().unwrap()).unwrap();
+    assert_eq!(marker["type"], "journal.truncated", "{text}");
+    assert_eq!(marker["reason"], "budget");
+    let first_missing = marker["first_missing_seq"].as_u64().unwrap();
+    let held = &lines[..lines.len() - 1];
+    let held_bytes: u64 = held.iter().map(|l| l.len() as u64 + 1).sum();
+    assert_eq!(marker["bytes_written"].as_u64(), Some(held_bytes));
+    assert_eq!(
+        held.len() as u64,
+        first_missing - 1,
+        "seq 1 up to the marker"
+    );
+    assert!(
+        text.len() as u64 <= CAP + lines.last().unwrap().len() as u64 + 1,
+        "at most the cap plus one marker line"
+    );
+
+    // The server got everything, gap-free (I5), and the journal's lines are the same events under
+    // the same numbers.
+    let s = srv.state.lock().unwrap();
+    let last = *s.committed.keys().next_back().unwrap();
+    assert_eq!(s.committed.len() as u64, last, "I5: gap-free from 1");
+    assert!(last > first_missing, "events past the cap still streamed");
+    for (i, line) in held.iter().enumerate() {
+        let seq = i as u64 + 1;
+        let journaled: Value = serde_json::from_str(line).unwrap();
+        assert_eq!(journaled, s.committed[&seq], "seq {seq}");
+    }
+    drop(s);
+
+    // The one end-of-run warning, with the agent's prefix, after Maestro has finished.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let warnings: Vec<&str> = stderr.lines().filter(|l| l.contains("size cap")).collect();
+    assert_eq!(warnings.len(), 1, "{stderr}");
+    assert_eq!(
+        warnings[0],
+        format!(
+            "[fleet-agent] journal.jsonl reached its size cap before seq {first_missing}, so events from seq {first_missing} on are not in it (raise FLEET_JOURNAL_MAX_BYTES to keep them); the run is unaffected"
+        )
+    );
+
+    // inspect reads the journal: everything up to the marker, and the first missing seq.
+    let (result, events) = fleet_agent::inspect::inspect(&run_dir).unwrap();
+    let json = serde_json::to_value(&result).unwrap();
+    assert_eq!(
+        json["journal"]["truncated"]["first_missing_seq"],
+        first_missing
+    );
+    assert_eq!(json["journal"]["events"], held.len());
+    assert_eq!(events.len(), held.len());
+    assert!(
+        fleet_agent::inspect::table(&result).contains(&format!(
+            "Events from seq {first_missing} on are missing from it."
+        )),
+        "{}",
+        fleet_agent::inspect::table(&result)
+    );
+}
+
+/// A journal under its cap is the whole run: no marker, no warning, and the same events the server
+/// got (issue #37).
+#[test]
+fn a_journal_under_the_cap_is_the_whole_run_with_no_marker() {
+    let srv = server(Mode::Normal);
+    let (out, _, run_dir) = run_agent("suite", Some(&format!("ws://{}", srv.addr)), &[], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    assert!(!String::from_utf8_lossy(&out.stderr).contains("size cap"));
+
+    let text = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    assert!(!text.contains("journal.truncated"), "{text}");
+    let s = srv.state.lock().unwrap();
+    let last = *s.committed.keys().next_back().unwrap();
+    assert_eq!(text.lines().count() as u64, last);
+    for (i, line) in text.lines().enumerate() {
+        let seq = i as u64 + 1;
+        assert_eq!(
+            serde_json::from_str::<Value>(line).unwrap(),
+            s.committed[&seq]
+        );
+    }
+    drop(s);
+    let (result, _) = fleet_agent::inspect::inspect(&run_dir).unwrap();
+    let json = serde_json::to_value(&result).unwrap();
+    assert!(json["journal"]["truncated"].is_null(), "{json}");
+}

@@ -2,9 +2,10 @@
 //! The observer process (`fleet-agent __observe`; research 02 §15).
 //!
 //! It turns the supervisor's frames, the session `maestro.log` and the flow bundles into journal
-//! events, keeps them in the outbox (spooled to disk and written to `journal.jsonl`), streams
-//! them to the server if one is configured, and samples metrics. Everything here is best-effort:
-//! the supervisor never depends on it, and it finishes within a bounded time.
+//! events, keeps them in the outbox (spooled to disk and written to `journal.jsonl`, up to its cap;
+//! see [`crate::journal`]), streams them to the server if one is configured, and samples metrics.
+//! Everything here is best-effort: the supervisor never depends on it, and it finishes within a
+//! bounded time.
 //!
 //! Configuration (environment): `FLEET_SERVER` (`ws(s)://` or `http(s)://` base URL; unset =
 //! offline), `FLEET_TOKEN`, `FLEET_FLUSH_TIMEOUT` (seconds, default 20), plus the CI variables in
@@ -12,7 +13,7 @@
 
 use std::{
     fs::File,
-    io::{self, BufWriter, Write},
+    io::{self, Write},
     path::{Path, PathBuf},
     sync::{Arc, atomic::Ordering},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -32,6 +33,7 @@ use uuid::Uuid;
 
 use crate::{
     ipc::{Control, Frame, Stream},
+    journal::Writer,
     metrics::Sampler,
     outbox::{Budget, Outbox},
     session::{Observation, Session},
@@ -139,7 +141,7 @@ struct Live {
     stdout: Lines,
     sampler: Sampler,
     shared: Arc<Shared>,
-    journal: Option<BufWriter<File>>,
+    journal: Option<Writer>,
     telemetry: Option<mpsc::Sender<Telemetry>>,
     transport: Option<tokio::task::JoinHandle<transport::End>>,
     tseq: u64,
@@ -177,8 +179,8 @@ async fn observe() -> io::Result<Option<String>> {
     loop {
         tokio::select! {
             frame = frames.recv() => match frame {
-                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, started_at_ms, debug_dir, report, run_dir, plan, evidence })) => {
-                    let mut l = start(&argv, pid, pgid, debug_dir, report, run_dir.as_deref().map(Path::new), evidence.map(|e| *e), UNIX_EPOCH + Duration::from_millis(started_at_ms), clock(), clock);
+                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, started_at_ms, debug_dir, report, run_dir, plan, evidence, journal_max_bytes })) => {
+                    let mut l = start(&argv, pid, pgid, debug_dir, report, run_dir.as_deref().map(Path::new), evidence.map(|e| *e), UNIX_EPOCH + Duration::from_millis(started_at_ms), clock(), clock, journal_max_bytes);
                     if let Some(plan) = plan {
                         l.session.observe(clock(), Observation::Plan(plan));
                     }
@@ -298,6 +300,7 @@ fn start(
     started: SystemTime,
     at: ClockSample,
     clock: impl Fn() -> ClockSample + Send + Sync + 'static,
+    journal_max_bytes: u64,
 ) -> Live {
     let agent_run_id = Uuid::now_v7();
     let redactor = Redactor::for_run(
@@ -316,9 +319,8 @@ fn start(
         outbox: std::sync::Mutex::new(outbox),
         ..Shared::default()
     });
-    let journal = run_dir
-        .and_then(|d| File::create(d.join("journal.jsonl")).ok())
-        .map(BufWriter::new);
+    let journal =
+        run_dir.and_then(|d| Writer::create(&d.join("journal.jsonl"), journal_max_bytes).ok());
     let mut uploader = None;
     let (telemetry, transport) = match server_url() {
         Some(url) => {
@@ -585,11 +587,9 @@ fn flush(l: &mut Live) {
     }
     if let Some(j) = l.journal.as_mut() {
         for e in &events {
-            if let Ok(line) = serde_json::to_string(e) {
-                let _ = writeln!(j, "{line}");
-            }
+            j.append(e);
         }
-        let _ = j.flush();
+        j.flush();
     }
     if let Ok(mut o) = l.shared.outbox.lock() {
         o.push(events);
@@ -697,6 +697,15 @@ async fn finalize(
     l.session
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
     flush(&mut l);
+    if let Some(t) = l.journal.as_ref().and_then(Writer::truncation) {
+        // Written before `finalized`, so the supervisor reads it with its end-of-run warnings
+        // (issue #37). Last, because `run.ended` can be the event that crosses the cap.
+        let _ = writeln!(
+            io::stdout().lock(),
+            "journal-truncated {}",
+            t.first_missing_seq
+        );
+    }
     let maestro = l.session.maestro().map(|b| b.version.clone());
     if let Ok(mut o) = l.shared.outbox.lock() {
         // Nothing more is coming: a gap for dropped events is sequenced now, before the flush.

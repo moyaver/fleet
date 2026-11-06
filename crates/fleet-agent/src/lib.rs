@@ -9,6 +9,7 @@ pub mod cli;
 mod commands;
 pub mod inspect;
 mod ipc;
+pub mod journal;
 mod metrics;
 mod net;
 mod observer;

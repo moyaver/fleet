@@ -46,6 +46,7 @@ Without the report, Fleet still follows the run from Maestro's session log, flow
 | `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
 | `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. The journal is sent first, while uploads run; the run end is sent after the upload results, and the final flush gets what is left of `FLEET_FLUSH_TIMEOUT`. |
 | `FLEET_UPLOAD_RATE` | Upload rate cap in bytes per second, shared by all uploads (default 4 MiB/s). |
+| `FLEET_JOURNAL_MAX_BYTES` | Most bytes the local `journal.jsonl` may take (default 256 MiB, 268435456). Past the cap the file stops growing and ends in a `journal.truncated` line; the events still go to the server. Also `--journal-max-bytes` on `fleet-agent run`. See [Offline mode](#offline-mode-and-inspect). |
 
 ### What the agent uploads
 
@@ -131,11 +132,13 @@ The data comes from `GET /api/v1/projects/{project}/history`, `…/flows/{name}/
 
 ## Offline mode and `inspect`
 
-Without `FLEET_SERVER`, everything still happens locally: the run directory gets `journal.jsonl` (every event) and `spool.bin` (capped at 64 MiB; if a run overflows it, the spool ends in a `journal.gap` saying which events it does not hold). To see what Fleet makes of any saved run:
+Without `FLEET_SERVER`, everything still happens locally: the run directory gets `journal.jsonl` (every event) and `spool.bin` (capped at 64 MiB; if a run overflows it, the spool ends in a `journal.gap` saying which events it does not hold). `journal.jsonl` is capped at 256 MiB (`FLEET_JOURNAL_MAX_BYTES`). When a run reaches the cap, the file stops with one `journal.truncated` line that gives the first event it does not hold and the bytes it wrote. The events still go to the server, the run's result is unchanged, and the end of the run prints one warning saying which `seq` the journal stops before. To see what Fleet makes of a run:
 
 ```bash
-fleet-agent inspect "$FLEET_RUN_DIR/artifacts"
+fleet-agent inspect "$FLEET_RUN_DIR"
 ```
+
+This reads `journal.jsonl`, and says when it is truncated and which events are missing. Pointed at a directory with Maestro's saved log (`…/artifacts`), `inspect` replays that log instead, and when the same directory also has a `journal.jsonl` it reports that journal's state too.
 
 `--json` prints the result as JSON; `--json --events` adds every journal event.
 
