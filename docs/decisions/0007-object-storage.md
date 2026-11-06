@@ -1,6 +1,6 @@
 # ADR-0007: Object storage
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [06 §7](../../research/06-ci-security-deployment.md), [03 §7](../../research/03-rust-server.md)
+**Status:** Accepted (shipped in M3 and M5, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [06 §7](../../research/06-ci-security-deployment.md), [03 §7](../../research/03-rust-server.md)
 
 ## Context
 MinIO community edition: console removed (2025), binary and Docker distribution stopped (Oct 2025), repository archived (2026-04-25).

@@ -1,6 +1,6 @@
 # ADR-0002: Agent supervisor/observer process split, fail-open
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [02 §1, §15](../../research/02-rust-agent.md)
+**Status:** Accepted (shipped in M2, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [02 §1, §15](../../research/02-rust-agent.md)
 
 ## Context
 Spec invariant: Fleet must never change Maestro's exit code or CI output. A single async process that does networking, parsing and adb calls can panic, hang or OOM.

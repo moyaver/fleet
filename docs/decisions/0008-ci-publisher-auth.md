@@ -1,6 +1,6 @@
 # ADR-0008: CI publisher authentication and untrusted PRs
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [06 §1–2, §6](../../research/06-ci-security-deployment.md)
+**Status:** Accepted (shipped in M3, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [06 §1–2, §6](../../research/06-ci-security-deployment.md)
 
 ## Decision
 - **Token exchange:** the agent exchanges a GitHub Actions OIDC token (custom audience) for a short-lived, write-only Fleet token scoped to one project and session.

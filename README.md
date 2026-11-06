@@ -96,7 +96,7 @@ Fleet is being developed in milestones with tested exit criteria. The agent, ser
 | **M0–M1** | Bootstrap and real-emulator Maestro research | Complete |
 | **M2** | Observability agent, parsers, metrics, local spool, transport | Complete |
 | **M3** | Durable ingest, authentication, live API, Postgres, reference deployment | Complete |
-| **M4** | Usable browser dashboard and end-to-end UI tests | Exit criteria met; 2 issues open |
+| **M4** | Usable browser dashboard and end-to-end UI tests | Complete |
 | **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Exit criteria met; Fleet Planner in progress |
 | **M6** | Security hardening, RBAC, load tests, v1.0 release | Planned |
 

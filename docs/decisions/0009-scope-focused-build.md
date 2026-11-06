@@ -1,6 +1,6 @@
 # ADR-0009: Scope: focused build
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [07 §6](../../research/07-prior-art-and-build-vs-buy.md)
+**Status:** Accepted (shipped in M5, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [07 §6](../../research/07-prior-art-and-build-vs-buy.md)
 
 ## Decision
 **Build** what nobody offers for company-run CI emulators:

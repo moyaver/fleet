@@ -1,6 +1,6 @@
 # ADR-0006: PostgreSQL 18 only; native partitioning
 
-**Status:** Proposed · **Date:** 2026-11-03 · **Research:** [05 §9–11](../../research/05-protocol-and-data-model.md), [03 §4–6](../../research/03-rust-server.md)
+**Status:** Accepted (shipped in M3, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [05 §9–11](../../research/05-protocol-and-data-model.md), [03 §4–6](../../research/03-rust-server.md)
 
 ## Decision
 - **PostgreSQL 18** (18.6 at time of writing; PG 19 GA is planned for 2026-11-19). Use native `uuidv7()`.
