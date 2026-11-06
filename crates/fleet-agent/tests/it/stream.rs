@@ -44,6 +44,8 @@ struct State {
     committed: BTreeMap<u64, Value>,
     connections: u32,
     hellos: Vec<Value>,
+    /// Created once the agent has been sent its welcome, to release the fake Maestro's exit.
+    gate: Option<PathBuf>,
     duplicates: u32,
     telemetry: u32,
     raw: String,
@@ -122,6 +124,7 @@ async fn connection(
         };
         let frame: Value = serde_json::from_str(text.as_str()).unwrap();
         st.lock().unwrap().raw.push_str(text.as_str());
+        let hello = frame["op"].as_str() == Some("hello");
         let reply = match frame["op"].as_str().unwrap() {
             "hello" => {
                 if let Mode::SlowWelcome(wait) = mode {
@@ -179,6 +182,12 @@ async fn connection(
             && ws.send(Message::text(r.to_string())).await.is_err()
         {
             return;
+        }
+        if hello {
+            let gate = st.lock().unwrap().gate.clone();
+            if let Some(gate) = gate {
+                let _ = std::fs::write(gate, b"");
+            }
         }
     }
 }
@@ -503,22 +512,44 @@ fn a_server_slow_to_welcome_still_gets_the_whole_journal() {
 #[test]
 fn the_journal_is_sent_while_uploads_are_still_running() {
     // Uploads can't finish here (the fake server does not speak HTTP), so they hold the finalize
-    // for their whole share of the budget (half of 10 s). The journal's tail must not wait behind
-    // them: the flows' results reach the server during that wait, and only the run end follows it.
+    // for their whole share of the budget. The journal's tail must not wait behind them: the
+    // flows' results reach the server during that wait, and only the run end follows it.
+    //
+    // Maestro holds its exit until the server has sent the agent its welcome (FLEET_FAKE_GATE), so
+    // the finalize starts on a connected transport. Otherwise the upload share is half of the
+    // 3 s budget for an unanswered server, and a loaded runner measured 1.5 s here.
+    //
+    // The share is pinned at 10 s with FLEET_UPLOAD_TIMEOUT, so it does not depend on the
+    // connection state at all. The flush budget is 20 s so the tail keeps its own time after the
+    // share, and the whole finalize stays inside it. The flow results must reach the server at
+    // least half the share before the run end: 5 s of slack for a slow runner.
     let srv = server(Mode::Normal);
+    let gate = std::env::temp_dir().join(format!("fleet-gate-{}", std::process::id()));
+    let _ = std::fs::remove_file(&gate);
+    srv.state.lock().unwrap().gate = Some(gate.clone());
     let (out, took, _) = run_agent(
         "suite",
         Some(&format!("ws://{}", srv.addr)),
         &[],
-        &[("FLEET_FLUSH_TIMEOUT", "10")],
+        &[
+            ("FLEET_FLUSH_TIMEOUT", "20"),
+            ("FLEET_UPLOAD_TIMEOUT", "10"),
+            ("FLEET_FAKE_GATE", gate.to_str().unwrap()),
+            ("FLEET_FAKE_GATE_TIMEOUT", "30"),
+        ],
     );
+    let _ = std::fs::remove_file(&gate);
     assert_eq!(out.status.code(), Some(1));
-    assert!(took < Duration::from_secs(12), "bounded: took {took:?}");
+    assert!(took < Duration::from_secs(20), "bounded: took {took:?}");
     let s = srv.state.lock().unwrap();
+    assert!(
+        !s.hellos.is_empty(),
+        "the agent never connected before Maestro exited"
+    );
     let reported = s.first_seen["flow.reported"];
     let ended = s.first_seen["run.ended"];
     assert!(
-        ended.duration_since(reported) >= Duration::from_secs(2),
+        ended.duration_since(reported) >= Duration::from_secs(5),
         "the run end waited for the uploads, the flow results did not: {:?} apart",
         ended.duration_since(reported)
     );
