@@ -479,3 +479,51 @@ async fn compare_explains_a_new_failure_by_the_changed_condition_and_lists_flows
     let _ = has_text;
     browser.quit().await;
 }
+
+#[tokio::test]
+async fn history_discards_an_inflight_page_after_filters_change() {
+    let stack = stack_without_host_telemetry().await;
+    run(&stack, "page-race", "abc1234def5678", 0, 55, "x86_64").await;
+    history_until(&stack, |h| h["next_cursor"].is_string()).await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/history?project=app", stack.addr()))
+        .await
+        .unwrap();
+    page.wait("first page and load more", "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('Load more'))").await;
+    page.eval("const original = window.fetch; window.__held = false; window.__firstHeld = false; window.fetch = async (...args) => { const url = String(args[0].url || args[0]); const response = await original(...args); if (url.includes('/history?') && url.includes('cursor=')) { window.__held = true; await new Promise(resolve => window.__release = resolve); window.__released = true; const text = response.text.bind(response); response.text = async () => { const body = await text(); window.__bodyRead = true; return body; }; } else if (!window.__firstHeld && url.includes('/history?') && url.includes('outcome=failed')) { window.__firstHeld = true; await new Promise(resolve => window.__releaseFirst = resolve); } return response; };", vec![]).await;
+    page.eval("Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Load more')).click();", vec![]).await;
+    page.wait("old page held", "window.__held === true").await;
+    choose(&page, "#filter-outcome", "failed").await;
+    page.wait("filtered first page held", "window.__firstHeld === true")
+        .await;
+    page.eval("window.__releaseFirst();", vec![]).await;
+    page.wait(
+        "filtered rows",
+        &format!(
+            "{} > 0 && {} < 50",
+            count_of(&q("history-row")),
+            count_of(&q("history-row"))
+        ),
+    )
+    .await;
+    let before = page
+        .eval(&format!("return {};", count_of(&q("history-row"))), vec![])
+        .await;
+    page.eval("window.__release();", vec![]).await;
+    page.wait("old response delivered", "window.__released === true")
+        .await;
+    page.wait("old response body consumed", "window.__bodyRead === true")
+        .await;
+    browser.client.execute_async("const done = arguments[arguments.length - 1]; requestAnimationFrame(() => requestAnimationFrame(done));", vec![]).await.unwrap();
+    let after = page
+        .eval(&format!("return {};", count_of(&q("history-row"))), vec![])
+        .await;
+    assert_eq!(after, before, "old page must not be appended to new filter");
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
