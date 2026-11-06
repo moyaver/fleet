@@ -59,7 +59,7 @@ async fn evidence_stack_with_link_ttl(link_ttl_seconds: u64) -> (Stack, u16) {
 }
 
 /// Runs the real agent to the end (Maestro exits 1: one flow fails); when this returns the agent
-/// process is gone and its uploads are done.
+/// process is gone, its uploads are done, and the server has stored the run's end.
 async fn run_agent_to_the_end(stack: &Stack) {
     let (ws, key) = (stack.ws_url(), stack.key.clone());
     let out = tokio::task::spawn_blocking(move || {
@@ -75,6 +75,8 @@ async fn run_agent_to_the_end(stack: &Stack) {
     .await
     .unwrap();
     assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+    // The default job key of a run without CI variables.
+    stack.await_run_ended("job").await;
 }
 
 /// The `(name, outcome)` of each testcase of the fixture's JUnit report, sorted. Read from the
