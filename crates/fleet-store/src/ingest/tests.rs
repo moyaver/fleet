@@ -348,7 +348,10 @@ async fn job(store: &Store, id: Uuid) -> (String, Option<String>) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_run_streams_resolves_and_closes_its_job(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("100", "e2e");
     let opened = store
@@ -406,7 +409,10 @@ async fn a_run_streams_resolves_and_closes_its_job(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn run_started_persists_the_evidence_description(pool: PgPool) {
     use fleet_protocol::event::{EvidenceSources, ReportReason, ReportSource};
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("102", "e2e");
     let h = store
@@ -465,7 +471,10 @@ async fn run_started_persists_the_evidence_description(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn duplicates_are_acked_without_effect_and_gaps_are_refused(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("101", "e2e");
     let h = store
@@ -548,7 +557,10 @@ async fn gap_rows(store: &Store, run: Uuid) -> Vec<(i64, i64)> {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_journal_gap_that_covers_a_hole_keeps_the_prefix_contiguous(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("110", "e2e");
     let h = store
@@ -587,7 +599,10 @@ async fn a_journal_gap_that_covers_a_hole_keeps_the_prefix_contiguous(pool: PgPo
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_journal_gap_that_does_not_fit_its_hole_is_a_sequence_gap(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("111", "e2e");
     let h = store
@@ -628,7 +643,10 @@ async fn a_journal_gap_that_does_not_fit_its_hole_is_a_sequence_gap(pool: PgPool
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_newer_connection_fences_the_old_one(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("102", "e2e");
     let old = store
@@ -663,7 +681,10 @@ async fn a_newer_connection_fences_the_old_one(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn resume_rules(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("103", "e2e");
     let h = store
@@ -735,7 +756,10 @@ async fn resume_rules(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn inferred_sources_can_never_claim_passed(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("104", "e2e");
     let h = store
@@ -803,7 +827,10 @@ async fn inferred_sources_can_never_claim_passed(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn foreign_entities_unknown_types_and_events_after_the_end(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("105", "a");
     let ha = store
@@ -911,7 +938,10 @@ async fn foreign_entities_unknown_types_and_events_after_the_end(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn concurrent_runs_in_one_job_and_attempt_stay_consistent(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut tasks = tokio::task::JoinSet::new();
     for i in 0..8 {
@@ -972,7 +1002,10 @@ async fn concurrent_runs_in_one_job_and_attempt_stay_consistent(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let first = Agent::new("107", "job");
     let h = store
@@ -1003,21 +1036,25 @@ async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
     };
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     // The batch then bumps the attempt: open_run must not be holding it.
-    bump_version(
-        &mut batch,
-        h.project_id,
-        h.pipeline_attempt_id,
-        BTreeSet::from([EntityRef::Job(h.job_id)]),
-    )
-    .await
-    .unwrap();
+    store
+        .bump_version(
+            &mut batch,
+            h.project_id,
+            h.pipeline_attempt_id,
+            BTreeSet::from([EntityRef::Job(h.job_id)]),
+        )
+        .await
+        .unwrap();
     batch.commit().await.unwrap();
     assert!(second.await.unwrap().is_ok());
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn foreign_device_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("foreign-device-a", "a");
     let ha = store
@@ -1076,7 +1113,10 @@ async fn foreign_device_on_flow_is_rejected_without_changing_its_owner(pool: PgP
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn foreign_shard_on_flow_is_rejected_without_changing_its_owner(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("foreign-device-a", "a");
     let ha = store
@@ -1135,7 +1175,10 @@ async fn foreign_shard_on_flow_is_rejected_without_changing_its_owner(pool: PgPo
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let other = store.upsert_project("other", "Other").await.unwrap();
     let mut a = Agent::new("live-scope", "a");
@@ -1166,7 +1209,10 @@ async fn live_entities_are_scoped_to_the_requested_project(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn nul_in_event_data_is_rejected_and_later_sequences_commit(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("nul-data", "a");
     let h = store
@@ -1193,7 +1239,10 @@ async fn nul_in_event_data_is_rejected_and_later_sequences_commit(pool: PgPool) 
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("nul-flow", "a");
     let h = store
@@ -1250,7 +1299,10 @@ async fn nul_in_flow_name_and_source_is_rejected_without_wedging_the_run(pool: P
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn rejected_process_exit_does_not_change_the_run(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("bad-exit", "a");
     let h = store
@@ -1279,7 +1331,10 @@ async fn rejected_process_exit_does_not_change_the_run(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn events_after_run_end_in_same_batch_are_rejected(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("same-batch-end", "a");
     let h = store
@@ -1308,7 +1363,10 @@ async fn events_after_run_end_in_same_batch_are_rejected(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("rejected-entities", "a");
     let h = store
@@ -1380,7 +1438,10 @@ async fn rejected_flow_claims_and_shard_leave_no_entities(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn absolute_and_relative_report_paths_share_history_identity(pool: PgPool) {
-    let store = Store { pool };
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
     let p = publisher(&store).await;
     let mut a = Agent::new("identity", "a");
     let h = store

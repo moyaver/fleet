@@ -204,7 +204,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_sweep_removes_expired_sessions_and_keeps_live_ones(pool: sqlx::PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let now = OffsetDateTime::now_utc();
         let data = serde_json::json!({});
         let old = store

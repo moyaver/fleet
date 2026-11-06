@@ -100,6 +100,10 @@ fn validate(m: &PlanManifest) -> Result<i32, PlanError> {
 
 impl Store {
     /// Stores a plan once. Retrying with the identical manifest is a no-op.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one straight-line transaction; the attempt's notice adds two lines"
+    )]
     pub async fn store_plan(
         &self,
         publisher: &Publisher,
@@ -190,12 +194,14 @@ impl Store {
                 )
                 .fetch_one(&mut *tx)
                 .await?;
-                Some(Change {
+                let change = Change {
                     project_id: project,
                     pipeline_attempt_id: a,
                     version: u64::try_from(version).unwrap_or(0),
                     entities: Vec::<EntityRef>::new(),
-                })
+                };
+                crate::live::notify(&mut tx, self.origin(), &change).await?;
+                Some(change)
             }
             None => None,
         };
@@ -306,7 +312,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn planned_totals_exist_before_any_job_and_plans_are_immutable(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let m = manifest("plan-1", &[&["a.yaml", "b.yaml"], &["c.yaml"]]);
         let pipeline = PlanPipeline {
@@ -473,7 +482,10 @@ mod tests {
     /// and stays unknown while a flow it started is still running.
     #[sqlx::test(migrations = "../../migrations")]
     async fn each_shards_actual_time_is_the_span_of_its_flows(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let mut m = manifest("plan-2", &[&["a.yaml", "b.yaml"], &["c.yaml"]]);
         m.equal_count_estimated_seconds = Some(90);

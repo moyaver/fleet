@@ -426,7 +426,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn a_flow_whose_only_failure_is_infrastructure_is_not_flaky(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         // Both flows pass on `abc`, then fail on `abc` under the same conditions. The login's
         // failure is the device dying, which says nothing about the test; the checkout's is the

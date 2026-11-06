@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     Result, Store,
-    ingest::{Change, EntityRef, bump_version, derive},
+    ingest::{Change, EntityRef, derive},
 };
 
 /// The key of the leader's advisory lock.
@@ -114,13 +114,14 @@ impl Store {
         report.detached = detached.len();
         for r in detached {
             let mut tx = self.pool().begin().await?;
-            if let Some(c) = bump_version(
-                &mut tx,
-                r.project_id,
-                r.pipeline_attempt_id,
-                BTreeSet::from([EntityRef::AgentRun(r.id)]),
-            )
-            .await?
+            if let Some(c) = self
+                .bump_version(
+                    &mut tx,
+                    r.project_id,
+                    r.pipeline_attempt_id,
+                    BTreeSet::from([EntityRef::AgentRun(r.id)]),
+                )
+                .await?
             {
                 report.changes.push(c);
             }
@@ -143,8 +144,9 @@ impl Store {
                 break;
             };
             let entities = abandon(&mut tx, run.id, run.job_id, run.committed_seq).await?;
-            if let Some(c) =
-                bump_version(&mut tx, run.project_id, run.pipeline_attempt_id, entities).await?
+            if let Some(c) = self
+                .bump_version(&mut tx, run.project_id, run.pipeline_attempt_id, entities)
+                .await?
             {
                 report.changes.push(c);
             }
@@ -249,7 +251,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn an_abandoned_run_is_never_green_and_late_evidence_still_wins(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let mut a = Agent::new("900", "e2e");
         let h = store
@@ -320,7 +325,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn silent_active_runs_are_detached(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let mut a = Agent::new("901", "e2e");
         let h = store
@@ -356,7 +364,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn persisted_contact_refreshes_the_worker_last_seen(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let a = Agent::new("902", "e2e");
         store

@@ -492,7 +492,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn keys_authenticate_until_revoked(pool: sqlx::PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let project = store.upsert_project("app", "App").await.unwrap();
         let (id, key) = store
             .create_api_key(project, "ci", TrustLevel::Trusted)
