@@ -478,3 +478,38 @@ async fn both_show(a: SocketAddr, b: SocketAddr, attempt: &str, want: &str) -> (
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
+
+#[tokio::test]
+async fn a_socket_closing_on_one_instance_reaches_a_subscriber_on_another() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("close-elsewhere", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    c.events(events[..4].to_vec()).await;
+    let attempt = attempt_of(&h).await;
+    // The subscriber is on the second instance; the agent's socket is on the first.
+    let (mut ws, _) = follow(other.addr(), &attempt).await;
+
+    drop(c);
+    // The close detaches the run; the delta carrying it must reach the subscriber without a
+    // resync, and say the run is disconnected.
+    let liveness = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let m = live_next(&mut ws).await;
+            if m["op"] != "delta" {
+                continue;
+            }
+            for e in m["entities"].as_array().unwrap() {
+                if e["kind"] == "agent_run" && e["entity"]["liveness"] == "disconnected" {
+                    return e["entity"]["liveness"].clone();
+                }
+            }
+        }
+    })
+    .await
+    .expect("a delta showing the run disconnected, within 5 s");
+    assert_eq!(liveness, "disconnected");
+    other.stop().await.unwrap();
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connections SET closed_at = now(), close_reason = $2\n          WHERE id = $1 AND closed_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f6b2beb1fd7ea2bc8b3628c7e5fe2fc6d5b71c0e869315aeb45974b007143506"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET state = 'detached', detached_at = now(), rev = rev + 1\n          WHERE id = $1 AND epoch = $2 AND state = 'active'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0651500c6ac3aa55b447a510484755db60e52f0abe8df4dfb97d35a91098e14e"
+}

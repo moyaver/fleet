@@ -102,13 +102,21 @@ async fn connection(state: AppState, mut socket: WebSocket, auth: Result<Publish
     state.hub.disconnected(&run, ended == Ended::Bye);
     tracing::info!(agent_run_id = %run.agent_run_id, epoch = run.epoch, reason = ended.reason(),
         "agent connection ended");
+    // A detach that changes the run's liveness is published so other instances see it too.
     let recorded = if ended == Ended::Shutdown {
-        state.store.connection_closed(&run, ended.reason()).await
+        state
+            .store
+            .connection_closed(&run, ended.reason())
+            .await
+            .map(|()| None)
     } else {
-        state.store.detach(&run, ended.reason()).await
+        state.store.detach_closed_socket(&run, ended.reason()).await
     };
-    if let Err(e) = recorded {
-        tracing::warn!(agent_run_id = %run.agent_run_id, error = %e, "recording a detach");
+    match recorded {
+        Ok(change) => state.publish(change),
+        Err(e) => {
+            tracing::warn!(agent_run_id = %run.agent_run_id, error = %e, "recording a detach");
+        }
     }
 }
 
