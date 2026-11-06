@@ -288,8 +288,22 @@ pub fn Tabs(
     }
 }
 
+const TOOLTIP_BASE: &str = "pointer-events-none invisible absolute left-0 top-full z-10 mt-1 w-max max-w-xs rounded bg-fg px-2 py-1 text-xs text-bg";
+const TOOLTIP_SHOWN: &str = "group-hover:visible group-focus-within:visible";
+
+/// The tooltip's classes: shown on hover or focus, unless Escape dismissed it.
+#[must_use]
+fn tooltip_class(dismissed: bool) -> String {
+    if dismissed {
+        TOOLTIP_BASE.to_owned()
+    } else {
+        format!("{TOOLTIP_BASE} {TOOLTIP_SHOWN}")
+    }
+}
+
 /// A tooltip shown on hover and keyboard focus of its content, with CSS only. Give the focusable
-/// child `aria-describedby=id` so assistive technology reads the text.
+/// child `aria-describedby=id` so assistive technology reads the text. Escape hides a shown
+/// tooltip without moving focus (WCAG 1.4.13); moving the pointer or focus away shows it again.
 #[component]
 pub fn Tooltip(
     /// The id the focusable child references with `aria-describedby`.
@@ -301,14 +315,22 @@ pub fn Tooltip(
     /// The element the tooltip describes.
     children: Children,
 ) -> impl IntoView {
+    let dismissed = RwSignal::new(false);
     view! {
-        <span class="group relative inline-block">
+        <span
+            class="group relative inline-block"
+            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                if Key::from_dom(&ev.key()) == Key::Escape && !dismissed.get_untracked() {
+                    dismissed.set(true);
+                    ev.prevent_default();
+                    ev.stop_propagation();
+                }
+            }
+            on:mouseleave=move |_| dismissed.set(false)
+            on:focusout=move |_| dismissed.set(false)
+        >
             {children()}
-            <span
-                role="tooltip"
-                id=id
-                class="pointer-events-none invisible absolute left-0 top-full z-10 mt-1 w-max max-w-xs rounded bg-fg px-2 py-1 text-xs text-bg group-hover:visible group-focus-within:visible"
-            >
+            <span role="tooltip" id=id class=move || tooltip_class(dismissed.get())>
                 {text}
             </span>
         </span>
@@ -399,5 +421,19 @@ pub fn ToastRegion(
                 }
             />
         </div>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_dismissed_tooltip_drops_the_hover_and_focus_rules_so_it_stays_hidden() {
+        assert!(tooltip_class(false).contains("group-hover:visible"));
+        assert!(tooltip_class(false).contains("group-focus-within:visible"));
+        let dismissed = tooltip_class(true);
+        assert!(dismissed.contains("invisible"), "{dismissed}");
+        assert!(!dismissed.contains("group-"), "{dismissed}");
     }
 }
