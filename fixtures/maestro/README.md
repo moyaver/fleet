@@ -53,7 +53,7 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 
 ### Provenance of the 2.12.1 scenarios added for #77
 
-Captured on 2026-11-07 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula (`/opt/homebrew/Cellar/maestro/2.12.1`). The device was a throwaway AVD set up the way the nightly job does it (`ci/nightly-emulator-green`, `.github/workflows/nightly-emulator.yml`): `system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a` (Android 17, build `CP31.260623.012`), `hw.gpu.enabled=yes`, `hw.gpu.mode=auto`, 1080x2424 at 420 dpi, 3 GB RAM, booted headless on port 5582 (serial `emulator-5582`, AVD `fleet-fixtures-77`). The AVD lived in a temporary `ANDROID_AVD_HOME` and was deleted afterwards. The owner's emulator was not used. `device.json` in each scenario records these values.
+Captured on 2026-11-07 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula (`/opt/homebrew/Cellar/maestro/2.12.1`). The device was a throwaway AVD set up the way the nightly job does it (`.github/workflows/nightly-emulator.yml`): `system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a` (Android 17, build `CP31.260623.012`), `hw.gpu.enabled=yes`, `hw.gpu.mode=auto`, 1080x2424 at 420 dpi, 3 GB RAM, booted headless on port 5582 (serial `emulator-5582`, AVD `fleet-fixtures-77`). The AVD lived in a temporary `ANDROID_AVD_HOME` and was deleted afterwards. The owner's emulator was not used. `device.json` in each scenario records these values.
 
 Imports normalize paths and cut `device-logcat.txt` to 32 KiB head and tail, and files over 1 MiB are listed in `SKIPPED.txt`.
 
