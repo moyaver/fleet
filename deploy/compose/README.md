@@ -16,7 +16,7 @@ docker compose up -d --build
 docker compose ps               # fleet turns healthy once migrations ran and Postgres answers
 ```
 
-Each release tag publishes the server image to `ghcr.io/moyaver/fleet` (`latest` for stable releases). To run a release instead of building, set `FLEET_IMAGE=ghcr.io/moyaver/fleet:<version>` in `.env`, then `docker compose pull && docker compose up -d` without `--build`.
+Each release tag publishes the server image to `ghcr.io/moyaver/fleet` (`latest` for stable releases only). The compose file uses `ghcr.io/moyaver/fleet:0.1.0-alpha.1` by default. To run another release instead of building, set `FLEET_IMAGE=ghcr.io/moyaver/fleet:<version>` in `.env`, then `docker compose pull && docker compose up -d` without `--build`.
 
 Fleet migrates on start (`FLEET_DATABASE__MIGRATE=auto`). For change-controlled upgrades set it to `manual` and run `docker compose run --rm fleet migrate`; `serve` then refuses a schema that is behind, or newer than the binary.
 

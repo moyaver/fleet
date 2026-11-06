@@ -6,7 +6,7 @@ Sources are listed at the end; the bracketed tags point to them.
 
 ## Workspace and packages
 
-- **Flat layout.** Crates live in `crates/fleet-*`, the folder name is the package name, the root manifest is virtual, and every crate is `publish = false` with `version = "0.0.0"`. [MATKLAD-WS] [MS]
+- **Flat layout.** Crates live in `crates/fleet-*`, the folder name is the package name, the root manifest is virtual, and every crate is `publish = false` and inherits the workspace version. [MATKLAD-WS] [MS]
 - **Split a crate only along a real boundary**: a dependency rule (wasm-safe, no I/O), a separately cached compile unit, or a separate binary. Use modules for everything else. The boundaries are in PLAN §4.2 **(CI: `xtask lint`)**.
 - **Thin binaries.** `main.rs` parses arguments, installs logging, builds the runtime and calls the library. Logic lives in `lib.rs`, where tests can reach it. [BOOK]
 - **Module files are `foo.rs` plus `foo/bar.rs`.** **(CI: `mod_module_files`)**

@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is next.** There are no published GitHub releases; build from source for now. See the [full roadmap](docs/ROADMAP.md).
+> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is next.** The first release is [`v0.1.0-alpha.1`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.1); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -34,6 +34,22 @@ Fleet adds that missing observability layer. **It does not replace Maestro, sche
 The agent, server, and web dashboard are written in **Rust** (the dashboard is Leptos compiled to WebAssembly; no JavaScript). Fleet starts with Maestro; the underlying protocol and domain model are designed to accommodate other test runners later.
 
 ## Get started
+
+### Install the agent (alpha pre-release)
+
+Install `fleet-agent` from the `v0.1.0-alpha.1` release. It ships for Apple Silicon macOS and for Linux on x86_64 and aarch64 (static musl binaries):
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.1/fleet-agent-installer.sh | sh
+```
+
+Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build attestation. To verify an archive you downloaded, with the [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
+```
+
+The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.1`; the [Compose guide](deploy/compose/README.md) uses it by default. To build the agent from source instead, follow step 1.
 
 ### 1. Observe a Maestro run locally
 
@@ -65,7 +81,7 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 2. Set `FLEET_SERVER` on your CI runner. Use GitHub Actions OIDC with an approved trust policy or a project API key (`FLEET_TOKEN`).
 3. Wrap your existing command with `fleet-agent run --`. Add `fleet-agent flush` as an always-run cleanup step if desired.
 
-The [GitHub Actions example](examples/github-actions/fleet-agent.yml) shows the intended integration pattern; **its release-installer step requires a future published release**. Until then, use a source-built agent.
+The [GitHub Actions example](examples/github-actions/fleet-agent.yml) shows the integration pattern and installs the `v0.1.0-alpha.1` agent from its release.
 
 > [!NOTE]
 > The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots and logs, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).
