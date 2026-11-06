@@ -294,6 +294,9 @@ async fn failure_groups(
     c: &mut sqlx::PgConnection,
     s: &Scope<'_>,
 ) -> Result<Vec<FailureGroupView>> {
+    // `f.project_id` and the state filter match `flow_executions_history` (0010); without them
+    // the planner cannot seek the window. Failure fingerprints exist only for final failures, so
+    // the state filter drops nothing.
     Ok(sqlx::query_as!(
             FailureGroupView,
             "SELECT ff.fingerprint, min(ff.step_kind) AS \"step_kind!\", min(ff.message) AS \"message!\",
@@ -305,7 +308,9 @@ async fn failure_groups(
                FROM failure_fingerprints ff
                JOIN flow_executions f ON f.id = ff.flow_execution_id
                LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
-              WHERE ff.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2
+              WHERE ff.project_id = $1 AND f.project_id = $1
+                AND f.state NOT IN ('pending', 'running')
+                AND coalesce(d.repo_path, f.flow_name) = $2
                 AND coalesce(f.ended_at, f.started_at) >= $3
                 AND coalesce(f.ended_at, f.started_at) < $4
               GROUP BY ff.fingerprint
@@ -502,6 +507,36 @@ mod tests {
             plan.iter()
                 .any(|line| line.contains("flow_executions_history")),
             "{plan:?}"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn flow_stats_failure_groups_can_use_its_project_and_time_index(pool: PgPool) {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("SET LOCAL enable_seqscan = off")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let plan: Vec<String> = sqlx::query_scalar(
+            "EXPLAIN SELECT ff.fingerprint
+               FROM failure_fingerprints ff
+               JOIN flow_executions f ON f.id = ff.flow_execution_id
+               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
+              WHERE ff.project_id = '00000000-0000-0000-0000-000000000001'
+                AND f.project_id = '00000000-0000-0000-0000-000000000001'
+                AND f.state NOT IN ('pending', 'running')
+                AND coalesce(f.ended_at, f.started_at) >= '2026-01-01'::timestamptz
+                AND coalesce(f.ended_at, f.started_at) < '2027-01-01'::timestamptz
+                AND coalesce(d.repo_path, f.flow_name) = 'flows/login.yaml'",
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap();
+        let plan = plan.join("\n");
+        assert!(
+            plan.contains("Index Scan using flow_executions_history on flow_executions f")
+                && plan.contains("Index Cond: ((project_id = "),
+            "{plan}"
         );
     }
 }

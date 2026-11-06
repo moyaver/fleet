@@ -5,6 +5,8 @@
 //! - **Garbage collection** every `retention.gc_interval_minutes`: artifacts past their
 //!   retention expire, blobs nobody refers to are deleted after a grace period, and the temp
 //!   files crashed uploads left behind are removed.
+//! - **Orphan sweep** hourly: objects that no `blobs` row records (a crash can leave one) are
+//!   deleted once they are older than the same grace period.
 //! - **Expiry of time-based data** hourly: old partitions are dropped, old rollups and audit
 //!   events deleted.
 //!
@@ -21,8 +23,9 @@ use std::{
     time::Duration,
 };
 
-use fleet_blob::{BlobKey, BlobStore, Sha256Digest};
+use fleet_blob::{BlobKey, BlobStore, Scope, Sha256Digest};
 use fleet_store::{Store, gc::GarbageBlob};
+use futures_util::StreamExt;
 use time::OffsetDateTime;
 use tokio::time::Instant;
 
@@ -124,6 +127,58 @@ pub(crate) async fn collect_garbage(
     }
 }
 
+/// Deletes objects no `blobs` row records and that are older than the blob grace period: a crash
+/// can leave one behind. Each is claimed first (its row goes in as `deleting`, the state the
+/// collector uses), so an upload of the same bytes waits until the delete is over. A failed
+/// delete leaves the row `deleting`, and the collector retries it. A young object is left alone,
+/// as its upload may still be in flight.
+pub(crate) async fn sweep_orphans(
+    store: &Store,
+    blobs: &dyn BlobStore,
+    config: &Retention,
+    now: OffsetDateTime,
+) {
+    let cutoff = now - time::Duration::hours(i64::from(config.blob_grace_hours));
+    let mut objects = blobs.list(Scope::All);
+    let mut deleted = 0_u64;
+    while let Some(object) = objects.next().await {
+        let info = match object {
+            Ok(info) => info,
+            Err(e) => {
+                tracing::warn!(error = %e, "listing blobs for orphans");
+                break;
+            }
+        };
+        if info.last_modified >= cutoff {
+            continue;
+        }
+        let blob = GarbageBlob {
+            project_id: info.key.project(),
+            sha256: info.key.digest().to_string(),
+        };
+        match store.claim_orphan_blob(&blob, info.size).await {
+            Ok(true) => {}
+            Ok(false) => continue,
+            Err(e) => {
+                tracing::warn!(error = %e, "claiming an orphan object");
+                continue;
+            }
+        }
+        match delete_blob(store, blobs, &blob).await {
+            Ok(()) => deleted += 1,
+            Err(error) => tracing::warn!(
+                project_id = %blob.project_id,
+                sha256 = blob.sha256,
+                error,
+                "deleting an orphan object"
+            ),
+        }
+    }
+    if deleted > 0 {
+        tracing::info!(deleted, "orphan objects deleted");
+    }
+}
+
 async fn delete_blob(
     store: &Store,
     blobs: &dyn BlobStore,
@@ -179,6 +234,7 @@ pub(crate) struct Schedule {
     rollups: Job,
     garbage: Job,
     expiry: Job,
+    orphans: Job,
 }
 
 impl Schedule {
@@ -187,6 +243,8 @@ impl Schedule {
             rollups: Job::new(Duration::from_secs(config.rollup_interval_seconds)),
             garbage: Job::new(Duration::from_secs(config.gc_interval_minutes * 60)),
             expiry: Job::new(Duration::from_secs(3600)),
+            // Hourly: the sweep lists every object in the store.
+            orphans: Job::new(Duration::from_secs(3600)),
         }
     }
 
@@ -215,6 +273,24 @@ impl Schedule {
                         .await;
                     }
                     Err(e) => tracing::warn!(error = format!("{e:#}"), "no blob store to collect"),
+                }
+            });
+        }
+        if let Some(guard) = self.orphans.due() {
+            let state = state.clone();
+            state.clone().tracker.spawn(async move {
+                let _guard = guard;
+                match state.blobs().await {
+                    Ok(blobs) => {
+                        sweep_orphans(
+                            &state.store,
+                            blobs.as_ref(),
+                            &state.config.retention,
+                            OffsetDateTime::now_utc(),
+                        )
+                        .await;
+                    }
+                    Err(e) => tracing::warn!(error = format!("{e:#}"), "no blob store to sweep"),
                 }
             });
         }

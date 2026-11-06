@@ -6,19 +6,21 @@
 //! blob directory, the metrics endpoint.
 
 use std::fs::File;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use fleet_blob::LocalFs;
+use fleet_blob::{LocalFs, Sha256Digest};
 use fleet_protocol::{artifact::UploadResult, event::FlowOutcome, frame::Sample};
 use serde_json::Value;
 use time::{Duration as Time, OffsetDateTime, format_description::well_known::Rfc3339};
+use tokio::time::Instant;
 use uuid::Uuid;
 
 use super::{
     artifacts::{Dirs, artifact_rig, request, stored_blobs},
     rig::{Agent, Rig, sample, telemetry},
 };
-use crate::{config::Retention, retention};
+use crate::{config::Retention, retention, sweeps};
 
 /// An agent run whose one flow passed.
 struct PassingRun {
@@ -183,6 +185,86 @@ async fn leftover_temp_files_of_crashed_uploads_are_swept_but_a_fresh_one_is_lef
         .collect();
     left.sort();
     assert_eq!(left, ["uploading"]);
+}
+
+/// The object of `digest` in `project` at the local store's layout (`<project>/<shard>/<digest>`).
+fn object_path(dirs: &Dirs, project: Uuid, digest: &str) -> PathBuf {
+    dirs.blobs
+        .join(project.hyphenated().to_string())
+        .join(&digest[..2])
+        .join(digest)
+}
+
+/// Writes an object with no `blobs` row behind it: what a crash can leave.
+fn orphan_object(dirs: &Dirs, project: Uuid, bytes: &[u8]) -> (PathBuf, String) {
+    let digest = Sha256Digest::of(bytes).to_string();
+    let path = object_path(dirs, project, &digest);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, bytes).unwrap();
+    (path, digest)
+}
+
+fn set_age(path: &Path, age: Duration) {
+    File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(SystemTime::now() - age)
+        .unwrap();
+}
+
+/// The leader's schedule, started the way the server starts it (`sweeps::run`), removes the
+/// orphan objects past the blob grace period and leaves the young ones and the referenced ones
+/// alone; the collector's other job, the stale temp files, runs in the same schedule.
+#[tokio::test]
+async fn the_leader_schedule_deletes_old_orphan_objects_and_nothing_still_referenced() {
+    // The leader's loop, fast: its first sweep runs a second after start.
+    let (rig, dirs) = artifact_rig(|c| c.liveness.sweep_interval_ms = 100).await;
+    let project = rig.store.project_id("app").await.unwrap().unwrap();
+
+    // A referenced blob, a day and a bit old: an artifact still names it, so it stays.
+    let run = passing_run(&rig, "730").await;
+    let referenced = run_level(&run, "maestro_log", "text/plain", b"kept log\n");
+    available(&rig, &referenced, b"kept log\n").await;
+    let referenced_path = object_path(&dirs, project, &Sha256Digest::of(b"kept log\n").to_string());
+    set_age(&referenced_path, Duration::from_hours(48));
+    // An orphan a day and a bit old: no row, past the grace period, so it goes.
+    let (stale, _) = orphan_object(&dirs, project, b"left behind by a crash");
+    set_age(&stale, Duration::from_hours(48));
+    // An orphan just written: an upload may still be in flight, so it stays.
+    let (fresh, _) = orphan_object(&dirs, project, b"being uploaded");
+    // A temp file of a crashed upload, three days old.
+    let tmp = dirs.blobs.join(".tmp");
+    std::fs::create_dir_all(&tmp).unwrap();
+    File::create(tmp.join("crashed"))
+        .unwrap()
+        .set_modified(SystemTime::now() - Duration::from_hours(72))
+        .unwrap();
+
+    let leader = tokio::spawn(sweeps::run(rig.state.clone()));
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while stale.exists() {
+        assert!(
+            Instant::now() < deadline,
+            "the leader's schedule did not remove the orphan object"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    rig.state.shutdown.cancel();
+    leader.await.unwrap();
+    // The jobs the schedule started finish before the checks.
+    rig.state.tracker.close();
+    rig.state.tracker.wait().await;
+
+    assert!(fresh.exists(), "a young orphan may be an upload in flight");
+    assert!(
+        referenced_path.exists(),
+        "a referenced blob is never an orphan"
+    );
+    assert!(
+        !tmp.join("crashed").exists(),
+        "the collector's stale temp files"
+    );
 }
 
 fn ms(t: OffsetDateTime) -> i64 {

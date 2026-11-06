@@ -13,6 +13,8 @@
 //!    `artifacts(project_id, sha256)` avoids hot reference counters.
 //! 3. [`Store::reserve_blob`] is the uploader's half of the protocol: it takes a blob off the
 //!    list before the bytes are written, and waits out a deletion in progress.
+//! 4. [`Store::claim_orphan_blob`] takes an object no row records (a crash can leave one) onto
+//!    the same protocol, so the server's orphan sweep can delete it safely.
 //!
 //! Time is a parameter, so tests control it.
 
@@ -203,6 +205,24 @@ impl Store {
         .execute(self.pool())
         .await?;
         Ok(())
+    }
+
+    /// Claims an object no `blobs` row records, for deletion. Its row goes in as `deleting`, the
+    /// state the collector uses, so an upload of the same bytes waits for the delete (see
+    /// [`reserve_blob`](Self::reserve_blob)). `false` when a row already exists: not an orphan.
+    pub async fn claim_orphan_blob(&self, blob: &GarbageBlob, size: u64) -> Result<bool> {
+        let claimed = sqlx::query!(
+            "INSERT INTO blobs (project_id, sha256, size_bytes, state)
+             VALUES ($1, decode($2, 'hex'), $3, 'deleting')
+             ON CONFLICT (project_id, sha256) DO NOTHING",
+            blob.project_id,
+            blob.sha256,
+            i64::try_from(size).unwrap_or(i64::MAX)
+        )
+        .execute(self.pool())
+        .await?
+        .rows_affected();
+        Ok(claimed == 1)
     }
 
     /// Protects a blob that is about to be written: records it (or finds it) and takes it off
