@@ -213,6 +213,17 @@ pub struct FailureRow {
     pub href: String,
 }
 
+/// The key a failure row is reused under: the view rebuilds the row when any of these change.
+#[must_use]
+pub fn failure_key(row: &FailureRow) -> (Uuid, Option<String>, &'static str, Provenance) {
+    (
+        row.flow_id,
+        row.message.clone(),
+        row.state.label,
+        row.provenance,
+    )
+}
+
 /// The attempt's failed and interrupted flows, by name, each linking to its investigation page.
 #[must_use]
 pub fn failures(state: &AttemptState, project: &str) -> Vec<FailureRow> {
@@ -360,5 +371,25 @@ mod tests {
             "/flows/00000000-0000-0000-0000-000000000034?project=app"
         );
         assert_eq!(rows[0].provenance, Provenance::Inferred);
+    }
+
+    #[test]
+    fn a_failure_whose_provenance_settles_gets_a_new_key_so_its_row_is_rebuilt() {
+        let at = |finality: &str| {
+            let mut failed = flow(52, SUITE, "checkout", "failed", finality);
+            failed.failure_message = Some("Assertion is false".into());
+            state(snapshot(
+                1,
+                vec![job(JOB, "a", "running", None, None)],
+                vec![],
+                vec![suite(SUITE, JOB, None)],
+                vec![failed],
+            ))
+        };
+        let provisional = failures(&at("provisional"), "app");
+        let verified = failures(&at("verified"), "app");
+        assert_eq!(provisional[0].provenance, Provenance::Provisional);
+        assert_eq!(verified[0].provenance, Provenance::Final);
+        assert_ne!(failure_key(&provisional[0]), failure_key(&verified[0]));
     }
 }

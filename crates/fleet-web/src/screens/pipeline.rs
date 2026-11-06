@@ -268,7 +268,7 @@ fn FailuresCard(model: LiveModel) -> impl IntoView {
                 <ul class="space-y-2" data-testid="failures">
                     <For
                         each=move || model.failures.get()
-                        key=|f| (f.flow_id, f.message.clone(), f.state.label)
+                        key=model::failure_key
                         children=move |f| {
                             view! {
                                 <li class="flex flex-wrap items-center gap-2" data-testid="failure">

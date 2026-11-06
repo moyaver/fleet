@@ -8,7 +8,7 @@ use crate::tone::Tone;
 pub const STALE_AFTER_MS: u64 = 25_000;
 
 /// Where a displayed value comes from (spec §18).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Provenance {
     /// Seen directly by the agent: device state, exit code, signal, file existence.
     Observed,

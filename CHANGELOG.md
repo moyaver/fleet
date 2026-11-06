@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).
 - Server: a worker's "Last seen" and the overview's 24-hour worker filter only moved when an agent connected, so a long-running worker looked stale; the periodic liveness persist now also refreshes the worker's `last_seen_at`.
 - Dashboard: history "Load more" could add a page fetched under the previous filter, or offer that filter's cursor until the new first page arrived; answers for an older filter are now dropped.
+- Dashboard: a failed or interrupted flow's Failures badge now updates when its provenance settles (it was keyed without provenance, so the row kept the old badge until reload).
 
 ### Changed
 
