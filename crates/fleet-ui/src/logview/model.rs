@@ -222,6 +222,13 @@ pub fn parse_anchor(fragment: &str) -> Option<usize> {
     digits.parse::<usize>().ok()?.checked_sub(1)
 }
 
+/// The zero-based line a `#L123` fragment names in a log of `lines` lines; `None` if malformed
+/// or past the end.
+#[must_use]
+pub fn anchored_line(fragment: &str, lines: usize) -> Option<usize> {
+    parse_anchor(fragment).filter(|&line| line < lines)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,6 +309,15 @@ mod tests {
         ] {
             assert_eq!(parse_anchor(bad), None, "{bad:?}");
         }
+    }
+
+    #[test]
+    fn an_anchor_names_a_line_only_when_the_log_has_it() {
+        assert_eq!(anchored_line("#L3", 3), Some(2));
+        assert_eq!(anchored_line("#L4", 3), None, "past the end");
+        assert_eq!(anchored_line("#L1", 0), None, "empty log");
+        assert_eq!(anchored_line("", 3), None);
+        assert_eq!(anchored_line("#top", 3), None);
     }
 
     #[test]

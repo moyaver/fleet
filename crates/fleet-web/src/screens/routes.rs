@@ -34,7 +34,7 @@ use crate::{
     screens::{
         device::view::DevicePage,
         flow::{
-            evidence::{Evidence, Load, LogSource, TextFile, renew_in_ms},
+            evidence::{Evidence, Load, LogSource, TextFile, refresh_in_ms},
             evidence_view::EvidenceFeed,
             model::evidence_steps,
             view::FlowPageView,
@@ -342,14 +342,15 @@ fn evidence_feed(
             }
         });
     }
-    // Fresh links before the current ones lapse.
+    // Fresh links before the current ones lapse, and soon again when a refresh fails.
     {
-        let (again, data) = (artifacts.clone(), artifacts.data);
+        let (again, data, error) = (artifacts.clone(), artifacts.data, artifacts.error);
         Effect::new(move |timer: Option<Option<TimeoutHandle>>| {
             if let Some(Some(handle)) = timer {
                 handle.clear();
             }
-            let wait = data.with(|l| l.as_ref().and_then(|l| renew_in_ms(l, now_ms())))?;
+            let wait =
+                data.with(|l| error.with(|e| refresh_in_ms(l.as_ref(), e.as_ref(), now_ms())))?;
             let again = again.clone();
             set_timeout_with_handle(
                 move || again.request(),

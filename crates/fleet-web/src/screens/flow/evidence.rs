@@ -28,13 +28,17 @@ use fleet_ui::{
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::clock::unix_ms;
+use crate::{api::ApiError, clock::unix_ms};
 
 /// The longest log the page fetches and parses (the whole text is held in the browser).
 pub const MAX_LOG_BYTES: i64 = 8 * 1024 * 1024;
 
 /// Links are renewed this long before the earliest one expires.
 const RENEW_BEFORE_MS: i64 = 60_000;
+
+/// A failed refresh that may pass (no network, a server error) is tried again this soon, while
+/// the links it failed to renew are still held.
+const RETRY_AFTER_FAILURE_MS: i64 = 5_000;
 
 /// A fetch of a text file, for the log and `commands.json`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -238,6 +242,25 @@ pub fn renew_in_ms(list: &ArtifactListView, now_ms: i64) -> Option<i64> {
         .map(|l| unix_ms(l.expires_at))
         .min()
         .map(|earliest| (earliest - now_ms - RENEW_BEFORE_MS).max(1_000))
+}
+
+/// When to ask for fresh links, in milliseconds from `now_ms`, given the last refresh's outcome.
+/// [`renew_in_ms`] normally. After a refresh that failed for a reason that may pass, the links
+/// still held are tried again soon. A refusal that retrying cannot fix (signed out, forbidden)
+/// is not retried. `None` when there is no link to renew.
+#[must_use]
+pub fn refresh_in_ms(
+    list: Option<&ArtifactListView>,
+    error: Option<&ApiError>,
+    now_ms: i64,
+) -> Option<i64> {
+    let wait = renew_in_ms(list?, now_ms)?;
+    match error {
+        None => Some(wait),
+        Some(ApiError::Network(_)) => Some(RETRY_AFTER_FAILURE_MS),
+        Some(ApiError::Status { status, .. }) if *status >= 500 => Some(RETRY_AFTER_FAILURE_MS),
+        Some(_) => None,
+    }
 }
 
 /// What a class of file is called.
@@ -716,6 +739,49 @@ mod tests {
         assert_eq!(renew_in_ms(&l, NOW), Some(60_000));
         // Nothing to open, nothing to renew.
         assert_eq!(renew_in_ms(&list(&[], Some(UC)), NOW), None);
+    }
+
+    #[test]
+    fn a_failed_refresh_is_tried_again_soon_while_its_links_are_held() {
+        let l = full();
+        let offline = ApiError::Network("offline".to_owned());
+        assert_eq!(refresh_in_ms(Some(&l), None, NOW), Some(240_000));
+        // A renewal that failed (the laptop woke before the network) must not leave the expired
+        // links on screen until a reload.
+        assert_eq!(
+            refresh_in_ms(Some(&l), Some(&offline), NOW),
+            Some(RETRY_AFTER_FAILURE_MS)
+        );
+        let busy = ApiError::Status {
+            status: 503,
+            message: "busy".to_owned(),
+        };
+        assert_eq!(
+            refresh_in_ms(Some(&l), Some(&busy), NOW),
+            Some(RETRY_AFTER_FAILURE_MS)
+        );
+        // Retrying cannot fix a lapsed sign-in, a refusal or a bad answer: stop, no loop.
+        assert_eq!(
+            refresh_in_ms(Some(&l), Some(&ApiError::Unauthorized), NOW),
+            None
+        );
+        assert_eq!(
+            refresh_in_ms(
+                Some(&l),
+                Some(&ApiError::Status {
+                    status: 400,
+                    message: "bad".to_owned(),
+                }),
+                NOW
+            ),
+            None
+        );
+        // Nothing to renew, failed or not.
+        assert_eq!(refresh_in_ms(None, Some(&offline), NOW), None);
+        assert_eq!(
+            refresh_in_ms(Some(&list(&[], Some(UC))), Some(&offline), NOW),
+            None
+        );
     }
 
     // The real session log of the captured suite run, trimmed to two flows (fixtures/maestro/

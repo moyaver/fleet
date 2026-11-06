@@ -15,11 +15,12 @@
 use fleet_protocol::rest::FlowDetailView;
 use fleet_ui::{
     components::display::{Card, Skeleton, StatusPill},
-    logview::view::LogViewer,
+    logview::{model::anchored_line, view::LogViewer},
     screenshots::{ScreenshotViewer, view::ScreenshotViewerView},
     tone::Tone,
 };
 use leptos::prelude::*;
+use leptos_router::hooks::use_location;
 
 use crate::screens::{
     flow::{
@@ -178,12 +179,18 @@ fn LogBody(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
             let (steps, failed) = evidence_steps(&detail);
             let log = LogEvidence::build(&text, &detail.flow.name, &steps);
             let failing = failed.map(|f| f.id);
-            // The user's pick wins; until there is one, show where the flow failed.
+            let lines = log.model.lines().len();
+            let location = use_location();
             let target = {
                 let (log, failing) = (log.clone(), failing.clone());
                 Signal::derive(move || {
-                    let id = feed.selected_step.get().or_else(|| failing.clone())?;
-                    log.line_of(&id)
+                    // The user's pick wins; then a `#L123` in the address; until either, where the
+                    // flow failed.
+                    if let Some(id) = feed.selected_step.get() {
+                        return log.line_of(&id);
+                    }
+                    anchored_line(&location.hash.get(), lines)
+                        .or_else(|| failing.as_ref().and_then(|id| log.line_of(id)))
                 })
             };
             let can_jump = failing.as_ref().is_some_and(|id| log.line_of(id).is_some());
