@@ -57,27 +57,32 @@ fn HistoryBody(project: String) -> impl IntoView {
     let parsed = Memo::new(move |_| HistoryQuery::parse(&query.get()));
     // Only what the server is asked changes the request: opening a stats panel does not.
     let rest = Memo::new(move |_| parsed.with(|p| p.rest_query(None)));
+    // Bumped on every filter change. Answers tagged with an older value are for other filters.
+    let generation = RwSignal::new(0_u64);
     let history = {
         let project = project.clone();
         remote(1000, move || {
             let project = project.clone();
             let q = rest.get_untracked();
-            async move { api::history(&project, &q).await }
+            let epoch = generation.get_untracked();
+            async move { api::history(&project, &q).await.map(|page| (epoch, page)) }
         })
     };
     let more: RwSignal<Vec<HistoryPage>> = RwSignal::new(Vec::new());
+    let loading_more = RwSignal::new(false);
     {
         let history = history.clone();
         Effect::new(move |previous: Option<()>| {
             rest.track();
             // The first run is the fetch `remote` already started.
             if previous.is_some() {
+                generation.update(|epoch| *epoch += 1);
                 more.set(Vec::new());
+                loading_more.set(false);
                 history.request();
             }
         });
     }
-    let loading_more = RwSignal::new(false);
     let on_more = {
         let project = project.clone();
         Callback::new(move |cursor: String| {
@@ -85,13 +90,19 @@ fn HistoryBody(project: String) -> impl IntoView {
                 return;
             }
             loading_more.set(true);
+            let epoch = generation.get_untracked();
             let project = project.clone();
             let q = parsed.with_untracked(|p| p.rest_query(Some(&cursor)));
             spawn_local(async move {
-                if let Ok(page) = api::history(&project, &q).await {
-                    more.update(|pages| pages.push(page));
+                let page = api::history(&project, &q).await;
+                // After a filter change this answer is for other filters: drop it. The change
+                // already cleared the loading flag, which now belongs to a newer request.
+                if generation.get_untracked() == epoch {
+                    if let Ok(page) = page {
+                        more.update(|pages| pages.push(page));
+                    }
+                    loading_more.set(false);
                 }
-                loading_more.set(false);
             });
         })
     };
@@ -99,9 +110,15 @@ fn HistoryBody(project: String) -> impl IntoView {
         let project = project.clone();
         Memo::new(move |_| {
             history.data.with(|first| {
-                first.as_ref().map(|first| {
-                    more.with(|more| HistoryTable::build(first, more, &ctx(&project), &query.get()))
-                })
+                // A first page for other filters is not shown, so Load more cannot offer its cursor.
+                first
+                    .as_ref()
+                    .filter(|(epoch, _)| *epoch == generation.get())
+                    .map(|(_, first)| {
+                        more.with(|more| {
+                            HistoryTable::build(first, more, &ctx(&project), &query.get())
+                        })
+                    })
             })
         })
     };
