@@ -168,6 +168,8 @@ fleet-agent run --plan plan.json --shard 2 -- maestro test
 
 The agent passes the plan's workspace config to Maestro, so `executionOrder` and tag rules keep their meaning. A plan that can't be read stops the step (exit 2) rather than running the whole suite on every shard. So does a shard with no flows, a command that isn't `maestro test`, and a command that names flow files or directories (`maestro test .maestro/`), selects tags with `--include-tags` or `--exclude-tags`, or passes its own `--config` when the plan has one. Maestro options such as `--device` and `-e` are fine.
 
+The pipeline page shows each shard's planned time against its actual time (first flow start to last flow end), and the slowest shard against an equal-count split of the same flows by the same estimates. The plan manifest records that baseline; plans published before it existed show no comparison.
+
 ## Example workflow
 
 See [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).

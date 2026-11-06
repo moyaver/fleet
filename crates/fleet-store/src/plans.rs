@@ -268,19 +268,28 @@ async fn upsert_attempt(
 
 #[cfg(test)]
 mod tests {
-    use fleet_protocol::plan::PlanShard;
+    use fleet_protocol::{
+        event::{
+            EventBody, FlowEnded, FlowOutcome, FlowRef, FlowStarted, ShardAssigned, ShardMode,
+            SuiteStarted,
+        },
+        journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
+        plan::PlanShard,
+    };
     use sqlx::PgPool;
+    use time::OffsetDateTime;
 
     use super::*;
     use crate::ingest::{
         Transport,
-        tests::{Agent, publisher},
+        tests::{Agent, SuiteIds, publisher},
     };
 
     fn manifest(id: &str, flows: &[&[&str]]) -> PlanManifest {
         PlanManifest {
             config_path: None,
             config_sha256: None,
+            equal_count_estimated_seconds: None,
             plan_id: id.into(),
             total_flows: None,
             shards: flows
@@ -362,5 +371,196 @@ mod tests {
             .unwrap();
         assert_eq!(snap.plans[0].shards[1].agent_runs, vec![a.id]);
         assert_eq!(snap.plans[0].shards[0].agent_runs, Vec::<Uuid>::new());
+    }
+    /// An event at a fixed wall-clock time, so shard spans are exact.
+    fn at(
+        a: &mut Agent,
+        subject: Subject,
+        body: &EventBody,
+        wall: OffsetDateTime,
+    ) -> EventEnvelope {
+        a.seq += 1;
+        EventEnvelope::new(
+            a.seq,
+            ClockSample { wall, mono_ms: 0 },
+            subject,
+            Provenance::new(SourceKind::LiveConsole),
+            body,
+        )
+    }
+
+    /// One shard's agent run: its suite, its device, the plan link, and each flow as
+    /// `(name, start, end)` in seconds after `base`; an end of `None` leaves the flow running.
+    fn shard_events(
+        a: &mut Agent,
+        ids: SuiteIds,
+        shard: u32,
+        serial: &str,
+        base: OffsetDateTime,
+        flows: &[(&str, i64, Option<i64>)],
+    ) -> Vec<EventEnvelope> {
+        let at_s = |s: i64| base + time::Duration::seconds(s);
+        let mut out = vec![
+            at(
+                a,
+                ids.suite(),
+                &EventBody::SuiteStarted(SuiteStarted {
+                    shard_mode: ShardMode::None,
+                    shards: 1,
+                }),
+                base,
+            ),
+            at(
+                a,
+                ids.shard(),
+                &EventBody::ShardAssigned(ShardAssigned {
+                    shard_number: 1,
+                    device_serial: serial.into(),
+                    planned: flows
+                        .iter()
+                        .map(|(n, _, _)| FlowRef {
+                            name: (*n).into(),
+                            path: Some(format!("{n}.yaml")),
+                        })
+                        .collect(),
+                }),
+                base,
+            ),
+            at(
+                a,
+                Subject::default(),
+                &EventBody::PlanAssigned(fleet_protocol::event::PlanAssigned {
+                    plan_id: "plan-2".into(),
+                    shard_id: shard,
+                    flows: flows.iter().map(|(n, _, _)| format!("{n}.yaml")).collect(),
+                }),
+                base,
+            ),
+        ];
+        for (ordinal, (name, start, end)) in flows.iter().enumerate() {
+            let flow = Uuid::now_v7();
+            out.push(at(
+                a,
+                ids.flow(flow),
+                &EventBody::FlowStarted(FlowStarted {
+                    flow: FlowRef {
+                        name: (*name).into(),
+                        path: Some(format!("{name}.yaml")),
+                    },
+                    shard_number: 1,
+                    ordinal: u32::try_from(ordinal).unwrap(),
+                }),
+                at_s(*start),
+            ));
+            if let Some(end) = end {
+                out.push(at(
+                    a,
+                    ids.flow(flow),
+                    &EventBody::FlowEnded(FlowEnded {
+                        outcome: FlowOutcome::Passed,
+                        duration_ms: None,
+                        failure: None,
+                        flow: None,
+                    }),
+                    at_s(*end),
+                ));
+            }
+        }
+        out
+    }
+
+    /// Each shard's actual time is the span from its first flow's start to its last flow's end,
+    /// and stays unknown while a flow it started is still running.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn each_shards_actual_time_is_the_span_of_its_flows(pool: PgPool) {
+        let store = Store { pool };
+        let p = publisher(&store).await;
+        let mut m = manifest("plan-2", &[&["a.yaml", "b.yaml"], &["c.yaml"]]);
+        m.equal_count_estimated_seconds = Some(90);
+        let pipeline = PlanPipeline {
+            repository: Some("o/r".into()),
+            run_id: Some("600".into()),
+            ..PlanPipeline::default()
+        };
+        let attempt = store
+            .store_plan(&p, &m, &pipeline)
+            .await
+            .unwrap()
+            .pipeline_attempt_id
+            .unwrap();
+        let base = OffsetDateTime::from_unix_timestamp(1_800_000_000).unwrap();
+
+        // Shard 0 finishes at +50 s; shard 1's only flow is still running.
+        let mut a = Agent::new("600", "shard-0");
+        let mut b = Agent::new("600", "shard-1");
+        let (ids_a, ids_b) = (SuiteIds::new(), SuiteIds::new());
+        let ha = store
+            .open_run(&p, &a.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let hb = store
+            .open_run(&p, &b.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let batch_a = shard_events(
+            &mut a,
+            ids_a,
+            0,
+            "emulator-5554",
+            base,
+            &[("a", 0, Some(30)), ("b", 30, Some(50))],
+        );
+        store.apply_batch(&ha, &batch_a).await.unwrap();
+        let batch_b = shard_events(&mut b, ids_b, 1, "emulator-5556", base, &[("c", 5, None)]);
+        store.apply_batch(&hb, &batch_b).await.unwrap();
+
+        let snap = store
+            .snapshot(p.project_id, attempt)
+            .await
+            .unwrap()
+            .unwrap();
+        let shards = &snap.plans[0].shards;
+        assert_eq!(shards[0].actual_ms, Some(50_000), "+0 s to +50 s");
+        assert_eq!(shards[1].actual_ms, None, "a flow is still running");
+        assert_eq!(
+            snap.plans[0].equal_count_estimate_ms,
+            Some(90_000),
+            "the manifest's equal-count baseline, in ms"
+        );
+
+        // Shard 1's flow ends at +95 s: its span is +5 s to +95 s.
+        let c_end = {
+            let flow = store
+                .snapshot(p.project_id, attempt)
+                .await
+                .unwrap()
+                .unwrap()
+                .flows
+                .iter()
+                .find(|f| f.name == "c")
+                .unwrap()
+                .id;
+            at(
+                &mut b,
+                ids_b.flow(flow),
+                &EventBody::FlowEnded(FlowEnded {
+                    outcome: FlowOutcome::Passed,
+                    duration_ms: None,
+                    failure: None,
+                    flow: None,
+                }),
+                base + time::Duration::seconds(95),
+            )
+        };
+        store.apply_batch(&hb, &[c_end]).await.unwrap();
+        let snap = store
+            .snapshot(p.project_id, attempt)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(snap.plans[0].shards[1].actual_ms, Some(90_000));
+        assert_eq!(snap.plans[0].shards[0].actual_ms, Some(50_000));
     }
 }

@@ -10,6 +10,7 @@
 //! - [`fingerprint`]: failure and condition fingerprints (ADR-0009).
 //! - [`flaky`]: flaky v1 classification over a run history (ADR-0009).
 //! - [`trust`]: publisher trust policies for CI OIDC identities (ADR-0008).
+//! - [`plan`]: what an equal-count split of a plan would have produced (ADR-0013, #81).
 #![warn(
     clippy::indexing_slicing,
     clippy::string_slice,
@@ -22,6 +23,7 @@ pub mod downsample;
 pub mod fingerprint;
 pub mod flaky;
 pub mod outcome;
+pub mod plan;
 pub mod policy;
 pub mod reconcile;
 pub mod redact;

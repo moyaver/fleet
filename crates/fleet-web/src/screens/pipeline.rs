@@ -15,6 +15,7 @@
 
 pub mod activity;
 pub mod model;
+pub mod plans;
 pub mod timeline;
 
 #[cfg(test)]
@@ -22,6 +23,7 @@ mod fixtures;
 
 use std::time::Duration;
 
+use fleet_protocol::live::PlanView;
 use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
     components::display::{Badge, Card, EmptyState, ProvenanceBadge, Skeleton, StatusPill},
@@ -31,7 +33,10 @@ use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
 use uuid::Uuid;
 
-use self::timeline::timeline_data;
+use self::{
+    plans::{PlanComparison, show, signed},
+    timeline::timeline_data,
+};
 use crate::{
     api,
     app::ErrorNotice,
@@ -98,12 +103,22 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
             async move { api::timeline(&project, attempt).await }
         })
     };
-    // The timeline follows the live version (its times are not in the deltas).
+    // The plans' actual shard times are in the attempt's snapshot, not in the deltas.
+    let plans = {
+        let project = project.clone();
+        remote(1000, move || {
+            let project = project.clone();
+            async move { api::snapshot(&project, attempt).await.map(|s| s.plans) }
+        })
+    };
+    // The timeline and the plans follow the live version.
     {
         let timeline = timeline.clone();
+        let plans = plans.clone();
         Effect::new(move |_| {
             if model.version.get() > 0 {
                 timeline.request();
+                plans.request();
             }
         });
     }
@@ -139,7 +154,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
                                 "Reconnecting to the live feed. This is the last known state; it is updating."
                             </p>
                         </Show>
-                        <ProgressCard model=model />
+                        <ProgressCard model=model plans=plans.data />
                         <FailuresCard model=model />
                         <Jobs model=model project=project />
                         <Card title="Execution timeline">
@@ -215,7 +230,7 @@ fn PageHeader(
 }
 
 #[component]
-fn ProgressCard(model: LiveModel) -> impl IntoView {
+fn ProgressCard(model: LiveModel, plans: RwSignal<Option<Vec<PlanView>>>) -> impl IntoView {
     view! {
         <Card title="Test progress">
             {move || {
@@ -239,10 +254,59 @@ fn ProgressCard(model: LiveModel) -> impl IntoView {
                                     </div>
                                 }).collect_view()}
                             </dl>
+                            <PlanTable plans=plans />
                         }
                     })
             }}
         </Card>
+    }
+}
+
+/// The attempt's plans: each shard planned against its actual time, and the slowest shard
+/// against an equal-count split. Nothing shows for an attempt with no plan.
+#[component]
+fn PlanTable(plans: RwSignal<Option<Vec<PlanView>>>) -> impl IntoView {
+    move || {
+        plans.with(|plans| {
+            plans
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|plan| {
+                    let view = PlanComparison::new(plan);
+                    view! {
+                        <div class="mt-4 space-y-2" data-testid="plan">
+                            <p class="text-xs text-muted">{format!("Plan {}", view.plan_id)}</p>
+                            <table class="w-full text-sm" data-testid="plan-shards">
+                                <thead class="text-left text-xs text-muted">
+                                    <tr>
+                                        <th class="font-medium">"Shard"</th>
+                                        <th class="font-medium">"Flows"</th>
+                                        <th class="font-medium">"Planned"</th>
+                                        <th class="font-medium">"Actual"</th>
+                                        <th class="font-medium">"Difference"</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="tabular-nums">
+                                    {view.shards.iter().map(|row| view! {
+                                        <tr data-testid="plan-shard">
+                                            <td>{row.shard_id}</td>
+                                            <td>{row.flows}</td>
+                                            <td>{show(row.planned_ms)}</td>
+                                            <td>{show(row.actual_ms)}</td>
+                                            <td>{row.difference_ms().map_or_else(|| "—".to_owned(), signed)}</td>
+                                        </tr>
+                                    }).collect_view()}
+                                </tbody>
+                            </table>
+                            <ul class="space-y-1 text-sm text-muted" data-testid="plan-summary">
+                                {view.summary().into_iter().map(|line| view! { <li>{line}</li> }).collect_view()}
+                            </ul>
+                        </div>
+                    }
+                })
+                .collect_view()
+        })
     }
 }
 

@@ -294,10 +294,17 @@ pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Resul
 async fn plans(c: &mut sqlx::PgConnection, project: Uuid, attempt: Uuid) -> Result<Vec<PlanView>> {
     let rows = sqlx::query!(
         "SELECT p.plan_id, p.planned_total, s.shard_id, s.flows, s.estimate_ms,
+                (p.manifest->>'equalCountEstimatedSeconds')::bigint * 1000 AS equal_count_estimate_ms,
                 coalesce(array_agg(DISTINCT r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"runs!\",
                 (SELECT count(*) FROM flow_executions f JOIN agent_runs r2 ON r2.id = f.agent_run_id
                   WHERE r2.project_id = p.project_id AND r2.plan_id = p.plan_id
-                    AND r2.plan_shard_id = s.shard_id) AS \"executed!\"
+                    AND r2.plan_shard_id = s.shard_id) AS \"executed!\",
+                (SELECT CASE WHEN bool_or(f.ended_at IS NULL) THEN NULL
+                             ELSE (extract(epoch FROM max(f.ended_at) - min(f.started_at)) * 1000)::bigint
+                        END
+                   FROM flow_executions f JOIN agent_runs r4 ON r4.id = f.agent_run_id
+                  WHERE r4.project_id = p.project_id AND r4.plan_id = p.plan_id
+                    AND r4.plan_shard_id = s.shard_id AND f.started_at IS NOT NULL) AS actual_ms
            FROM plans p
            JOIN plan_shards s ON s.project_id = p.project_id AND s.plan_id = p.plan_id
            LEFT JOIN agent_runs r ON r.project_id = p.project_id AND r.plan_id = p.plan_id
@@ -306,7 +313,8 @@ async fn plans(c: &mut sqlx::PgConnection, project: Uuid, attempt: Uuid) -> Resu
             AND (p.pipeline_attempt_id = $2
                  OR p.plan_id IN (SELECT r3.plan_id FROM agent_runs r3 JOIN jobs j ON j.id = r3.job_id
                                    WHERE j.pipeline_attempt_id = $2 AND r3.plan_id IS NOT NULL))
-          GROUP BY p.project_id, p.plan_id, p.planned_total, s.shard_id, s.flows, s.estimate_ms
+          GROUP BY p.project_id, p.plan_id, p.planned_total, p.manifest, s.shard_id, s.flows,
+                   s.estimate_ms
           ORDER BY p.plan_id, s.shard_id",
         project,
         attempt
@@ -321,12 +329,14 @@ async fn plans(c: &mut sqlx::PgConnection, project: Uuid, attempt: Uuid) -> Resu
             estimate_ms: r.estimate_ms,
             agent_runs: r.runs,
             executed: r.executed,
+            actual_ms: r.actual_ms,
         };
         match out.last_mut() {
             Some(p) if p.plan_id == r.plan_id => p.shards.push(shard),
             _ => out.push(PlanView {
                 plan_id: r.plan_id,
                 planned_total: r.planned_total,
+                equal_count_estimate_ms: r.equal_count_estimate_ms,
                 shards: vec![shard],
             }),
         }

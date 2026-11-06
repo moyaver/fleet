@@ -231,6 +231,10 @@ pub struct PlanShardView {
     pub agent_runs: Vec<Uuid>,
     /// Flow executions those runs reported.
     pub executed: i64,
+    /// Wall-clock span of the shard's flows: first start to last end. `None` until every flow
+    /// that started has ended, and when none started.
+    #[serde(default)]
+    pub actual_ms: Option<i64>,
 }
 
 /// A Fleet plan (ADR-0013).
@@ -242,6 +246,10 @@ pub struct PlanView {
     pub plan_id: String,
     /// Flows planned across shards.
     pub planned_total: i32,
+    /// The largest shard's estimate had the flows been split by count alone, in ms; `None` for
+    /// plans published before the planner recorded it.
+    #[serde(default)]
+    pub equal_count_estimate_ms: Option<i64>,
     /// The shards.
     pub shards: Vec<PlanShardView>,
 }

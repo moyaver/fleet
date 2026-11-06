@@ -24,6 +24,11 @@ pub struct PlanManifest {
     /// SHA-256 of `config_path` at planning time; the agent refuses to run if it changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_sha256: Option<String>,
+    /// The largest shard's estimate, in seconds, had the same flows been split into the same
+    /// number of shards by count alone (each `executionOrder` sequence kept whole), with the same
+    /// estimates. The plan's saving is measured against it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equal_count_estimated_seconds: Option<u64>,
     /// The shards.
     pub shards: Vec<PlanShard>,
 }

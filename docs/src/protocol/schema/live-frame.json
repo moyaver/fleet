@@ -531,6 +531,15 @@
     "PlanShardView": {
       "description": "One shard of a Fleet plan: planned against actual.",
       "properties": {
+        "actual_ms": {
+          "default": null,
+          "description": "Wall-clock span of the shard's flows: first start to last end. `None` until every flow\nthat started has ended, and when none started.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "agent_runs": {
           "description": "Agent runs that ran it.",
           "items": {
@@ -576,6 +585,15 @@
     "PlanView": {
       "description": "A Fleet plan (ADR-0013).",
       "properties": {
+        "equal_count_estimate_ms": {
+          "default": null,
+          "description": "The largest shard's estimate had the flows been split by count alone, in ms; `None` for\nplans published before the planner recorded it.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "plan_id": {
           "description": "Plan ID.",
           "type": "string"
