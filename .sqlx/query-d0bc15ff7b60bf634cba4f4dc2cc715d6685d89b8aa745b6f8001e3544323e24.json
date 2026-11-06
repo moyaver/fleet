@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
+  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.maestro_version, r.maestro_profile_supported, r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
   "describe": {
     "columns": [
       {
@@ -138,6 +138,28 @@
       },
       {
         "ordinal": 13,
+        "name": "maestro_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_version"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "maestro_profile_supported",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_profile_supported"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
         "name": "rev",
         "type_info": "Int8",
         "origin": {
@@ -148,7 +170,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 16,
         "name": "liveness",
         "type_info": "Text",
         "origin": "Expression"
@@ -175,9 +197,11 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       null
     ]
   },
-  "hash": "9f05760ac99f5ae6c7e8630c6140def55575b7dd88d11a2f6e7a8e3cbe35d21a"
+  "hash": "d0bc15ff7b60bf634cba4f4dc2cc715d6685d89b8aa745b6f8001e3544323e24"
 }

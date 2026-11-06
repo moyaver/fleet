@@ -16,9 +16,9 @@ use fleet_protocol::{
     artifact::ArtifactClass,
     event::{
         AgentWarning, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo, FlowEnded,
-        FlowOutcome, FlowRef, FlowReported, FlowStarted, ProcessExited, ReportParsed, ReportStatus,
-        RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
-        StepStatus, SuiteStarted,
+        FlowOutcome, FlowRef, FlowReported, FlowStarted, MaestroBuild, ProcessExited, ReportParsed,
+        ReportStatus, RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode, StepEnded,
+        StepStarted, StepStatus, SuiteStarted,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -153,6 +153,8 @@ pub(crate) struct Session {
     sequence_aborted: bool,
     closed: bool,
     signalled: bool,
+    /// The Maestro build the session log named, once it has.
+    maestro: Option<MaestroBuild>,
     pub(crate) unrecognized_stdout: u32,
     devices: std::collections::BTreeMap<String, fleet_protocol::event::AdbState>,
     out: Vec<EventEnvelope>,
@@ -244,6 +246,7 @@ impl Session {
             sequence_aborted: false,
             closed: false,
             signalled: false,
+            maestro: None,
             unrecognized_stdout: 0,
             devices: std::collections::BTreeMap::new(),
             out: Vec::new(),
@@ -277,6 +280,11 @@ impl Session {
             }),
         );
         s
+    }
+
+    /// The Maestro build the session log named, if it has.
+    pub(crate) fn maestro(&self) -> Option<&MaestroBuild> {
+        self.maestro.as_ref()
     }
 
     /// Events produced so far, removed from the session.
@@ -477,6 +485,23 @@ impl Session {
                         message,
                         parser,
                     );
+                }
+            }
+            Some(log::Event::MaestroVersion { version }) => {
+                // Once per run: Maestro writes its version at the start of the session log.
+                if self.maestro.is_none() {
+                    let build = MaestroBuild {
+                        version: self.redactor.redact(&version).into_owned(),
+                        profile_supported: fleet_maestro::supports(&version),
+                    };
+                    self.emit(
+                        at,
+                        Subject::default(),
+                        SourceKind::DebugLog,
+                        Some(parser),
+                        &EventBody::MaestroDetected(build.clone()),
+                    );
+                    self.maestro = Some(build);
                 }
             }
             Some(log::Event::RetryAttemptFailed { .. }) | None => {}

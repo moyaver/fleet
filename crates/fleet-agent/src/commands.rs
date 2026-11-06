@@ -3,15 +3,23 @@
 //! exists to find them before a real run.
 
 use std::{
+    ffi::OsStr,
+    io::Read,
     net::{SocketAddr, TcpStream, ToSocketAddrs},
+    os::unix::process::CommandExt,
     path::Path,
-    process::Command,
-    sync::{Arc, atomic::Ordering},
+    process::{Command, Stdio},
+    sync::{Arc, atomic::Ordering, mpsc},
+    thread,
     time::{Duration, Instant},
 };
 
 use anyhow::Context;
 use fleet_protocol::journal::ClockSample;
+use nix::{
+    sys::signal::{Signal, killpg},
+    unistd::Pid,
+};
 use time::OffsetDateTime;
 
 use crate::{
@@ -68,43 +76,30 @@ pub(crate) struct Check {
 /// Runs every check.
 pub(crate) fn check() -> Vec<Check> {
     let mut out = Vec::new();
-    let maestro = Command::new("maestro")
-        .arg("--version")
-        .env("MAESTRO_CLI_NO_ANALYTICS", "1")
-        .output();
-    out.push(match maestro {
-        Ok(o) if o.status.success() => {
-            let v = String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .last()
-                .unwrap_or("")
-                .trim()
-                .to_owned();
-            let supported = v.starts_with(fleet_maestro::PROFILE);
-            Check {
-                name: "maestro",
-                ok: true,
-                detail: if supported {
-                    format!("{v} (profile {})", fleet_maestro::PROFILE)
-                } else {
-                    format!(
-                        "{v}: parsers target {}, results may degrade",
-                        fleet_maestro::PROFILE
-                    )
-                },
+    out.push(
+        match maestro_version(OsStr::new("maestro"), PROBE_TIMEOUT) {
+            Ok(v) => {
+                let supported = fleet_maestro::supports(&v);
+                Check {
+                    name: "maestro",
+                    ok: true,
+                    detail: if supported {
+                        format!("{v} (profile {})", fleet_maestro::PROFILE)
+                    } else {
+                        format!(
+                            "{v}: parsers target {}, results may degrade",
+                            fleet_maestro::PROFILE
+                        )
+                    },
+                }
             }
-        }
-        Ok(o) => Check {
-            name: "maestro",
-            ok: false,
-            detail: format!("`maestro --version` exited {}", o.status),
+            Err(detail) => Check {
+                name: "maestro",
+                ok: false,
+                detail,
+            },
         },
-        Err(e) => Check {
-            name: "maestro",
-            ok: false,
-            detail: format!("not on PATH: {e}"),
-        },
-    });
+    );
     out.push(tcp(
         "adb server",
         "127.0.0.1:5037",
@@ -155,6 +150,67 @@ pub(crate) fn check() -> Vec<Check> {
     out
 }
 
+/// How long `maestro --version` may take before the probe gives up.
+pub(crate) const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Asks `program` for its version with `--version`: the binary a run would start. Its output is
+/// captured, never shown, and the probe is killed (with the group it started) past `timeout`.
+/// The error is the reason the version is unknown.
+pub(crate) fn maestro_version(program: &OsStr, timeout: Duration) -> Result<String, String> {
+    let mut child = Command::new(program)
+        .arg("--version")
+        .env("MAESTRO_CLI_NO_ANALYTICS", "1")
+        .env("MAESTRO_DISABLE_UPDATE_CHECK", "true")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        // Its own group: a timeout also kills the JVM a wrapper script started.
+        .process_group(0)
+        .spawn()
+        .map_err(|e| format!("not on PATH: {e}"))?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "no stdout pipe".to_owned())?;
+    // Read on a thread: a grandchild holding the pipe must not hold the probe past its timeout.
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut text = Vec::new();
+        let _ = stdout.read_to_end(&mut text);
+        let _ = tx.send(text);
+    });
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(5)),
+            _ => {
+                if let Ok(pid) = i32::try_from(child.id()) {
+                    let _ = killpg(Pid::from_raw(pid), Signal::SIGKILL);
+                }
+                let _ = child.wait();
+                return Err(format!(
+                    "`maestro --version` did not finish within {timeout:?}"
+                ));
+            }
+        }
+    };
+    if !status.success() {
+        return Err(format!("`maestro --version` exited {status}"));
+    }
+    let text = rx.recv_timeout(Duration::from_secs(1)).unwrap_or_default();
+    let version = String::from_utf8_lossy(&text)
+        .lines()
+        .last()
+        .unwrap_or("")
+        .trim()
+        .to_owned();
+    if version.is_empty() {
+        return Err("`maestro --version` printed no version".to_owned());
+    }
+    Ok(version)
+}
+
 fn tcp(name: &'static str, addr: &str, failure: &str) -> Check {
     let target: Option<SocketAddr> = addr.to_socket_addrs().ok().and_then(|mut a| a.next());
     match target.map(|a| TcpStream::connect_timeout(&a, Duration::from_secs(3))) {
@@ -185,4 +241,29 @@ pub(crate) fn version() -> String {
         fleet_protocol::PROTOCOL_VERSION,
         fleet_maestro::PROFILE
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    use super::*;
+
+    #[test]
+    fn a_probe_that_hangs_is_killed_at_its_timeout() {
+        let dir = std::env::temp_dir().join(format!("fleet-probe-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("maestro");
+        std::fs::write(&script, "#!/bin/sh\nsleep 30\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let started = Instant::now();
+        let err = maestro_version(script.as_os_str(), Duration::from_millis(300)).unwrap_err();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(err.contains("did not finish within"), "{err}");
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
+    }
 }

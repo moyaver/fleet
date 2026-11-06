@@ -16,12 +16,13 @@ expression: result
       "failure": "Assertion is false: \"Fleet never shows this\" is visible"
     }
   ],
-  "events": 21,
+  "events": 22,
   "event_types": {
     "artifact.registered": 2,
     "flow.ended": 1,
     "flow.reported": 1,
     "flow.started": 1,
+    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,

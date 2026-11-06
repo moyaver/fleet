@@ -4,8 +4,9 @@ expression: result
 ---
 {
   "flows": [],
-  "events": 6,
+  "events": 7,
   "event_types": {
+    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,

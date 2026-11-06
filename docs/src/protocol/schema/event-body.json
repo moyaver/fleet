@@ -465,6 +465,24 @@
       ],
       "type": "object"
     },
+    "MaestroBuild": {
+      "description": "The Maestro build the run's session log named: the payload of `maestro.detected`.",
+      "properties": {
+        "profile_supported": {
+          "description": "Whether the agent's parsers were built for this version. `false` marks the run degraded.",
+          "type": "boolean"
+        },
+        "version": {
+          "description": "The version as Maestro logged it, for example `2.12.1`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "profile_supported"
+      ],
+      "type": "object"
+    },
     "MatchMethod": {
       "description": "How a report test case was matched to a live flow execution.",
       "oneOf": [
@@ -1234,6 +1252,23 @@
         },
         "type": {
           "const": "parser.unrecognized",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`MaestroBuild`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/MaestroBuild"
+        },
+        "type": {
+          "const": "maestro.detected",
           "type": "string"
         }
       },

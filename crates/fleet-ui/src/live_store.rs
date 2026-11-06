@@ -297,6 +297,8 @@ mod tests {
             plan_id: None,
             plan_shard_id: None,
             maestro_exit_code: None,
+            maestro_version: None,
+            maestro_profile_supported: None,
             rev: 1,
             liveness,
         }

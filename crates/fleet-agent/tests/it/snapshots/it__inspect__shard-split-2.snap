@@ -49,12 +49,13 @@ expression: result
       "failure": null
     }
   ],
-  "events": 69,
+  "events": 70,
   "event_types": {
     "artifact.registered": 2,
     "flow.ended": 8,
     "flow.reported": 4,
     "flow.started": 4,
+    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,

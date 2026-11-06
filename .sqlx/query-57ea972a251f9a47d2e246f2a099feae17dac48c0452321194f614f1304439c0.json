@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT maestro_version, maestro_profile_supported FROM agent_runs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "maestro_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_version"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "maestro_profile_supported",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_profile_supported"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "57ea972a251f9a47d2e246f2a099feae17dac48c0452321194f614f1304439c0"
+}

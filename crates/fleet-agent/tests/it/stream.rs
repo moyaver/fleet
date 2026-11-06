@@ -313,6 +313,82 @@ fn a_run_streams_to_the_server_without_changing_the_result() {
     assert_eq!(ev["maestro_log"], true);
 }
 
+/// The `maestro.detected` payloads the server committed.
+fn maestro_detected(state: &State) -> Vec<Value> {
+    state
+        .committed
+        .values()
+        .filter(|e| e["type"] == "maestro.detected")
+        .map(|e| e["data"].clone())
+        .collect()
+}
+
+#[test]
+fn the_maestro_version_is_journaled_once_per_run() {
+    let srv = server(Mode::Normal);
+    let (out, _, _) = run_agent("suite", Some(&format!("ws://{}", srv.addr)), &[], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    assert_eq!(
+        maestro_detected(&srv.state.lock().unwrap()),
+        [json!({ "version": "2.12.1", "profile_supported": true })]
+    );
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("version profile"),
+        "a supported version is not flagged"
+    );
+}
+
+#[test]
+fn an_unsupported_maestro_version_is_flagged_and_the_run_is_unchanged() {
+    let srv = server(Mode::Normal);
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_FAKE_VERSION", "2.13.0")],
+    );
+    // I1: Maestro's exit status and output are untouched by the warning.
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains(
+            "[fleet-agent] Maestro 2.13.0 is not in the version profile Fleet's parsers target (2.12): results may degrade"
+        ),
+        "{stderr}"
+    );
+    assert_eq!(
+        maestro_detected(&srv.state.lock().unwrap()),
+        [json!({ "version": "2.13.0", "profile_supported": false })]
+    );
+}
+
+#[test]
+fn a_log_without_a_version_line_reports_none() {
+    let srv = server(Mode::Normal);
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_FAKE_VERSION", "")],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("suite/stdout.bin")).unwrap()
+    );
+    let detected: Vec<Value> = maestro_detected(&srv.state.lock().unwrap());
+    assert!(detected.is_empty(), "{detected:?}");
+    assert!(!String::from_utf8_lossy(&out.stderr).contains("version profile"));
+}
+
 #[test]
 fn a_dropped_connection_resumes_without_loss_or_duplicates() {
     let srv = server(Mode::DropAfter(10));

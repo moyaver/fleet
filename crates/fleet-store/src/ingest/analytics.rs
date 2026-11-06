@@ -27,9 +27,9 @@ struct Flow {
 /// from a flow that is no longer a final failure. Writes nothing when nothing changed.
 ///
 /// The condition facts come from what the store holds today: the worker's OS and architecture,
-/// the CI provider, the device profile (still empty until adb properties are reported) and the
-/// host's memory from its latest telemetry sample. The Maestro version and the host core count
-/// are not reported yet, so they read `unknown`.
+/// the CI provider, the Maestro version the run reported at start, the device profile (still
+/// empty until adb properties are reported) and the host's memory from its latest telemetry
+/// sample. The host core count is not reported yet, so it reads `unknown`.
 pub(crate) async fn finalize_flows(
     tx: &mut PgConnection,
     flows: &[Uuid],
@@ -65,7 +65,7 @@ async fn load(tx: &mut PgConnection, flows: &[Uuid]) -> Result<Vec<Flow>, sqlx::
                   WHERE s.flow_execution_id = f.id AND s.run_day = r.run_day
                     AND s.status = 'failed'
                   ORDER BY s.step_index LIMIT 1) AS failed_step,
-                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider,
+                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider, r.maestro_version,
                 coalesce(dp.model, dp.avd_or_runtime) AS device_model, dp.api_level AS \"api_level?\",
                 (SELECT h.host_mem_total_bytes FROM host_samples h
                   WHERE h.agent_run_id = f.agent_run_id AND h.host_mem_total_bytes IS NOT NULL
@@ -97,7 +97,7 @@ async fn load(tx: &mut PgConnection, flows: &[Uuid]) -> Result<Vec<Flow>, sqlx::
             conditions: ConditionFacts {
                 device_model: row.device_model,
                 device_api_level: row.api_level.and_then(|n| u32::try_from(n).ok()),
-                maestro_version: None,
+                maestro_version: row.maestro_version,
                 os: row.os,
                 arch: row.arch,
                 host_cores: None,
@@ -164,8 +164,9 @@ async fn store_failure(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx::E
 mod tests {
     use fleet_core::fingerprint::FailureFacts;
     use fleet_protocol::{
+        event::{EventBody, MaestroBuild, RunEnded},
         frame::{Hello, Sample, Telemetry},
-        journal::ClockSample,
+        journal::{ClockSample, SourceKind, Subject},
     };
     use sqlx::PgPool;
     use time::OffsetDateTime;
@@ -191,6 +192,20 @@ mod tests {
         run_id: &str,
         flows: &[Script<'_>],
         host_memory: Option<u64>,
+        tweak: impl FnOnce(&mut Hello),
+    ) -> Agent {
+        run_as(store, run_id, flows, host_memory, None, tweak).await
+    }
+
+    /// [`run`], with the Maestro build its session log names, as `(version, profile_supported)`
+    /// (`None`: never named). The build arrives after the flows are final, as it does when the
+    /// observer reads the log late, and before `run.ended`.
+    async fn run_as(
+        store: &Store,
+        run_id: &str,
+        flows: &[Script<'_>],
+        host_memory: Option<u64>,
+        maestro: Option<(&str, bool)>,
         tweak: impl FnOnce(&mut Hello),
     ) -> Agent {
         let p = publisher(store).await;
@@ -231,9 +246,39 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let events = suite_run_scripted(&mut a, SuiteIds::new(), flows);
+        let mut events = suite_run_scripted(&mut a, SuiteIds::new(), flows);
+        // The suite closes at `process.exited`, which makes the flows final: they go first.
+        let ended = events.pop().expect("run.ended is last");
         let applied = store.apply_batch(&opened.handle, &events).await.unwrap();
         assert!(applied.rejected.is_empty(), "{:?}", applied.rejected);
+        // The end takes its place after the build, one event per batch.
+        a.seq = ended.seq - 1;
+        let mut rest = Vec::new();
+        if let Some((version, profile_supported)) = maestro {
+            rest.push(a.event(
+                Subject::default(),
+                SourceKind::DebugLog,
+                &EventBody::MaestroDetected(MaestroBuild {
+                    version: version.into(),
+                    profile_supported,
+                }),
+            ));
+        }
+        rest.push(a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunEnded(RunEnded {
+                interrupted: false,
+                output_bytes_dropped: 0,
+            }),
+        ));
+        for e in &rest {
+            let applied = store
+                .apply_batch(&opened.handle, std::slice::from_ref(e))
+                .await
+                .unwrap();
+            assert!(applied.rejected.is_empty(), "{:?}", applied.rejected);
+        }
         a
     }
 
@@ -407,6 +452,62 @@ mod tests {
             c_login.dims.as_ref().and_then(|d| d.get("host_memory")),
             Some(&serde_json::json!("unknown"))
         );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_condition_fingerprint_includes_the_maestro_version(pool: PgPool) {
+        let store = Store { pool };
+        let first = run_as(
+            &store,
+            "340",
+            &[LOGIN],
+            None,
+            Some(("2.12.1", true)),
+            |_| {},
+        )
+        .await;
+        // The same major.minor is the same condition; another minor, or none named, is not.
+        run_as(
+            &store,
+            "341",
+            &[LOGIN],
+            None,
+            Some(("2.12.3", true)),
+            |_| {},
+        )
+        .await;
+        run_as(
+            &store,
+            "342",
+            &[LOGIN],
+            None,
+            Some(("2.13.0", false)),
+            |_| {},
+        )
+        .await;
+        run_as(&store, "343", &[LOGIN], None, None, |_| {}).await;
+        // The run keeps the version it reported, and whether its profile was supported.
+        let stored = sqlx::query!(
+            "SELECT maestro_version, maestro_profile_supported FROM agent_runs WHERE id = $1",
+            first.id
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        assert_eq!(stored.maestro_version.as_deref(), Some("2.12.1"));
+        assert_eq!(stored.maestro_profile_supported, Some(true));
+        let all = conditions(&store).await;
+        let [a, b, c, unknown] = all.as_slice() else {
+            panic!("expected four flows, got {}", all.len());
+        };
+        assert!(a.id.is_some());
+        assert_eq!(a.id, b.id);
+        assert_ne!(a.id, c.id);
+        assert_ne!(a.id, unknown.id);
+        let maestro = |c: &Condition| c.dims.as_ref().and_then(|d| d.get("maestro")).cloned();
+        assert_eq!(maestro(a), Some(serde_json::json!("2.12")));
+        assert_eq!(maestro(c), Some(serde_json::json!("2.13")));
+        assert_eq!(maestro(unknown), Some(serde_json::json!("unknown")));
     }
 
     #[sqlx::test(migrations = "../../migrations")]

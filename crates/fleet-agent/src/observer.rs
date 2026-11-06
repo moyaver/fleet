@@ -91,7 +91,11 @@ pub(crate) fn run() -> io::Result<()> {
     let mut out = io::stdout().lock();
     writeln!(out, "ready")?;
     out.flush()?;
-    rt.block_on(observe())?;
+    let maestro = rt.block_on(observe())?;
+    // Before "finalized", which the supervisor waits for: the version the session log named.
+    if let Some(version) = maestro {
+        writeln!(out, "maestro-version {version}")?;
+    }
     writeln!(out, "finalized")?;
     out.flush()
 }
@@ -147,7 +151,12 @@ struct Live {
     debug: Option<PathBuf>,
 }
 
-async fn observe() -> io::Result<()> {
+/// Observes the run until it ends, and returns the Maestro version its session log named, if any.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one select loop over the observer's frames, which owns the run's state"
+)]
+async fn observe() -> io::Result<Option<String>> {
     let (frames_tx, mut frames) = mpsc::channel::<Frame>(1024);
     std::thread::spawn(move || {
         let mut input = io::stdin().lock();
@@ -204,10 +213,11 @@ async fn observe() -> io::Result<()> {
                     }
                 }
                 Some(Frame::Control(Control::ChildExited { code, signal, output_bytes_dropped })) => {
-                    if let Some(l) = live.take() {
-                        finalize(l, (code, signal), output_bytes_dropped, clock).await;
-                    }
-                    return Ok(());
+                    let maestro = match live.take() {
+                        Some(l) => finalize(l, (code, signal), output_bytes_dropped, clock).await,
+                        None => None,
+                    };
+                    return Ok(maestro);
                 }
                 None => {
                     // The supervisor is gone while Maestro may still run: stop Maestro (research 02 §1.5).
@@ -216,9 +226,9 @@ async fn observe() -> io::Result<()> {
                             let _ = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pgid), nix::sys::signal::Signal::SIGTERM);
                         }
                         l.session.observe(clock(), Observation::Signal(15));
-                        finalize(l, (None, None), 0, clock).await;
+                        return Ok(finalize(l, (None, None), 0, clock).await);
                     }
-                    return Ok(());
+                    return Ok(None);
                 }
             },
             _ = poll.tick() => {
@@ -611,12 +621,13 @@ fn read_report(path: &Path, started: SystemTime) -> ReportRead {
     }
 }
 
+/// Ends the run's session and flushes it. Returns the Maestro version its session log named.
 async fn finalize(
     mut l: Live,
     (code, signal): (Option<i32>, Option<i32>),
     output_bytes_dropped: u64,
     clock: impl Fn() -> ClockSample,
-) {
+) -> Option<String> {
     // Everything after Maestro exits (uploads, then the transport's flush) shares one budget, so
     // an unreachable server can't stretch the end of the job (I2).
     let started = Instant::now();
@@ -670,6 +681,7 @@ async fn finalize(
     l.session
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
     flush(&mut l);
+    let maestro = l.session.maestro().map(|b| b.version.clone());
     if let Ok(mut o) = l.shared.outbox.lock() {
         // Nothing more is coming: a gap for dropped events is sequenced now, before the flush.
         o.seal();
@@ -693,6 +705,7 @@ async fn finalize(
             Err(_) => tracing::warn!("transport did not flush in time; the spool keeps the events"),
         }
     }
+    maestro
 }
 
 #[cfg(test)]

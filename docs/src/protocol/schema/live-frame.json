@@ -51,6 +51,20 @@
             "null"
           ]
         },
+        "maestro_profile_supported": {
+          "description": "Whether the agent's parsers were built for that version. Absent until it is known.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maestro_version": {
+          "description": "The Maestro version the run's session log named, when it did.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "plan_id": {
           "description": "The Fleet plan it runs a shard of.",
           "type": [
