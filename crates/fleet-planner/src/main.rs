@@ -2,8 +2,9 @@
 //! Static, duration-aware Maestro shard planner (ADR-0013).
 //!
 //! `fleet-planner plan` finds the flows the way Maestro's workspace planner does (`config.yaml`
-//! `flows` globs and tags), keeps each `executionOrder` sequence in one shard, balances the rest
-//! Longest Processing Time first, and writes an immutable manifest and a CI matrix.
+//! `flows` globs, tags, and `executionOrder`), keeps the `executionOrder` sequence in one shard,
+//! balances the rest Longest Processing Time first, and writes an immutable manifest and a CI
+//! matrix.
 //!
 //! Fleet trouble never stops a plan (invariant I2): history that can't be read falls back to the
 //! supplied estimates or an even split, and a manifest that can't be published is a warning. A
@@ -15,12 +16,14 @@ use std::{
     fmt::Write as _,
     io::Write as _,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
 use anyhow::{Context as _, ensure};
 use clap::{Args, Parser, Subcommand};
 use fleet_protocol::plan::{PlanManifest, PlanShard};
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
@@ -116,6 +119,15 @@ struct FlowConstraint {
     exclusive_group: Option<String>,
 }
 
+/// A flow the workspace runs.
+struct Flow {
+    /// Repository-relative path, as Fleet records flows and the agent runs them.
+    path: String,
+    /// The name Maestro matches `executionOrder` against: the header's `name:`, else the file
+    /// name without its extension (`ExecutionOrderPlanner`, Maestro 2.12.1).
+    name: String,
+}
+
 /// Per-flow durations in whole seconds, from Fleet.
 #[derive(Default)]
 struct History {
@@ -138,18 +150,21 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
     let constraints: Constraints = read_json(args.constraints.as_deref())?;
     let mut estimates: BTreeMap<String, u64> = read_json(args.estimates.as_deref())?;
 
-    // Flow names are repository-relative, as Fleet records them and the agent runs them.
+    // Flow paths are repository-relative, as Fleet records them and the agent runs them.
     let repo_root = root
         .ancestors()
         .find(|p| p.join(".git").exists())
         .unwrap_or(root);
     let prefix = root.strip_prefix(repo_root)?;
-    let found: Vec<String> = discover(root, &config, &parsed)?
+    let flows: Vec<Flow> = discover(root, &config, &parsed)?
         .into_iter()
-        .map(|flow| prefix.join(flow).to_string_lossy().into_owned())
+        .map(|flow| Flow {
+            path: prefix.join(&flow.path).to_string_lossy().into_owned(),
+            name: flow.name,
+        })
         .collect();
     ensure!(
-        !found.is_empty(),
+        !flows.is_empty(),
         "no flows match the `flows` globs in {}",
         config.display()
     );
@@ -157,7 +172,8 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
     let mut p90 = BTreeMap::new();
     if let Some(server) = &args.history_server {
         let project = args.project.as_deref().unwrap_or_default();
-        match fetch_history(server, args.token.as_deref(), project, &found) {
+        let paths: Vec<String> = flows.iter().map(|f| f.path.clone()).collect();
+        match fetch_history(server, args.token.as_deref(), project, &paths) {
             Ok(history) => {
                 estimates.extend(history.p50);
                 p90 = history.p90;
@@ -168,8 +184,9 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
         }
     }
 
-    let units = build_units(found, parsed.execution_order.as_ref(), &constraints);
-    let shards = allocate(units, args.shards, &estimates, &p90, &constraints)?;
+    let units = build_units(&flows, parsed.execution_order.as_ref(), &constraints)?;
+    let durations = durations(&flows, &estimates);
+    let shards = allocate(units, args.shards, &durations, &p90, &constraints)?;
     let config_name = config.file_name().context("config path has no file name")?;
 
     let plan_id = match args.plan_id {
@@ -223,11 +240,12 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The flow files Maestro would run for `config`, relative to its directory, sorted.
+/// The flows Maestro would run for `config`, with paths relative to its directory, sorted.
 ///
-/// Mirrors Maestro's workspace planner: `flows` globs (default `*`, top level only, `!` negates),
-/// only `*.yaml`/`*.yml` files that are not the config, then the header tags filter.
-fn discover(root: &Path, config: &Path, parsed: &Config) -> anyhow::Result<Vec<String>> {
+/// Mirrors Maestro's workspace planner (WorkspaceExecutionPlanner.kt, 2.12.1): `flows` globs
+/// (default `*`, top level only, `!` negates), `*.yaml`/`*.yml` files that are not the config,
+/// then the header's include and exclude tags. Every candidate's header is read, as Maestro does.
+fn discover(root: &Path, config: &Path, parsed: &Config) -> anyhow::Result<Vec<Flow>> {
     let defaults = ["*".to_owned()];
     let patterns: &[String] = if parsed.flows.is_empty() {
         &defaults
@@ -261,68 +279,134 @@ fn discover(root: &Path, config: &Path, parsed: &Config) -> anyhow::Result<Vec<S
     found.sort();
     found.dedup();
 
-    if parsed.include_tags.is_empty() && parsed.exclude_tags.is_empty() {
-        return Ok(found);
-    }
-    let mut selected = Vec::new();
-    for flow in found {
-        let tags = flow_tags(&root.join(&flow))?;
-        let included =
-            parsed.include_tags.is_empty() || parsed.include_tags.iter().any(|t| tags.contains(t));
-        if included && !parsed.exclude_tags.iter().any(|t| tags.contains(t)) {
-            selected.push(flow);
+    let mut flows = Vec::new();
+    for path in found {
+        let header = read_header(&root.join(&path))?;
+        let included = parsed.include_tags.is_empty()
+            || parsed.include_tags.iter().any(|t| header.tags.contains(t));
+        if included && !parsed.exclude_tags.iter().any(|t| header.tags.contains(t)) {
+            let name = header.name.unwrap_or_else(|| file_stem(&path));
+            flows.push(Flow { path, name });
         }
     }
-    Ok(selected)
+    Ok(flows)
 }
 
-/// Tags from a flow's header, the YAML before the first `---`.
-fn flow_tags(path: &Path) -> anyhow::Result<Vec<String>> {
+/// What the planner reads from a flow's header: the YAML before the first `---`.
+struct Header {
+    name: Option<String>,
+    tags: Vec<String>,
+}
+
+fn read_header(path: &Path) -> anyhow::Result<Header> {
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("reading flow {}", path.display()))?;
     let header = contents.split("\n---").next().unwrap_or_default();
     let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(header)
         .with_context(|| format!("reading the header of {}", path.display()))?;
-    Ok(yaml
-        .get("tags")
-        .and_then(serde_yaml_ng::Value::as_sequence)
-        .into_iter()
-        .flatten()
-        .filter_map(|t| t.as_str().map(str::to_owned))
-        .collect())
+    Ok(Header {
+        name: yaml
+            .get("name")
+            .and_then(serde_yaml_ng::Value::as_str)
+            .map(str::to_owned),
+        tags: yaml
+            .get("tags")
+            .and_then(serde_yaml_ng::Value::as_sequence)
+            .into_iter()
+            .flatten()
+            .filter_map(|t| t.as_str().map(str::to_owned))
+            .collect(),
+    })
 }
 
-/// Scheduling units: each `executionOrder` sequence is one unit, in its order, and every other
-/// flow is a unit of its own. Units that share an exclusive group are merged.
-///
-/// Names in `flowsOrder` that match no selected flow are ignored, as Maestro ignores them.
+/// The file name without its extension, which is Maestro's flow name when the header has none.
+fn file_stem(path: &str) -> String {
+    Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// Scheduling units, in Maestro's terms: the `executionOrder` sequence (one unit, in its order),
+/// then every other flow alone. Units that share an exclusive group are merged.
 fn build_units(
-    mut found: Vec<String>,
+    flows: &[Flow],
     order: Option<&ExecutionOrder>,
     constraints: &Constraints,
-) -> Vec<Vec<String>> {
+) -> anyhow::Result<Vec<Vec<String>>> {
+    let sequence = match order {
+        Some(order) => sequence(flows, &order.flows_order)?,
+        None => Vec::new(),
+    };
     let mut units = Vec::new();
-    if let Some(order) = order {
-        let mut sequence: Vec<String> = Vec::new();
-        for name in &order.flows_order {
-            if let Some(path) = found.iter().find(|p| stem(p) == Some(name.as_str()))
-                && !sequence.contains(path)
-            {
-                sequence.push(path.clone());
-            }
-        }
-        found.retain(|p| !sequence.contains(p));
-        if !sequence.is_empty() {
-            units.push(sequence);
-        }
+    units.extend(
+        flows
+            .iter()
+            .filter(|f| !sequence.contains(&f.path))
+            .map(|f| vec![f.path.clone()]),
+    );
+    if !sequence.is_empty() {
+        units.push(sequence);
     }
-    units.extend(found.into_iter().map(|f| vec![f]));
 
     while let Some((i, j)) = shared_group(&units, constraints) {
         let merged = units.remove(j);
         units[i].extend(merged);
     }
-    units
+    Ok(units)
+}
+
+/// The flows of Maestro's `executionOrder` sequence, as `ExecutionOrderPlanner` picks them
+/// (`maestro-orchestra/.../workspace/ExecutionOrderPlanner.kt`, 2.12.1):
+///
+/// - flows are matched by name, and `flowsOrder` is first de-duplicated;
+/// - no name matches, so there is no sequence;
+/// - the sequence is the longest prefix of `flowsOrder` whose names all match a flow;
+/// - if `flowsOrder` as written doesn't start with that prefix (a repeated name), there is no
+///   sequence, and Maestro silently runs every flow as a normal flow;
+/// - if some name matches but the first does not, Maestro stops with an error, and so does the
+///   planner.
+fn sequence(flows: &[Flow], flows_order: &[String]) -> anyhow::Result<Vec<String>> {
+    let has = |name: &str| flows.iter().any(|f| f.name == name);
+    let mut names: Vec<&str> = Vec::new();
+    for name in flows_order {
+        if !names.contains(&name.as_str()) {
+            names.push(name);
+        }
+    }
+    if !names.iter().any(|name| has(name)) {
+        return Ok(Vec::new());
+    }
+    let result: Vec<&str> = names.iter().copied().take_while(|name| has(name)).collect();
+    if result.is_empty() {
+        let missing: Vec<&str> = names.iter().copied().filter(|n| !has(n)).collect();
+        anyhow::bail!(
+            "executionOrder names no flow for {}; Maestro stops with an error here",
+            missing.join(", ")
+        );
+    }
+    if !flows_order
+        .iter()
+        .take(result.len())
+        .map(String::as_str)
+        .eq(result.iter().copied())
+    {
+        return Ok(Vec::new());
+    }
+    result
+        .into_iter()
+        .map(|name| {
+            let matching: Vec<&Flow> = flows.iter().filter(|f| f.name == name).collect();
+            match matching.as_slice() {
+                [flow] => Ok(flow.path.clone()),
+                _ => anyhow::bail!(
+                    "executionOrder names {name}, which {} flows have; give each flow its own name",
+                    matching.len()
+                ),
+            }
+        })
+        .collect()
 }
 
 /// The first pair of units (by index) that contain flows from the same exclusive group.
@@ -338,25 +422,47 @@ fn shared_group(units: &[Vec<String>], constraints: &Constraints) -> Option<(usi
         .find(|&(i, j)| !sets[i].is_disjoint(&sets[j]))
 }
 
-fn stem(path: &str) -> Option<&str> {
-    Path::new(path).file_stem().and_then(|s| s.to_str())
+/// Estimated seconds for each flow: its supplied estimate or Fleet's p50 (which wins), and for a
+/// flow with neither, the median of the flows that have one. When no flow has one, every flow
+/// weighs one second, which is an even split.
+fn durations(flows: &[Flow], estimates: &BTreeMap<String, u64>) -> BTreeMap<String, u64> {
+    let known: Vec<u64> = flows
+        .iter()
+        .filter_map(|f| estimates.get(&f.path).copied())
+        .collect();
+    let fallback = median(known).unwrap_or(1);
+    flows
+        .iter()
+        .map(|f| {
+            (
+                f.path.clone(),
+                estimates.get(&f.path).copied().unwrap_or(fallback),
+            )
+        })
+        .collect()
+}
+
+/// The upper middle of `values` for an even count, or `None` when there are none.
+fn median(mut values: Vec<u64>) -> Option<u64> {
+    values.sort_unstable();
+    values.get(values.len() / 2).copied()
 }
 
 /// Longest Processing Time first: each unit goes to the eligible shard with the least estimated
-/// work so far. A flow without an estimate counts as one second, which makes the split even.
+/// work so far. Ties between equal units go to the one with the larger p90, then by name.
 ///
 /// Fails when a shard would get nothing, so no job is ever planned to run an empty shard.
 fn allocate(
     mut units: Vec<Vec<String>>,
     shards: u32,
-    estimates: &BTreeMap<String, u64>,
+    durations: &BTreeMap<String, u64>,
     p90: &BTreeMap<String, u64>,
     constraints: &Constraints,
 ) -> anyhow::Result<Vec<PlanShard>> {
     let unit_count = units.len();
     let cost = |unit: &[String]| {
         unit.iter()
-            .map(|f| estimates.get(f).copied().unwrap_or(1))
+            .map(|f| durations.get(f).copied().unwrap_or(1))
             .sum::<u64>()
     };
     let tail = |unit: &[String]| {
@@ -485,14 +591,41 @@ fn fleet_client(url: &url::Url) -> anyhow::Result<reqwest::blocking::Client> {
         "credentials need https:// unless the host is loopback (got {})",
         url.host_str().unwrap_or("no host")
     );
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    let tls = tls_config(std::env::var("FLEET_CA_FILE").ok().as_deref());
     let mut builder = reqwest::blocking::Client::builder()
         .timeout(TIMEOUT)
-        .redirect(reqwest::redirect::Policy::none());
+        .redirect(reqwest::redirect::Policy::none())
+        .tls_backend_preconfigured((*tls).clone());
     if url.scheme() == "http" {
         builder = builder.no_proxy();
     }
     Ok(builder.build()?)
+}
+
+/// The TLS client config, the same as fleet-agent's (`net::tls`): Mozilla's roots, the OS trust
+/// store, and `FLEET_CA_FILE` (a PEM bundle, for corporate TLS inspection). A CA file that can't
+/// be read is a warning and is ignored.
+fn tls_config(ca_file: Option<&str>) -> Arc<rustls::ClientConfig> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let _ = roots.add_parsable_certificates(rustls_native_certs::load_native_certs().certs);
+    if let Some(path) = ca_file.filter(|p| !p.trim().is_empty()) {
+        match CertificateDer::pem_file_iter(path) {
+            Ok(certs) => {
+                let certs: Vec<CertificateDer<'static>> = certs.filter_map(Result::ok).collect();
+                let _ = roots.add_parsable_certificates(certs);
+            }
+            Err(e) => warn(&format!(
+                "FLEET_CA_FILE {path} can't be read, ignoring it: {e}"
+            )),
+        }
+    }
+    Arc::new(
+        rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
 }
 
 /// Writes both files, or neither: each is staged under a temporary name first.

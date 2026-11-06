@@ -493,32 +493,6 @@ fn a_shard_that_would_get_no_flows_is_an_error_and_writes_nothing() {
 }
 
 #[test]
-fn execution_order_names_that_match_no_flow_are_ignored() {
-    let dir = fresh_dir("order-unknown");
-    std::fs::write(dir.join("a.yaml"), "appId: example\n---\n- launchApp\n").unwrap();
-    std::fs::write(dir.join("b.yaml"), "appId: example\n---\n- launchApp\n").unwrap();
-    std::fs::write(dir.join("c.yaml"), "appId: example\n---\n- launchApp\n").unwrap();
-    std::fs::write(
-        dir.join("config.yaml"),
-        "flows: ['*.yaml']\nexecutionOrder:\n  flowsOrder: [missing, c, a]\n",
-    )
-    .unwrap();
-    let output = plan_in(&dir, "1", &[]);
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let plan: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(dir.join("manifest.json")).unwrap()).unwrap();
-    assert_eq!(
-        plan["shards"][0]["flows"],
-        serde_json::json!(["c.yaml", "a.yaml", "b.yaml"]),
-        "the sequence keeps its order and no missing.yaml is invented"
-    );
-}
-
-#[test]
 fn history_that_cannot_be_read_falls_back_to_an_even_split() {
     use std::io::{Read, Write};
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -614,4 +588,216 @@ fn the_token_is_never_sent_in_cleartext_to_a_remote_host() {
     assert!(stderr.contains("need https://"), "{stderr}");
     assert!(!stderr.contains("secret"), "the token must not be echoed");
     assert!(dir.join("manifest.json").exists());
+}
+
+#[test]
+fn execution_order_matches_flows_by_their_header_name() {
+    let dir = fresh_dir("order-names");
+    std::fs::write(
+        dir.join("a.yaml"),
+        "name: second-step\nappId: example\n---\n- launchApp\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("b.yaml"),
+        "name: first-step\nappId: example\n---\n- launchApp\n",
+    )
+    .unwrap();
+    std::fs::write(dir.join("c.yaml"), "appId: example\n---\n- launchApp\n").unwrap();
+    std::fs::write(
+        dir.join("config.yaml"),
+        "flows: ['*.yaml']\nexecutionOrder:\n  flowsOrder: [first-step, second-step]\n",
+    )
+    .unwrap();
+    let output = plan_in(&dir, "1", &[]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let plan: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(
+        plan["shards"][0]["flows"],
+        serde_json::json!(["b.yaml", "a.yaml", "c.yaml"]),
+        "the flows named by the sequence stay together, in order, even though their file names differ"
+    );
+}
+
+#[test]
+fn execution_order_whose_first_name_has_no_flow_is_an_error() {
+    let dir = fresh_dir("order-missing");
+    for name in ["a.yaml", "c.yaml"] {
+        std::fs::write(dir.join(name), "appId: example\n---\n- launchApp\n").unwrap();
+    }
+    std::fs::write(
+        dir.join("config.yaml"),
+        "flows: ['*.yaml']\nexecutionOrder:\n  flowsOrder: [missing, c, a]\n",
+    )
+    .unwrap();
+    let output = plan_in(&dir, "1", &[]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("names no flow for missing"));
+    assert!(!dir.join("manifest.json").exists());
+}
+
+#[test]
+fn execution_order_with_a_repeated_name_is_not_a_sequence() {
+    // Maestro's check fails when the written order and its de-duplicated prefix differ, so the
+    // flows run as normal flows and can be split across shards.
+    let dir = fresh_dir("order-repeated");
+    for name in ["a.yaml", "b.yaml"] {
+        std::fs::write(dir.join(name), "appId: example\n---\n- launchApp\n").unwrap();
+    }
+    std::fs::write(
+        dir.join("config.yaml"),
+        "flows: ['*.yaml']\nexecutionOrder:\n  flowsOrder: [a, a, b]\n",
+    )
+    .unwrap();
+    let output = plan_in(&dir, "2", &[]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let plan: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(plan["shards"][0]["flows"], serde_json::json!(["a.yaml"]));
+    assert_eq!(plan["shards"][1]["flows"], serde_json::json!(["b.yaml"]));
+}
+
+#[test]
+fn a_flow_without_an_estimate_weighs_the_median_of_the_others() {
+    let dir = fresh_dir("median");
+    for name in ["a.yaml", "b.yaml", "c.yaml", "d.yaml"] {
+        std::fs::write(dir.join(name), "appId: example\n---\n- launchApp\n").unwrap();
+    }
+    std::fs::write(dir.join("config.yaml"), "flows: ['*.yaml']\n").unwrap();
+    std::fs::write(
+        dir.join("estimates.json"),
+        r#"{"a.yaml":30,"b.yaml":10,"d.yaml":10}"#,
+    )
+    .unwrap();
+    let output = plan_in(
+        &dir,
+        "2",
+        &["--estimates", dir.join("estimates.json").to_str().unwrap()],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let plan: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("manifest.json")).unwrap()).unwrap();
+    // c.yaml has no estimate, so it weighs the median (10 s). Counted as 1 s it would have been
+    // packed with the 10 s flows, and the shards would be 30 s and 21 s instead of 30 s each.
+    assert_eq!(plan["shards"][0]["flows"], serde_json::json!(["a.yaml"]));
+    assert_eq!(plan["shards"][0]["estimatedSeconds"], 30);
+    assert_eq!(
+        plan["shards"][1]["flows"],
+        serde_json::json!(["b.yaml", "c.yaml", "d.yaml"])
+    );
+    assert_eq!(plan["shards"][1]["estimatedSeconds"], 30);
+}
+
+/// Reads one HTTP request (headers, then a Content-Length body) and returns it as text.
+fn read_request(stream: &mut impl std::io::Read) -> String {
+    let mut bytes = Vec::new();
+    let mut buf = [0_u8; 4096];
+    while let Ok(n) = stream.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buf[..n]);
+        if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+            let headers = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();
+            let length = headers
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length:"))
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+            if bytes.len() >= end + 4 + length {
+                break;
+            }
+        }
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+#[test]
+fn fleet_requests_verify_against_fleet_ca_file_and_refuse_unknown_issuers() {
+    use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+    use std::io::Write;
+    use std::sync::Arc;
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let tls_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/tls");
+    let certs: Vec<CertificateDer<'static>> =
+        CertificateDer::pem_file_iter(tls_dir.join("cert.pem"))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+    let key = PrivateKeyDer::from_pem_file(tls_dir.join("key.pem")).unwrap();
+    let server_config = Arc::new(
+        rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .unwrap(),
+    );
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    // Connection 0 trusts the test CA through FLEET_CA_FILE and must get the plan. Connection 1
+    // runs without it, so the handshake must fail and nothing is sent.
+    let server = std::thread::spawn(move || {
+        let mut first = String::new();
+        for connection in 0..2 {
+            let (socket, _) = listener.accept().unwrap();
+            let Ok(session) = rustls::ServerConnection::new(Arc::clone(&server_config)) else {
+                continue;
+            };
+            let mut stream = rustls::StreamOwned::new(session, socket);
+            let request = read_request(&mut stream);
+            if connection == 0 {
+                first = request;
+                let _ = stream.write_all(
+                    b"HTTP/1.1 201 Created\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+                );
+            }
+        }
+        first
+    });
+    let dir = fresh_dir("tls");
+    std::fs::write(dir.join("a.yaml"), "appId: example\n---\n- launchApp\n").unwrap();
+    std::fs::write(dir.join("config.yaml"), "flows: ['*.yaml']\n").unwrap();
+    let server_url = format!("https://localhost:{port}");
+    let run = |ca: Option<&std::path::Path>| {
+        let mut command =
+            std::process::Command::new(assert_cmd::cargo::cargo_bin!("fleet-planner"));
+        command
+            .args(["plan", "--config"])
+            .arg(dir.join("config.yaml"))
+            .args(["--shards", "1", "--manifest"])
+            .arg(dir.join("manifest.json"))
+            .arg("--matrix")
+            .arg(dir.join("matrix.json"))
+            .args(["--server", &server_url, "--token", "test-token"])
+            .env_remove("FLEET_CA_FILE");
+        if let Some(ca) = ca {
+            command.env("FLEET_CA_FILE", ca);
+        }
+        command.output().expect("running fleet-planner")
+    };
+    let trusted = run(Some(&tls_dir.join("ca.pem")));
+    let stderr = String::from_utf8_lossy(&trusted.stderr).into_owned();
+    assert!(trusted.status.success(), "{stderr}");
+    assert!(!stderr.contains("was not published"), "{stderr}");
+    let untrusted = run(None);
+    let stderr = String::from_utf8_lossy(&untrusted.stderr).into_owned();
+    assert!(untrusted.status.success(), "{stderr}");
+    assert!(
+        stderr.contains("was not published"),
+        "an unknown issuer must not verify: {stderr}"
+    );
+    let first = server.join().unwrap();
+    assert!(first.starts_with("POST /api/v1/plans "), "{first}");
 }

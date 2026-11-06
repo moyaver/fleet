@@ -1359,11 +1359,13 @@ dependencies = [
  "glob",
  "reqwest",
  "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_json",
  "serde_yaml_ng",
  "sha2 0.11.1",
  "url",
+ "webpki-roots 1.0.11",
 ]
 
 [[package]]
