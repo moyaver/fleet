@@ -22,7 +22,15 @@ The agent reads the device list from the adb server (`host:track-devices`) and n
 
 ## Cost
 
-Measured on a real 4-flow Maestro 2.12.1 suite (50 s, Apple M1 Pro): the agent used 0.07 s of CPU in total, about 0.14% of one core, and the suite took the same time with and without it. Its own CPU and memory are reported with every metrics sample.
+`cargo xtask bench-overhead` measures the agent's cost on the captured four-flow suite the agent's tests replay, with a fake Maestro. It runs the suite with and without `fleet-agent run` (offline, no server), alternating the order, and reports wall time, the agent's CPU time and its peak memory. `--runs N` (default 5) sets the number of runs, `--linger SECS` (default 10) how long each run lasts, and `--max-cpu-percent X` makes it exit 1 when the agent uses more than X% of one core. The numbers depend on the machine, so the command is not part of `cargo xtask ci`.
+
+Measured with `cargo xtask bench-overhead --runs 3 --linger 50` on an Apple M1 Pro (10 cores, macOS 26.7.1), release build, 50 s per run, about the length of the real four-flow suite:
+
+- agent CPU: 99 ms per run (range 86 to 119 ms), 0.20% of one core and 0.02% of the host;
+- agent peak memory: 17.2 MiB, supervisor and observer together;
+- duration: the run with the agent took 0.32 s longer (range 0.27 to 0.34 s), 0.6% of 50 s. Most of that is probably the observer's 250 ms wait for Maestro's last writes after Maestro exits (`crates/fleet-agent/src/observer.rs`).
+
+Shorter runs spend more of their time on the fixed start-up and exit cost: the default 10 s runs used 0.42% and 0.43% of one core in two runs on the same machine. Its own CPU and memory are also reported with every metrics sample.
 
 ## Signals and CI cancellation
 
