@@ -45,6 +45,7 @@ webpki-roots.workspace = true
 assert_cmd.workspace = true
 futures-util.workspace = true
 insta.workspace = true
+nix = { workspace = true, features = ["fs"] }
 predicates.workspace = true
 proptest.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
