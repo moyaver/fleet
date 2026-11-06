@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO blobs (project_id, sha256, size_bytes, state)\n             VALUES ($1, decode($2, 'hex'), $3, 'deleting')\n             ON CONFLICT (project_id, sha256) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ec133e763309dce7ddeae6b7e9e14fd93bcd9afcdbef3dde54889c96b68d4bcd"
+}

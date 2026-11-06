@@ -7,7 +7,7 @@
 //! time) then detaches silent runs and abandons runs whose resume grace expired. Hourly, the
 //! leader creates partitions ahead, drops expired credentials and expired time-based data; it
 //! also starts the retention jobs (rollups, artifact expiry and blob collection) on their own
-//! schedules, beside this loop ([`crate::retention`]).
+//! schedules, beside this loop ([`crate::retention`]), orphan object sweep included.
 
 use std::time::Duration;
 
