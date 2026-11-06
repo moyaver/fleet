@@ -522,10 +522,13 @@ async fn i7_an_uploaded_html_report_never_runs_on_the_app_origin() {
     assert!(head.contains("x-content-type-options: nosniff"), "{head}");
     assert!(head.contains("content-type: text/html"), "{head}");
     assert_eq!(body, HOSTILE_REPORT.as_bytes());
-    // A link with one character of its signature changed opens nothing.
+    // A link with one character of its signature changed opens nothing. The first character of
+    // the signature (after the leading '/') carries six data bits; the last carries padding bits
+    // too, so changing it can leave the decoded signature unchanged.
     let (head, last) = path.split_at(path.rfind('/').unwrap());
     let (head, signature) = head.split_at(head.rfind('/').unwrap());
-    let flipped = format!("{head}{}A{last}", &signature[..signature.len() - 1]);
+    let first = if &signature[1..2] == "A" { "B" } else { "A" };
+    let flipped = format!("{head}/{first}{}{last}", &signature[2..]);
     let (status, _, _) = get_as(stack.addr(), &format!("localhost:{port}"), &flipped).await;
     assert_eq!(status, 403, "a tampered link is refused");
 
