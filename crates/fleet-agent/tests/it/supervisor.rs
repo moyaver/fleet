@@ -201,6 +201,83 @@ fn a_grandchild_holding_the_pipe_does_not_delay_the_exit() {
     thread::sleep(Duration::from_millis(10));
 }
 
+/// Runs the agent with its stdout and stderr on non-blocking pipes that slow consumers read, so a
+/// full pipe reports `WouldBlock`, as an inherited CI log that fell behind does.
+fn run_with_slow_readers(script: &str) -> (std::process::ExitStatus, Vec<u8>, Vec<u8>) {
+    let (out_r, out_w) = nix::unistd::pipe().unwrap();
+    let (err_r, err_w) = nix::unistd::pipe().unwrap();
+    for w in [&out_w, &err_w] {
+        nix::fcntl::fcntl(
+            w,
+            nix::fcntl::FcntlArg::F_SETFL(nix::fcntl::OFlag::O_NONBLOCK),
+        )
+        .unwrap();
+    }
+    let mut child = agent()
+        .args(["run", "--finalize-timeout", "3", "--", "sh", "-c", script])
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(out_w))
+        .stderr(Stdio::from(err_w))
+        .spawn()
+        .unwrap();
+    // Each consumer stalls for longer than a transient stall once its first bytes arrive, so the
+    // pipes fill while the agent is writing, then reads slowly: 16 KiB, then a pause.
+    let readers = [out_r, err_r].map(|fd| {
+        thread::spawn(move || {
+            let mut pipe = std::fs::File::from(fd);
+            let mut got = Vec::new();
+            let mut buf = [0u8; 16384];
+            let mut stalled = false;
+            loop {
+                match std::io::Read::read(&mut pipe, &mut buf) {
+                    Ok(0) => return got,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        let pause = if stalled { 1 } else { 300 };
+                        thread::sleep(Duration::from_millis(pause));
+                        stalled = true;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(e) => panic!("read failed: {e}"),
+                }
+            }
+        })
+    });
+    let status = child.wait().unwrap();
+    let [out, err] = readers.map(|r| r.join().unwrap());
+    (status, out, err)
+}
+
+#[test]
+fn a_slow_reader_gets_every_byte_in_order_and_the_exit_status_passes() {
+    // About 2 MB per stream: far more than a pipe holds, so both consumers fall behind.
+    let script = "seq 1 300000; seq 1 300000 >&2; exit 3";
+    let (status, out, err) = run_with_slow_readers(script);
+    let expected: Vec<u8> = (1..=300_000)
+        .flat_map(|n| format!("{n}\n").into_bytes())
+        .collect();
+    assert_eq!(status.code(), Some(3));
+    assert!(
+        out == expected,
+        "stdout: {} of {} bytes",
+        out.len(),
+        expected.len()
+    );
+    assert!(
+        err.starts_with(&expected),
+        "stderr: {} of {} bytes",
+        err.len(),
+        expected.len()
+    );
+    // Fleet's own notices may follow the output, never interrupt it.
+    let notices = &err[expected.len()..];
+    assert!(
+        notices.is_empty() || notices.starts_with(b"[fleet-agent]"),
+        "{}",
+        String::from_utf8_lossy(notices)
+    );
+}
+
 #[test]
 fn a_plan_with_flow_paths_is_refused_and_maestro_never_starts() {
     let dir = std::env::temp_dir().join(format!("fleet-plan-it-{}", std::process::id()));

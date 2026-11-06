@@ -320,8 +320,9 @@ fn spawn_pump(
 
 /// Writes every chunk to `sink` (flushed, so partial lines appear at once), then offers a copy.
 ///
-/// Every byte whose copy is dropped is added to `dropped_total`, so the count survives a gap
-/// notice that never fits before EOF (I5). `Control::Gap` only serves live accounting.
+/// The copy to `sink` (the CI log) is never dropped; see [`write_through`]. Every byte whose
+/// observer copy is dropped is added to `dropped_total`, so the count survives a gap notice that
+/// never fits before EOF (I5). `Control::Gap` only serves live accounting.
 fn pump(
     mut source: impl Read,
     mut sink: impl Write,
@@ -343,7 +344,7 @@ fn pump(
         let chunk = &buf[..n];
         if sink_ok {
             // A closed CI log (EPIPE) must not stop us draining, or Maestro would block.
-            sink_ok = sink.write_all(chunk).and_then(|()| sink.flush()).is_ok();
+            sink_ok = write_through(&mut sink, chunk).is_ok();
         }
         if let Some(lock) = last_byte
             && let Ok(mut b) = lock.lock()
@@ -371,6 +372,43 @@ fn pump(
                 dropped += n as u64;
                 dropped_total.fetch_add(n as u64, Ordering::SeqCst);
             }
+        }
+    }
+}
+
+/// Writes `chunk` to `sink` and flushes it, waiting as long as the sink is only slow.
+///
+/// Guarantee (I1, PLAN §3): Maestro's bytes reach the CI log in full and in order, for as long as
+/// the log accepts them. A slow log slows Maestro down: its pipe fills and Maestro blocks on the
+/// write, as it would if it wrote to the log itself. Nothing is dropped here. `Interrupted` is
+/// retried at once, and `WouldBlock` (a full non-blocking pipe) is retried until the log accepts
+/// the bytes. Any other error means the log is closed or broken, and it is returned as `Err`: the
+/// pump then stops writing to that log but keeps draining Maestro's pipe, so Maestro never blocks
+/// on a dead log. The only output lost is what is still unwritten when the bounded shutdown wait
+/// after Maestro's exit expires (`DRAIN_AFTER_EXIT`, 2 s).
+fn write_through(sink: &mut impl Write, chunk: &[u8]) -> io::Result<()> {
+    let mut rest = chunk;
+    while !rest.is_empty() {
+        match until_ready(|| sink.write(rest))? {
+            0 => return Err(io::ErrorKind::WriteZero.into()),
+            n => rest = &rest[n..],
+        }
+    }
+    until_ready(|| sink.flush())
+}
+
+/// Runs `op` until it stops failing with `Interrupted` or `WouldBlock`. A full non-blocking sink
+/// is waited for, with a pause that starts at 1 ms and doubles up to 10 ms.
+fn until_ready<T>(mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    let mut pause = Duration::from_millis(1);
+    loop {
+        match op() {
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                thread::sleep(pause);
+                pause = (pause * 2).min(Duration::from_millis(10));
+            }
+            result => return result,
         }
     }
 }
@@ -586,6 +624,8 @@ fn write_frames(mut stdin: ChildStdin, rx: &Receiver<Frame>) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
     use super::*;
 
     #[test]
@@ -679,6 +719,155 @@ mod tests {
             buf[0] = b'.';
             Ok(1)
         }
+    }
+
+    /// A log that fails its writes and flushes with the given errors, in order, then accepts.
+    struct FlakyLog {
+        fail_writes: VecDeque<io::ErrorKind>,
+        fail_flushes: VecDeque<io::ErrorKind>,
+        written: Vec<u8>,
+    }
+
+    impl Write for FlakyLog {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if let Some(kind) = self.fail_writes.pop_front() {
+                return Err(kind.into());
+            }
+            self.written.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.fail_flushes
+                .pop_front()
+                .map_or(Ok(()), |kind| Err(kind.into()))
+        }
+    }
+
+    /// A log whose reader has gone: every write fails with `BrokenPipe`.
+    struct ClosedLog {
+        writes: usize,
+    }
+
+    impl Write for ClosedLog {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            self.writes += 1;
+            Err(io::ErrorKind::BrokenPipe.into())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A log that refuses writes and flushes with `WouldBlock` until `open_at`, then accepts, like
+    /// a reader that fell far behind.
+    struct SlowLog {
+        open_at: Instant,
+        written: Vec<u8>,
+    }
+
+    impl SlowLog {
+        fn refusing(&self) -> bool {
+            Instant::now() < self.open_at
+        }
+    }
+
+    impl Write for SlowLog {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.refusing() {
+                return Err(io::ErrorKind::WouldBlock.into());
+            }
+            self.written.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if self.refusing() {
+                return Err(io::ErrorKind::WouldBlock.into());
+            }
+            Ok(())
+        }
+    }
+
+    fn observed_output_len(rx: &Receiver<Frame>) -> usize {
+        rx.try_iter()
+            .map(|f| match f {
+                Frame::Output(_, bytes) => bytes.len(),
+                Frame::Control(_) => 0,
+            })
+            .sum()
+    }
+
+    #[test]
+    fn transient_sink_errors_lose_no_output() {
+        // A full non-blocking log (WouldBlock) and signals (Interrupted) on writes and on flushes.
+        let data: Vec<u8> = (0..CHUNK * 3)
+            .map(|i| u8::try_from(i % 251).expect("below 251"))
+            .collect();
+        let mut log = FlakyLog {
+            fail_writes: VecDeque::from([io::ErrorKind::WouldBlock, io::ErrorKind::Interrupted]),
+            fail_flushes: VecDeque::from([io::ErrorKind::WouldBlock, io::ErrorKind::Interrupted]),
+            written: Vec::new(),
+        };
+        pump(
+            data.as_slice(),
+            &mut log,
+            Stream::Stdout,
+            None,
+            None,
+            &AtomicU64::new(0),
+        );
+        assert_eq!(log.written, data, "every byte reaches the log, in order");
+    }
+
+    #[test]
+    fn closed_sink_stops_writing_but_draining_goes_on() {
+        let (tx, rx) = mpsc::sync_channel::<Frame>(8);
+        let data = vec![b'x'; CHUNK * 3];
+        let mut log = ClosedLog { writes: 0 };
+        pump(
+            data.as_slice(),
+            &mut log,
+            Stream::Stdout,
+            Some(&tx),
+            None,
+            &AtomicU64::new(0),
+        );
+        drop(tx);
+        assert_eq!(
+            log.writes, 1,
+            "a closed log is written to once, then left alone"
+        );
+        assert_eq!(
+            observed_output_len(&rx),
+            data.len(),
+            "Maestro's output is still drained to the end, and the observer gets it all"
+        );
+    }
+
+    #[test]
+    fn a_stall_of_any_length_loses_no_output() {
+        // Refuses for 300 ms, far longer than a transient stall, so the pump has to keep waiting.
+        let stall = Duration::from_millis(300);
+        let data: Vec<u8> = (0..CHUNK * 3)
+            .map(|i| u8::try_from(i % 251).expect("below 251"))
+            .collect();
+        let mut log = SlowLog {
+            open_at: Instant::now() + stall,
+            written: Vec::new(),
+        };
+        let started = Instant::now();
+        pump(
+            data.as_slice(),
+            &mut log,
+            Stream::Stderr,
+            None,
+            None,
+            &AtomicU64::new(0),
+        );
+        assert!(started.elapsed() >= stall, "the pump waited for the log");
+        assert_eq!(log.written, data, "every byte reaches the log, in order");
     }
 
     #[test]
