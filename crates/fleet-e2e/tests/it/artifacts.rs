@@ -59,7 +59,7 @@ async fn a_failed_runs_evidence_is_uploaded_redacted_and_opens_only_on_the_userc
     .unwrap();
     assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
 
-    let snap = stack.latest_snapshot().await;
+    let snap = stack.await_run_ended("job").await;
     let flow = snap["flows"][0]["id"].as_str().unwrap().to_owned();
     let listed = stack
         .get(&format!("/api/v1/projects/app/flows/{flow}/artifacts"))
@@ -131,7 +131,7 @@ async fn a_server_that_refuses_uploads_never_changes_the_run() {
     .await
     .unwrap();
     assert_eq!(out.status.code(), Some(1), "unchanged exit status (I1, I2)");
-    let snap = stack.latest_snapshot().await;
+    let snap = stack.await_run_ended("job").await;
     assert_eq!(
         snap["agent_runs"][0]["state"], "ended",
         "the journal still arrived"

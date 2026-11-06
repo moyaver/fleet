@@ -38,7 +38,7 @@ async fn the_agent_exchanges_its_github_oidc_token_and_claims_name_the_job() {
         issuer.requests.load(Ordering::SeqCst) >= 1,
         "the agent asked the runner for a token"
     );
-    let snap = stack.latest_snapshot().await;
+    let snap = stack.await_run_ended("31337").await;
     assert_eq!(
         snap["attempt"]["run_key"], "acme/app:9001",
         "from the verified claims"
@@ -137,7 +137,7 @@ async fn the_agent_tunnels_through_an_http_proxy() {
         "the secure WebSocket went through CONNECT"
     );
     tls.abort();
-    let snap = stack.latest_snapshot().await;
+    let snap = stack.await_run_ended("job").await;
     assert_eq!(
         snap["agent_runs"][0]["state"], "ended",
         "the run arrived whole"
@@ -213,7 +213,7 @@ async fn agent_batch_fallback_reaches_the_real_server_and_finishes() {
     .await
     .unwrap();
     assert_eq!(out.status.code(), Some(0));
-    let snapshot = stack.latest_snapshot().await;
+    let snapshot = stack.await_run_ended("job").await;
     assert_eq!(snapshot["agent_runs"][0]["state"], "ended");
     assert_ne!(flows(&snapshot), vec![]);
     assert!(
