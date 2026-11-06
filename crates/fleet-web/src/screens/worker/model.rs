@@ -4,7 +4,9 @@
 //! A value the agent doesn't report is a [`Fact`] with no value ("Not reported"), and a host
 //! sample that is too old to trust turns stale instead of passing for current (invariant I4).
 
-use fleet_protocol::rest::{MetricReading, WorkerRunPage, WorkerRunView, WorkerView};
+use fleet_protocol::rest::{
+    MetricReading, WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
+};
 use fleet_ui::{
     charts::{
         format::{Unit, format_duration},
@@ -26,6 +28,18 @@ use crate::{
 };
 
 const MEM_TOTAL: &str = "host_mem_total_bytes";
+const CPU_CORES: &str = "host_cpu_cores";
+
+/// The newest host sample's value for `metric`, when the agent reported one.
+fn latest_value(w: &WorkerSummaryView, metric: &str) -> Option<f64> {
+    w.latest
+        .as_ref()?
+        .readings
+        .iter()
+        .find(|r| r.metric == metric)
+        .filter(|r| r.available)
+        .and_then(|r| r.value)
+}
 
 /// The machine at a glance.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,13 +61,8 @@ impl WorkerHeader {
             let id = w.id.simple().to_string();
             format!("Worker {}", id.chars().take(8).collect::<String>())
         });
-        let memory = w
-            .latest
-            .as_ref()
-            .and_then(|l| l.readings.iter().find(|r| r.metric == MEM_TOTAL))
-            .filter(|r| r.available)
-            .and_then(|r| r.value)
-            .map(|bytes| Unit::Bytes.format(bytes));
+        let memory = latest_value(w, MEM_TOTAL).map(|bytes| Unit::Bytes.format(bytes));
+        let cores = latest_value(w, CPU_CORES).map(|n| Unit::Number.format(n));
         Self {
             title,
             liveness: liveness_pill(w.liveness),
@@ -61,8 +70,7 @@ impl WorkerHeader {
                 Fact::maybe("Operating system", w.os.clone()),
                 Fact::maybe("Architecture", w.arch.clone()),
                 Fact::maybe("Memory", memory),
-                // The agent doesn't report a core count yet (no field in `WorkerSummaryView`).
-                Fact::maybe("CPU cores", None),
+                Fact::maybe("CPU cores", cores),
                 Fact::known("First seen", ctx.time(unix_ms(w.first_seen_at))),
                 Fact::known("Last seen", ctx.ago(unix_ms(w.last_seen_at))),
             ],
@@ -307,6 +315,14 @@ mod tests {
              "scope": "host", "value": 6442450944.0, "available": true},
             {"metric": "host_mem_total_bytes", "label": "Host memory total", "unit": "bytes",
              "scope": "host", "value": 17179869184.0, "available": true},
+            {"metric": "host_cpu_cores", "label": "Host CPU cores", "unit": "number",
+             "scope": "host", "value": 8.0, "available": true},
+            {"metric": "host_load_1m", "label": "Host load (1 min)", "unit": "number",
+             "scope": "host", "value": 1.5, "available": true},
+            {"metric": "host_swap_used_bytes", "label": "Host swap used", "unit": "bytes",
+             "scope": "host", "value": 1073741824.0, "available": true},
+            {"metric": "host_psi_cpu_pct", "label": "Host CPU pressure", "unit": "percent",
+             "scope": "host", "value": 0.25, "available": true},
             {"metric": "host_thermal_c", "label": "Host temperature", "unit": "celsius",
              "scope": "host", "value": null, "available": false,
              "reason": "the agent does not report this metric yet"}
@@ -345,8 +361,7 @@ mod tests {
                 ("Operating system", "macos"),
                 ("Architecture", "aarch64"),
                 ("Memory", "16 GiB"),
-                // The agent doesn't report a core count yet: say so rather than guess.
-                ("CPU cores", "Not reported"),
+                ("CPU cores", "8"),
                 ("First seen", "2026-01-01 08:00:00"),
                 ("Last seen", "5 s ago"),
             ]
@@ -391,6 +406,10 @@ mod tests {
                 ("Host CPU", "37.5%".to_owned()),
                 ("Host memory used", "6 GiB".to_owned()),
                 ("Host memory total", "16 GiB".to_owned()),
+                ("Host CPU cores", "8".to_owned()),
+                ("Host load (1 min)", "1.5".to_owned()),
+                ("Host swap used", "1 GiB".to_owned()),
+                ("Host CPU pressure", "0.25%".to_owned()),
                 (
                     "Host temperature",
                     "unavailable (the agent does not report this metric yet)".to_owned()

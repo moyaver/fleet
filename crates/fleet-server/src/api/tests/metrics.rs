@@ -159,7 +159,7 @@ async fn a_range_without_samples_says_so_for_every_metric() {
         .await;
 
     let all = view["series"].as_array().unwrap();
-    assert_eq!(all.len(), 8, "every host metric is listed: {view}");
+    assert_eq!(all.len(), 15, "every host metric is listed: {view}");
     for s in all {
         assert_eq!(s["available"], false, "{s}");
         assert_eq!(s["points"], json!([]));
@@ -168,6 +168,70 @@ async fn a_range_without_samples_says_so_for_every_metric() {
         series(&view, "host_cpu_pct")["reason"],
         "no samples in this range"
     );
+}
+
+/// Load, cores, swap and pressure reach the store through ingest and come back as series and as
+/// the worker's latest readings; a sample that predates them has no value, not a zero.
+#[tokio::test]
+async fn load_cores_swap_and_pressure_round_trip_and_are_unavailable_when_absent() {
+    let rig = rig().await;
+    let mut samples: Vec<Sample> = (0..3).map(|i| sample(at(i), 10.0)).collect();
+    samples[2].host_load_1m = Some(1.5);
+    samples[2].host_cpu_cores = Some(8);
+    samples[2].host_swap_used_bytes = Some(1 << 30);
+    samples[2].host_swap_total_bytes = Some(2 << 30);
+    samples[2].host_psi_cpu_pct = Some(0.25);
+    let worker = worker_with(&rig, samples).await;
+    let metrics = "host_load_1m,host_cpu_cores,host_swap_used_bytes,host_swap_total_bytes,\
+                   host_psi_cpu_pct,host_psi_memory_pct";
+
+    let view = rig
+        .json(&format!(
+            "/api/v1/projects/app/workers/{worker}/metrics{}",
+            range(&format!("&metrics={metrics}"))
+        ))
+        .await;
+
+    let load = series(&view, "host_load_1m");
+    assert_eq!(load["label"], "Host load (1 min)");
+    assert_eq!(load["unit"], "number");
+    assert_eq!(load["scope"], "host");
+    assert_eq!(
+        load["points"][0]["available"], false,
+        "older sample: no value"
+    );
+    assert_eq!(load["points"][2]["value"], 1.5);
+    assert_eq!(series(&view, "host_cpu_cores")["points"][2]["value"], 8.0);
+    assert_eq!(
+        series(&view, "host_swap_used_bytes")["points"][2]["value"],
+        1_073_741_824.0
+    );
+    let psi = series(&view, "host_psi_cpu_pct");
+    assert_eq!(psi["label"], "Host CPU pressure");
+    assert_eq!(psi["unit"], "percent");
+    assert_eq!(psi["points"][2]["value"], 0.25);
+    let memory_psi = series(&view, "host_psi_memory_pct");
+    assert_eq!(memory_psi["available"], false, "never reported: not zero");
+    assert_eq!(
+        memory_psi["reason"],
+        "the agent reported no value in this range"
+    );
+
+    let overview = rig.json("/api/v1/projects/app/overview").await;
+    let readings = overview["workers"][0]["latest"]["readings"]
+        .as_array()
+        .unwrap();
+    let latest = |metric: &str| {
+        readings
+            .iter()
+            .find(|r| r["metric"] == metric)
+            .unwrap_or_else(|| panic!("no reading {metric}"))
+            .clone()
+    };
+    assert_eq!(latest("host_cpu_cores")["value"], 8.0);
+    assert_eq!(latest("host_cpu_cores")["unit"], "number");
+    assert_eq!(latest("host_load_1m")["value"], 1.5);
+    assert_eq!(latest("host_psi_io_pct")["available"], false);
 }
 
 #[tokio::test]

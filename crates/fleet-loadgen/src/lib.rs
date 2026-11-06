@@ -230,6 +230,27 @@ fn clock(t0: Instant) -> ClockSample {
     }
 }
 
+/// One host sample with fixed readings; the newer optional host fields are left unreported.
+fn host_sample(t0: Instant) -> Sample {
+    Sample {
+        at: clock(t0),
+        host_cpu_pct: Some(25.0),
+        host_mem_used_bytes: Some(4 << 30),
+        host_mem_total_bytes: Some(16 << 30),
+        maestro_cpu_pct: Some(80.0),
+        maestro_rss_bytes: Some(300 << 20),
+        agent_cpu_pct: Some(0.2),
+        agent_rss_bytes: Some(8 << 20),
+        host_load_1m: None,
+        host_cpu_cores: None,
+        host_swap_used_bytes: None,
+        host_swap_total_bytes: None,
+        host_psi_cpu_pct: None,
+        host_psi_memory_pct: None,
+        host_psi_io_pct: None,
+    }
+}
+
 struct Script {
     /// The index just after each flow's live end, in script order.
     flow_ends: Vec<usize>,
@@ -635,16 +656,7 @@ async fn stream(
             tseq_from: tseq,
             tseq_to: tseq,
             dropped_since_last: 0,
-            samples: vec![Sample {
-                at: clock(t0),
-                host_cpu_pct: Some(25.0),
-                host_mem_used_bytes: Some(4 << 30),
-                host_mem_total_bytes: Some(16 << 30),
-                maestro_cpu_pct: Some(80.0),
-                maestro_rss_bytes: Some(300 << 20),
-                agent_cpu_pct: Some(0.2),
-                agent_rss_bytes: Some(8 << 20),
-            }],
+            samples: vec![host_sample(t0)],
         })))
         .await?;
         // Stop-and-wait for the cumulative ack of this batch.

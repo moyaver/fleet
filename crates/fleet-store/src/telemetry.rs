@@ -114,10 +114,21 @@ struct Columns {
     maestro_rss: Vec<Option<i64>>,
     agent_cpu: Vec<Option<f32>>,
     agent_rss: Vec<Option<i64>>,
+    load_1m: Vec<Option<f32>>,
+    cpu_cores: Vec<Option<i32>>,
+    swap_used: Vec<Option<i64>>,
+    swap_total: Vec<Option<i64>>,
+    psi_cpu: Vec<Option<f32>>,
+    psi_memory: Vec<Option<f32>>,
+    psi_io: Vec<Option<f32>>,
 }
 
 fn opt_i64(v: Option<u64>) -> Option<i64> {
     v.and_then(|v| i64::try_from(v).ok())
+}
+
+fn opt_i32(v: Option<u32>) -> Option<i32> {
+    v.and_then(|v| i32::try_from(v).ok())
 }
 
 impl Columns {
@@ -134,6 +145,13 @@ impl Columns {
         self.maestro_rss.push(opt_i64(s.maestro_rss_bytes));
         self.agent_cpu.push(s.agent_cpu_pct);
         self.agent_rss.push(opt_i64(s.agent_rss_bytes));
+        self.load_1m.push(s.host_load_1m);
+        self.cpu_cores.push(opt_i32(s.host_cpu_cores));
+        self.swap_used.push(opt_i64(s.host_swap_used_bytes));
+        self.swap_total.push(opt_i64(s.host_swap_total_bytes));
+        self.psi_cpu.push(s.host_psi_cpu_pct);
+        self.psi_memory.push(s.host_psi_memory_pct);
+        self.psi_io.push(s.host_psi_io_pct);
     }
 
     async fn insert(&self, tx: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
@@ -143,10 +161,15 @@ impl Columns {
         sqlx::query!(
             "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq, host_cpu_pct,
                                        host_mem_used_bytes, host_mem_total_bytes, maestro_cpu_pct,
-                                       maestro_rss_bytes, agent_cpu_pct, agent_rss_bytes)
+                                       maestro_rss_bytes, agent_cpu_pct, agent_rss_bytes,
+                                       host_load_1m, host_cpu_cores, host_swap_used_bytes,
+                                       host_swap_total_bytes, host_psi_cpu_pct,
+                                       host_psi_memory_pct, host_psi_io_pct)
              SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],
                                   $5::bigint[], $6::real[], $7::bigint[], $8::bigint[],
-                                  $9::real[], $10::bigint[], $11::real[], $12::bigint[])
+                                  $9::real[], $10::bigint[], $11::real[], $12::bigint[],
+                                  $13::real[], $14::integer[], $15::bigint[], $16::bigint[],
+                                  $17::real[], $18::real[], $19::real[])
              ON CONFLICT DO NOTHING",
             &self.ts,
             &self.run,
@@ -159,7 +182,14 @@ impl Columns {
             &self.maestro_cpu as &[Option<f32>],
             &self.maestro_rss as &[Option<i64>],
             &self.agent_cpu as &[Option<f32>],
-            &self.agent_rss as &[Option<i64>]
+            &self.agent_rss as &[Option<i64>],
+            &self.load_1m as &[Option<f32>],
+            &self.cpu_cores as &[Option<i32>],
+            &self.swap_used as &[Option<i64>],
+            &self.swap_total as &[Option<i64>],
+            &self.psi_cpu as &[Option<f32>],
+            &self.psi_memory as &[Option<f32>],
+            &self.psi_io as &[Option<f32>]
         )
         .execute(&mut *tx)
         .await?;

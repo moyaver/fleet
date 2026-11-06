@@ -104,6 +104,13 @@ async fn shutdown_sends_goaway_the_final_telemetry_ack_and_1012() {
                 maestro_rss_bytes: None,
                 agent_cpu_pct: Some(0.1),
                 agent_rss_bytes: Some(1 << 20),
+                host_load_1m: None,
+                host_cpu_cores: None,
+                host_swap_used_bytes: None,
+                host_swap_total_bytes: None,
+                host_psi_cpu_pct: None,
+                host_psi_memory_pct: None,
+                host_psi_io_pct: None,
             },
             Sample {
                 at: ClockSample {
@@ -117,6 +124,13 @@ async fn shutdown_sends_goaway_the_final_telemetry_ack_and_1012() {
                 maestro_rss_bytes: None,
                 agent_cpu_pct: None,
                 agent_rss_bytes: None,
+                host_load_1m: None,
+                host_cpu_cores: None,
+                host_swap_used_bytes: None,
+                host_swap_total_bytes: None,
+                host_psi_cpu_pct: None,
+                host_psi_memory_pct: None,
+                host_psi_io_pct: None,
             },
         ],
     }))
@@ -170,6 +184,13 @@ async fn telemetry_is_acked_after_its_checkpoint() {
             maestro_rss_bytes: None,
             agent_cpu_pct: None,
             agent_rss_bytes: None,
+            host_load_1m: None,
+            host_cpu_cores: None,
+            host_swap_used_bytes: None,
+            host_swap_total_bytes: None,
+            host_psi_cpu_pct: None,
+            host_psi_memory_pct: None,
+            host_psi_io_pct: None,
         }],
     }))
     .await;

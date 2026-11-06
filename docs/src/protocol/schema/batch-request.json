@@ -320,8 +320,27 @@
           "$ref": "#/$defs/ClockSample",
           "description": "When it was taken."
         },
+        "host_cpu_cores": {
+          "default": null,
+          "description": "Host physical CPU cores. Absent from older agents.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "host_cpu_pct": {
           "description": "Host CPU use across all cores, percent.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "host_load_1m": {
+          "default": null,
+          "description": "Host load average over one minute (runnable tasks, averaged). Absent from older agents.",
           "format": "float",
           "type": [
             "number",
@@ -339,6 +358,53 @@
         },
         "host_mem_used_bytes": {
           "description": "Host memory in use, bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "host_psi_cpu_pct": {
+          "default": null,
+          "description": "Linux pressure stall information: percent of the last 10 seconds in which some task\nwaited for CPU. `None` where the kernel has no PSI (macOS, Windows). Absent from older\nagents.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "host_psi_io_pct": {
+          "default": null,
+          "description": "Linux pressure stall information: percent of the last 10 seconds in which some task\nwaited for I/O. Absent from older agents.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "host_psi_memory_pct": {
+          "default": null,
+          "description": "Linux pressure stall information: percent of the last 10 seconds in which some task\nwaited for memory. Absent from older agents.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "host_swap_total_bytes": {
+          "default": null,
+          "description": "Host swap configured, bytes. Absent from older agents.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "host_swap_used_bytes": {
+          "default": null,
+          "description": "Host swap in use, bytes. Absent from older agents.",
           "format": "uint64",
           "minimum": 0,
           "type": [

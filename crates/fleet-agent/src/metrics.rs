@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use fleet_protocol::{frame::Sample, journal::ClockSample};
 use nix::sys::resource::{UsageWho, getrusage};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use sysinfo::{LoadAvg, Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 
 /// Samples metrics; keep one per run so CPU percentages have a baseline.
 pub(crate) struct Sampler {
@@ -23,6 +23,8 @@ pub(crate) struct Sampler {
     last_self: Option<(Instant, Duration)>,
     /// Baseline of the supervisor's accumulated CPU time.
     last_supervisor: Option<Duration>,
+    /// Physical CPU cores, read once: it does not change while the agent runs.
+    cpu_cores: Option<u32>,
 }
 
 impl std::fmt::Debug for Sampler {
@@ -50,6 +52,9 @@ impl Sampler {
             supervisor: supervisor_pid.map(Pid::from_u32),
             last_self: None,
             last_supervisor: None,
+            cpu_cores: System::physical_core_count()
+                .ok()
+                .and_then(|n| u32::try_from(n).ok()),
         }
     }
 
@@ -65,6 +70,13 @@ impl Sampler {
             maestro_rss_bytes: None,
             agent_cpu_pct,
             agent_rss_bytes,
+            host_load_1m: None,
+            host_cpu_cores: None,
+            host_swap_used_bytes: None,
+            host_swap_total_bytes: None,
+            host_psi_cpu_pct: None,
+            host_psi_memory_pct: None,
+            host_psi_io_pct: None,
         };
         let Some(system) = self.system.as_mut() else {
             return empty;
@@ -91,6 +103,13 @@ impl Sampler {
             host_mem_total_bytes: (total > 0).then_some(total),
             maestro_cpu_pct,
             maestro_rss_bytes,
+            host_load_1m: System::load_average().ok().as_ref().map(load_one),
+            host_cpu_cores: self.cpu_cores,
+            host_swap_used_bytes: Some(system.used_swap()),
+            host_swap_total_bytes: Some(system.total_swap()),
+            host_psi_cpu_pct: read_psi("cpu"),
+            host_psi_memory_pct: read_psi("memory"),
+            host_psi_io_pct: read_psi("io"),
             ..empty
         }
     }
@@ -144,6 +163,32 @@ impl Sampler {
         }
         (pct, rss)
     }
+}
+
+/// The one-minute load average as the sample carries it.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a load average is a small number; f32 keeps far more digits than it needs"
+)]
+fn load_one(load: &LoadAvg) -> f32 {
+    load.one as f32
+}
+
+/// Linux pressure stall information for `resource` (`cpu`, `memory` or `io`): the `some` share of
+/// the last ten seconds. `None` where there is no PSI (macOS, or a kernel built without it).
+fn read_psi(resource: &str) -> Option<f32> {
+    parse_psi_some_avg10(&std::fs::read_to_string(format!("/proc/pressure/{resource}")).ok()?)
+}
+
+/// The `avg10` figure of the `some` line of a PSI file, for example
+/// `some avg10=0.12 avg60=0.04 avg300=0.01 total=1234`. The `full` line is not taken for it.
+fn parse_psi_some_avg10(text: &str) -> Option<f32> {
+    text.lines()
+        .find(|line| line.starts_with("some "))?
+        .split_whitespace()
+        .find_map(|field| field.strip_prefix("avg10="))?
+        .parse()
+        .ok()
 }
 
 fn tv(t: nix::sys::time::TimeVal) -> Duration {
@@ -201,6 +246,58 @@ mod tests {
         assert!(
             w.agent_rss_bytes.expect("rss") > wo.agent_rss_bytes.expect("rss"),
             "its resident memory is in the sum"
+        );
+    }
+
+    // UNVERIFIED: synthetic. The layout follows the kernel's pressure-stall-information
+    // documentation (Documentation/accounting/psi.rst); no real /proc/pressure file was captured.
+    #[test]
+    fn psi_parser_reads_the_some_avg10_figure() {
+        assert_eq!(
+            parse_psi_some_avg10("some avg10=12.34 avg60=5.00 avg300=1.00 total=123456\n"),
+            Some(12.34)
+        );
+        // A `full` line before it (or alone) must not be read as the `some` figure.
+        assert_eq!(
+            parse_psi_some_avg10(
+                "full avg10=9.99 avg60=0.00 avg300=0.00 total=1\nsome avg10=0.50 avg60=0.00 avg300=0.00 total=2\n"
+            ),
+            Some(0.50)
+        );
+        assert_eq!(
+            parse_psi_some_avg10("full avg10=9.99 avg60=0.00 avg300=0.00 total=1\n"),
+            None
+        );
+        assert_eq!(parse_psi_some_avg10("some avg10=oops\n"), None);
+        assert_eq!(parse_psi_some_avg10(""), None);
+    }
+
+    /// Load and swap come from sysinfo on every platform it supports; cores when it can count them.
+    #[test]
+    fn host_load_cores_and_swap_are_reported() {
+        let at = ClockSample {
+            wall: OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        };
+        let s = Sampler::new(None, None).sample(at);
+        assert!(s.host_load_1m.is_some_and(|l| l >= 0.0));
+        // Unknown is allowed (a container may hide the topology), zero is not.
+        assert_ne!(s.host_cpu_cores, Some(0));
+        assert!(s.host_swap_used_bytes.is_some() && s.host_swap_total_bytes.is_some());
+    }
+
+    /// Without Linux's PSI the pressure figures are unavailable, never zero.
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn pressure_is_unavailable_off_linux() {
+        let at = ClockSample {
+            wall: OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        };
+        let s = Sampler::new(None, None).sample(at);
+        assert_eq!(
+            (s.host_psi_cpu_pct, s.host_psi_memory_pct, s.host_psi_io_pct),
+            (None, None, None)
         );
     }
 

@@ -257,13 +257,17 @@ async fn host_minutes(
     Ok(sqlx::query!(
         "INSERT INTO host_rollup_1m (bucket, agent_run_id, worker_id, project_id, n,
                         host_cpu_pct_avg, host_cpu_pct_max, host_mem_used_avg, host_mem_used_max,
-                        maestro_cpu_avg, maestro_rss_max)
+                        maestro_cpu_avg, maestro_rss_max, host_load_1m_avg, host_swap_used_avg,
+                        host_psi_cpu_pct_avg, host_psi_memory_pct_avg, host_psi_io_pct_avg)
                  SELECT date_bin('1 minute', ts, TIMESTAMPTZ '2000-01-01'), agent_run_id,
                         (array_agg(worker_id ORDER BY ts DESC))[1],
                         (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,
                         avg(host_cpu_pct)::real, max(host_cpu_pct),
                         avg(host_mem_used_bytes)::bigint, max(host_mem_used_bytes),
-                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes)
+                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes),
+                        avg(host_load_1m)::real, avg(host_swap_used_bytes)::bigint,
+                        avg(host_psi_cpu_pct)::real, avg(host_psi_memory_pct)::real,
+                        avg(host_psi_io_pct)::real
                    FROM host_samples
                   WHERE ts >= $1 AND ts < $2 AND ($3::uuid IS NULL OR agent_run_id = $3)
                   GROUP BY 1, agent_run_id
@@ -274,7 +278,12 @@ async fn host_minutes(
                         host_mem_used_avg = excluded.host_mem_used_avg,
                         host_mem_used_max = excluded.host_mem_used_max,
                         maestro_cpu_avg = excluded.maestro_cpu_avg,
-                        maestro_rss_max = excluded.maestro_rss_max",
+                        maestro_rss_max = excluded.maestro_rss_max,
+                        host_load_1m_avg = excluded.host_load_1m_avg,
+                        host_swap_used_avg = excluded.host_swap_used_avg,
+                        host_psi_cpu_pct_avg = excluded.host_psi_cpu_pct_avg,
+                        host_psi_memory_pct_avg = excluded.host_psi_memory_pct_avg,
+                        host_psi_io_pct_avg = excluded.host_psi_io_pct_avg",
         from,
         to,
         subject
@@ -293,13 +302,17 @@ async fn host_hours(
     Ok(sqlx::query!(
         "INSERT INTO host_rollup_1h (bucket, agent_run_id, worker_id, project_id, n,
                         host_cpu_pct_avg, host_cpu_pct_max, host_mem_used_avg, host_mem_used_max,
-                        maestro_cpu_avg, maestro_rss_max)
+                        maestro_cpu_avg, maestro_rss_max, host_load_1m_avg, host_swap_used_avg,
+                        host_psi_cpu_pct_avg, host_psi_memory_pct_avg, host_psi_io_pct_avg)
                  SELECT date_bin('1 hour', ts, TIMESTAMPTZ '2000-01-01'), agent_run_id,
                         (array_agg(worker_id ORDER BY ts DESC))[1],
                         (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,
                         avg(host_cpu_pct)::real, max(host_cpu_pct),
                         avg(host_mem_used_bytes)::bigint, max(host_mem_used_bytes),
-                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes)
+                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes),
+                        avg(host_load_1m)::real, avg(host_swap_used_bytes)::bigint,
+                        avg(host_psi_cpu_pct)::real, avg(host_psi_memory_pct)::real,
+                        avg(host_psi_io_pct)::real
                    FROM host_samples
                   WHERE ts >= $1 AND ts < $2 AND ($3::uuid IS NULL OR agent_run_id = $3)
                   GROUP BY 1, agent_run_id
@@ -310,7 +323,12 @@ async fn host_hours(
                         host_mem_used_avg = excluded.host_mem_used_avg,
                         host_mem_used_max = excluded.host_mem_used_max,
                         maestro_cpu_avg = excluded.maestro_cpu_avg,
-                        maestro_rss_max = excluded.maestro_rss_max",
+                        maestro_rss_max = excluded.maestro_rss_max,
+                        host_load_1m_avg = excluded.host_load_1m_avg,
+                        host_swap_used_avg = excluded.host_swap_used_avg,
+                        host_psi_cpu_pct_avg = excluded.host_psi_cpu_pct_avg,
+                        host_psi_memory_pct_avg = excluded.host_psi_memory_pct_avg,
+                        host_psi_io_pct_avg = excluded.host_psi_io_pct_avg",
         from,
         to,
         subject
@@ -638,6 +656,55 @@ mod tests {
             Some(&(old + Duration::minutes(5), Some(7.0), Some(1.0)))
         );
         assert_eq!(rig.host(&c, MetricResolution::OneHour).await.len(), 2);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn load_swap_and_pressure_roll_up_as_averages_of_the_readings_there_are(pool: PgPool) {
+        let rig = rig(pool).await;
+        let c = Clock::new();
+        for (second, load, psi, swap) in [
+            (5, Some(1.0_f32), Some(10.0_f32), Some(100_i64)),
+            (10, Some(3.0), None, Some(300)),
+        ] {
+            sqlx::query!(
+                "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq,
+                                           host_load_1m, host_psi_cpu_pct, host_swap_used_bytes)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                c.at(20, second),
+                rig.run,
+                rig.worker,
+                rig.project,
+                second,
+                load,
+                psi,
+                swap
+            )
+            .execute(rig.store.pool())
+            .await
+            .unwrap();
+        }
+
+        rig.store.roll_up(c.now()).await.unwrap();
+
+        let m = sqlx::query!(
+            "SELECT host_load_1m_avg, host_psi_cpu_pct_avg, host_psi_memory_pct_avg,
+                    host_swap_used_avg
+               FROM host_rollup_1m WHERE agent_run_id = $1",
+            rig.run
+        )
+        .fetch_one(rig.store.pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            (
+                m.host_load_1m_avg,
+                m.host_psi_cpu_pct_avg,
+                m.host_psi_memory_pct_avg,
+                m.host_swap_used_avg
+            ),
+            (Some(2.0), Some(10.0), None, Some(200)),
+            "an average over the readings that exist; no reading stays missing"
+        );
     }
 
     #[sqlx::test(migrations = "../../migrations")]

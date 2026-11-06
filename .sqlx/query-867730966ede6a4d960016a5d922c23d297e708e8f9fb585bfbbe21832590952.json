@@ -1,0 +1,139 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (worker_id) worker_id AS \"worker_id!\", ts,\n                host_cpu_pct::float8 AS host_cpu_pct,\n                host_mem_used_bytes::float8 AS host_mem_used_bytes,\n                host_mem_total_bytes::float8 AS host_mem_total_bytes,\n                maestro_cpu_pct::float8 AS maestro_cpu_pct,\n                maestro_rss_bytes::float8 AS maestro_rss_bytes,\n                agent_cpu_pct::float8 AS agent_cpu_pct,\n                agent_rss_bytes::float8 AS agent_rss_bytes,\n                host_load_1m::float8 AS host_load_1m,\n                host_cpu_cores::float8 AS host_cpu_cores,\n                host_swap_used_bytes::float8 AS host_swap_used_bytes,\n                host_swap_total_bytes::float8 AS host_swap_total_bytes,\n                host_psi_cpu_pct::float8 AS host_psi_cpu_pct,\n                host_psi_memory_pct::float8 AS host_psi_memory_pct,\n                host_psi_io_pct::float8 AS host_psi_io_pct\n           FROM host_samples\n          WHERE project_id = $1 AND worker_id = ANY($2) AND ts > now() - interval '1 hour'\n          ORDER BY worker_id, ts DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "worker_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "host_samples",
+            "name": "worker_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "ts",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "host_samples",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "host_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "host_mem_used_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "host_mem_total_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "maestro_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "maestro_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "agent_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "agent_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "host_load_1m",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "host_cpu_cores",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "host_swap_used_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 12,
+        "name": "host_swap_total_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 13,
+        "name": "host_psi_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 14,
+        "name": "host_psi_memory_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 15,
+        "name": "host_psi_io_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "867730966ede6a4d960016a5d922c23d297e708e8f9fb585bfbbe21832590952"
+}

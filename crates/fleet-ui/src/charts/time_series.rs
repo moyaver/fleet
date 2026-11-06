@@ -219,6 +219,15 @@ pub struct TimeSeriesModel {
     visible: Range<usize>,
 }
 
+/// The y-axis title: the metric's name, with its unit in brackets when it has one.
+fn axis_label(name: &str, symbol: &str) -> String {
+    if symbol.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{name} ({symbol})")
+    }
+}
+
 impl TimeSeriesModel {
     /// Lays `series` out as `config` says.
     #[must_use]
@@ -256,7 +265,7 @@ impl TimeSeriesModel {
             (plot.bottom, plot.top),
         );
         let y_axis = YAxis {
-            label: format!("{} ({})", series.metric.name, axis.symbol),
+            label: axis_label(&series.metric.name, axis.symbol),
             ticks: nice
                 .ticks
                 .iter()

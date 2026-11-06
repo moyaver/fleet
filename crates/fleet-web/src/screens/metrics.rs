@@ -86,6 +86,7 @@ pub(crate) fn unit_of(unit: MetricUnit, scope: MetricScope) -> Unit {
     match (unit, scope) {
         (MetricUnit::Bytes, _) => Unit::Bytes,
         (MetricUnit::Celsius, _) => Unit::Celsius,
+        (MetricUnit::Number, _) => Unit::Number,
         (
             MetricUnit::Percent,
             MetricScope::Maestro | MetricScope::Agent | MetricScope::Emulator,
@@ -103,6 +104,7 @@ const fn unit_symbol(unit: Unit) -> &'static str {
         Unit::PercentOfCore => "% of one core",
         Unit::Celsius => "°C",
         Unit::Millis => "ms",
+        Unit::Number => "",
     }
 }
 

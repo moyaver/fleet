@@ -351,6 +351,7 @@ fn unit(u: MetricUnit) -> Unit {
         MetricUnit::Percent => Unit::Percent,
         MetricUnit::Bytes => Unit::Bytes,
         MetricUnit::Celsius => Unit::Celsius,
+        MetricUnit::Number => Unit::Number,
     }
 }
 
