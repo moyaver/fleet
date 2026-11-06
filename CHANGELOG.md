@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Agent: `journal.jsonl` is capped at 256 MiB (`FLEET_JOURNAL_MAX_BYTES`, `--journal-max-bytes`). Past the cap it stops with one `journal.truncated` line, the run ends with one warning, and `fleet-agent inspect` reports the missing events; the server still gets every event (#37).
 
+### Fixed
+
+- Release: the shipped third-party license notices leave out dev and build dependencies, so a test-only crate with an unaccepted license no longer fails the release build.
+
 ## [0.1.0-alpha.1] - 2026-11-06
 
 ### Added
