@@ -7,6 +7,7 @@ use fleet_protocol::{
     live::{AttemptView, JobView},
     rest::{ActiveAttemptView, FlowCounts, JobCounts, RecentAttemptView, WorkerSummaryView},
 };
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::samples::HostRow;
@@ -24,6 +25,8 @@ pub struct RunState {
     pub id: Uuid,
     /// Its stored state (`active`, `detached`, `finalizing`, `abandoned`).
     pub state: String,
+    /// Its last persisted contact.
+    pub last_frame_at: OffsetDateTime,
 }
 
 /// A worker, and the runs its display liveness is derived from.
@@ -230,7 +233,8 @@ pub(super) async fn workers(
     let mut rows: Vec<WorkerRow> = sqlx::query!(
         "SELECT w.id, w.runner_name, w.os, w.arch, w.first_seen_at, w.last_seen_at,
                 coalesce(array_agg(r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_ids!\",
-                coalesce(array_agg(r.state) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_states!\"
+                coalesce(array_agg(r.state) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_states!\",
+                coalesce(array_agg(r.last_frame_at) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_frames!\"
            FROM workers w
            LEFT JOIN agent_runs r ON r.worker_id = w.id AND r.state <> 'ended'
                                  AND r.last_frame_at > now() - interval '24 hours'
@@ -251,8 +255,12 @@ pub(super) async fn workers(
         let runs: Vec<RunState> = r
             .run_ids
             .into_iter()
-            .zip(r.run_states)
-            .map(|(id, state)| RunState { id, state })
+            .zip(r.run_states.into_iter().zip(r.run_frames))
+            .map(|(id, (state, last_frame_at))| RunState {
+                id,
+                state,
+                last_frame_at,
+            })
             .collect();
         WorkerRow {
             view: WorkerSummaryView {

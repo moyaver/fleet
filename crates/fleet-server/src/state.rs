@@ -54,6 +54,7 @@ impl AppState {
     pub(crate) fn new(store: Store, config: Config) -> anyhow::Result<Self> {
         let hub = Hub::new(
             std::time::Duration::from_millis(config.liveness.stale_after_ms),
+            std::time::Duration::from_millis(config.liveness.sweep_interval_ms),
             config.api.live_buffer,
         );
         let limits = Limits::new(&config.rate_limits, std::time::Instant::now());

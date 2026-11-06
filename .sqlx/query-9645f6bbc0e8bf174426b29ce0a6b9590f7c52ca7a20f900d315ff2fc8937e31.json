@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT w.id, w.runner_name, w.os, w.arch, w.first_seen_at, w.last_seen_at,\n                coalesce(array_agg(r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_ids!\",\n                coalesce(array_agg(r.state) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_states!\"\n           FROM workers w\n           LEFT JOIN agent_runs r ON r.worker_id = w.id AND r.state <> 'ended'\n                                 AND r.last_frame_at > now() - interval '24 hours'\n          WHERE w.project_id = $1\n            AND CASE WHEN $2::uuid IS NULL THEN w.last_seen_at > now() - interval '24 hours'\n                     ELSE w.id = $2 END\n          GROUP BY w.id\n          ORDER BY w.last_seen_at DESC, w.id\n          LIMIT $3",
+  "query": "SELECT w.id, w.runner_name, w.os, w.arch, w.first_seen_at, w.last_seen_at,\n                coalesce(array_agg(r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_ids!\",\n                coalesce(array_agg(r.state) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_states!\",\n                coalesce(array_agg(r.last_frame_at) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"run_frames!\"\n           FROM workers w\n           LEFT JOIN agent_runs r ON r.worker_id = w.id AND r.state <> 'ended'\n                                 AND r.last_frame_at > now() - interval '24 hours'\n          WHERE w.project_id = $1\n            AND CASE WHEN $2::uuid IS NULL THEN w.last_seen_at > now() - interval '24 hours'\n                     ELSE w.id = $2 END\n          GROUP BY w.id\n          ORDER BY w.last_seen_at DESC, w.id\n          LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -80,6 +80,12 @@
         "name": "run_states!",
         "type_info": "TextArray",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "run_frames!",
+        "type_info": "TimestamptzArray",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -97,8 +103,9 @@
       false,
       false,
       null,
+      null,
       null
     ]
   },
-  "hash": "7a0599617fc0c20601499c6d68a00176a9629ae1eb4a2fd25672aed08f952fb8"
+  "hash": "9645f6bbc0e8bf174426b29ce0a6b9590f7c52ca7a20f900d315ff2fc8937e31"
 }
