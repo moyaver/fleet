@@ -208,7 +208,101 @@ Without `usercontent.url` artifacts are stored but cannot be opened (the flow pa
 
 On SIGTERM the server stops accepting connections, finishes each agent's in-flight batch, sends `goaway`, writes the last telemetry checkpoint and closes sockets with 1012; agents reconnect and resume where the server says. All state is in Postgres, so a restart loses nothing that was acknowledged. Give the container a stop grace period of 30 s.
 
-Back up first, then upgrade the server (migrations run, or run `fleet migrate`), then the agents.
+Back up first ([Backup and restore](#backup-and-restore)), then upgrade the server (migrations run, or run `fleet migrate`), then the agents.
+
+## Backup and restore
+
+Fleet keeps its state in two places. **Postgres 18** holds everything except artifact bytes: runs, flows, telemetry rollups, the audit log, the artifact and blob index, and API keys and sessions (stored as hashes). The **blob store** holds the bytes of artifacts (screenshots, JUnit reports, logs, HTML reports, bundles), content-addressed by project and SHA-256. A backup is both, plus the configuration and secrets needed to start the server again.
+
+Backups hold user names, audit events and every artifact, so encrypt them at rest and restrict who can read them. [Retention](#retention) removes data from the live database and blob store only: a backup keeps it until you delete the backup, so keep backups no longer than the retention you promise.
+
+### What to back up
+
+| What | Compose deployment | How |
+|---|---|---|
+| Database | `postgres`, database `fleet` | `pg_dump -Fc` (custom format) |
+| Blob store | Garage bucket `fleet-artifacts` | copy the bucket through the S3 API |
+| Blob store, `local_fs` | the `storage.path` directory | copy the directory |
+| Configuration | `fleet.toml`, `Caddyfile`, `.env`, `secrets/` | copy, and keep the secret values in your secret store |
+
+Do not back up `artifacts.spool_dir` (the `fleet_spool` volume). It holds uploads waiting for verification; an upload cut off by the backup is abandoned and its artifact expires.
+
+The secrets a restore needs:
+
+- **`.env`**: `GARAGE_ACCESS_KEY` and `GARAGE_SECRET_KEY` (Fleet's S3 credentials, and the key the bucket is created with) and `GARAGE_RPC_SECRET`. Without them the copied bucket cannot be read.
+- **`secrets/postgres_password` and `secrets/database_url`**: the restored Postgres takes its password from `postgres_password` when its volume is first created, and `database_url` must match it.
+- **`secrets/viewer_token`**: the bearer token for the REST API and CI scripts. Keep it, or every script that uses it breaks.
+- **`secrets/usercontent_key`**: signs links to uploaded files. A new key works but invalidates links in flight (they last `usercontent.link_ttl_seconds`, 5 minutes by default).
+- **The `[login]` client secret** (`FLEET_LOGIN__CLIENT_SECRET_FILE`), if you use browser sign-in.
+
+API keys and browser sessions are rows in Postgres, so the database dump carries them: there is nothing else to back up for them.
+
+### Order: database first, then blobs
+
+1. **Dump the database.** `pg_dump` reads one consistent snapshot while the server runs.
+2. **Copy the blob store**, and finish within `retention.blob_grace_hours` (24 by default) of starting step 1.
+
+The order follows from how the retention jobs work ([`gc.rs`](https://github.com/moyaver/fleet/blob/main/crates/fleet-store/src/gc.rs), [`retention.rs`](https://github.com/moyaver/fleet/blob/main/crates/fleet-server/src/retention.rs)):
+
+- An artifact becomes `available` only after its bytes are stored.
+- The collector deletes a blob only when no live artifact refers to it and `retention.blob_grace_hours` have passed since the last one expired. So a blob that an `available` artifact in the dump refers to is still in the bucket for that long after the dump, and a copy that finishes in that window has every blob those artifacts need. Expired artifacts in the dump may have lost their bytes; they are tombstones and are never served.
+- Blobs written after the dump are copied too. After a restore nothing refers to them, and nothing deletes objects the database does not know about, so they stay and take space. They break nothing; delete them by hand if the space matters.
+
+The reverse order is unsafe: an artifact that becomes `available` between the bucket copy and the dump would refer to bytes the copy does not have.
+
+### Take a backup
+
+Run this in `deploy/compose`. The server keeps running; the Garage container is reached from a tool container that shares its network namespace, so nothing is published on the host.
+
+```bash
+cd deploy/compose
+set -a; . ./.env; set +a
+export AWS_ACCESS_KEY_ID="$GARAGE_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$GARAGE_SECRET_KEY"
+BACKUP=/var/backups/fleet/$(date -u +%Y%m%dT%H%M%SZ)
+mkdir -p "$BACKUP/blobs"
+
+# 1. Database: one consistent snapshot
+docker compose exec -T postgres pg_dump -Fc -U fleet -d fleet > "$BACKUP/fleet.dump"
+
+# 2. Blobs: the bucket, through Garage's S3 API (s3 sync copies only what is new or changed)
+docker run --rm --network container:"$(docker compose ps -q garage)" \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
+  -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
+  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:latest \
+  --endpoint-url http://127.0.0.1:3900 s3 sync s3://fleet-artifacts /backup/blobs
+```
+
+Then copy `$BACKUP` and the configuration off the host. For `local_fs`, dump the database as above and copy `storage.path` (skipping `.tmp`): blobs are written by an atomic rename, so copying a live directory is safe in the same order.
+
+### Restore
+
+Restore into a new stack under its own Compose project name (`-p`), so it gets its own volumes. Do not restore over a running server: `pg_restore --clean` replaces the database objects underneath it. Use the same `.env` and `secrets/` as the backup, and the image that wrote the backup or a newer one, since migrations only move forward.
+
+```bash
+cd deploy/compose
+set -a; . ./.env; set +a
+export AWS_ACCESS_KEY_ID="$GARAGE_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$GARAGE_SECRET_KEY"
+BACKUP=/var/backups/fleet/20260101T000000Z        # the backup to restore
+
+docker compose -p fleet-restore up -d --wait postgres garage
+docker compose -p fleet-restore exec -T postgres \
+  pg_restore -U fleet -d fleet --no-owner --clean --if-exists < "$BACKUP/fleet.dump"
+docker run --rm --network container:"$(docker compose -p fleet-restore ps -q garage)" \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
+  -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
+  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:latest \
+  --endpoint-url http://127.0.0.1:3900 s3 sync /backup/blobs s3://fleet-artifacts
+docker compose -p fleet-restore up -d --wait fleet
+```
+
+The restored stack has no proxy in this sequence. Start one when the restored stack is the live one, on its own host or with the old stack stopped, since both publish ports 80 and 443. Point the agents' `FLEET_SERVER` and the DNS name at it.
+
+Runs that were in progress at the dump come back `active`. Once their agents stop reporting they are detached, and they are abandoned after `liveness.resume_grace_ms` unless an agent resumes them; their open flows then become `unknown`, never success.
+
+### Verify a restore
+
+- Run [`deploy/compose/backup-restore-check.sh`](https://github.com/moyaver/fleet/blob/main/deploy/compose/backup-restore-check.sh). It runs the whole sequence above against throwaway stacks (`fleet-backup-src` and `fleet-backup-dst`, or `SRC_PROJECT` and `DST_PROJECT`) and checks that a row written before the backup is in the restored database, that the REST API lists the project, and that the bucket inventory matches the source. It writes an API key and a canary object to the source stack, so do not point it at production. It removes both stacks and their volumes when it finishes.
+- On a restored live stack, compare the state with what you recorded before the backup: `docker compose exec -T postgres psql -U fleet -d fleet -c 'SELECT count(*) FROM artifacts'`, and open a run you know. `curl -H "Authorization: Bearer $(cat secrets/viewer_token)" https://<FLEET_DOMAIN>/api/v1/projects/<slug>/attempts` lists it, and its flow page in the dashboard shows the screenshots, which come from the blob store.
 
 ## Load testing
 
