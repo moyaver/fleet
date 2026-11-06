@@ -27,7 +27,10 @@ use signal_hook::{
     iterator::Signals,
 };
 
-use crate::ipc::{Control, Frame, Stream};
+use crate::{
+    ipc::{Control, Frame, Stream},
+    journal,
+};
 
 /// How the supervisor ends: the child's exit code, or the signal that killed it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -552,7 +555,8 @@ impl Observer {
         let deadline = Instant::now() + timeout;
         let mut finalized = false;
         let mut maestro = None;
-        let mut truncated = None;
+        // `journal-truncated <first missing seq> <reason>`, the reason as the journal records it.
+        let mut truncated: Option<(u64, String)> = None;
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
             match self.control.recv_timeout(left) {
                 Ok(line) if line == "finalized" => {
@@ -562,17 +566,25 @@ impl Observer {
                 Ok(line) => {
                     if let Some(version) = line.strip_prefix("maestro-version ") {
                         maestro = Some(version.to_owned());
-                    } else if let Some(seq) = line.strip_prefix("journal-truncated ") {
-                        truncated = seq.parse::<u64>().ok();
+                    } else if let Some(rest) = line.strip_prefix("journal-truncated ") {
+                        truncated = rest
+                            .split_once(' ')
+                            .and_then(|(seq, reason)| Some((seq.parse().ok()?, reason.to_owned())));
                     }
                 }
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
             }
         }
-        if let Some(seq) = truncated {
-            warnings.push(format!(
-                "journal.jsonl reached its size cap before seq {seq}, so events from seq {seq} on are not in it (raise FLEET_JOURNAL_MAX_BYTES to keep them); the run is unaffected"
-            ));
+        if let Some((seq, reason)) = truncated {
+            warnings.push(if reason == journal::REASON_BUDGET {
+                format!(
+                    "journal.jsonl reached its size cap before seq {seq}, so events from seq {seq} on are not in it (raise FLEET_JOURNAL_MAX_BYTES to keep them); the run is unaffected"
+                )
+            } else {
+                format!(
+                    "journal.jsonl stopped on a write error ({reason}) before seq {seq}, so events from seq {seq} on are not in it; the run is unaffected"
+                )
+            });
         }
         if let Some(version) = maestro
             && !fleet_maestro::supports(&version)

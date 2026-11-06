@@ -3,6 +3,66 @@
 
 use std::{fs, path::Path};
 
+use fleet_protocol::{
+    event::{EventBody, RunSignal},
+    journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
+};
+use time::OffsetDateTime;
+
+/// A journal that stopped on a failed write says so, with the error, and from which `seq` its
+/// events are missing. The marker is what the writer leaves behind (issue #112, I5).
+#[test]
+fn a_journal_that_stopped_on_a_write_error_says_so() {
+    let dir = std::env::temp_dir().join(format!("fleet-inspect-io-{}", std::process::id()));
+    fs::remove_dir_all(&dir).ok();
+    fs::create_dir_all(&dir).unwrap();
+    let event = |seq| {
+        let at = ClockSample {
+            wall: OffsetDateTime::UNIX_EPOCH,
+            mono_ms: seq,
+        };
+        EventEnvelope::new(
+            seq,
+            at,
+            Subject::default(),
+            Provenance::new(SourceKind::AgentObserved),
+            &EventBody::RunSignal(RunSignal { signal: 2 }),
+        )
+    };
+    let mut text = String::new();
+    for seq in 1..=2 {
+        text.push_str(&serde_json::to_string(&event(seq)).unwrap());
+        text.push('\n');
+    }
+    let marker = serde_json::json!({
+        "type": "journal.truncated",
+        "first_missing_seq": 3,
+        "bytes_written": text.len(),
+        "reason": "io: StorageFull",
+    });
+    text.push_str(&marker.to_string());
+    text.push('\n');
+    fs::write(dir.join("journal.jsonl"), &text).unwrap();
+
+    let (result, events) = fleet_agent::inspect::inspect(&dir).unwrap();
+    fs::remove_dir_all(&dir).ok();
+    let journal = result.journal.as_ref().expect("the journal is read");
+    assert_eq!(journal.events, 2);
+    assert_eq!(events.len(), 2);
+    let stop = journal.truncated.as_ref().expect("the stop is reported");
+    assert_eq!(stop.first_missing_seq, 3);
+    assert_eq!(stop.reason, "io: StorageFull");
+    let table = fleet_agent::inspect::table(&result);
+    assert!(
+        table.contains("it stopped on a write error (io: StorageFull)"),
+        "{table}"
+    );
+    assert!(
+        table.contains("Events from seq 3 on are missing from it."),
+        "{table}"
+    );
+}
+
 #[test]
 fn every_fixture_reconciles() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");

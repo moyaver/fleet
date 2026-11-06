@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Agent: a failed write to `journal.jsonl` (disk full, I/O error) stops the journal like the cap does: one `journal.truncated` line names the error, the run's warning names the first missing seq, and `fleet-agent inspect` reports it. Before, the error was dropped silently (#112).
+
 ## [0.1.0-alpha.1] - 2026-11-06
 
 ### Added

@@ -3,9 +3,10 @@
 //!
 //! Each line is an [`EventEnvelope`] serialized as the outbox sends it, so the `seq` numbers in the
 //! file are the ones the spool, the wire and the server carry. The file is bounded: once the next
-//! line would take it past its cap, the writer stops, writes one [`Truncation`] marker in that
-//! line's place, and writes nothing else. The events still reach the outbox and the server, and
-//! their numbering is unchanged, so `journal.gap` ranges stay valid.
+//! line would take it past its cap, or a write to it fails (disk full, I/O error), the writer
+//! stops, writes one [`Truncation`] marker in that line's place, and writes nothing else. The events
+//! still reach the outbox and the server, and their numbering is unchanged, so `journal.gap` ranges
+//! stay valid.
 //!
 //! The marker is a local record, not a protocol event. Journal lines are protocol events, but the
 //! marker is never sent, so it has no `EventBody` and no place in the schema. It has no `seq` and
@@ -13,7 +14,7 @@
 
 use std::{
     fs::File,
-    io::{self, BufWriter, Write},
+    io::{self, Write},
     path::Path,
 };
 
@@ -27,8 +28,8 @@ pub(crate) const DEFAULT_MAX_BYTES: u64 = 256 * 1024 * 1024;
 /// The `type` of the marker line. Deliberately not an event type.
 const MARKER: &str = "journal.truncated";
 
-/// The reason the writer stops. The cap is the only thing that stops it.
-const REASON_BUDGET: &str = "budget";
+/// The reason the writer stops when the cap is reached.
+pub(crate) const REASON_BUDGET: &str = "budget";
 
 /// Why the journal stopped, and what it holds before that point.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +38,7 @@ pub struct Truncation {
     pub first_missing_seq: u64,
     /// Bytes of event lines written before the marker.
     pub bytes_written: u64,
-    /// Why it stopped, for example `budget`.
+    /// Why it stopped: `budget` at the cap, or `io: <kind>` for a failed write.
     pub reason: String,
 }
 
@@ -50,10 +51,11 @@ struct MarkerLine<'a> {
     truncation: &'a Truncation,
 }
 
-/// The journal file as it is being written.
+/// The journal file as it is being written. Each line goes straight to `out`, with no buffer in
+/// between, so after a failed write the file holds exactly the events before the one that failed.
 #[derive(Debug)]
-pub(crate) struct Writer {
-    out: BufWriter<File>,
+pub(crate) struct Writer<W: Write = File> {
+    out: W,
     max_bytes: u64,
     /// Bytes of event lines written so far (the marker is not counted).
     written: u64,
@@ -63,16 +65,22 @@ pub(crate) struct Writer {
 impl Writer {
     /// Creates `path`, replacing any earlier file. Event lines stop before passing `max_bytes`.
     pub(crate) fn create(path: &Path, max_bytes: u64) -> io::Result<Self> {
-        Ok(Self {
-            out: BufWriter::new(File::create(path)?),
+        Ok(Self::new(File::create(path)?, max_bytes))
+    }
+}
+
+impl<W: Write> Writer<W> {
+    fn new(out: W, max_bytes: u64) -> Self {
+        Self {
+            out,
             max_bytes,
             written: 0,
             truncated: None,
-        })
+        }
     }
 
-    /// Writes `event` as one line. If the line would take the file past its cap, writes the marker
-    /// instead and stops: from then on nothing else is written.
+    /// Writes `event` as one line. If the line would take the file past its cap, or its write
+    /// fails, writes the marker instead and stops: from then on nothing else is written.
     pub(crate) fn append(&mut self, event: &EventEnvelope) {
         if self.truncated.is_some() {
             return;
@@ -85,18 +93,24 @@ impl Writer {
             .unwrap_or(u64::MAX)
             .saturating_add(1);
         if self.written.saturating_add(len) > self.max_bytes {
-            self.stop(event.seq);
-        } else if writeln!(self.out, "{line}").is_ok() {
+            self.stop(event.seq, REASON_BUDGET.to_owned());
+        } else if let Err(e) = writeln!(self.out, "{line}") {
+            // The line may be part-written. Ending it here puts the marker on a line of its own,
+            // so `parse` skips the torn start and still reads the marker.
+            let _ = writeln!(self.out);
+            self.stop(event.seq, format!("io: {:?}", e.kind()));
+        } else {
             self.written += len;
         }
     }
 
-    /// Writes the marker and remembers where the journal stopped.
-    fn stop(&mut self, first_missing_seq: u64) {
+    /// Writes the marker and remembers where the journal stopped. If the marker cannot be written
+    /// (the disk is still failing), the truncation is recorded all the same.
+    fn stop(&mut self, first_missing_seq: u64, reason: String) {
         let truncation = Truncation {
             first_missing_seq,
             bytes_written: self.written,
-            reason: REASON_BUDGET.to_owned(),
+            reason,
         };
         let marker = MarkerLine {
             kind: MARKER,
@@ -106,11 +120,6 @@ impl Writer {
             let _ = writeln!(self.out, "{line}");
         }
         self.truncated = Some(truncation);
-    }
-
-    /// Pushes the buffered lines to the file. A failed write is not reported, as before.
-    pub(crate) fn flush(&mut self) {
-        let _ = self.out.flush();
     }
 
     /// Where the journal stopped, once it has.
@@ -124,7 +133,7 @@ impl Writer {
 pub struct Journal {
     /// The events, in file order, up to the marker.
     pub events: Vec<EventEnvelope>,
-    /// Set when the journal stopped at its cap.
+    /// Set when the journal stopped early: at its cap, or on a failed write.
     pub truncated: Option<Truncation>,
 }
 
@@ -190,7 +199,6 @@ mod tests {
         for seq in 1..=3 {
             w.append(&event(seq));
         }
-        w.flush();
         let expected = (1..=3).fold(String::new(), |mut text, seq| {
             text.push_str(&serde_json::to_string(&event(seq)).unwrap());
             text.push('\n');
@@ -215,7 +223,6 @@ mod tests {
         for seq in 1..=5 {
             w.append(&event(seq));
         }
-        w.flush();
         let text = std::fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3, "{text}");
@@ -251,5 +258,69 @@ mod tests {
         let parsed = parse(&text);
         assert_eq!(parsed.events.len(), 1);
         assert!(parsed.truncated.is_none());
+    }
+
+    /// A disk with `room` bytes, that fails once when it is full (as a full disk does) and then
+    /// takes writes again, so a marker written after the failure is kept.
+    #[derive(Debug)]
+    struct FullDisk {
+        room: usize,
+        failed: bool,
+        taken: Vec<u8>,
+    }
+
+    impl Write for FullDisk {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let room = self.room.saturating_sub(self.taken.len());
+            if room == 0 && !self.failed {
+                self.failed = true;
+                return Err(io::Error::from(io::ErrorKind::StorageFull));
+            }
+            let n = if self.failed {
+                buf.len()
+            } else {
+                room.min(buf.len())
+            };
+            self.taken.extend_from_slice(&buf[..n]);
+            Ok(n)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_write_error_stops_the_journal_and_names_the_first_event_it_lost() {
+        let line = serde_json::to_string(&event(1)).unwrap();
+        let two_lines = 2 * (line.len() + 1);
+        // Lines 1 and 2 fit, and the first 10 bytes of line 3 before the disk is full.
+        let mut w = Writer::new(
+            FullDisk {
+                room: two_lines + 10,
+                failed: false,
+                taken: Vec::new(),
+            },
+            DEFAULT_MAX_BYTES,
+        );
+        for seq in 1..=5 {
+            w.append(&event(seq));
+        }
+        let expected = Truncation {
+            first_missing_seq: 3,
+            bytes_written: two_lines as u64,
+            reason: "io: StorageFull".into(),
+        };
+        assert_eq!(w.truncation(), Some(&expected));
+        // The file: lines 1 and 2, the torn start of line 3, then the marker. Nothing after that.
+        let text = String::from_utf8(w.out.taken.clone()).unwrap();
+        let parsed = parse(&text);
+        assert_eq!(
+            parsed.events.iter().map(|e| e.seq).collect::<Vec<_>>(),
+            [1, 2],
+            "{text}"
+        );
+        assert_eq!(parsed.truncated, Some(expected), "{text}");
+        assert_eq!(text.lines().count(), 4, "{text}");
     }
 }
