@@ -13,6 +13,8 @@ use std::{
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use tokio_tungstenite::tungstenite::{
     Message,
     handshake::server::{Request, Response},
@@ -736,4 +738,81 @@ fn batch_with_invalid_welcome_stops_without_sending_events() {
         "invalid welcome must stop batch transport"
     );
     assert_eq!(requests[0]["events"], serde_json::json!([]));
+}
+
+#[test]
+fn planned_ordered_shard_forwards_its_workspace_config() {
+    let bin_dir = fake_maestro_dir();
+    let config = bin_dir.join("config.yaml");
+    std::fs::write(&config, "flows: ['*.yaml']\nexecutionOrder:\n  continueOnFailure: false\n  flowsOrder: [first, second]\n").unwrap();
+    let mut digest = String::new();
+    for byte in Sha256::digest(std::fs::read(&config).unwrap()) {
+        write!(digest, "{byte:02x}").unwrap();
+    }
+    let plan = bin_dir.join("plan.json");
+    std::fs::write(&plan, serde_json::json!({"planId":"ordered", "configPath":"config.yaml", "configSha256":digest, "shards":[{"id":0,"flows":["first.yaml","second.yaml"]}]}).to_string()).unwrap();
+    let log = bin_dir.join("argv.log");
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
+        .current_dir(&bin_dir)
+        .args(["run", "--finalize-timeout", "30", "--plan"])
+        .arg(&plan)
+        .args(["--shard", "0", "--"])
+        .arg(bin_dir.join("maestro"))
+        .arg("test")
+        .env("FLEET_FAKE_FIXTURE", fixture("execution-order"))
+        .env("FLEET_FAKE_ARGV_LOG", &log)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let args = std::fs::read_to_string(log).unwrap();
+    assert!(args.contains("--config\nconfig.yaml\n"), "{args}");
+}
+
+#[test]
+fn planned_config_digest_mismatch_refuses_to_launch_maestro() {
+    let dir = fake_maestro_dir();
+    std::fs::write(dir.join("config.yaml"), "flows: ['*.yaml']\n").unwrap();
+    let plan = dir.join("digest-plan.json");
+    std::fs::write(&plan, r#"{"planId":"ordered","configPath":"config.yaml","configSha256":"wrong","shards":[{"id":0,"flows":["first.yaml"]}]}"#).unwrap();
+    let log = dir.join("never-launched");
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
+        .current_dir(&dir)
+        .args(["run", "--plan"])
+        .arg(&plan)
+        .args(["--shard", "0", "--"])
+        .arg(dir.join("maestro"))
+        .arg("test")
+        .env("FLEET_FAKE_FIXTURE", fixture("pass"))
+        .env("FLEET_FAKE_ARGV_LOG", &log)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(!log.exists());
+}
+
+#[test]
+fn planned_empty_shard_runs_nothing_and_exits_2() {
+    let dir = fake_maestro_dir();
+    let plan = dir.join("empty-shard-plan.json");
+    std::fs::write(
+        &plan,
+        r#"{"planId":"empty","shards":[{"id":0,"flows":[]},{"id":1,"flows":["a.yaml"]}]}"#,
+    )
+    .unwrap();
+    let log = dir.join("never-launched");
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
+        .current_dir(&dir)
+        .args(["run", "--plan"])
+        .arg(&plan)
+        .args(["--shard", "0", "--"])
+        .arg(dir.join("maestro"))
+        .arg("test")
+        .env("FLEET_FAKE_FIXTURE", fixture("pass"))
+        .env("FLEET_FAKE_ARGV_LOG", &log)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(!log.exists(), "maestro must not start for an empty shard");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("nothing to run"), "{stderr}");
 }
