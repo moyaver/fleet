@@ -47,6 +47,12 @@ impl Stack {
             name: "App".into(),
             trust_policies: Vec::new(),
         }];
+        // The default blob store is under /var/lib/fleet, which the test host can't write: every
+        // upload would fail and wait out its budget.
+        c.storage.path =
+            std::env::temp_dir().join(format!("fleet-e2e-blobs-{}", uuid::Uuid::now_v7()));
+        c.artifacts.spool_dir =
+            std::env::temp_dir().join(format!("fleet-e2e-spool-{}", uuid::Uuid::now_v7()));
         tweak(&mut c);
         let server = fleet_server::start(c.clone()).await.unwrap();
         let project = store.project_id("app").await.unwrap().unwrap();
@@ -91,6 +97,40 @@ impl Stack {
         self.get(&format!("/api/v1/projects/app/attempts/{id}"))
             .await
     }
+
+    /// Waits (up to 30 s) until the job's agent run is `ended`, the state the dashboard shows as
+    /// Completed, and returns the snapshot. The agent's exit doesn't show that the server stored
+    /// the run end: its final flush can run out of budget, so a read right after the exit can
+    /// see the run still active. This fails with that state if the run never ends.
+    pub(crate) async fn await_run_ended(&self, job_key: &str) -> Value {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        loop {
+            let snap = self.latest_snapshot().await;
+            let state = job_run_state(&snap, job_key);
+            if state.as_deref() == Some("ended") {
+                return snap;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{job_key}: its agent run is still {state:?} 30 s after the agent exited; \
+                 not every event reached the server"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+}
+
+/// The state of the agent run of the job `job_key` in a snapshot, if both are there.
+fn job_run_state(snap: &Value, job_key: &str) -> Option<String> {
+    let job = snap["jobs"]
+        .as_array()?
+        .iter()
+        .find(|j| j["job_key"] == job_key)?;
+    let run = snap["agent_runs"]
+        .as_array()?
+        .iter()
+        .find(|r| r["job_id"] == job["id"])?;
+    run["state"].as_str().map(str::to_owned)
 }
 
 /// A minimal HTTP/1.1 request over a raw socket.

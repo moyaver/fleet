@@ -483,14 +483,9 @@ fn record(session: &mut Session, at: ClockSample, done: upload::Done) {
     session.artifact_result(at, done.flow, &body);
 }
 
-/// The run is over: queue the report and the log, wait up to `budget` for every upload, journal
-/// them.
-async fn finish_uploads(
-    l: &mut Live,
-    report: Option<&[u8]>,
-    budget: Duration,
-    clock: &impl Fn() -> ClockSample,
-) {
+/// The run is over: queues the report and the log for upload. Their results are journaled by
+/// [`await_uploads`].
+fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> ClockSample) {
     pump_uploads(l, clock);
     let Some(up) = l.uploader.as_ref() else {
         return;
@@ -534,10 +529,15 @@ async fn finish_uploads(
             source: Source::Text(log, Arc::new(l.session.redactor().clone())),
         });
     }
-    if let Some(up) = l.uploader.as_ref() {
-        for done in up.finish(budget).await {
-            record(&mut l.session, clock(), done);
-        }
+}
+
+/// Waits up to `budget` for every upload, then journals how each one ended.
+async fn await_uploads(l: &mut Live, budget: Duration, clock: &impl Fn() -> ClockSample) {
+    let Some(up) = l.uploader.as_ref() else {
+        return;
+    };
+    for done in up.finish(budget).await {
+        record(&mut l.session, clock(), done);
     }
 }
 
@@ -638,15 +638,22 @@ async fn finalize(
         .ok()
         .and_then(|s| s.parse().ok())
         .map_or(Duration::from_secs(20), Duration::from_secs);
-    let flush_budget = if l.shared.connected.load(Ordering::SeqCst) {
-        configured_budget
-    } else {
-        configured_budget.min(Duration::from_secs(3))
+    // A server that never answered the WebSocket upgrade gets a short budget. One that answered
+    // gets the whole budget, however slowly it welcomes (a busy server is not an unreachable one).
+    let flush_budget = |answered: bool| {
+        if answered {
+            configured_budget
+        } else {
+            configured_budget.min(Duration::from_secs(3))
+        }
     };
     let upload_budget = std::env::var("FLEET_UPLOAD_TIMEOUT")
         .ok()
         .and_then(|s| s.parse().ok())
-        .map_or(flush_budget / 2, Duration::from_secs);
+        .map_or(
+            flush_budget(l.shared.connected.load(Ordering::SeqCst)) / 2,
+            Duration::from_secs,
+        );
     // Let Maestro's last writes land, then take a final look.
     tokio::time::sleep(POLL).await;
     watch(&mut l, true, &clock);
@@ -666,7 +673,7 @@ async fn finalize(
         }
         Some((_, ReportRead::Missing)) | None => None,
     };
-    finish_uploads(&mut l, report.as_deref(), upload_budget, &clock).await;
+    submit_uploads(&mut l, report.as_deref(), &clock);
     l.session.observe(
         clock(),
         Observation::Exited {
@@ -680,6 +687,12 @@ async fn finalize(
         },
     );
     l.session.observe(clock(), Observation::Report(report));
+    // The journal goes out first: its tail is sent while the uploads run, so a slow upload can't
+    // hold back the flows' results (uploads can't be replayed from the spool, events can).
+    flush(&mut l);
+    // Upload results follow the tail, and the run end comes last: the server refuses events
+    // after it.
+    await_uploads(&mut l, upload_budget, &clock).await;
     // Gap sums are a subset of the authoritative total: never under-report or double-count.
     l.session
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
@@ -699,7 +712,7 @@ async fn finalize(
     l.shared.wake.notify_one();
     if let Some(handle) = l.transport.take() {
         // What is left of the shared budget, but never less than a few seconds.
-        let budget = flush_budget
+        let budget = flush_budget(l.shared.connected.load(Ordering::SeqCst))
             .saturating_sub(started.elapsed())
             .max(Duration::from_secs(3));
         match tokio::time::timeout(budget, handle).await {
