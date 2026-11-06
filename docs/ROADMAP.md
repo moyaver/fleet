@@ -129,6 +129,16 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 | 9. Test history remains accessible after the runner disappears | `m5_exit::ac09_history_and_evidence_outlive_the_runner_and_a_server_restart` |
 | I7. User-uploaded HTML never runs on the app origin | `m5_exit::i7_an_uploaded_html_report_never_runs_on_the_app_origin` |
 
+### M6 checklist
+
+Tracking: [#86](https://github.com/moyaver/fleet/issues/86). Items from the [2026-11-06 competitive review](../research/09-competitive-review-2026-11.md) are included.
+
+- [ ] Correct results: nested steps, retry attempts, supervisor passthrough, dashboard and worker fixes, infrastructure exclusions in flaky analysis, Maestro version per run
+- [ ] Evidence Maestro already writes: missing fixtures first, then step artifact links, UI hierarchy, bounded logcat, device samples, host metric series
+- [ ] Install and operate: first pre-release, composite GitHub Action with a job summary, server image, backup and restore
+- [ ] Hardening: rate limits, multi-instance fan-out, bounded journal, remaining agent review items, accessibility
+- [ ] Proof: nightly real-Maestro job, repeatable overhead benchmark, planner planned vs actual, comparative diagnosis study
+
 ### Owner actions
 
 Things only the owner can do. Each one has an issue labelled [`owner-action`](https://github.com/moyaver/fleet/labels/owner-action).
