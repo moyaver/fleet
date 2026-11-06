@@ -491,20 +491,17 @@ impl Session {
         );
     }
 
-    /// The flow a step line belongs to. An end can arrive after its flow's stdout result (the log
-    /// lags stdout), so an end goes to the latest flow when that flow still holds the step open.
+    /// The flow a step line belongs to. An end can arrive after a later flow's stdout result (the
+    /// log lags stdout), so an end goes to the newest started flow that still holds this step open.
     fn step_flow(&self, shard: u32, description: &str, state: log::StepState) -> Option<usize> {
         if state != log::StepState::Running {
-            let latest = self
-                .flows
-                .iter()
-                .rposition(|f| f.shard == shard && f.started);
-            if let Some(i) = latest.filter(|&i| {
-                self.flows
-                    .get(i)
-                    .is_some_and(|f| f.open_steps.iter().any(|(_, open)| open == description))
-            }) {
-                return Some(i);
+            let holder = self.flows.iter().rposition(|f| {
+                f.shard == shard
+                    && f.started
+                    && f.open_steps.iter().any(|(_, open)| open == description)
+            });
+            if holder.is_some() {
+                return holder;
             }
         }
         self.open_flow(shard, None)
@@ -1243,5 +1240,56 @@ mod tests {
         let mut s = session();
         file(&mut s, "pass/commands.json", Some(FAILED));
         assert_eq!(artifact_outcomes(&s), [FlowOutcome::Failed]);
+    }
+
+    fn log_line(s: &mut Session, logger: &str, message: &str) {
+        s.observe(
+            at(),
+            Observation::Log(log::Record {
+                unix_ms: None,
+                level: "INFO".into(),
+                logger: logger.into(),
+                message: message.into(),
+                continuation: Vec::new(),
+            }),
+        );
+    }
+
+    /// Stdout can report a later flow before the log delivers an earlier flow's last step end.
+    // UNVERIFIED: synthetic interleaving of stdout ahead of maestro.log
+    #[test]
+    fn a_late_step_end_pairs_with_the_flow_that_holds_it_open() {
+        const SUITE: &str = "maestro.cli.runner.TestSuiteInteractor";
+        const CONSOLE: &str = "maestro.cli.runner.CliConsoleListener";
+        let mut n = 0u128;
+        let ids: IdGen = Box::new(move || {
+            n += 1;
+            Uuid::from_u128(n)
+        });
+        let mut s = Session::new(
+            &["maestro".into(), "test".into()],
+            None,
+            Redactor::new([]),
+            ids,
+            at(),
+        );
+        log_line(&mut s, SUITE, "Running flow A");
+        log_line(&mut s, CONSOLE, "Tap on \"X\" RUNNING");
+        s.observe(at(), Observation::Stdout("[Passed] A (1s)".into()));
+        s.observe(at(), Observation::Stdout("[Passed] B (1s)".into()));
+        log_line(&mut s, CONSOLE, "Tap on \"X\" COMPLETED");
+        let (a, b) = (s.flows[0].id, s.flows[1].id);
+        let events = s.drain();
+
+        let ended: Vec<_> = events.iter().filter(|e| e.kind == "step.ended").collect();
+        assert_eq!(ended.len(), 1, "A's end was not paired: {events:?}");
+        assert_eq!(ended[0].subject.flow_execution_id, Some(a));
+        assert_eq!(ended[0].subject.step.as_ref().map(|r| r.index), Some(0));
+        assert!(
+            events
+                .iter()
+                .all(|e| e.subject.flow_execution_id != Some(b) || e.subject.step.is_none()),
+            "B got a step: {events:?}"
+        );
     }
 }
