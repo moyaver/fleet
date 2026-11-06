@@ -1355,6 +1355,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "clap",
+ "fleet-core",
  "fleet-protocol",
  "glob",
  "reqwest",

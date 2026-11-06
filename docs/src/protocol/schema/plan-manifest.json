@@ -50,6 +50,15 @@
         "null"
       ]
     },
+    "equalCountEstimatedSeconds": {
+      "description": "The largest shard's estimate, in seconds, had the same flows been split into the same\nnumber of shards by count alone (each `executionOrder` sequence kept whole), with the same\nestimates. The plan's saving is measured against it.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "planId": {
       "description": "Stable identifier, unique per project.",
       "type": "string"

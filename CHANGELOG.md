@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Planner: the manifest records what an equal-count split of the same flows would have produced by the same estimates (`equalCountEstimatedSeconds`), so a plan can state its saving over that split (#81).
+- Dashboard: a pipeline with a Fleet plan shows each shard's planned and actual time (first flow start to last flow end) and the slowest shard's saving over an equal-count split (#81).
+
 ### Fixed
 
 - Credential-bearing agent requests require TLS for remote hosts, and cleartext loopback traffic bypasses proxies. The sign-in callback preserves authenticated sessions.

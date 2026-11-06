@@ -22,6 +22,7 @@ use std::{
 
 use anyhow::{Context as _, ensure};
 use clap::{Args, Parser, Subcommand};
+use fleet_core::plan::equal_count_max;
 use fleet_protocol::plan::{PlanManifest, PlanShard};
 use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, de::DeserializeOwned};
@@ -186,6 +187,10 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
 
     let units = build_units(&flows, parsed.execution_order.as_ref(), &constraints)?;
     let durations = durations(&flows, &estimates);
+    let equal_count_estimated_seconds = Some(equal_count_max(
+        &unit_durations(&units, &durations),
+        args.shards,
+    ));
     let shards = allocate(units, args.shards, &durations, &p90, &constraints)?;
     let config_name = config.file_name().context("config path has no file name")?;
 
@@ -203,6 +208,7 @@ fn plan(args: PlanArgs) -> anyhow::Result<()> {
         )?),
         config_path: Some(prefix.join(config_name).to_string_lossy().into_owned()),
         config_sha256: Some(hex(&Sha256::digest(&config_bytes))),
+        equal_count_estimated_seconds,
         shards,
     };
     let manifest_bytes = serde_json::to_vec_pretty(&plan)?;
@@ -446,6 +452,18 @@ fn durations(flows: &[Flow], estimates: &BTreeMap<String, u64>) -> BTreeMap<Stri
 fn median(mut values: Vec<u64>) -> Option<u64> {
     values.sort_unstable();
     values.get(values.len() / 2).copied()
+}
+
+/// Each unit's flow durations, in order: the input to the equal-count baseline.
+fn unit_durations(units: &[Vec<String>], durations: &BTreeMap<String, u64>) -> Vec<Vec<u64>> {
+    units
+        .iter()
+        .map(|unit| {
+            unit.iter()
+                .map(|f| durations.get(f).copied().unwrap_or(1))
+                .collect()
+        })
+        .collect()
 }
 
 /// Longest Processing Time first: each unit goes to the eligible shard with the least estimated

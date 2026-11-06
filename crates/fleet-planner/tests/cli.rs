@@ -75,6 +75,9 @@ fn discovers_unordered_flows_and_balances_supplied_estimates() {
         plan["shards"][1]["flows"],
         serde_json::json!(["b.yaml", "c.yaml"])
     );
+    // Counting alone deals a (10 s) and b (7 s) apart, then c (3 s) ties and lands with a: 13 s.
+    // The planned shards are 10 s and 10 s.
+    assert_eq!(plan["equalCountEstimatedSeconds"], 13);
 }
 
 #[test]

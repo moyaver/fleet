@@ -1,0 +1,105 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.plan_id, p.planned_total, s.shard_id, s.flows, s.estimate_ms,\n                (p.manifest->>'equalCountEstimatedSeconds')::bigint * 1000 AS equal_count_estimate_ms,\n                coalesce(array_agg(DISTINCT r.id) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"runs!\",\n                (SELECT count(*) FROM flow_executions f JOIN agent_runs r2 ON r2.id = f.agent_run_id\n                  WHERE r2.project_id = p.project_id AND r2.plan_id = p.plan_id\n                    AND r2.plan_shard_id = s.shard_id) AS \"executed!\",\n                (SELECT CASE WHEN bool_or(f.ended_at IS NULL) THEN NULL\n                             ELSE (extract(epoch FROM max(f.ended_at) - min(f.started_at)) * 1000)::bigint\n                        END\n                   FROM flow_executions f JOIN agent_runs r4 ON r4.id = f.agent_run_id\n                  WHERE r4.project_id = p.project_id AND r4.plan_id = p.plan_id\n                    AND r4.plan_shard_id = s.shard_id AND f.started_at IS NOT NULL) AS actual_ms\n           FROM plans p\n           JOIN plan_shards s ON s.project_id = p.project_id AND s.plan_id = p.plan_id\n           LEFT JOIN agent_runs r ON r.project_id = p.project_id AND r.plan_id = p.plan_id\n                                 AND r.plan_shard_id = s.shard_id\n          WHERE p.project_id = $1\n            AND (p.pipeline_attempt_id = $2\n                 OR p.plan_id IN (SELECT r3.plan_id FROM agent_runs r3 JOIN jobs j ON j.id = r3.job_id\n                                   WHERE j.pipeline_attempt_id = $2 AND r3.plan_id IS NOT NULL))\n          GROUP BY p.project_id, p.plan_id, p.planned_total, p.manifest, s.shard_id, s.flows,\n                   s.estimate_ms\n          ORDER BY p.plan_id, s.shard_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "plan_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "plans",
+            "name": "plan_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "planned_total",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "plans",
+            "name": "planned_total"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "shard_id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "plan_shards",
+            "name": "shard_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "flows",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "plan_shards",
+            "name": "flows"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "estimate_ms",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "plan_shards",
+            "name": "estimate_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "equal_count_estimate_ms",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "runs!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "executed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "actual_ms",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "eea883ca5b30e7a89ed0d92c800fcb5d8f144e220f2e14433bbbdd494a470a1b"
+}
