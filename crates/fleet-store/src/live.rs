@@ -5,6 +5,12 @@
 //! with the attempt's live `version`, so a client that applies deltas with a higher version
 //! never misses or double-applies a change. Every outcome travels with its source and, for
 //! flows, its finality: nothing is shown without a provenance.
+//!
+//! Between instances (research 03 §5.5): every committed version bump also runs `pg_notify` in
+//! its transaction, so the notice is delivered only if the commit happens. Each instance
+//! listens on the `fleet_live` channel ([`Store::notices`]) and republishes the others' changes into its own
+//! hub. A notice carries ids and the version, never the state: the receiver loads the entities
+//! from Postgres, as a resync does.
 
 use std::collections::BTreeMap;
 
@@ -12,9 +18,115 @@ use fleet_protocol::live::{
     AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, PlanShardView, PlanView,
     ProjectView, Snapshot, SuiteView,
 };
+use serde::{Deserialize, Serialize};
+use sqlx::{PgConnection, postgres::PgListener};
 use uuid::Uuid;
 
-use crate::{Result, Store, ingest::EntityRef};
+use crate::{
+    Result, Store,
+    ingest::{Change, EntityRef},
+};
+
+/// The Postgres channel that carries committed live changes between instances.
+const CHANNEL: &str = "fleet_live";
+/// Postgres refuses notifications of 8000 bytes or more; a longer entity list is sent as none.
+const MAX_PAYLOAD: usize = 7_000;
+
+/// What an instance tells the others about one committed change.
+#[derive(Debug, Serialize, Deserialize)]
+struct Notice {
+    origin: Uuid,
+    project: Uuid,
+    attempt: Uuid,
+    version: u64,
+    /// `None` when the list would not fit: receivers resync their subscribers instead.
+    entities: Option<Vec<EntityRef>>,
+}
+
+/// Announces a change committed by `tx`. The notice is delivered only when `tx` commits.
+pub(crate) async fn notify(
+    tx: &mut PgConnection,
+    origin: Uuid,
+    change: &Change,
+) -> std::result::Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_notify($1, $2)")
+        .bind(CHANNEL)
+        .bind(payload(origin, change))
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
+fn payload(origin: Uuid, change: &Change) -> String {
+    let notice = |entities: Option<Vec<EntityRef>>| Notice {
+        origin,
+        project: change.project_id,
+        attempt: change.pipeline_attempt_id,
+        version: change.version,
+        entities,
+    };
+    let full = serde_json::to_string(&notice(Some(change.entities.clone())))
+        .expect("a notice of ids should serialize");
+    if full.len() < MAX_PAYLOAD {
+        return full;
+    }
+    serde_json::to_string(&notice(None)).expect("a notice of ids should serialize")
+}
+
+/// The change a notice describes, unless this instance sent it or it is malformed.
+fn decode(payload: &str, origin: Uuid) -> Option<Change> {
+    let notice: Notice = match serde_json::from_str(payload) {
+        Ok(notice) => notice,
+        Err(err) => {
+            tracing::warn!(error = %err, "ignoring a malformed live notice");
+            return None;
+        }
+    };
+    (notice.origin != origin).then(|| Change {
+        project_id: notice.project,
+        pipeline_attempt_id: notice.attempt,
+        version: notice.version,
+        entities: notice.entities.unwrap_or_default(),
+    })
+}
+
+/// One thing [`Notices::recv`] reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LiveNotice {
+    /// A change another instance committed.
+    Change(Change),
+    /// The connection was lost and re-established: notices sent in the gap are gone, so
+    /// subscribers must resync.
+    Reconnected,
+}
+
+/// This instance's listener on the other instances' committed changes.
+#[derive(Debug)]
+pub struct Notices {
+    listener: PgListener,
+    origin: Uuid,
+}
+
+impl Notices {
+    /// The next notice from another instance, or [`LiveNotice::Reconnected`].
+    ///
+    /// # Errors
+    /// The listener is broken. Drop it and call [`Store::notices`] again.
+    ///
+    /// # Cancel safety
+    /// Cancel-safe: a cancelled call loses no notice, because sqlx consumes a message only once
+    /// it is complete.
+    pub async fn recv(&mut self) -> Result<LiveNotice> {
+        loop {
+            let Some(notification) = self.listener.try_recv().await? else {
+                return Ok(LiveNotice::Reconnected);
+            };
+            if let Some(change) = decode(notification.payload(), self.origin) {
+                return Ok(LiveNotice::Change(change));
+            }
+        }
+    }
+}
 
 /// Rows of one attempt, or the rows with these IDs.
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +145,16 @@ impl Scope<'_> {
 }
 
 impl Store {
+    /// Starts listening for the other instances' committed changes. Holds one pool connection.
+    pub async fn notices(&self) -> Result<Notices> {
+        let mut listener = PgListener::connect_with(self.pool()).await?;
+        listener.listen(CHANNEL).await?;
+        Ok(Notices {
+            listener,
+            origin: self.origin(),
+        })
+    }
+
     /// Every project.
     pub async fn projects(&self) -> Result<Vec<ProjectView>> {
         Ok(sqlx::query_as!(

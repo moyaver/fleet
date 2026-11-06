@@ -24,10 +24,13 @@ use fleet_protocol::live::{EntityView, LiveFrame, Liveness, ResyncReason, Snapsh
 use fleet_store::{
     Store,
     ingest::{Change, RunHandle},
+    live::{LiveNotice, Notices},
 };
 use time::OffsetDateTime;
 use tokio::{sync::broadcast, time::Instant};
 use uuid::Uuid;
+
+use crate::state::AppState;
 
 /// How long a later version waits for an earlier one before it is sent anyway.
 const REORDER_WAIT: Duration = Duration::from_secs(2);
@@ -213,6 +216,24 @@ impl Hub {
         }
     }
 
+    /// Asks every subscriber to re-snapshot: this instance may have missed changes made elsewhere.
+    pub(crate) fn resync_all(&self) {
+        let frame = json(&LiveFrame::Resync {
+            reason: ResyncReason::Lagged,
+        });
+        let channels: Vec<_> = self
+            .channels
+            .lock()
+            .expect("hub lock should not be poisoned: no code panics while holding it")
+            .values()
+            .cloned()
+            .collect();
+        for tx in channels {
+            // No subscribers is fine.
+            let _ = tx.send(Arc::clone(&frame));
+        }
+    }
+
     /// Known attempt → project pairs (for [`Self::flush_stale`]).
     pub(crate) fn attempt_projects(&self) -> HashMap<Uuid, Uuid> {
         self.runs
@@ -355,6 +376,48 @@ impl Hub {
                 _ => None,
             })
             .collect();
+    }
+}
+
+/// Republishes other instances' committed changes into this instance's hub (research 03 §5.5),
+/// as a local commit would be. Runs until shutdown. A lost listener is re-established with
+/// backoff, and subscribers resync: notices sent in the gap are gone.
+pub(crate) async fn relay(state: AppState, mut notices: Notices) {
+    loop {
+        let received = tokio::select! {
+            () = state.shutdown.cancelled() => return,
+            received = notices.recv() => received,
+        };
+        match received {
+            Ok(LiveNotice::Change(change)) => state.publish(Some(change)),
+            Ok(LiveNotice::Reconnected) => state.hub.resync_all(),
+            Err(err) => {
+                tracing::warn!(error = %err, "live listener lost; reconnecting");
+                let Some(fresh) = reconnect(&state).await else {
+                    return;
+                };
+                notices = fresh;
+                state.hub.resync_all();
+            }
+        }
+    }
+}
+
+/// Listens again after a failure, backing off from 100 ms to 5 s; `None` on shutdown.
+async fn reconnect(state: &AppState) -> Option<Notices> {
+    let mut delay = Duration::from_millis(100);
+    loop {
+        tokio::select! {
+            () = state.shutdown.cancelled() => return None,
+            () = tokio::time::sleep(delay) => {}
+        }
+        match state.store.notices().await {
+            Ok(notices) => return Some(notices),
+            Err(err) => {
+                tracing::warn!(error = %err, "re-listening for live changes");
+                delay = (delay * 2).min(Duration::from_secs(5));
+            }
+        }
     }
 }
 

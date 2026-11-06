@@ -30,6 +30,7 @@ use fleet_protocol::{
     frame::{CiProvider, ErrorCode, Hello, ResumeOutcome},
     journal::EventEnvelope,
 };
+use serde::{Deserialize, Serialize};
 use sqlx::{Connection as _, PgConnection};
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
@@ -169,7 +170,7 @@ pub struct Change {
 }
 
 /// An entity whose stored state changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EntityRef {
     /// A job.
     Job(Uuid),
@@ -351,7 +352,9 @@ impl Store {
         if derive::job(&mut tx, job_id).await? {
             entities.insert(EntityRef::Job(job_id));
         }
-        let change = bump_version(&mut tx, publisher.project_id, attempt_id, entities).await?;
+        let change = self
+            .bump_version(&mut tx, publisher.project_id, attempt_id, entities)
+            .await?;
         tx.commit().await?;
         Ok(Opened {
             handle: RunHandle {
@@ -515,8 +518,9 @@ impl Store {
         if advanced.rows_affected() != 1 {
             return Err(ApplyError::Superseded);
         }
-        let change =
-            bump_version(&mut tx, run.project_id, run.pipeline_attempt_id, entities).await?;
+        let change = self
+            .bump_version(&mut tx, run.project_id, run.pipeline_attempt_id, entities)
+            .await?;
         tx.commit().await?;
         Ok(Applied {
             through,
@@ -908,26 +912,32 @@ async fn write_journal(
     Ok(())
 }
 
-/// Bumps the attempt's live version when anything changed; the hub orders deltas by it.
-pub(crate) async fn bump_version(
-    tx: &mut PgConnection,
-    project_id: Uuid,
-    attempt_id: Uuid,
-    entities: BTreeSet<EntityRef>,
-) -> Result<Option<Change>, sqlx::Error> {
-    if entities.is_empty() {
-        return Ok(None);
+impl Store {
+    /// Bumps the attempt's live version when anything changed; the hub orders deltas by it. The
+    /// version's notice goes out with the same transaction, for the other instances' hubs.
+    pub(crate) async fn bump_version(
+        &self,
+        tx: &mut PgConnection,
+        project_id: Uuid,
+        attempt_id: Uuid,
+        entities: BTreeSet<EntityRef>,
+    ) -> Result<Option<Change>, sqlx::Error> {
+        if entities.is_empty() {
+            return Ok(None);
+        }
+        let version = sqlx::query_scalar!(
+            "UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version",
+            attempt_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let change = Change {
+            project_id,
+            pipeline_attempt_id: attempt_id,
+            version: to_u64(version),
+            entities: entities.into_iter().collect(),
+        };
+        crate::live::notify(tx, self.origin(), &change).await?;
+        Ok(Some(change))
     }
-    let version = sqlx::query_scalar!(
-        "UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version",
-        attempt_id
-    )
-    .fetch_one(&mut *tx)
-    .await?;
-    Ok(Some(Change {
-        project_id,
-        pipeline_attempt_id: attempt_id,
-        version: to_u64(version),
-        entities: entities.into_iter().collect(),
-    }))
 }

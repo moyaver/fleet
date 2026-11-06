@@ -328,7 +328,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn a_failed_flow_gets_a_fingerprint_and_equivalent_failures_share_it(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let a = run(
             &store,
             "300",
@@ -406,7 +409,10 @@ mod tests {
     async fn final_flows_get_a_condition_fingerprint_that_says_unknown_for_what_is_unknown(
         pool: PgPool,
     ) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         run(
             &store,
             "310",
@@ -456,7 +462,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_condition_fingerprint_includes_the_maestro_version(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let first = run_as(
             &store,
             "340",
@@ -512,7 +521,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn nothing_is_fingerprinted_before_the_outcome_is_final(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let p = publisher(&store).await;
         let mut a = Agent::new("320", "e2e");
         let opened = store
@@ -557,7 +569,10 @@ mod tests {
     async fn the_flaky_history_view_lists_final_passes_and_failures_with_their_conditions(
         pool: PgPool,
     ) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         run(
             &store,
             "330",

@@ -816,7 +816,10 @@ mod tests {
     /// without one has none.
     #[sqlx::test(migrations = "../../migrations")]
     async fn an_artifact_requested_with_a_step_is_listed_with_it(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let publisher = publisher(&store).await;
         let mut agent = Agent::new("1", "e2e");
         let handle = store

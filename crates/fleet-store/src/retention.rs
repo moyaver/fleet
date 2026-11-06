@@ -225,7 +225,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn partitions_older_than_their_retention_are_dropped_and_newer_ones_kept(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         // Samples: 7 days. The journal and steps: 14 days. A partition goes once its whole day
         // is older than the retention: with `now` at noon, the day 8 days back ended 7 days and
         // 12 hours ago; the day 7 days back ended 6 days and 12 hours ago.
@@ -260,7 +263,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn raw_samples_that_are_not_rolled_up_yet_outlive_their_retention(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let project = store.upsert_project("app", "App").await.unwrap();
         make_partitions(&store, "host_samples", &[8]).await;
         let at = (today() - Duration::days(8))
@@ -312,7 +318,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn rollups_and_audit_events_expire_by_their_own_retention(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let project = store.upsert_project("app", "App").await.unwrap();
         let now = OffsetDateTime::now_utc();
         let run = Uuid::now_v7();
@@ -373,7 +382,10 @@ mod tests {
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn no_retention_means_keep_everything(pool: PgPool) {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         make_partitions(&store, "host_samples", &[400]).await;
         make_partitions(&store, "agent_events", &[400]).await;
         sqlx::query!("INSERT INTO audit_events (at, actor_kind, action) VALUES (now() - interval '5 years', 'system', 'x')")

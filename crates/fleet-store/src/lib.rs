@@ -110,6 +110,8 @@ static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../migrations");
 #[derive(Debug, Clone)]
 pub struct Store {
     pool: PgPool,
+    /// Identifies this instance's notifications, so it can skip its own (see [`live`]).
+    origin: uuid::Uuid,
 }
 
 impl Store {
@@ -121,11 +123,18 @@ impl Store {
             .max_connections(options.max_connections)
             .acquire_timeout(options.acquire_timeout)
             .connect_lazy_with(connect);
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        })
     }
 
     pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
+    }
+
+    pub(crate) fn origin(&self) -> uuid::Uuid {
+        self.origin
     }
 
     /// Applies pending migrations under sqlx's advisory lock, so concurrent instances are safe.

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! REST snapshots, the live hub, plans, OpenAPI and the liveness sweeps.
 
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use futures_util::SinkExt;
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::support::{Agent, Harness, VIEWER, get, live, live_next, post_json};
+use crate::support::{Agent, Harness, VIEWER, Ws, get, live, live_next, post_json};
 
 async fn attempt_of(h: &Harness) -> String {
     let (status, body) = get(h.addr(), "/api/v1/projects/app/attempts", Some(VIEWER)).await;
@@ -309,4 +309,83 @@ async fn an_agent_that_never_returns_is_abandoned_and_its_job_never_green() {
     assert_eq!(snap["flows"][0]["state"], "unknown");
     assert_eq!(snap["flows"][0]["outcome_source"], "server_inferred");
     assert_eq!(snap["jobs"][0]["outcome"], "interrupted");
+}
+
+/// A second server instance on the harness's database, as a second replica would run.
+async fn second_instance(h: &Harness) -> fleet_server::Server {
+    fleet_server::start(h.config.clone()).await.unwrap()
+}
+
+/// Subscribes to `attempt` on `addr`; returns the socket and the snapshot's version.
+async fn follow(addr: SocketAddr, attempt: &str) -> (Ws, u64) {
+    let mut ws = live(addr, Some(VIEWER), None).await.unwrap();
+    let subscribe = json!({"op": "subscribe", "project": "app", "attempt": attempt});
+    ws.send(Message::text(subscribe.to_string())).await.unwrap();
+    let snap = live_next(&mut ws).await;
+    assert_eq!(snap["op"], "snapshot");
+    let version = snap["snapshot"]["attempt"]["version"].as_u64().unwrap();
+    assert_eq!(live_next(&mut ws).await["op"], "subscribed");
+    (ws, version)
+}
+
+/// The next live frame, which must arrive within `within`.
+async fn next_within(ws: &mut Ws, within: Duration) -> Value {
+    tokio::time::timeout(within, live_next(ws))
+        .await
+        .expect("a live frame in time")
+}
+
+#[tokio::test]
+async fn a_commit_on_one_instance_reaches_a_subscriber_on_another() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("fanout", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+    // The subscriber is on the second instance; the batch commits through the first.
+    let (mut ws, version) = follow(other.addr(), &attempt).await;
+
+    c.events(events).await;
+    let delta = next_within(&mut ws, Duration::from_secs(5)).await;
+    assert_eq!(delta["op"], "delta", "a delta, not a resync: {delta}");
+    assert_eq!(delta["version"].as_u64().unwrap(), version + 1);
+    assert_ne!(delta["entities"].as_array().unwrap().len(), 0, "{delta}");
+    other.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_lost_listener_connection_resyncs_subscribers_and_deltas_resume() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let mut agent = Agent::new("relisten", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+    let (mut ws, version) = follow(other.addr(), &attempt).await;
+
+    // Drop every LISTEN connection on the database, as a network blip would.
+    let url = h.config.database.url.as_ref().unwrap().expose();
+    let db = sqlx::PgPool::connect(url).await.unwrap();
+    let killed: Vec<bool> = sqlx::query_scalar(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+          WHERE datname = current_database() AND pid <> pg_backend_pid()
+            AND query LIKE 'LISTEN %'",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert!(!killed.is_empty(), "the instances hold LISTEN connections");
+
+    let frame = next_within(&mut ws, Duration::from_secs(10)).await;
+    assert_eq!(frame["op"], "resync", "{frame}");
+
+    // The listener is back: a later commit reaches the subscriber as a delta again.
+    c.events(events).await;
+    let delta = next_within(&mut ws, Duration::from_secs(5)).await;
+    assert_eq!(delta["op"], "delta", "{delta}");
+    assert_eq!(delta["version"].as_u64().unwrap(), version + 1);
+    other.stop().await.unwrap();
 }

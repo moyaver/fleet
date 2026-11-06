@@ -292,7 +292,10 @@ mod tests {
     }
 
     async fn run(pool: PgPool, ci_run: &str, passes: bool) -> Run {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let publisher = publisher(&store).await;
         run_in(store, publisher, ci_run, passes).await
     }

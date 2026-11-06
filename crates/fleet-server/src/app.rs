@@ -17,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     api, artifacts,
     config::{Config, MigrateMode},
-    health, ingest, login,
+    health, ingest, live, login,
     state::AppState,
     sweeps, web,
 };
@@ -176,6 +176,12 @@ pub(crate) fn router(state: &AppState) -> Router {
 /// Starts the server; returns once it listens and is ready.
 pub async fn start(config: Config) -> anyhow::Result<Server> {
     let state = init(config).await?;
+    // Listening before the first socket is accepted: no other instance's change can be missed.
+    let notices = state
+        .store
+        .notices()
+        .await
+        .context("listening for live changes")?;
     let listener = tokio::net::TcpListener::bind(state.config.listen)
         .await
         .with_context(|| format!("binding {}", state.config.listen))?;
@@ -184,6 +190,7 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
         .tracker
         .spawn(ingest::telemetry::flusher(state.clone()));
     state.tracker.spawn(sweeps::run(state.clone()));
+    state.tracker.spawn(live::relay(state.clone(), notices));
 
     let router = router(&state);
     let stop = CancellationToken::new();

@@ -427,7 +427,10 @@ mod tests {
     }
 
     async fn rig(pool: PgPool) -> Rig {
-        let store = Store { pool };
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
         let project = store.upsert_project("app", "App").await.unwrap();
         let worker = sqlx::query_scalar!(
             "INSERT INTO workers (project_id, identity_key) VALUES ($1, 'runner-a') RETURNING id",
