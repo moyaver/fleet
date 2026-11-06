@@ -521,7 +521,7 @@ Upload is relayed through the server by default; presigned direct upload is opti
 |---|---|---|
 | `ci.yml` | PR, push to main | `cargo xtask ci` on ubuntu-latest (Postgres 18 service); macOS arm64 job for agent build + tests; wasm build |
 | `cla.yml` | PR, comments | CLA Assistant Lite (pinned SHA) |
-| `release.yml` | Tag `v*` | cargo-dist: agent for linux-musl x86_64/aarch64 and macOS arm64, server for linux x86_64/aarch64; SHA-256, GitHub artifact attestations, minisign signatures; THIRD_PARTY_LICENSES |
+| `release.yml` | Tag `v*` | cargo-dist: agent for linux-musl x86_64/aarch64 and macOS arm64, server for linux x86_64/aarch64; SHA-256 checksums and GitHub artifact attestations (verified with `gh attestation verify`; no minisign); THIRD_PARTY_LICENSES |
 | `image.yml` | Tag `v*` | Multi-arch `ghcr.io/<owner>/fleet` (native arm64 runner), SBOM, attestation |
 | `nightly-emulator.yml` | Nightly + manual | Linux x64 + KVM, `reactivecircus/android-emulator-runner`, Maestro pinned, `maestro download-samples` flows; run wrapped by the agent against a Compose stack in the job; assert the reconciled results; upload fixtures as artifacts |
 | `audit.yml` | Weekly | cargo-deny advisories, `cargo outdated` report |
@@ -672,6 +672,6 @@ Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the 
 
 - Spec acceptance criteria 1–15 (§16 of the spec) demonstrated by automated tests or a recorded demo.
 - Invariants I1–I10 have tests in CI.
-- Release artifacts are signed and attested and include THIRD_PARTY_LICENSES.
+- Release artifacts have SHA-256 checksums and GitHub build attestations, and include THIRD_PARTY_LICENSES.
 - Docs are complete enough for an IT team to deploy, operate and upgrade without the author.
 - LICENSE, CLA and FUNDING are in place; `LICENSING.md` has been reviewed by the owner (ideally a lawyer).

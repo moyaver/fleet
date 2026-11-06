@@ -5,54 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-11-06
+
 ### Added
 
 - Planner: the manifest records what an equal-count split of the same flows would have produced by the same estimates (`equalCountEstimatedSeconds`), so a plan can state its saving over that split (#81).
 - Dashboard: a pipeline with a Fleet plan shows each shard's planned and actual time (first flow start to last flow end) and the slowest shard's saving over an equal-count split (#81).
 - Server: with several instances on one database, a change committed through one instance reaches browsers on the others as a live delta (Postgres `NOTIFY`/`LISTEN`), not only after a resync (#34).
 - Agent: host samples carry the load average, CPU cores, swap and Linux pressure stall information (CPU, memory, I/O); screen C charts them and the worker page shows the core count, with "Not reported" for what an agent doesn't send (#42).
-
-### Fixed
-
-- Credential-bearing agent requests require TLS for remote hosts, and cleartext loopback traffic bypasses proxies. The sign-in callback preserves authenticated sessions.
-- Ingest checks device and shard ownership, contains invalid NUL characters, rolls back rejected event effects, and rejects events after `run.ended` within the same batch.
-- Agents reconnect silent sockets and replay spool records after disk-write failures. Live clients resnapshot missing changes, ignore superseded socket disconnects, and release idle ordering state.
-- Flow history uses repository-relative report identities when the workspace is known. Running flows without a device display stale provenance, and history scans have a supporting index.
-
-- Dashboard: the "Sign in" links were taken over by the client-side router and landed on "Page not found"; they now leave the single-page app (`rel="external"`) so the browser follows the redirect to the identity provider (found by the M4 exit tests).
-- Agent: the outbox kept every unacked event in memory, so a long run with no server (offline mode) or an unreachable one grew without bound (I10). The spool file is now the source of truth, read back into a small send window; when the 64 MiB spool (or the window, with no spool) is exhausted the agent stops storing event bodies and sequences a `journal.gap` instead (I5), and the spool starts over once everything in it is acked. `fleet-agent flush` streams the spool instead of loading it.
-- Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
-- `fleet-loadgen`: `wss://` servers panicked for want of a rustls crypto provider; it now installs ring, as the agent does.
-- Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).
-- Server: a worker's "Last seen" and the overview's 24-hour worker filter only moved when an agent connected, so a long-running worker looked stale; the periodic liveness persist now also refreshes the worker's `last_seen_at`.
-- Dashboard: history "Load more" could add a page fetched under the previous filter, or offer that filter's cursor until the new first page arrived; answers for an older filter are now dropped.
-- Dashboard: a failed or interrupted flow's Failures badge now updates when its provenance settles (it was keyed without provenance, so the row kept the old badge until reload).
-- Dashboard: Escape hides a tooltip without moving focus (WCAG 1.4.13); a `#L123` in the log's address scrolls to and highlights that line on load; a flow's screenshot and log links are retried after 5 s when a refresh fails for a transient reason, instead of staying expired until reload.
-- Agent: nested steps (`runFlow`, `retry`, `repeat`) were paired with the wrong start, so parent steps stayed running and their ends appeared as unnamed steps; each end now closes its own step, and a step whose end arrives after the flow's console result is no longer dropped (#62).
-- Agent: a transient write error to the CI log (a full non-blocking pipe, an interrupted flush) used to stop, or drop output from, Maestro's copy to the log. Output now reaches the log in full and in order: a slow log slows Maestro down (backpressure), and only a closed log stops the copy.
-- Agent: failure screenshots and screen hierarchies are journalled against the step Maestro's `commands.json` says produced them (`artifacts[]`), instead of a step guessed from the file name; the file name is only the fallback for output without `artifacts[]`, and a file still waiting for its `commands.json` at run end keeps that fallback (#76).
-- Dashboard: a failure screenshot links to the step Maestro's `artifacts[]` names, which the server now stores on the artifact (`step` in the artifact view, migration 0011); the file name is only the fallback for uploads without a stored step, and screenshots upload once their step is known (#76).
-- Agent: at finalize, a server that was still answering `hello` when Maestro exited got the 3-second budget of an unreachable one, and uploads could hold back the journal's tail; the journal's tail is now sent first, and a server that answered the upgrade gets the full flush budget (#90).
-- Server: flaky history no longer counts a failure whose message names a lost device (Maestro's `DeviceServerDiedException`) as flakiness, as ADR-0009 promises; such a run is excluded from the verdict (#72).
-- Server: a flow's failure groups scanned every flow execution (the stats query filtered the project only on failure fingerprints), so they now use the history index; the leader's blob collection also deletes objects that no `blobs` row records once past the blob grace period (orphans a crash leaves behind), hourly.
-
-### Changed
-
-- Suspected flakiness requires five eligible runs. I6 now specifies supported redaction sources and encodings, withholds resolved command fields, and documents binary evidence access controls.
-- Finalization uses a shorter flush budget when the server never answered the WebSocket upgrade during the run.
-
-- Relicensed from PolyForm Internal Use 1.0.0 to the GNU AGPL v3 (`AGPL-3.0-only`); a commercial license is available on request (ADR-0012).
-- Renamed the product to Fleet; the agent binary is `fleet-agent` (ADR-0011).
-
-### Added
-
 - Fleet Planner (ADR-0013): `fleet-planner plan` splits a Maestro suite into CI shards. It finds flows the way Maestro does (`config.yaml` globs, tags, `executionOrder`), balances shards Longest Processing Time first from Fleet history (or an even split without it), writes an immutable manifest and a GitHub Actions matrix, and publishes the plan. `fleet-agent run --plan` runs one shard with the plan's workspace config, and refuses an empty shard or a command that would select flows itself.
 - The agent falls back to HTTPS batch transport after repeated blocked WebSocket upgrades, with server-authoritative resume and telemetry acknowledgments.
 - Generated protocol JSON Schemas, golden wire frames and a CI freshness check.
 - A pinned Maestro nightly emulator workflow and a captured absolute-path regression fixture.
 - Agent: `cargo xtask bench-overhead` measures the agent's overhead (I10) by running the fake-Maestro suite with and without it, reporting the duration delta, the agent's CPU time and its peak memory.
 - Agent: the Maestro version comes from the session log's own version line, and is recorded once per run as `maestro.detected` (no extra `maestro --version` process). The server keeps it on the run and in the run's condition fingerprint; a version outside Fleet's profile is warned about on stderr and recorded with `profile_supported: false` (#73).
-
 - M5 exit: screen D shows a failed flow's evidence from the usercontent origin: the failure screenshot in the screenshot viewer (tied to the step named in its file name), the Maestro log in the log viewer opened at the failing step of that flow (the step tree moves it; "Jump to the failing step" returns), command timings from `commands.json`, a link to the Maestro HTML report that opens sandboxed on the usercontent origin, downloads, refused uploads with their reasons, and honest empty states (nothing uploaded, no usercontent origin). The dashboard's CSP allows exactly the configured usercontent origin in `img-src` and `connect-src`. `fleet-e2e` proves acceptance criteria 7, 8 and 9 and invariant I7 in a real browser with the real agent. The step tree now sets `aria-level`, `aria-posinset` and `aria-setsize` (they were being written as `attr:aria-level`). User guide: "Investigating a failure".
 - M5: retention (issue #45). The leader runs telemetry rollups (one-minute and one-hour, idempotent, late-data aware; unavailable readings stay unavailable), drops expired partitions of raw samples, the journal and steps (raw samples only once rolled up), deletes expired rollups and audit events, expires artifacts by retention class (failure evidence is promoted when its flow finalizes as failed; legal hold keeps an artifact), and deletes blob objects only when no artifact refers to them and after a grace period; leftover temp files of crashed local uploads are swept (`BlobStore::sweep_stale_uploads`). Migration 0009; `[retention]` server settings; operator guide section. The metrics endpoints serve ranges over 24 hours from the rollups.
 - M5: screens E and F of the dashboard (History and Compare): `GET /api/v1/projects/{project}/history` (filters by flow, branch, outcome and time, bounded to 90 days, cursor pages, failure and condition fingerprints, flaky v1 verdicts naming the runs behind them), `…/flows/{name}/stats` (settled counts, p50/p90 duration of passes, the latest durations, failures grouped by fingerprint) and `…/compare?a=&b=` (flow-by-flow outcomes with explanations drawn from the sides' evidence only); the `/history` and `/compare` pages with URL-synced filters and attempt pickers; `fleet-loadgen` can set the commit, ref, architecture and failure pattern of a run.
@@ -70,3 +36,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - M1: `cargo xtask fixtures capture | import`, 24 Maestro 2.12.1 fixtures, Phase 0 flows, research 08; ADR-0003 accepted.
 - M0 repository bootstrap: Cargo workspace skeleton, `cargo xtask` (setup, ci, lint, web), CI and CLA workflows,
   licensing and governance files, mdBook skeleton, and a Leptos hello page served by `fleet serve`.
+
+### Changed
+
+- Suspected flakiness requires five eligible runs. I6 now specifies supported redaction sources and encodings, withholds resolved command fields, and documents binary evidence access controls.
+- Finalization uses a shorter flush budget when the server never answered the WebSocket upgrade during the run.
+- Relicensed from PolyForm Internal Use 1.0.0 to the GNU AGPL v3 (`AGPL-3.0-only`); a commercial license is available on request (ADR-0012).
+- Renamed the product to Fleet; the agent binary is `fleet-agent` (ADR-0011).
+
+### Fixed
+
+- Credential-bearing agent requests require TLS for remote hosts, and cleartext loopback traffic bypasses proxies. The sign-in callback preserves authenticated sessions.
+- Ingest checks device and shard ownership, contains invalid NUL characters, rolls back rejected event effects, and rejects events after `run.ended` within the same batch.
+- Agents reconnect silent sockets and replay spool records after disk-write failures. Live clients resnapshot missing changes, ignore superseded socket disconnects, and release idle ordering state.
+- Flow history uses repository-relative report identities when the workspace is known. Running flows without a device display stale provenance, and history scans have a supporting index.
+- Dashboard: the "Sign in" links were taken over by the client-side router and landed on "Page not found"; they now leave the single-page app (`rel="external"`) so the browser follows the redirect to the identity provider (found by the M4 exit tests).
+- Agent: the outbox kept every unacked event in memory, so a long run with no server (offline mode) or an unreachable one grew without bound (I10). The spool file is now the source of truth, read back into a small send window; when the 64 MiB spool (or the window, with no spool) is exhausted the agent stops storing event bodies and sequences a `journal.gap` instead (I5), and the spool starts over once everything in it is acked. `fleet-agent flush` streams the spool instead of loading it.
+- Server: a new agent run opening while another run's batch in the same job was mid-transaction could deadlock in Postgres (attempt and job rows locked in opposite orders); the batch was retried and nothing was lost, but the agent reconnected. `open_run` no longer locks the attempt row (found by the Compose smoke test).
+- `fleet-loadgen`: `wss://` servers panicked for want of a rustls crypto provider; it now installs ring, as the agent does.
+- Agent: a late-starting observer could read a flow's console result before the log line that starts it and split one flow into two; it now catches up on the log before applying console output (found by the M3 end-to-end tests).
+- Server: a worker's "Last seen" and the overview's 24-hour worker filter only moved when an agent connected, so a long-running worker looked stale; the periodic liveness persist now also refreshes the worker's `last_seen_at`.
+- Dashboard: history "Load more" could add a page fetched under the previous filter, or offer that filter's cursor until the new first page arrived; answers for an older filter are now dropped.
+- Dashboard: a failed or interrupted flow's Failures badge now updates when its provenance settles (it was keyed without provenance, so the row kept the old badge until reload).
+- Dashboard: Escape hides a tooltip without moving focus (WCAG 1.4.13); a `#L123` in the log's address scrolls to and highlights that line on load; a flow's screenshot and log links are retried after 5 s when a refresh fails for a transient reason, instead of staying expired until reload.
+- Agent: nested steps (`runFlow`, `retry`, `repeat`) were paired with the wrong start, so parent steps stayed running and their ends appeared as unnamed steps; each end now closes its own step, and a step whose end arrives after the flow's console result is no longer dropped (#62).
+- Agent: a transient write error to the CI log (a full non-blocking pipe, an interrupted flush) used to stop, or drop output from, Maestro's copy to the log. Output now reaches the log in full and in order: a slow log slows Maestro down (backpressure), and only a closed log stops the copy.
+- Agent: failure screenshots and screen hierarchies are journalled against the step Maestro's `commands.json` says produced them (`artifacts[]`), instead of a step guessed from the file name; the file name is only the fallback for output without `artifacts[]`, and a file still waiting for its `commands.json` at run end keeps that fallback (#76).
+- Dashboard: a failure screenshot links to the step Maestro's `artifacts[]` names, which the server now stores on the artifact (`step` in the artifact view, migration 0011); the file name is only the fallback for uploads without a stored step, and screenshots upload once their step is known (#76).
+- Agent: at finalize, a server that was still answering `hello` when Maestro exited got the 3-second budget of an unreachable one, and uploads could hold back the journal's tail; the journal's tail is now sent first, and a server that answered the upgrade gets the full flush budget (#90).
+- Server: flaky history no longer counts a failure whose message names a lost device (Maestro's `DeviceServerDiedException`) as flakiness, as ADR-0009 promises; such a run is excluded from the verdict (#72).
+- Server: a flow's failure groups scanned every flow execution (the stats query filtered the project only on failure fingerprints), so they now use the history index; the leader's blob collection also deletes objects that no `blobs` row records once past the blob grace period (orphans a crash leaves behind), hourly.

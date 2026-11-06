@@ -2,11 +2,17 @@
 
 ## Install
 
+This installs the alpha pre-release `v0.1.0-alpha.1` (pinned, because `latest` skips pre-releases):
+
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/latest/download/fleet-agent-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.1/fleet-agent-installer.sh | sh
 ```
 
-Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum, a GitHub artifact attestation, the license and the third-party notices.
+Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum (also listed in `sha256.sum`), a GitHub artifact attestation, the license and the third-party notices. To verify a downloaded archive with the [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
+```
 
 ## Check the setup
 
