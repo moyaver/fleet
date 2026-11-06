@@ -36,6 +36,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "A plan.",
   "properties": {
+    "configPath": {
+      "description": "The workspace `config.yaml`, relative to the repository root. The agent passes it to\nMaestro with `--config`, so `executionOrder` and tag rules still apply to the shard's flows.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "configSha256": {
+      "description": "SHA-256 of `config_path` at planning time; the agent refuses to run if it changed.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "planId": {
       "description": "Stable identifier, unique per project.",
       "type": "string"
