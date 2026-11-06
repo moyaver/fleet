@@ -1,0 +1,34 @@
+{
+  "maestro": "2.12.1",
+  "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
+  "device": {
+    "avd": "fleet-fixtures-77",
+    "serial": "emulator-5582",
+    "system_image": "system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a",
+    "api_level": "37.1",
+    "build": "CP31.260623.012 dev-keys",
+    "fingerprint": "google/sdk_gphone16k_arm64/emu64a16k:17/CP31.260623.012/16064790:user/dev-keys",
+    "sdk_int": "37",
+    "release": "17",
+    "abi": "arm64-v8a",
+    "model": "sdk_gphone16k_arm64",
+    "egl": "emulation"
+  },
+  "emulator": {
+    "version": "36.6.11.0",
+    "launch": "emulator -avd fleet-fixtures-77 -port 5582 -no-window -no-snapshot -no-audio -no-boot-anim -no-metrics -memory 4096 -cores 4",
+    "config_ini": {
+      "hw.gpu.enabled": "yes",
+      "hw.gpu.mode": "auto",
+      "hw.lcd.width": "1080",
+      "hw.lcd.height": "2424",
+      "hw.lcd.density": "420",
+      "hw.ramSize": "3072"
+    },
+    "avd_home": "temporary directory, deleted after capture"
+  },
+  "host": {
+    "os": "macOS 26 (Darwin 25.6.0)",
+    "arch": "arm64"
+  }
+}

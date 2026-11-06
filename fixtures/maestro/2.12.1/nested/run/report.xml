@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet-fixtures-77" tests="1" failures="0" time="35.426" timestamp="2026-11-07T01:48:35">
+    <testcase id="nested" name="nested" classname="nested" file="examples/flows/phase0/nested.yaml" time="35.402" timestamp="2026-11-07T01:48:35" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

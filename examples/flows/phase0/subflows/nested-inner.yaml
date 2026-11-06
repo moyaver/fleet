@@ -1,0 +1,7 @@
+appId: com.android.settings
+---
+- assertVisible: "Network & internet"
+- tapOn: "Apps"
+- assertVisible: "Apps"
+- back
+- assertVisible: "Network & internet"

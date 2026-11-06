@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet-fixtures-77" tests="1" failures="0" time="6.249" timestamp="2026-11-07T01:36:58">
+    <testcase id="screenshot" name="screenshot" classname="screenshot" file="examples/flows/phase0/screenshot.yaml" time="6.236" timestamp="2026-11-07T01:36:58" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

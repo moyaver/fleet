@@ -1,0 +1,33 @@
+{
+  "command": [
+    "sh",
+    "-c",
+    "(until [ -n \"$(<HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5582 shell pidof com.android.settings | tr -d \"\\r\")\" ]; do sleep 0.5; done; sleep 4; <HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5582 shell am crash com.android.settings) >/dev/null 2>&1 & exec maestro --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/crash.yaml"
+  ],
+  "default_env": [
+    {
+      "name": "MAESTRO_CLI_NO_ANALYTICS",
+      "value": "1"
+    },
+    {
+      "name": "MAESTRO_DISABLE_UPDATE_CHECK",
+      "value": "true"
+    },
+    {
+      "name": "MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED",
+      "value": "true"
+    }
+  ],
+  "env": [
+    {
+      "name": "MAESTRO_CLI_LOG_PATTERN_FILE",
+      "value": "MFLT1|%d{UNIX_MILLIS}|%t|%level|%logger|%enc{%msg}{CRLF}%n"
+    }
+  ],
+  "host": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "signal": null,
+  "started_at_unix_ms": 1794008473385
+}

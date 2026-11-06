@@ -1,0 +1,9 @@
+appId: com.android.settings
+name: recording
+---
+- launchApp
+- startRecording: fleet-recording
+- tapOn: "Apps"
+- assertVisible: "Apps"
+- back
+- stopRecording
