@@ -63,8 +63,12 @@ pub(crate) struct Options {
 const CHUNK: usize = 64 * 1024;
 /// Bounded copy queue to the observer, in chunks (~16 MiB at most).
 const QUEUE: usize = 256;
-/// After the child exits, how long to keep draining pipes that a grandchild may hold open.
+/// After the child exits, how long a pump may sit idle before the exit stops waiting for it (see
+/// [`drain`]).
 const DRAIN_AFTER_EXIT: Duration = Duration::from_secs(2);
+/// After the child exits, the longest the exit waits for any pump that still reads, however much
+/// output a grandchild keeps writing. A chunk already held for the CI log always finishes.
+const DRAIN_CEILING: Duration = Duration::from_secs(10);
 
 /// Runs `command` under supervision and returns how the supervisor must end.
 #[must_use]
@@ -167,16 +171,10 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
 
     let status = wait(&mut child);
     exited.store(true, Ordering::SeqCst);
-    let deadline = Instant::now() + DRAIN_AFTER_EXIT;
-    for pump in pumps.into_iter().flatten() {
-        // A grandchild can keep the pipe open; don't let that hold up the exit.
-        while !pump.is_finished() && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(10));
-        }
-    }
+    drain(pumps.into_iter().flatten().collect());
 
     let outcome = outcome(status);
-    // Read after the pumps stop. A pump still held open by a grandchild past the drain deadline
+    // Read after the pumps stop. A pump that `drain` left behind (idle, held open by a grandchild)
     // may drop more later; those bytes are not part of the run's total.
     let dropped = dropped_total.load(Ordering::SeqCst);
     finish_observer(observer.as_mut(), outcome, dropped, opts, &warnings);
@@ -292,6 +290,18 @@ fn spawn_signal_thread(
     });
 }
 
+/// What the supervisor reads from a pump to tell whether it is still busy after Maestro exits.
+#[derive(Default)]
+struct PumpProgress {
+    /// Bumped each time the pump reads a chunk from the child's pipe.
+    reads: AtomicU64,
+    /// True while a chunk read from the pipe is still waiting for the CI log to accept it.
+    pending: AtomicBool,
+}
+
+/// A pump thread and what it reports, as [`drain`] takes them.
+type Pump = (thread::JoinHandle<()>, Arc<PumpProgress>);
+
 /// Copies one child stream to our own stream, byte for byte, then offers a copy to the observer.
 fn spawn_pump(
     child: &mut Child,
@@ -299,12 +309,14 @@ fn spawn_pump(
     observer: Option<SyncSender<Frame>>,
     last_byte: Option<Arc<Mutex<u8>>>,
     dropped_total: Arc<AtomicU64>,
-) -> Option<thread::JoinHandle<()>> {
+) -> Option<Pump> {
     let source: Box<dyn Read + Send> = match stream {
         Stream::Stdout => Box::new(child.stdout.take()?),
         Stream::Stderr => Box::new(child.stderr.take()?),
     };
-    Some(thread::spawn(move || match stream {
+    let progress = Arc::new(PumpProgress::default());
+    let thread_progress = Arc::clone(&progress);
+    let handle = thread::spawn(move || match stream {
         Stream::Stdout => pump(
             source,
             io::stdout(),
@@ -312,6 +324,7 @@ fn spawn_pump(
             observer.as_ref(),
             last_byte.as_deref(),
             &dropped_total,
+            &thread_progress,
         ),
         Stream::Stderr => pump(
             source,
@@ -320,8 +333,44 @@ fn spawn_pump(
             observer.as_ref(),
             last_byte.as_deref(),
             &dropped_total,
+            &thread_progress,
         ),
-    }))
+    });
+    Some((handle, progress))
+}
+
+/// Waits for the pumps after Maestro exits. A pump is given up once it holds no chunk for the CI
+/// log and either has been idle for [`DRAIN_AFTER_EXIT`] or [`DRAIN_CEILING`] has passed since the
+/// exit; a chunk the log is still taking always finishes first, so no byte is cut mid-write.
+///
+/// A pump is busy while it reads from the child's pipe or holds a chunk the CI log has not
+/// accepted yet, so a slow log is waited for and nothing Maestro wrote is lost (I1). Idle is a
+/// grandchild holding the pipe open with no output (#27). Its thread is left behind, so the exit is
+/// not held up. Reads from a grandchild that keeps writing stop extending the wait at the ceiling.
+fn drain(pumps: Vec<Pump>) {
+    // Per pump: the thread, its progress, the read count last seen, and when it was last busy.
+    let start = Instant::now();
+    let mut watch: Vec<(thread::JoinHandle<()>, Arc<PumpProgress>, u64, Instant)> = pumps
+        .into_iter()
+        .map(|(handle, progress)| (handle, progress, 0, start))
+        .collect();
+    while !watch.is_empty() {
+        let now = Instant::now();
+        let past_ceiling = now.duration_since(start) >= DRAIN_CEILING;
+        watch.retain_mut(|(handle, progress, reads_seen, busy_at)| {
+            if handle.is_finished() {
+                return false;
+            }
+            let reads = progress.reads.load(Ordering::SeqCst);
+            let pending = progress.pending.load(Ordering::SeqCst);
+            if pending || (reads != *reads_seen && !past_ceiling) {
+                *busy_at = now;
+            }
+            *reads_seen = reads;
+            pending || (!past_ceiling && now.duration_since(*busy_at) < DRAIN_AFTER_EXIT)
+        });
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 /// Writes every chunk to `sink` (flushed, so partial lines appear at once), then offers a copy.
@@ -336,6 +385,7 @@ fn pump(
     observer: Option<&SyncSender<Frame>>,
     last_byte: Option<&Mutex<u8>>,
     dropped_total: &AtomicU64,
+    progress: &PumpProgress,
 ) {
     let mut buf = vec![0u8; CHUNK];
     let mut sink_ok = true;
@@ -347,10 +397,13 @@ fn pump(
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(_) => return,
         };
+        progress.reads.fetch_add(1, Ordering::SeqCst);
         let chunk = &buf[..n];
         if sink_ok {
             // A closed CI log (EPIPE) must not stop us draining, or Maestro would block.
+            progress.pending.store(true, Ordering::SeqCst);
             sink_ok = write_through(&mut sink, chunk).is_ok();
+            progress.pending.store(false, Ordering::SeqCst);
         }
         if let Some(lock) = last_byte
             && let Ok(mut b) = lock.lock()
@@ -390,8 +443,8 @@ fn pump(
 /// retried at once, and `WouldBlock` (a full non-blocking pipe) is retried until the log accepts
 /// the bytes. Any other error means the log is closed or broken, and it is returned as `Err`: the
 /// pump then stops writing to that log but keeps draining Maestro's pipe, so Maestro never blocks
-/// on a dead log. The only output lost is what is still unwritten when the bounded shutdown wait
-/// after Maestro's exit expires (`DRAIN_AFTER_EXIT`, 2 s).
+/// on a dead log. Nothing is lost at the exit either: [`drain`] waits for a pump that still holds
+/// a chunk for the log.
 fn write_through(sink: &mut impl Write, chunk: &[u8]) -> io::Result<()> {
     let mut rest = chunk;
     while !rest.is_empty() {
@@ -686,6 +739,7 @@ mod tests {
             Some(&tx),
             None,
             &AtomicU64::new(0),
+            &PumpProgress::default(),
         );
         assert_eq!(
             sink, data,
@@ -711,6 +765,7 @@ mod tests {
             Some(&tx),
             None,
             &total,
+            &PumpProgress::default(),
         );
         drop(tx);
         let frames: Vec<Frame> = rx.into_iter().collect();
@@ -739,6 +794,7 @@ mod tests {
             Some(&tx),
             None,
             &AtomicU64::new(0),
+            &PumpProgress::default(),
         );
         drop(tx);
         let frames = reader.join().unwrap();
@@ -862,6 +918,7 @@ mod tests {
             None,
             None,
             &AtomicU64::new(0),
+            &PumpProgress::default(),
         );
         assert_eq!(log.written, data, "every byte reaches the log, in order");
     }
@@ -878,6 +935,7 @@ mod tests {
             Some(&tx),
             None,
             &AtomicU64::new(0),
+            &PumpProgress::default(),
         );
         drop(tx);
         assert_eq!(
@@ -910,9 +968,70 @@ mod tests {
             None,
             None,
             &AtomicU64::new(0),
+            &PumpProgress::default(),
         );
         assert!(started.elapsed() >= stall, "the pump waited for the log");
         assert_eq!(log.written, data, "every byte reaches the log, in order");
+    }
+
+    /// A log that refuses every write with `WouldBlock` until `open_at`, then keeps what it takes.
+    struct StalledLog {
+        open_at: Instant,
+        written: Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl Write for StalledLog {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if Instant::now() < self.open_at {
+                return Err(io::ErrorKind::WouldBlock.into());
+            }
+            self.written
+                .lock()
+                .expect("the test log is not poisoned")
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn drain_waits_for_a_log_that_is_backed_up_when_maestro_exits() {
+        // The log stalls for longer than DRAIN_AFTER_EXIT, so the pump still holds a chunk when
+        // Maestro exits. The drain must not give up on it: the whole output is in the log when the
+        // drain returns.
+        let data: Vec<u8> = (0..CHUNK * 2)
+            .map(|i| u8::try_from(i % 251).expect("below 251"))
+            .collect();
+        let expected = data.clone();
+        let written = Arc::new(Mutex::new(Vec::new()));
+        let log = StalledLog {
+            open_at: Instant::now() + Duration::from_secs(3),
+            written: Arc::clone(&written),
+        };
+        let progress = Arc::new(PumpProgress::default());
+        let pump_progress = Arc::clone(&progress);
+        let handle = thread::spawn(move || {
+            pump(
+                data.as_slice(),
+                log,
+                Stream::Stdout,
+                None,
+                None,
+                &AtomicU64::new(0),
+                &pump_progress,
+            );
+        });
+        drain(vec![(handle, progress)]);
+        let written = written.lock().expect("the test log is not poisoned");
+        assert_eq!(
+            written.len(),
+            expected.len(),
+            "the log has every byte when the drain returns"
+        );
+        assert!(*written == expected, "every byte reaches the log in order");
     }
 
     #[test]

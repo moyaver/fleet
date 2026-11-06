@@ -203,6 +203,48 @@ fn a_grandchild_holding_the_pipe_does_not_delay_the_exit() {
     thread::sleep(Duration::from_millis(10));
 }
 
+#[test]
+fn a_grandchild_that_keeps_writing_does_not_hold_the_exit_past_the_ceiling() {
+    // Maestro prints 2000 numbered lines and exits, while a grandchild holding the pipe prints
+    // `tick` every 100 ms for about 20 s, longer than the 10 s drain ceiling. The exit must come
+    // within the ceiling plus slack, and Maestro's own lines must all be there.
+    let script = "(i=0; while [ $i -lt 200 ]; do echo tick; sleep 0.1; i=$((i+1)); done) & seq 1 2000; exit 0";
+    let mut child = agent()
+        .args(["run", "--no-observer", "--", "sh", "-c", script])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut stdout = child.stdout.take().unwrap();
+    let reader = thread::spawn(move || {
+        let mut out = Vec::new();
+        std::io::Read::read_to_end(&mut stdout, &mut out).unwrap();
+        out
+    });
+    let t = Instant::now();
+    let status = child.wait().unwrap();
+    let took = t.elapsed();
+    let out = String::from_utf8_lossy(&reader.join().unwrap()).into_owned();
+    assert_eq!(status.code(), Some(0));
+    assert!(
+        took < Duration::from_secs(13),
+        "the exit waited {took:?} for a grandchild that keeps writing"
+    );
+    // Each tick is one whole write, so removing them leaves exactly Maestro's bytes.
+    let maestro = out.replace("tick\n", "");
+    let expected: String = (1..=2000)
+        .map(|n| format!("{n}\n"))
+        .collect::<Vec<_>>()
+        .concat();
+    assert!(
+        maestro == expected,
+        "Maestro's output: {} of {} bytes",
+        maestro.len(),
+        expected.len()
+    );
+}
+
 /// Runs the agent with its stdout and stderr on non-blocking pipes that slow consumers read, so a
 /// full pipe reports `WouldBlock`, as an inherited CI log that fell behind does.
 fn run_with_slow_readers(script: &str) -> (std::process::ExitStatus, Vec<u8>, Vec<u8>) {
