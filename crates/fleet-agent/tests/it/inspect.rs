@@ -120,3 +120,105 @@ fn status_of<'a>(
         .map(|(_, status)| status.as_str())
         .collect()
 }
+
+/// A failure screenshot and screen hierarchy attach to the step Maestro's `commands.json` says
+/// produced them (`artifacts[]`), so the index is the step's, not one guessed from the file name.
+#[test]
+fn failure_files_attach_to_the_step_that_produced_them() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");
+
+    // `fail`: the failing assertion is command 4, the fifth step (index 4).
+    let (_, events) = fleet_agent::inspect::inspect(&root.join("fail")).unwrap();
+    let steps = paired_steps("fail", &events);
+    assert_eq!(
+        status_of(&steps, "Assert that \"Fleet never shows this\""),
+        ["failed"]
+    );
+    assert_eq!(
+        artifact_steps(&events),
+        [
+            (
+                "screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json",
+                Some(4)
+            ),
+            (
+                "screenshots/step-005-assertCondition-Fleet_never_shows_this.png",
+                Some(4)
+            ),
+        ]
+    );
+    assert!(
+        steps[&4]
+            .0
+            .starts_with("Assert that \"Fleet never shows this\"")
+    );
+
+    // `retry-fail`: the retry itself (index 3) produced `step-004-retry.png`, and each failed
+    // attempt inside it (indices 4 and 5) produced its own files.
+    let (_, events) = fleet_agent::inspect::inspect(&root.join("retry-fail")).unwrap();
+    let steps = paired_steps("retry-fail", &events);
+    assert_eq!(
+        artifact_steps(&events),
+        [
+            (
+                "screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json",
+                Some(4)
+            ),
+            (
+                "screen-hierarchy/step-006-assertCondition-Fleet_never_shows_this.json",
+                Some(5)
+            ),
+            ("screenshots/step-004-retry.png", Some(3)),
+            (
+                "screenshots/step-005-assertCondition-Fleet_never_shows_this.png",
+                Some(4)
+            ),
+            (
+                "screenshots/step-006-assertCondition-Fleet_never_shows_this.png",
+                Some(5)
+            ),
+        ]
+    );
+    assert_eq!(steps[&3].0, "Retry 1 times");
+    assert_eq!(steps[&3].1, "failed");
+
+    // `features` warns at command 17; the skipped runFlow after it is command 18, so the warning's
+    // screenshot is still step 17.
+    let (_, events) = fleet_agent::inspect::inspect(&root.join("features")).unwrap();
+    let steps = paired_steps("features", &events);
+    assert_eq!(
+        artifact_steps(&events),
+        [
+            (
+                "screen-hierarchy/step-018-assertCondition-Fleet_optional_marker.json",
+                Some(17)
+            ),
+            (
+                "screenshots/step-018-assertCondition-Fleet_optional_marker.png",
+                Some(17)
+            ),
+        ]
+    );
+    assert!(
+        steps[&17]
+            .0
+            .starts_with("Assert that (Optional) \"Fleet optional marker\"")
+    );
+    assert_eq!(steps[&17].1, "warned");
+}
+
+/// Each `artifact.registered` as `(path, step index)`, sorted by path, with the path reduced to
+/// the flow folder's relative path.
+fn artifact_steps(events: &[fleet_protocol::journal::EventEnvelope]) -> Vec<(&str, Option<u32>)> {
+    let mut found: Vec<_> = events
+        .iter()
+        .filter(|e| e.kind == "artifact.registered")
+        .map(|e| {
+            let path = e.data["path"].as_str().unwrap_or_default();
+            let path = path.split_once('/').map_or(path, |(_, rest)| rest);
+            (path, e.subject.step.as_ref().map(|s| s.index))
+        })
+        .collect();
+    found.sort();
+    found
+}

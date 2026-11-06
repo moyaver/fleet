@@ -5,6 +5,8 @@
 //! fails; `commands.json` and then `manifest.json` when it ends. `commands.json` is not final on
 //! abnormal ends: empty after SIGTERM, `RUNNING` entries left after a device loss.
 
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 
 /// What a path inside the debug output directory is.
@@ -110,6 +112,10 @@ pub struct CommandRecord {
     pub timestamp_ms: Option<u64>,
     /// Duration in milliseconds.
     pub duration_ms: Option<u64>,
+    /// Flow-folder-relative paths of the files this command produced (`artifacts[].path`, for
+    /// example `screenshots/step-005-….png`). `None` when the command carries no `artifacts[]`
+    /// key at all.
+    pub artifacts: Option<Vec<String>>,
 }
 
 /// What a `commands.json` says.
@@ -148,6 +154,12 @@ struct RawMetadata {
     duration: Option<u64>,
     sequence_number: u32,
     depth: u32,
+    artifacts: Option<Vec<RawArtifact>>,
+}
+
+#[derive(Deserialize)]
+struct RawArtifact {
+    path: String,
 }
 
 /// Parses a `commands.json` file's bytes.
@@ -167,6 +179,10 @@ pub fn parse_commands(bytes: &[u8]) -> Commands {
             status: c.metadata.status,
             timestamp_ms: c.metadata.timestamp,
             duration_ms: c.metadata.duration,
+            artifacts: c
+                .metadata
+                .artifacts
+                .map(|a| a.into_iter().map(|a| a.path).collect()),
         })
         .collect();
     let is = |set: &[&str], r: &CommandRecord| set.contains(&r.status.as_str());
@@ -179,6 +195,23 @@ pub fn parse_commands(bytes: &[u8]) -> Commands {
     } else {
         Commands::Unverified(records)
     }
+}
+
+/// Which command produced each file of a flow folder, from `commands.json`'s `artifacts[]`: the
+/// flow-relative path mapped to the producing command's sequence number. `None` when no command
+/// carries `artifacts[]` (older Maestro output), so a file name is the only link to a step.
+#[must_use]
+pub fn produced_files(records: &[CommandRecord]) -> Option<BTreeMap<String, u32>> {
+    if records.iter().all(|r| r.artifacts.is_none()) {
+        return None;
+    }
+    let mut files = BTreeMap::new();
+    for r in records {
+        for path in r.artifacts.iter().flatten() {
+            files.insert(path.clone(), r.sequence);
+        }
+    }
+    Some(files)
 }
 
 #[cfg(test)]
@@ -267,5 +300,67 @@ mod tests {
         let cut = br#"[{"metadata":{"status":"ERROR","sequenceNumber":0,"depth":0}},
             {"metadata":{"status":"RUNNING","sequenceNumber":1,"depth":0}}]"#;
         assert!(matches!(parse_commands(cut), Commands::Aborted(_)));
+    }
+
+    /// The records of a fixture's `commands.json`, whatever its state.
+    fn records(bytes: &[u8]) -> Vec<CommandRecord> {
+        match parse_commands(bytes) {
+            Commands::Final(v) | Commands::Aborted(v) | Commands::Unverified(v) => v,
+            other => panic!("not a commands file: {other:?}"),
+        }
+    }
+
+    /// `artifacts[]` names the step that produced each file, so the link never depends on a name.
+    #[test]
+    fn produced_files_follow_artifacts_fixtures() {
+        let fail = records(include_bytes!(
+            "../../../fixtures/maestro/2.12.1/fail/run/debug/fail/commands.json"
+        ));
+        assert_eq!(
+            produced_files(&fail),
+            Some(BTreeMap::from([
+                (
+                    "screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json".into(),
+                    4
+                ),
+                (
+                    "screenshots/step-005-assertCondition-Fleet_never_shows_this.png".into(),
+                    4
+                ),
+            ]))
+        );
+
+        // A retry's own screenshot belongs to the retry (3), each failed attempt to itself (4, 5).
+        let retry = records(include_bytes!(
+            "../../../fixtures/maestro/2.12.1/retry-fail/run/debug/retry-fail/commands.json"
+        ));
+        assert_eq!(
+            produced_files(&retry),
+            Some(BTreeMap::from([
+                ("screenshots/step-004-retry.png".into(), 3),
+                (
+                    "screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json".into(),
+                    4
+                ),
+                (
+                    "screenshots/step-005-assertCondition-Fleet_never_shows_this.png".into(),
+                    4
+                ),
+                (
+                    "screen-hierarchy/step-006-assertCondition-Fleet_never_shows_this.json".into(),
+                    5
+                ),
+                (
+                    "screenshots/step-006-assertCondition-Fleet_never_shows_this.png".into(),
+                    5
+                ),
+            ]))
+        );
+
+        // A passing flow lists no artifacts at all: older output, so names are the link.
+        let pass = records(include_bytes!(
+            "../../../fixtures/maestro/2.12.1/pass/run/debug/pass/commands.json"
+        ));
+        assert_eq!(produced_files(&pass), None);
     }
 }

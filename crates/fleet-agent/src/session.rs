@@ -76,6 +76,51 @@ pub(crate) struct Flow {
     /// A fully terminal, failure-free `commands.json` waiting for the manifest before it may
     /// claim `passed` (I3).
     pending_pass: Option<String>,
+    /// Which step produced each of the flow's files, once its `commands.json` has commands.
+    produced: Produced,
+    /// Step-bound files seen before `produced` was known: their step waits for it.
+    pending_files: Vec<PendingFile>,
+}
+
+/// Which step produced a flow's files, as its `commands.json` says.
+#[derive(Debug, Clone, Default)]
+enum Produced {
+    /// No `commands.json` with commands yet: a file's step waits for it.
+    #[default]
+    Unknown,
+    /// `artifacts[]` is there: flow-relative path to the producing command's sequence number.
+    Listed(std::collections::BTreeMap<String, u32>),
+    /// Older output without `artifacts[]`: the `step-NNN-…` file name is the only link.
+    FromFileNames,
+}
+
+impl Produced {
+    /// The step a file of the flow belongs to (`named` is the step its file name gives, 0-based).
+    /// A file `artifacts[]` does not list has none. Not called while [`Produced::Unknown`].
+    ///
+    /// A step index is the command's sequence number: Maestro numbers commands in the order it
+    /// starts them and logs one step per command, so the two match (the inspect tests check this on
+    /// the captured fixtures).
+    fn step_of(&self, rel: &str, named: Option<u32>) -> Option<u32> {
+        // `rel` starts with the flow folder; `artifacts[]` paths are relative to it.
+        let in_flow = rel.split_once('/').map_or(rel, |(_, rest)| rest);
+        match self {
+            Produced::Unknown => None,
+            Produced::Listed(files) => files.get(in_flow).copied(),
+            Produced::FromFileNames => named,
+        }
+    }
+}
+
+/// A failure screenshot or hierarchy waiting for its flow's `commands.json`.
+#[derive(Debug, Clone)]
+struct PendingFile {
+    at: ClockSample,
+    class: &'static str,
+    /// Path relative to the debug output directory.
+    rel: String,
+    /// The 0-based step its file name gives.
+    named: Option<u32>,
 }
 
 impl Flow {
@@ -306,6 +351,13 @@ impl Session {
 
     /// Ends the run: open flows of a finished suite get their final finality.
     pub(crate) fn end(&mut self, at: ClockSample, output_bytes_dropped: u64) {
+        // Files still waiting (no `commands.json` with commands came) keep the file-name link.
+        for idx in 0..self.flows.len() {
+            let pending = std::mem::take(&mut self.flows[idx].pending_files);
+            for p in pending {
+                self.register_file(p.at, idx, p.class, &p.rel, p.named);
+            }
+        }
         self.closed = true;
         self.emit(
             at,
@@ -581,8 +633,8 @@ impl Session {
                     );
                 }
             }
-            bundle::Entry::StepScreenshot { flow_dir, .. }
-            | bundle::Entry::StepHierarchy { flow_dir, .. } => {
+            bundle::Entry::StepScreenshot { flow_dir, step }
+            | bundle::Entry::StepHierarchy { flow_dir, step } => {
                 let (name, shard) = bundle::split_shard_suffix(&flow_dir);
                 let class = if rel.contains("/screenshots/") {
                     "failure_screenshot"
@@ -590,7 +642,6 @@ impl Session {
                     "failure_hierarchy"
                 };
                 if let Some(idx) = self.find_flow(shard.unwrap_or(1), name) {
-                    let subject = self.flow_subject_at(idx);
                     if class == "failure_screenshot" {
                         let flow = self.flows.get(idx).map(|f| f.id);
                         self.uploads.push(Candidate {
@@ -599,16 +650,22 @@ impl Session {
                             flow,
                         });
                     }
-                    self.emit(
-                        at,
-                        subject,
-                        SourceKind::AgentObserved,
-                        None,
-                        &EventBody::ArtifactRegistered(ArtifactRegistered {
-                            class: class.into(),
-                            path: rel.to_owned(),
-                        }),
-                    );
+                    let named = step.checked_sub(1);
+                    match self.flows.get_mut(idx) {
+                        Some(f) if matches!(f.produced, Produced::Unknown) => {
+                            f.pending_files.push(PendingFile {
+                                at,
+                                class,
+                                rel: rel.to_owned(),
+                                named,
+                            });
+                        }
+                        Some(f) => {
+                            let step = f.produced.step_of(rel, named);
+                            self.register_file(at, idx, class, rel, step);
+                        }
+                        None => {}
+                    }
                 }
             }
             bundle::Entry::FlowDir { .. } | bundle::Entry::Other => {}
@@ -617,7 +674,14 @@ impl Session {
 
     /// Turns a flow's `commands.json` into a claim or a warning (fail closed, I3).
     fn on_commands(&mut self, at: ClockSample, rel: &str, idx: usize, bytes: &[u8]) {
-        match bundle::parse_commands(bytes) {
+        let parsed = bundle::parse_commands(bytes);
+        if let bundle::Commands::Final(cmds)
+        | bundle::Commands::Aborted(cmds)
+        | bundle::Commands::Unverified(cmds) = &parsed
+        {
+            self.learn_produced(idx, cmds);
+        }
+        match parsed {
             bundle::Commands::Final(cmds) => {
                 let failed = cmds.iter().any(|c| c.depth == 0 && c.status == "FAILED");
                 let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
@@ -672,6 +736,49 @@ impl Session {
                 );
             }
         }
+    }
+
+    /// Records which step produced each of a flow's files, then attaches the files that waited for
+    /// it. A file `artifacts[]` does not list gets no step (I3: nothing is guessed).
+    fn learn_produced(&mut self, idx: usize, cmds: &[bundle::CommandRecord]) {
+        let Some(f) = self.flows.get_mut(idx) else {
+            return;
+        };
+        f.produced = match bundle::produced_files(cmds) {
+            Some(files) => Produced::Listed(files),
+            None => Produced::FromFileNames,
+        };
+        let pending = std::mem::take(&mut f.pending_files);
+        for p in pending {
+            let step = self
+                .flows
+                .get(idx)
+                .and_then(|f| f.produced.step_of(&p.rel, p.named));
+            self.register_file(p.at, idx, p.class, &p.rel, step);
+        }
+    }
+
+    /// Journals a failure screenshot or hierarchy, against the step that produced it when known.
+    fn register_file(
+        &mut self,
+        at: ClockSample,
+        idx: usize,
+        class: &str,
+        rel: &str,
+        step: Option<u32>,
+    ) {
+        let mut subject = self.flow_subject_at(idx);
+        subject.step = step.map(|index| StepRef { index });
+        self.emit(
+            at,
+            subject,
+            SourceKind::AgentObserved,
+            None,
+            &EventBody::ArtifactRegistered(ArtifactRegistered {
+                class: class.into(),
+                path: rel.to_owned(),
+            }),
+        );
     }
 
     fn on_exit(
@@ -971,6 +1078,8 @@ impl Session {
             failure: None,
             manifest_seen: false,
             pending_pass: None,
+            produced: Produced::Unknown,
+            pending_files: Vec::new(),
         });
         self.flows.len() - 1
     }
@@ -1290,6 +1399,94 @@ mod tests {
                 .iter()
                 .all(|e| e.subject.flow_execution_id != Some(b) || e.subject.step.is_none()),
             "B got a step: {events:?}"
+        );
+    }
+
+    /// A failed command 2 whose `artifacts[]` names a screenshot the file name would call step 4.
+    const LISTED: &[u8] = br#"[{"metadata":{"status":"COMPLETED","sequenceNumber":0,"depth":0}},
+        {"metadata":{"status":"COMPLETED","sequenceNumber":1,"depth":0}},
+        {"metadata":{"status":"FAILED","sequenceNumber":2,"depth":0,
+          "artifacts":[{"type":"SCREENSHOT","path":"screenshots/step-004-odd.png"}]}}]"#;
+
+    /// Each `artifact.registered` of the session as `(file, step index)`.
+    fn registered(s: &mut Session) -> Vec<(String, Option<u32>)> {
+        s.drain()
+            .into_iter()
+            .filter(|e| e.kind == "artifact.registered")
+            .map(|e| {
+                (
+                    e.data["path"].as_str().unwrap_or_default().to_owned(),
+                    e.subject.step.map(|r| r.index),
+                )
+            })
+            .collect()
+    }
+
+    /// `artifacts[]` names the step, whichever of the file or `commands.json` is seen first.
+    #[test]
+    fn a_failure_file_attaches_to_the_command_that_produced_it() {
+        let mut s = session();
+        file(&mut s, "pass/screenshots/step-004-odd.png", None);
+        assert!(registered(&mut s).is_empty(), "waits for the step");
+        file(&mut s, "pass/commands.json", Some(LISTED));
+        assert_eq!(
+            registered(&mut s),
+            [("pass/screenshots/step-004-odd.png".to_owned(), Some(2))]
+        );
+
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(LISTED));
+        file(&mut s, "pass/screenshots/step-004-odd.png", None);
+        assert_eq!(
+            registered(&mut s),
+            [("pass/screenshots/step-004-odd.png".to_owned(), Some(2))]
+        );
+    }
+
+    /// A file `artifacts[]` does not list is not guessed onto a step (I3).
+    #[test]
+    fn an_unlisted_file_gets_no_step() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(LISTED));
+        file(&mut s, "pass/screenshots/step-003-other.png", None);
+        assert_eq!(
+            registered(&mut s),
+            [("pass/screenshots/step-003-other.png".to_owned(), None)]
+        );
+    }
+
+    /// Older output without `artifacts[]` links a file to its step by name.
+    #[test]
+    fn older_output_links_a_file_by_its_name() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(GOOD));
+        file(&mut s, "pass/screenshots/step-003-x.png", None);
+        assert_eq!(
+            registered(&mut s),
+            [("pass/screenshots/step-003-x.png".to_owned(), Some(2))]
+        );
+    }
+
+    /// A file still waiting when the run ends falls back to its name, and is journalled before the
+    /// run ends.
+    #[test]
+    fn a_file_still_waiting_at_run_end_keeps_its_name_link() {
+        let mut s = session();
+        file(&mut s, "pass/screenshots/step-003-x.png", None);
+        s.end(at(), 0);
+        let events = s.drain();
+        let kinds: Vec<&str> = events.iter().map(|e| e.kind.as_str()).collect();
+        assert_eq!(
+            kinds[kinds.len() - 2..],
+            ["artifact.registered", "run.ended"]
+        );
+        assert_eq!(
+            events[events.len() - 2]
+                .subject
+                .step
+                .as_ref()
+                .map(|r| r.index),
+            Some(2)
         );
     }
 }
