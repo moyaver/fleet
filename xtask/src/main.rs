@@ -6,6 +6,7 @@
     reason = "xtask is a terminal tool; its output is the user interface"
 )]
 
+mod bench;
 mod db;
 mod fixtures;
 mod lint;
@@ -30,7 +31,7 @@ const TOOLS: &[&str] = &[
     "mdbook",
 ];
 
-const USAGE: &str = "usage: cargo xtask <setup | tools | ci | lint | sqlx | schema [--check] | web [--release] | fixtures …>";
+const USAGE: &str = "usage: cargo xtask <setup | tools | ci | lint | sqlx | schema [--check] | web [--release] | fixtures … | bench-overhead [--runs N] [--linger SECS] [--max-cpu-percent X]>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,6 +54,7 @@ fn main() -> anyhow::Result<()> {
         ["web"] => web(&root, false),
         ["web", "--release"] => web(&root, true),
         ["fixtures", rest @ ..] => fixtures::run(&root, rest),
+        ["bench-overhead", rest @ ..] => bench::run(&root, rest),
         _ => bail!(USAGE),
     }
 }

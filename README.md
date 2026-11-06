@@ -85,7 +85,7 @@ The supervisor is **fail-open**, the event stream is **resumable**, and the serv
 
 ### Measured, not just promised
 
-In the [Maestro phase-0 validation](research/08-phase0-results.md), a real emulator run established which progress signals could actually be observed. In a later **four-flow, 50-second run on an Apple M1 Pro**, the agent used **0.07 seconds of CPU time (about 0.14% of one core)**, with no measured increase in suite duration for that run. This is a specific validation result, **not a general performance guarantee**. See the [runner guide](docs/src/runner-guide.md#cost).
+In the [Maestro phase-0 validation](research/08-phase0-results.md), a real emulator run established which progress signals could actually be observed. `cargo xtask bench-overhead` measures the agent's overhead on the captured suite, with and without the agent. On an Apple M1 Pro, a 50-second run used **0.20% of one core** and **17 MiB** of memory, and the agent added about **0.3 seconds** to the run. This is a specific measurement on one machine, **not a general performance guarantee**. See the [runner guide](docs/src/runner-guide.md#cost).
 
 ## Roadmap
 
