@@ -3,7 +3,7 @@
 //! (PLAN §10.1). The session cookie travels with every request and the SPA holds no token.
 
 use fleet_protocol::{
-    live::{AttemptView, ProjectView, Snapshot},
+    live::{AttemptView, PlanView, ProjectView},
     rest::{
         ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
         TimelineView, WorkerRunPage, WorkerView,
@@ -96,10 +96,10 @@ pub async fn overview(project: &str) -> Result<OverviewView, ApiError> {
     get(&format!("{API}/projects/{}/overview", segment(project))).await
 }
 
-/// One attempt's snapshot: its linked plans, with each shard's actual time.
-pub async fn snapshot(project: &str, attempt: Uuid) -> Result<Snapshot, ApiError> {
+/// One attempt's Fleet plans, each shard with its actual time: the plan table's data.
+pub async fn plans(project: &str, attempt: Uuid) -> Result<Vec<PlanView>, ApiError> {
     get(&format!(
-        "{API}/projects/{}/attempts/{attempt}",
+        "{API}/projects/{}/attempts/{attempt}/plans",
         segment(project)
     ))
     .await

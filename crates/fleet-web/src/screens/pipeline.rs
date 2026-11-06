@@ -38,7 +38,7 @@ use self::{
     timeline::timeline_data,
 };
 use crate::{
-    api,
+    api::{self, ApiError},
     app::ErrorNotice,
     clock::{now_ms, utc_offset_minutes},
     live::{
@@ -103,21 +103,28 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
             async move { api::timeline(&project, attempt).await }
         })
     };
-    // The plans' actual shard times are in the attempt's snapshot, not in the deltas.
+    // The plans' actual shard times are not in the deltas: the plan table refetches them only
+    // when a batch may have changed them (see `LiveModel::apply`).
     let plans = {
         let project = project.clone();
         remote(1000, move || {
             let project = project.clone();
-            async move { api::snapshot(&project, attempt).await.map(|s| s.plans) }
+            async move { api::plans(&project, attempt).await }
         })
     };
-    // The timeline and the plans follow the live version.
+    // The timeline follows the live version.
     {
         let timeline = timeline.clone();
-        let plans = plans.clone();
         Effect::new(move |_| {
             if model.version.get() > 0 {
                 timeline.request();
+            }
+        });
+    }
+    {
+        let plans = plans.clone();
+        Effect::new(move |_| {
+            if model.plan_refreshes.get() > 0 {
                 plans.request();
             }
         });
@@ -154,7 +161,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
                                 "Reconnecting to the live feed. This is the last known state; it is updating."
                             </p>
                         </Show>
-                        <ProgressCard model=model plans=plans.data />
+                        <ProgressCard model=model plans=plans.data plans_error=plans.error />
                         <FailuresCard model=model />
                         <Jobs model=model project=project />
                         <Card title="Execution timeline">
@@ -230,7 +237,11 @@ fn PageHeader(
 }
 
 #[component]
-fn ProgressCard(model: LiveModel, plans: RwSignal<Option<Vec<PlanView>>>) -> impl IntoView {
+fn ProgressCard(
+    model: LiveModel,
+    plans: RwSignal<Option<Vec<PlanView>>>,
+    plans_error: RwSignal<Option<ApiError>>,
+) -> impl IntoView {
     view! {
         <Card title="Test progress">
             {move || {
@@ -254,6 +265,7 @@ fn ProgressCard(model: LiveModel, plans: RwSignal<Option<Vec<PlanView>>>) -> imp
                                     </div>
                                 }).collect_view()}
                             </dl>
+                            <ErrorNotice error=plans_error />
                             <PlanTable plans=plans />
                         }
                     })

@@ -22,6 +22,7 @@ use crate::{
     screens::pipeline::{
         activity::ActivityLog,
         model::{FailureRow, Header, Tree, failures, header},
+        plans,
     },
 };
 
@@ -109,6 +110,8 @@ pub struct LiveModel {
     pub version: RwSignal<u64>,
     /// The snapshot generation: part of every list key.
     pub epoch: RwSignal<u64>,
+    /// Counts the batches that may have changed the attempt's plans; the page refetches them.
+    pub plan_refreshes: RwSignal<u64>,
     /// Waiting for a new snapshot: what is shown is the last known state.
     pub awaiting_snapshot: RwSignal<bool>,
     /// The server's last refusal.
@@ -140,6 +143,7 @@ impl LiveModel {
             activity: RwSignal::new(ActivityLog::new()),
             version: RwSignal::new(0),
             epoch: RwSignal::new(0),
+            plan_refreshes: RwSignal::new(0),
             awaiting_snapshot: RwSignal::new(false),
             error: RwSignal::new(None),
             jobs: EntityTable::new(),
@@ -153,6 +157,11 @@ impl LiveModel {
     /// Applies a batch of frames and updates the signals once.
     pub fn apply(&self, project: &str, frames: Vec<LiveFrame>) {
         let before = self.state();
+        let plans_may_change = plans::batch_changes_plans(&frames, |run| {
+            before
+                .as_ref()
+                .is_some_and(|s| s.agent_runs().any(|r| r.id == run && r.plan_id.is_some()))
+        });
         self.store.update_value(|s| {
             for frame in frames {
                 // A resync is acted on by the socket (it resubscribes); the store marks itself.
@@ -162,6 +171,14 @@ impl LiveModel {
         self.error
             .set(self.store.with_value(|s| s.last_error().map(str::to_owned)));
         self.publish(project, before.as_ref());
+        // The attempt ending moves its plans' actual times one last time: refetch once, then.
+        let ended_now = self.state().is_some_and(|s| plans::attempt_ended(s.jobs()));
+        let ended_before = before
+            .as_ref()
+            .is_some_and(|s| plans::attempt_ended(s.jobs()));
+        if plans_may_change || (ended_now && !ended_before) {
+            self.plan_refreshes.update(|n| *n += 1);
+        }
     }
 
     /// The socket closed: the state shown may be behind until a new snapshot arrives.

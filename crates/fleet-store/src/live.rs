@@ -198,6 +198,23 @@ impl Store {
         Ok(Some(snapshot))
     }
 
+    /// One attempt's linked plans, each shard with its actual span: what the plan table shows,
+    /// without the rest of the snapshot. `None` when the attempt isn't in `project_id`.
+    pub async fn attempt_plans(
+        &self,
+        project_id: Uuid,
+        attempt_id: Uuid,
+    ) -> Result<Option<Vec<PlanView>>> {
+        let mut conn = self.pool().acquire().await?;
+        if attempts(&mut *conn, Some(project_id), Some(&[attempt_id]), 1)
+            .await?
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        Ok(Some(plans(&mut conn, project_id, attempt_id).await?))
+    }
+
     /// The current state of changed entities, for a live delta.
     pub async fn entities(&self, project: Uuid, refs: &[EntityRef]) -> Result<Vec<EntityView>> {
         let mut by_kind: BTreeMap<u8, Vec<Uuid>> = BTreeMap::new();

@@ -3,8 +3,9 @@
 //! slowest shard against an equal-count split of the same flows (ADR-0013, issue #81). Pure: every
 //! number comes from the server's plan view, so this module needs no browser.
 
-use fleet_protocol::live::PlanView;
+use fleet_protocol::live::{EntityView, JobView, LiveFrame, PlanView};
 use fleet_ui::charts::format::format_duration;
+use uuid::Uuid;
 
 /// One shard's row. Times are milliseconds.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +110,33 @@ fn max_of(values: impl Iterator<Item = Option<i64>>) -> Option<i64> {
     values.collect::<Option<Vec<i64>>>()?.into_iter().max()
 }
 
+/// Whether a live batch can have changed what the plan table shows, so the table must fetch
+/// again. A rebuilt snapshot always can (frames may have been missed). Otherwise a shard's actual
+/// times move only when a run of a plan, or one of its flows, changes: flows carry no timestamps,
+/// so any change to one counts. `in_plan` says whether a run belonged to a plan before the batch.
+#[must_use]
+pub fn batch_changes_plans(frames: &[LiveFrame], in_plan: impl Fn(Uuid) -> bool) -> bool {
+    frames.iter().any(|frame| match frame {
+        LiveFrame::Snapshot { .. } => true,
+        LiveFrame::Delta { entities, .. } => entities.iter().any(|entity| match entity {
+            EntityView::AgentRun(run) => run.plan_id.is_some() || in_plan(run.id),
+            EntityView::Flow(flow) => in_plan(flow.agent_run_id),
+            EntityView::Job(_) | EntityView::Suite(_) | EntityView::Device(_) => false,
+        }),
+        LiveFrame::Subscribed { .. }
+        | LiveFrame::Liveness { .. }
+        | LiveFrame::Resync { .. }
+        | LiveFrame::Error { .. } => false,
+    })
+}
+
+/// Whether an attempt has ended: it has jobs and none is still open, the rule the header uses.
+#[must_use]
+pub fn attempt_ended<'a>(jobs: impl IntoIterator<Item = &'a JobView>) -> bool {
+    let mut jobs = jobs.into_iter().peekable();
+    jobs.peek().is_some() && jobs.all(|job| job.lifecycle == "closed")
+}
+
 /// A duration for a table cell, or a dash when it is not known.
 #[must_use]
 pub fn show(ms: Option<i64>) -> String {
@@ -124,10 +152,10 @@ pub fn signed(ms: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use fleet_protocol::live::PlanShardView;
-    use uuid::Uuid;
+    use fleet_protocol::live::{Liveness, PlanShardView};
 
     use super::*;
+    use crate::screens::pipeline::fixtures::{ATTEMPT, JOB, RUN, flow, id, job, run, snapshot};
 
     fn shard(id: i32, flows: usize, planned: i64, actual: Option<i64>) -> PlanShardView {
         PlanShardView {
@@ -218,5 +246,81 @@ mod tests {
         assert_eq!(show(Some(1_500)), format_duration(1_500));
         assert_eq!(signed(-2_000), format!("-{}", format_duration(2_000)));
         assert_eq!(signed(0), format!("+{}", format_duration(0)));
+    }
+
+    /// A run that belongs to plan `nightly`, shard 1.
+    fn planned_run(n: u128) -> fleet_protocol::live::AgentRunView {
+        let mut r = run(n, JOB, "online");
+        r.plan_id = Some("nightly".into());
+        r.plan_shard_id = Some(1);
+        r
+    }
+
+    fn delta(entities: Vec<EntityView>) -> LiveFrame {
+        LiveFrame::Delta {
+            project_id: id(100),
+            attempt_id: id(ATTEMPT),
+            version: 2,
+            entities,
+        }
+    }
+
+    #[test]
+    fn a_change_to_a_planned_run_or_one_of_its_flows_refreshes_the_plan_table() {
+        // RUN was a planned run before the batch: its flow changing is a shard changing.
+        let planned_before = |run: Uuid| run == id(RUN);
+        let flow_of_shard = flow(40, 30, "login", "running", "provisional");
+        assert!(batch_changes_plans(
+            &[delta(vec![EntityView::Flow(flow_of_shard)])],
+            planned_before
+        ));
+        // A run that is planned in this very batch counts too (its shard was just assigned).
+        assert!(batch_changes_plans(
+            &[delta(vec![EntityView::AgentRun(planned_run(21))])],
+            |_| false
+        ));
+    }
+
+    #[test]
+    fn a_change_that_touches_no_plan_leaves_the_plan_table_alone() {
+        // A flow of an ordinary run, and a job: the attempt moved on, the plans did not.
+        let ordinary_flow = flow(40, 30, "login", "passed", "provisional");
+        let build = job(JOB, "build", "running", None, None);
+        assert!(!batch_changes_plans(
+            &[delta(vec![
+                EntityView::Flow(ordinary_flow),
+                EntityView::Job(build)
+            ])],
+            |_| false
+        ));
+        let liveness = LiveFrame::Liveness {
+            attempt_id: id(ATTEMPT),
+            agent_run_id: id(RUN),
+            liveness: Liveness::Stale,
+        };
+        assert!(!batch_changes_plans(&[liveness], |_| true));
+    }
+
+    #[test]
+    fn a_rebuilt_snapshot_refreshes_the_plan_table_because_frames_may_have_been_missed() {
+        assert!(batch_changes_plans(
+            &[snapshot(3, vec![], vec![], vec![], vec![])],
+            |_| false
+        ));
+    }
+
+    #[test]
+    fn an_attempt_has_ended_when_it_has_jobs_and_none_is_open() {
+        let open = job(10, "build", "running", None, None);
+        let closed = job(
+            11,
+            "test",
+            "closed",
+            Some("completed"),
+            Some("live_console"),
+        );
+        assert!(!attempt_ended(Vec::<&JobView>::new()), "no jobs yet");
+        assert!(!attempt_ended([&open, &closed]), "one job is open");
+        assert!(attempt_ended([&closed]));
     }
 }

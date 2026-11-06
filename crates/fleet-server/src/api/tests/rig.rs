@@ -10,9 +10,9 @@ use fleet_protocol::{
     brand::WS_SUBPROTOCOL,
     event::{
         EventBody, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        FlowStarted, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
-        RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
-        SuiteStarted,
+        FlowStarted, JunitTestcase, MatchMethod, PlanAssigned, ProcessExited, ReportParsed,
+        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
+        StepStatus, SuiteStarted,
     },
     frame::{
         AgentInfo, BatchRequest, BatchResponse, CiContext, CiProvider, ClientFrame, Hello,
@@ -381,6 +381,19 @@ impl Agent {
             &EventBody::RunEnded(RunEnded {
                 interrupted: false,
                 output_bytes_dropped: 0,
+            }),
+        );
+    }
+
+    /// This run executes shard `shard_id` of the Fleet plan `plan_id` (`plan.assigned`).
+    pub(super) fn plan_assigned(&mut self, plan_id: &str, shard_id: u32) {
+        self.push(
+            Subject::default(),
+            SourceKind::Declared,
+            &EventBody::PlanAssigned(PlanAssigned {
+                plan_id: plan_id.into(),
+                shard_id,
+                flows: Vec::new(),
             }),
         );
     }
