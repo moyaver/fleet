@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 - Dashboard: the pipeline's plan table reads a small plan endpoint (`GET /api/v1/projects/{project}/attempts/{attempt}/plans`) and refetches it only when a planned shard's runs change or the attempt ends, instead of the whole attempt snapshot on every live update; its own fetch error shows in the table (#115).
+- Server: the image takes wasm-opt, tailwindcss and wasm-bindgen from a cached build layer, pinned by checksum, so a source change no longer downloads them again and a stalled download resumes (deploy/docker).
 
 ### Fixed
 
