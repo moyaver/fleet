@@ -4,7 +4,7 @@
 
 # Fleet
 
-[![CI](https://github.com/moyaver/fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/moyaver/fleet/actions/workflows/ci.yml)
+[![CI](https://github.com/moyaver/fleet/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/moyaver/fleet/actions/workflows/ci.yml)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/built_with-Rust-333333?logo=rust)](Cargo.toml)
 
