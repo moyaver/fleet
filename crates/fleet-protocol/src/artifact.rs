@@ -151,6 +151,11 @@ pub struct UploadRequest {
     /// The flow execution it is evidence for, if any. It must belong to the same run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flow_execution_id: Option<Uuid>,
+    /// The 0-based index of the flow step that produced the file, when Maestro's `artifacts[]`
+    /// names it (the step tree's index). The server keeps it on the artifact; absent when no step
+    /// produced the file, and from agents that predate it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u32>,
     /// The class, one of [`ArtifactClass::as_str`]. A string, so an older server answers an
     /// unknown class with [`RejectReason::ClassNotAllowed`] instead of failing to parse.
     pub class: String,

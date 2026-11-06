@@ -56,6 +56,8 @@ pub struct UploadAsk<'a> {
     pub agent_run_id: Uuid,
     /// The flow it is evidence for.
     pub flow_execution_id: Option<Uuid>,
+    /// The flow step that produced it, when known (see [`ArtifactRow::step`]).
+    pub step: Option<u32>,
     /// Its class.
     pub class: ArtifactClass,
     /// A sanitised label relative to the output directory.
@@ -167,6 +169,9 @@ pub struct ArtifactRow {
     pub id: Uuid,
     /// The flow it is evidence for; `None` for a file of the whole run (report, log).
     pub flow_execution_id: Option<Uuid>,
+    /// The flow step that produced it, as Maestro's `artifacts[]` names it; `None` when no step
+    /// did, and for artifacts uploaded before step links were stored.
+    pub step: Option<u32>,
     /// Class (the wire name).
     pub class: String,
     /// Last path segment.
@@ -434,7 +439,7 @@ impl Store {
         }
         Ok(Some(
             sqlx::query!(
-                "SELECT id, flow_execution_id, class, name, path,
+                "SELECT id, flow_execution_id, step_index, class, name, path,
                     coalesce(served_type, content_type) AS \"content_type!\",
                     size_bytes, encode(sha256, 'hex') AS \"sha256!\", state, reject_reason,
                     retention_class, created_at
@@ -454,6 +459,7 @@ impl Store {
             .map(|r| ArtifactRow {
                 id: r.id,
                 flow_execution_id: r.flow_execution_id,
+                step: r.step_index.and_then(|s| u32::try_from(s).ok()),
                 class: r.class,
                 name: r.name,
                 path: r.path,
@@ -677,20 +683,23 @@ async fn declare(
         Some(k) => ("available", Some(k.served_type.as_str())),
         None => ("declared", None),
     };
+    // A step index past `i32` is no real step: it is stored as none rather than refused.
+    let step = ask.step.and_then(|s| i32::try_from(s).ok());
     let inserted = sqlx::query!(
         "INSERT INTO artifacts
-             (project_id, agent_run_id, job_id, suite_execution_id, flow_execution_id, class,
-              content_type, served_type, size_bytes, sha256, path, name, retention_class,
+             (project_id, agent_run_id, job_id, suite_execution_id, flow_execution_id, step_index,
+              class, content_type, served_type, size_bytes, sha256, path, name, retention_class,
               state, credential_id, grant_expires_at, available_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, decode($10, 'hex'), $11, $12, $13, $14, $15,
-                 CASE WHEN $14 = 'declared' THEN now() + make_interval(secs => $16) END,
-                 CASE WHEN $14 = 'available' THEN now() END)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, decode($11, 'hex'), $12, $13, $14, $15,
+                 $16, CASE WHEN $15 = 'declared' THEN now() + make_interval(secs => $17) END,
+                 CASE WHEN $15 = 'available' THEN now() END)
          RETURNING id, grant_expires_at",
         ask.project_id,
         ask.agent_run_id,
         scope.job_id,
         scope.suite_execution_id,
         ask.flow_execution_id,
+        step,
         class,
         ask.content_type,
         served,
@@ -725,4 +734,116 @@ async fn declare(
     Ok(Requested::Exists {
         artifact_id: inserted.id,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use sha2::{Digest, Sha256};
+    use sqlx::PgPool;
+
+    use super::*;
+    use crate::{
+        auth::Publisher,
+        ingest::{
+            RunHandle, Transport,
+            tests::{Agent, SuiteIds, publisher, suite_run},
+        },
+    };
+
+    /// The SHA-256 of `content`, lowercase hex.
+    fn hex_of(content: &str) -> String {
+        use std::fmt::Write as _;
+        Sha256::digest(content.as_bytes())
+            .iter()
+            .fold(String::new(), |mut hex, b| {
+                write!(hex, "{b:02x}").unwrap();
+                hex
+            })
+    }
+
+    /// Uploads a failure screenshot of `flow` at `step` and returns its artifact.
+    async fn upload_shot(
+        store: &Store,
+        publisher: &Publisher,
+        handle: &RunHandle,
+        flow: Uuid,
+        step: Option<u32>,
+        content: &str,
+    ) -> Uuid {
+        let sha = hex_of(content);
+        let ask = UploadAsk {
+            project_id: publisher.project_id,
+            credential: publisher.credential,
+            agent_run_id: handle.agent_run_id,
+            flow_execution_id: Some(flow),
+            class: ArtifactClass::FailureScreenshot,
+            path: "login/screenshots/shot.png",
+            name: "shot.png",
+            content_type: "image/png",
+            size: content.len() as u64,
+            sha256: &sha,
+            step,
+        };
+        let quota = Quota {
+            max_bytes: 1 << 30,
+            max_files: 100,
+        };
+        let Requested::Grant {
+            artifact_id: id, ..
+        } = store
+            .request_upload(&ask, Duration::from_mins(15), quota)
+            .await
+            .unwrap()
+        else {
+            panic!("a new screenshot should be granted");
+        };
+        let (project, credential) = (publisher.project_id, publisher.credential);
+        assert_eq!(
+            store.claim_content(project, credential, id).await.unwrap(),
+            Claim::Claimed {
+                size: content.len() as u64
+            }
+        );
+        store.content_received(id).await.unwrap();
+        store
+            .mark_available(project, id, "image/png")
+            .await
+            .unwrap();
+        id
+    }
+
+    /// The step an artifact was requested with is stored and listed with it; an artifact requested
+    /// without one has none.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_artifact_requested_with_a_step_is_listed_with_it(pool: PgPool) {
+        let store = Store { pool };
+        let publisher = publisher(&store).await;
+        let mut agent = Agent::new("1", "e2e");
+        let handle = store
+            .open_run(&publisher, &agent.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let events = suite_run(&mut agent, SuiteIds::new(), &[("login", false)]);
+        store.apply_batch(&handle, &events[..4]).await.unwrap();
+        let flow = sqlx::query_scalar!(
+            "SELECT id FROM flow_executions WHERE agent_run_id = $1",
+            handle.agent_run_id
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+
+        let at_step = upload_shot(&store, &publisher, &handle, flow, Some(2), "at step").await;
+        let unlinked = upload_shot(&store, &publisher, &handle, flow, None, "unlinked").await;
+
+        let rows = store
+            .flow_artifacts(publisher.project_id, flow)
+            .await
+            .unwrap()
+            .unwrap();
+        let step_of = |id: Uuid| rows.iter().find(|r| r.id == id).map(|r| r.step);
+        assert_eq!(step_of(at_step), Some(Some(2)));
+        assert_eq!(step_of(unlinked), Some(None));
+    }
 }

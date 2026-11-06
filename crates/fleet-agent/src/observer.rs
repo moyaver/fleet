@@ -420,6 +420,7 @@ fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
             path: label,
             content_type,
             flow: c.flow,
+            step: c.step,
             source,
         });
     }
@@ -495,6 +496,7 @@ async fn finish_uploads(
                     .map_or_else(|| "report.xml".into(), |n| n.to_string_lossy().into_owned()),
                 content_type: "application/xml",
                 flow: None,
+                step: None,
                 source: Source::Bytes(text.into()),
             }),
             Err(reason) => record(
@@ -518,6 +520,7 @@ async fn finish_uploads(
             path: "maestro.log".into(),
             content_type: "text/plain",
             flow: None,
+            step: None,
             source: Source::Text(log, Arc::new(l.session.redactor().clone())),
         });
     }

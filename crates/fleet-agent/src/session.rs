@@ -167,6 +167,8 @@ pub(crate) struct Candidate {
     /// Path relative to the debug output directory.
     pub(crate) rel: String,
     pub(crate) flow: Option<Uuid>,
+    /// The step that produced it, as `artifacts[]` names it (see [`Session::register_file`]).
+    pub(crate) step: Option<u32>,
 }
 
 impl std::fmt::Debug for Session {
@@ -610,6 +612,7 @@ impl Session {
                     class: ArtifactClass::Commands,
                     rel: rel.to_owned(),
                     flow,
+                    step: None,
                 });
             }
             bundle::Entry::Manifest { flow_dir } => {
@@ -642,14 +645,6 @@ impl Session {
                     "failure_hierarchy"
                 };
                 if let Some(idx) = self.find_flow(shard.unwrap_or(1), name) {
-                    if class == "failure_screenshot" {
-                        let flow = self.flows.get(idx).map(|f| f.id);
-                        self.uploads.push(Candidate {
-                            class: ArtifactClass::FailureScreenshot,
-                            rel: rel.to_owned(),
-                            flow,
-                        });
-                    }
                     let named = step.checked_sub(1);
                     match self.flows.get_mut(idx) {
                         Some(f) if matches!(f.produced, Produced::Unknown) => {
@@ -759,6 +754,8 @@ impl Session {
     }
 
     /// Journals a failure screenshot or hierarchy, against the step that produced it when known.
+    /// A screenshot is queued for upload here, not when it appears, so the upload request carries
+    /// the step too (issue #76).
     fn register_file(
         &mut self,
         at: ClockSample,
@@ -769,6 +766,14 @@ impl Session {
     ) {
         let mut subject = self.flow_subject_at(idx);
         subject.step = step.map(|index| StepRef { index });
+        if class == "failure_screenshot" {
+            self.uploads.push(Candidate {
+                class: ArtifactClass::FailureScreenshot,
+                rel: rel.to_owned(),
+                flow: self.flows.get(idx).map(|f| f.id),
+                step,
+            });
+        }
         self.emit(
             at,
             subject,
@@ -1452,6 +1457,33 @@ mod tests {
         assert_eq!(
             registered(&mut s),
             [("pass/screenshots/step-003-other.png".to_owned(), None)]
+        );
+    }
+
+    /// A failure screenshot is queued for upload once its step is known, and carries that step.
+    #[test]
+    fn a_failure_screenshot_is_queued_for_upload_with_its_step() {
+        let mut s = session();
+        let flow = s.flows[0].id;
+        file(&mut s, "pass/screenshots/step-004-odd.png", None);
+        assert!(s.take_uploads().is_empty(), "waits for the step");
+        file(&mut s, "pass/commands.json", Some(LISTED));
+        assert_eq!(
+            s.take_uploads(),
+            [
+                Candidate {
+                    class: ArtifactClass::FailureScreenshot,
+                    rel: "pass/screenshots/step-004-odd.png".into(),
+                    flow: Some(flow),
+                    step: Some(2),
+                },
+                Candidate {
+                    class: ArtifactClass::Commands,
+                    rel: "pass/commands.json".into(),
+                    flow: Some(flow),
+                    step: None,
+                },
+            ]
         );
     }
 

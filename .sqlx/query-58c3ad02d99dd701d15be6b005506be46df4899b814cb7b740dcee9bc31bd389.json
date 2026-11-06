@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO artifacts\n             (project_id, agent_run_id, job_id, suite_execution_id, flow_execution_id, class,\n              content_type, served_type, size_bytes, sha256, path, name, retention_class,\n              state, credential_id, grant_expires_at, available_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, decode($10, 'hex'), $11, $12, $13, $14, $15,\n                 CASE WHEN $14 = 'declared' THEN now() + make_interval(secs => $16) END,\n                 CASE WHEN $14 = 'available' THEN now() END)\n         RETURNING id, grant_expires_at",
+  "query": "INSERT INTO artifacts\n             (project_id, agent_run_id, job_id, suite_execution_id, flow_execution_id, step_index,\n              class, content_type, served_type, size_bytes, sha256, path, name, retention_class,\n              state, credential_id, grant_expires_at, available_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, decode($11, 'hex'), $12, $13, $14, $15,\n                 $16, CASE WHEN $15 = 'declared' THEN now() + make_interval(secs => $17) END,\n                 CASE WHEN $15 = 'available' THEN now() END)\n         RETURNING id, grant_expires_at",
   "describe": {
     "columns": [
       {
@@ -33,6 +33,7 @@
         "Uuid",
         "Uuid",
         "Uuid",
+        "Int4",
         "Text",
         "Text",
         "Text",
@@ -51,5 +52,5 @@
       true
     ]
   },
-  "hash": "364d170d5b032cf2408e2a83e89f824733d83225664ea145cf1b6056f21ee18d"
+  "hash": "58c3ad02d99dd701d15be6b005506be46df4899b814cb7b740dcee9bc31bd389"
 }
