@@ -37,6 +37,7 @@ async fn routes(rig: &Rig) -> Routes {
         project: vec!["overview".into(), "history".into()],
         objects: vec![
             format!("attempts/{attempt}/timeline"),
+            format!("attempts/{attempt}/plans"),
             format!("workers/{worker}"),
             format!("workers/{worker}/runs"),
             format!("workers/{worker}/metrics"),

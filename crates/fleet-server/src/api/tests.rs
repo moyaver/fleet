@@ -14,6 +14,7 @@ mod live_recovery;
 mod metrics;
 mod openapi;
 mod overview;
+mod plans;
 mod retention;
 mod rig;
 mod timeline;

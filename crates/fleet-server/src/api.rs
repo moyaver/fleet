@@ -65,6 +65,7 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         projects,
         attempts,
         snapshot,
+        attempt_plans,
         store_plan,
         screens::overview,
         screens::timeline,
@@ -169,6 +170,10 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/projects/{project}/attempts/{attempt}",
             get(snapshot),
+        )
+        .route(
+            "/api/v1/projects/{project}/attempts/{attempt}/plans",
+            get(attempt_plans),
         )
         .route(
             "/api/v1/projects/{project}/overview",
@@ -361,6 +366,28 @@ async fn snapshot(
             state.hub.overlay_snapshot(&mut s);
             Json(s).into_response()
         }
+        Ok(None) => error(StatusCode::NOT_FOUND, "no such attempt"),
+        Err(e) => internal(&e),
+    }
+}
+
+/// One attempt's Fleet plans: each shard's planned time, its flows and its actual span. Screen B's
+/// plan table reads this instead of the whole snapshot.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/attempts/{attempt}/plans",
+    params(("project" = String, Path, description = "Project slug"),
+           ("attempt" = Uuid, Path, description = "Pipeline attempt ID")),
+    responses((status = 200, body = [PlanView]), (status = 404, body = ApiError)))]
+async fn attempt_plans(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path((project, attempt)): Path<(String, Uuid)>,
+) -> Response {
+    let project = match read_project(&state, &principal, &project).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    match state.store.attempt_plans(project, attempt).await {
+        Ok(Some(plans)) => Json(plans).into_response(),
         Ok(None) => error(StatusCode::NOT_FOUND, "no such attempt"),
         Err(e) => internal(&e),
     }

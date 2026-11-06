@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).
 - Server: per-IP limits on the pre-auth routes (agent token exchange, browser sign-in and callback) and per-credential limits on agent connections, answered with `429 Too Many Requests` and `Retry-After`; an agent socket's events are paced, never dropped. Client IPs come from `trusted_proxies` (#35).
 
+### Changed
+
+- Dashboard: the pipeline's plan table reads a small plan endpoint (`GET /api/v1/projects/{project}/attempts/{attempt}/plans`) and refetches it only when a planned shard's runs change or the attempt ends, instead of the whole attempt snapshot on every live update; its own fetch error shows in the table (#115).
+
 ### Fixed
 
 - Agent: a failed write to `journal.jsonl` (disk full, I/O error) stops the journal like the cap does: one `journal.truncated` line names the error, the run's warning names the first missing seq, and `fleet-agent inspect` reports it. Before, the error was dropped silently (#112).
