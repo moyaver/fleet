@@ -42,9 +42,9 @@ Without the report, Fleet still follows the run from Maestro's session log, flow
 | `FLEET_RUN_DIR` | The agent's directory for this run (journal, spool, its own log). |
 | `FLEET_GRACE` | Seconds between the first INT/TERM and killing Maestro's process group (default 15). |
 | `FLEET_FINALIZE_TIMEOUT` | Seconds the agent may spend finishing after Maestro exits (default 60). |
-| `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20); capped at 3 seconds if no connection was established during the run. |
+| `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20); capped at 3 seconds if the server never answered the WebSocket upgrade during the run. |
 | `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
-| `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. Uploads and the final flush share the `FLEET_FLUSH_TIMEOUT` budget. |
+| `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. The journal is sent first, while uploads run; the run end is sent after the upload results, and the final flush gets what is left of `FLEET_FLUSH_TIMEOUT`. |
 | `FLEET_UPLOAD_RATE` | Upload rate cap in bytes per second, shared by all uploads (default 4 MiB/s). |
 
 ### What the agent uploads

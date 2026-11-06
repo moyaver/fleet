@@ -32,10 +32,14 @@ enum Mode {
     Reject,
     /// Accepts TCP, never answers.
     Blackhole,
+    /// Upgrades at once, but takes this long to answer `hello` (a server busy under load).
+    SlowWelcome(Duration),
 }
 
 #[derive(Default)]
 struct State {
+    /// When each event type first arrived.
+    first_seen: BTreeMap<String, Instant>,
     /// Committed events by seq (dedup: a resent seq replaces nothing).
     committed: BTreeMap<u64, Value>,
     connections: u32,
@@ -120,6 +124,9 @@ async fn connection(
         st.lock().unwrap().raw.push_str(text.as_str());
         let reply = match frame["op"].as_str().unwrap() {
             "hello" => {
+                if let Mode::SlowWelcome(wait) = mode {
+                    tokio::time::sleep(wait).await;
+                }
                 if mode == Mode::Reject {
                     Some(
                         json!({ "op": "reject", "code": "unauthorized", "message": "no", "retry_after_ms": null, "fatal": true }),
@@ -146,6 +153,8 @@ async fn connection(
                 }
                 let mut s = st.lock().unwrap();
                 for e in events {
+                    let kind = e["type"].as_str().unwrap().to_owned();
+                    s.first_seen.entry(kind).or_insert_with(Instant::now);
                     let seq = e["seq"].as_u64().unwrap();
                     let expected = s.committed.keys().next_back().copied().unwrap_or(0) + 1;
                     match s.committed.entry(seq) {
@@ -465,6 +474,54 @@ fn no_server_black_hole_or_refusal_never_changes_the_result() {
             "{name}: the spool keeps the events"
         );
     }
+}
+
+#[test]
+fn a_server_slow_to_welcome_still_gets_the_whole_journal() {
+    // The run is over before the server answers `hello` (a busy server takes seconds). The
+    // finalize must keep waiting for that answer within its budget, not give up at once.
+    let srv = server(Mode::SlowWelcome(Duration::from_secs(7)));
+    let (out, took, run_dir) = run_agent(
+        "pass",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_FLUSH_TIMEOUT", "15")],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    assert!(took < Duration::from_secs(15), "bounded: took {took:?}");
+    let s = srv.state.lock().unwrap();
+    assert_eq!(
+        types(&s).get("run.ended"),
+        Some(&1),
+        "the run end reached the server"
+    );
+    let last = *s.committed.keys().next_back().unwrap();
+    assert_eq!(s.committed.len() as u64, last, "gap-free (I5)");
+    assert!(run_dir.join("spool.bin").exists());
+}
+
+#[test]
+fn the_journal_is_sent_while_uploads_are_still_running() {
+    // Uploads can't finish here (the fake server does not speak HTTP), so they hold the finalize
+    // for their whole share of the budget (half of 10 s). The journal's tail must not wait behind
+    // them: the flows' results reach the server during that wait, and only the run end follows it.
+    let srv = server(Mode::Normal);
+    let (out, took, _) = run_agent(
+        "suite",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_FLUSH_TIMEOUT", "10")],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert!(took < Duration::from_secs(12), "bounded: took {took:?}");
+    let s = srv.state.lock().unwrap();
+    let reported = s.first_seen["flow.reported"];
+    let ended = s.first_seen["run.ended"];
+    assert!(
+        ended.duration_since(reported) >= Duration::from_secs(2),
+        "the run end waited for the uploads, the flow results did not: {:?} apart",
+        ended.duration_since(reported)
+    );
 }
 
 /// Reads the argv the fake Maestro recorded.

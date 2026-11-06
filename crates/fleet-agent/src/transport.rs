@@ -79,7 +79,8 @@ pub(crate) struct Shared {
     pub(crate) wake: Notify,
     /// The run is over: flush what's left, then say `bye`.
     pub(crate) finishing: std::sync::atomic::AtomicBool,
-    /// A welcome was received during this run.
+    /// The server answered during this run: a WebSocket upgrade or a batch response, even if its
+    /// welcome is still to come.
     pub(crate) connected: std::sync::atomic::AtomicBool,
     /// The bearer credential in use (`FLEET_TOKEN`, or the token the OIDC exchange returned),
     /// for the artifact uploader, which speaks as the same agent.
@@ -253,6 +254,9 @@ async fn batch(
                 return Ok(End::Refused("batch authentication refused".into()));
             }
             Ok(response) if response.status().is_success() => {
+                shared
+                    .connected
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
                 response.json::<BatchResponse>().await
             }
             Ok(_) | Err(_) => {
@@ -417,6 +421,9 @@ async fn connection(
     clock: &impl Fn() -> ClockSample,
 ) -> Result<End, Error> {
     let ws = open(cfg).await?;
+    shared
+        .connected
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     let (mut tx, mut rx) = ws.split();
 
     tokio::time::timeout(

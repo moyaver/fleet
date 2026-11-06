@@ -85,7 +85,7 @@ async fn stored_outcomes_match_inspect_for_every_fixture() {
             exit_code(name),
             "{name}: the agent exits with Maestro's code (criterion 11)"
         );
-        let snap = stack.latest_snapshot().await;
+        let snap = stack.await_run_ended(&format!("job-{name}")).await;
         let job = snap["jobs"]
             .as_array()
             .unwrap()
@@ -146,7 +146,8 @@ async fn concurrent_jobs_and_same_serial_emulators_stay_separate() {
     for h in handles {
         h.await.unwrap();
     }
-    let snap = stack.latest_snapshot().await;
+    stack.await_run_ended("e2e-sharded").await;
+    let snap = stack.await_run_ended("e2e-single").await;
     let jobs = snap["jobs"].as_array().unwrap();
     assert_eq!(jobs.len(), 2, "two jobs in one attempt");
     for (name, job_key) in [("shard-split-2", "e2e-sharded"), ("suite", "e2e-single")] {
