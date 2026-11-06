@@ -14,6 +14,8 @@ pub enum Unit {
     Celsius,
     /// Milliseconds, shown as seconds from one second up.
     Millis,
+    /// A plain number with no unit, such as a load average or a core count.
+    Number,
 }
 
 impl Unit {
@@ -26,6 +28,7 @@ impl Unit {
             Self::PercentOfCore => format!("{}% of one core", number(value)),
             Self::Celsius => format!("{} °C", number(value)),
             Self::Millis => with_symbol(AxisUnit::for_millis(value), value),
+            Self::Number => number(value),
         }
     }
 
@@ -45,6 +48,7 @@ impl Unit {
             Self::PercentOfCore => AxisUnit::plain("% of one core"),
             Self::Celsius => AxisUnit::plain("°C"),
             Self::Millis => AxisUnit::for_millis(max_abs),
+            Self::Number => AxisUnit::plain(""),
         }
     }
 }
@@ -227,6 +231,8 @@ mod tests {
         assert_eq!(Unit::PercentOfCore.format(180.0), "180% of one core");
         assert_eq!(Unit::Celsius.format(36.5), "36.5 °C");
         assert_eq!(Unit::Celsius.format(-3.0), "-3 °C");
+        assert_eq!(Unit::Number.format(8.0), "8");
+        assert_eq!(Unit::Number.format(1.5), "1.5");
         assert_eq!(Unit::Millis.format(250.0), "250 ms");
         assert_eq!(Unit::Millis.format(1500.0), "1.5 s");
         assert_eq!(Unit::Millis.format(90_000.0), "90 s");

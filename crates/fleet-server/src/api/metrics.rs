@@ -61,6 +61,13 @@ enum HostCol {
     MaestroRss,
     AgentCpu,
     AgentRss,
+    Load1m,
+    CpuCores,
+    SwapUsed,
+    SwapTotal,
+    PsiCpu,
+    PsiMemory,
+    PsiIo,
 }
 
 #[derive(Clone, Copy)]
@@ -91,9 +98,9 @@ const fn def<C>(
 
 use MetricAggregate::{Avg, Max};
 use MetricScope::{Agent, Device, Emulator, Guest, Host, Maestro};
-use MetricUnit::{Bytes, Celsius, Percent};
+use MetricUnit::{Bytes, Celsius, Number, Percent};
 
-const HOST: [Def<HostCol>; 8] = [
+const HOST: [Def<HostCol>; 15] = [
     def(
         "host_cpu_pct",
         "Host CPU",
@@ -149,6 +156,62 @@ const HOST: [Def<HostCol>; 8] = [
         Agent,
         Some(HostCol::AgentRss),
         None,
+    ),
+    def(
+        "host_load_1m",
+        "Host load (1 min)",
+        Number,
+        Host,
+        Some(HostCol::Load1m),
+        Some(Avg),
+    ),
+    def(
+        "host_cpu_cores",
+        "Host CPU cores",
+        Number,
+        Host,
+        Some(HostCol::CpuCores),
+        None,
+    ),
+    def(
+        "host_swap_used_bytes",
+        "Host swap used",
+        Bytes,
+        Host,
+        Some(HostCol::SwapUsed),
+        Some(Avg),
+    ),
+    def(
+        "host_swap_total_bytes",
+        "Host swap total",
+        Bytes,
+        Host,
+        Some(HostCol::SwapTotal),
+        None,
+    ),
+    def(
+        "host_psi_cpu_pct",
+        "Host CPU pressure",
+        Percent,
+        Host,
+        Some(HostCol::PsiCpu),
+        Some(Avg),
+    ),
+    def(
+        "host_psi_memory_pct",
+        "Host memory pressure",
+        Percent,
+        Host,
+        Some(HostCol::PsiMemory),
+        Some(Avg),
+    ),
+    def(
+        "host_psi_io_pct",
+        "Host I/O pressure",
+        Percent,
+        Host,
+        Some(HostCol::PsiIo),
+        Some(Avg),
     ),
     def(
         "host_thermal_c",
@@ -212,6 +275,13 @@ fn host_value(c: HostCol, r: &HostRow) -> Option<f64> {
         HostCol::MaestroRss => r.maestro_rss_bytes,
         HostCol::AgentCpu => r.agent_cpu_pct,
         HostCol::AgentRss => r.agent_rss_bytes,
+        HostCol::Load1m => r.host_load_1m,
+        HostCol::CpuCores => r.host_cpu_cores,
+        HostCol::SwapUsed => r.host_swap_used_bytes,
+        HostCol::SwapTotal => r.host_swap_total_bytes,
+        HostCol::PsiCpu => r.host_psi_cpu_pct,
+        HostCol::PsiMemory => r.host_psi_memory_pct,
+        HostCol::PsiIo => r.host_psi_io_pct,
     }
 }
 

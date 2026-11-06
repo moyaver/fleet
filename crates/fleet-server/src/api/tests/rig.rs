@@ -599,5 +599,12 @@ pub(super) fn sample(at: OffsetDateTime, cpu: f32) -> Sample {
         maestro_rss_bytes: Some(300 << 20),
         agent_cpu_pct: Some(0.2),
         agent_rss_bytes: Some(8 << 20),
+        host_load_1m: None,
+        host_cpu_cores: None,
+        host_swap_used_bytes: None,
+        host_swap_total_bytes: None,
+        host_psi_cpu_pct: None,
+        host_psi_memory_pct: None,
+        host_psi_io_pct: None,
     }
 }

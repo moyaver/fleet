@@ -29,6 +29,20 @@ pub struct HostRow {
     pub agent_cpu_pct: Option<f64>,
     /// The agent's resident memory, bytes (raw samples only).
     pub agent_rss_bytes: Option<f64>,
+    /// Host load average over one minute.
+    pub host_load_1m: Option<f64>,
+    /// Host physical CPU cores (raw samples only).
+    pub host_cpu_cores: Option<f64>,
+    /// Host swap in use, bytes.
+    pub host_swap_used_bytes: Option<f64>,
+    /// Host swap configured, bytes (raw samples only).
+    pub host_swap_total_bytes: Option<f64>,
+    /// Linux pressure stall: percent of the last 10 seconds with some task waiting for CPU.
+    pub host_psi_cpu_pct: Option<f64>,
+    /// Linux pressure stall: percent of the last 10 seconds with some task waiting for memory.
+    pub host_psi_memory_pct: Option<f64>,
+    /// Linux pressure stall: percent of the last 10 seconds with some task waiting for I/O.
+    pub host_psi_io_pct: Option<f64>,
 }
 
 /// One device sample, or one aggregate bucket. `None`: no reading.
@@ -65,6 +79,10 @@ fn capped<T>(mut rows: Vec<T>) -> Samples<T> {
 impl Store {
     /// A worker's host samples in `[from, to)`, from the raw table or an aggregate. `None` when
     /// the worker doesn't exist in the project.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one SQL query per resolution, each listing the same host columns"
+    )]
     pub async fn host_samples(
         &self,
         project_id: Uuid,
@@ -94,7 +112,14 @@ impl Store {
                             maestro_cpu_pct::float8 AS maestro_cpu_pct,
                             maestro_rss_bytes::float8 AS maestro_rss_bytes,
                             agent_cpu_pct::float8 AS agent_cpu_pct,
-                            agent_rss_bytes::float8 AS agent_rss_bytes
+                            agent_rss_bytes::float8 AS agent_rss_bytes,
+                            host_load_1m::float8 AS host_load_1m,
+                            host_cpu_cores::float8 AS host_cpu_cores,
+                            host_swap_used_bytes::float8 AS host_swap_used_bytes,
+                            host_swap_total_bytes::float8 AS host_swap_total_bytes,
+                            host_psi_cpu_pct::float8 AS host_psi_cpu_pct,
+                            host_psi_memory_pct::float8 AS host_psi_memory_pct,
+                            host_psi_io_pct::float8 AS host_psi_io_pct
                        FROM host_samples
                       WHERE project_id = $1 AND worker_id = $2 AND ts >= $3 AND ts < $4
                       ORDER BY ts LIMIT $5",
@@ -115,7 +140,14 @@ impl Store {
                             NULL::float8 AS host_mem_total_bytes,
                             avg(maestro_cpu_avg)::float8 AS maestro_cpu_pct,
                             max(maestro_rss_max)::float8 AS maestro_rss_bytes,
-                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes
+                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes,
+                            avg(host_load_1m_avg)::float8 AS host_load_1m,
+                            NULL::float8 AS host_cpu_cores,
+                            avg(host_swap_used_avg)::float8 AS host_swap_used_bytes,
+                            NULL::float8 AS host_swap_total_bytes,
+                            avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,
+                            avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,
+                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct
                        FROM host_rollup_1m
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4
                       GROUP BY bucket ORDER BY bucket LIMIT $5",
@@ -136,7 +168,14 @@ impl Store {
                             NULL::float8 AS host_mem_total_bytes,
                             avg(maestro_cpu_avg)::float8 AS maestro_cpu_pct,
                             max(maestro_rss_max)::float8 AS maestro_rss_bytes,
-                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes
+                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes,
+                            avg(host_load_1m_avg)::float8 AS host_load_1m,
+                            NULL::float8 AS host_cpu_cores,
+                            avg(host_swap_used_avg)::float8 AS host_swap_used_bytes,
+                            NULL::float8 AS host_swap_total_bytes,
+                            avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,
+                            avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,
+                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct
                        FROM host_rollup_1h
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4
                       GROUP BY bucket ORDER BY bucket LIMIT $5",

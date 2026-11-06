@@ -159,6 +159,31 @@ pub struct Sample {
     pub agent_cpu_pct: Option<f32>,
     /// The agent itself (supervisor + observer): current resident memory of both, summed, bytes.
     pub agent_rss_bytes: Option<u64>,
+    /// Host load average over one minute (runnable tasks, averaged). Absent from older agents.
+    #[serde(default)]
+    pub host_load_1m: Option<f32>,
+    /// Host physical CPU cores. Absent from older agents.
+    #[serde(default)]
+    pub host_cpu_cores: Option<u32>,
+    /// Host swap in use, bytes. Absent from older agents.
+    #[serde(default)]
+    pub host_swap_used_bytes: Option<u64>,
+    /// Host swap configured, bytes. Absent from older agents.
+    #[serde(default)]
+    pub host_swap_total_bytes: Option<u64>,
+    /// Linux pressure stall information: percent of the last 10 seconds in which some task
+    /// waited for CPU. `None` where the kernel has no PSI (macOS, Windows). Absent from older
+    /// agents.
+    #[serde(default)]
+    pub host_psi_cpu_pct: Option<f32>,
+    /// Linux pressure stall information: percent of the last 10 seconds in which some task
+    /// waited for memory. Absent from older agents.
+    #[serde(default)]
+    pub host_psi_memory_pct: Option<f32>,
+    /// Linux pressure stall information: percent of the last 10 seconds in which some task
+    /// waited for I/O. Absent from older agents.
+    #[serde(default)]
+    pub host_psi_io_pct: Option<f32>,
 }
 
 /// The handshake payload.
@@ -373,6 +398,39 @@ mod tests {
             serde_json::to_value(ClientFrame::Bye).unwrap(),
             serde_json::json!({ "op": "bye" })
         );
+    }
+
+    #[test]
+    fn sample_host_fields_added_later_are_optional() {
+        // A sample from an agent that predates load, cores, swap and PSI.
+        let old: Sample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},"host_cpu_pct":12.5,
+                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"maestro_cpu_pct":null,
+                "maestro_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                old.host_load_1m,
+                old.host_cpu_cores,
+                old.host_swap_used_bytes,
+                old.host_psi_cpu_pct
+            ),
+            (None, None, None, None),
+            "a missing field is unavailable, not zero"
+        );
+        let full = Sample {
+            host_load_1m: Some(1.5),
+            host_cpu_cores: Some(8),
+            host_swap_used_bytes: Some(1 << 30),
+            host_swap_total_bytes: Some(2 << 30),
+            host_psi_cpu_pct: Some(0.25),
+            host_psi_memory_pct: None,
+            host_psi_io_pct: Some(3.0),
+            ..old
+        };
+        let back: Sample = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
+        assert_eq!(back, full);
     }
 
     #[test]

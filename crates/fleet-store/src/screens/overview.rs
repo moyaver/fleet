@@ -293,7 +293,14 @@ async fn latest_host_samples(
                 maestro_cpu_pct::float8 AS maestro_cpu_pct,
                 maestro_rss_bytes::float8 AS maestro_rss_bytes,
                 agent_cpu_pct::float8 AS agent_cpu_pct,
-                agent_rss_bytes::float8 AS agent_rss_bytes
+                agent_rss_bytes::float8 AS agent_rss_bytes,
+                host_load_1m::float8 AS host_load_1m,
+                host_cpu_cores::float8 AS host_cpu_cores,
+                host_swap_used_bytes::float8 AS host_swap_used_bytes,
+                host_swap_total_bytes::float8 AS host_swap_total_bytes,
+                host_psi_cpu_pct::float8 AS host_psi_cpu_pct,
+                host_psi_memory_pct::float8 AS host_psi_memory_pct,
+                host_psi_io_pct::float8 AS host_psi_io_pct
            FROM host_samples
           WHERE project_id = $1 AND worker_id = ANY($2) AND ts > now() - interval '1 hour'
           ORDER BY worker_id, ts DESC",
@@ -315,6 +322,13 @@ async fn latest_host_samples(
                 maestro_rss_bytes: r.maestro_rss_bytes,
                 agent_cpu_pct: r.agent_cpu_pct,
                 agent_rss_bytes: r.agent_rss_bytes,
+                host_load_1m: r.host_load_1m,
+                host_cpu_cores: r.host_cpu_cores,
+                host_swap_used_bytes: r.host_swap_used_bytes,
+                host_swap_total_bytes: r.host_swap_total_bytes,
+                host_psi_cpu_pct: r.host_psi_cpu_pct,
+                host_psi_memory_pct: r.host_psi_memory_pct,
+                host_psi_io_pct: r.host_psi_io_pct,
             },
         )
     })

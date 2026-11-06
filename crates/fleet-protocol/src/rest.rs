@@ -361,6 +361,8 @@ pub enum MetricUnit {
     Bytes,
     /// Degrees Celsius.
     Celsius,
+    /// A plain number with no unit: a load average, a core count.
+    Number,
 }
 
 /// What a metric is about. Host, process and guest figures are never mixed: a host CPU

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq, host_cpu_pct,\n                                       host_mem_used_bytes, host_mem_total_bytes, maestro_cpu_pct,\n                                       maestro_rss_bytes, agent_cpu_pct, agent_rss_bytes,\n                                       host_load_1m, host_cpu_cores, host_swap_used_bytes,\n                                       host_swap_total_bytes, host_psi_cpu_pct,\n                                       host_psi_memory_pct, host_psi_io_pct)\n             SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],\n                                  $5::bigint[], $6::real[], $7::bigint[], $8::bigint[],\n                                  $9::real[], $10::bigint[], $11::real[], $12::bigint[],\n                                  $13::real[], $14::integer[], $15::bigint[], $16::bigint[],\n                                  $17::real[], $18::real[], $19::real[])\n             ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TimestamptzArray",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "Int8Array",
+        "Float4Array",
+        "Int8Array",
+        "Int8Array",
+        "Float4Array",
+        "Int8Array",
+        "Float4Array",
+        "Int8Array",
+        "Float4Array",
+        "Int4Array",
+        "Int8Array",
+        "Int8Array",
+        "Float4Array",
+        "Float4Array",
+        "Float4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60f4af665243aff7f8f2f088f6a4675abce84cf91e8c09e7571340c5702f8458"
+}

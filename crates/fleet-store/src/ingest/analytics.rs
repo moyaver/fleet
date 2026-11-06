@@ -230,6 +230,13 @@ mod tests {
                 maestro_rss_bytes: None,
                 agent_cpu_pct: None,
                 agent_rss_bytes: None,
+                host_load_1m: None,
+                host_cpu_cores: None,
+                host_swap_used_bytes: None,
+                host_swap_total_bytes: None,
+                host_psi_cpu_pct: None,
+                host_psi_memory_pct: None,
+                host_psi_io_pct: None,
             };
             store
                 .store_telemetry(&[TelemetryBatch {
