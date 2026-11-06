@@ -7,6 +7,7 @@
 
 use fleet_protocol::{
     event::StepStatus,
+    live::AgentRunView,
     rest::{ClaimView, FlowDetailView, StepView},
 };
 use fleet_ui::{
@@ -332,9 +333,19 @@ fn ci(view: &FlowDetailView, ctx: &Ctx) -> CiSection {
                     .map(|n| format!("{n} of {}", view.suite.shard_count)),
             ),
             Fact::maybe("Runner", view.agent_run.runner_name.clone()),
+            Fact::maybe("Maestro version", maestro_version(&view.agent_run)),
         ],
         links,
     }
+}
+
+/// The run's Maestro version, flagged when Fleet's parsers were not built for it.
+fn maestro_version(run: &AgentRunView) -> Option<String> {
+    let version = run.maestro_version.as_ref()?;
+    Some(match run.maestro_profile_supported {
+        Some(false) => format!("{version} (not in Fleet's supported profile)"),
+        _ => version.clone(),
+    })
 }
 
 fn claims(claims: &[ClaimView], ctx: &Ctx) -> ClaimsSection {
@@ -459,7 +470,8 @@ mod tests {
                     "runner_name": "mac-mini-3", "state": "active", "trust_level": "trusted",
                     "committed_seq": 40, "gaps": 0, "last_frame_at": "2026-01-01T10:59:55Z",
                     "late_resume": false, "plan_id": null, "plan_shard_id": null,
-                    "maestro_exit_code": null, "rev": 3, "liveness": "online"},
+                    "maestro_exit_code": null, "maestro_version": "2.12.1", "rev": 3,
+                    "liveness": "online"},
       "device": {"device": {"id": "00000000-0000-0000-0000-0000000000d1",
                             "agent_run_id": "00000000-0000-0000-0000-000000000101",
                             "serial": "emulator-5554", "state": "busy", "rev": 4},
@@ -707,6 +719,7 @@ mod tests {
                 ("Job", "E2E (shard 1)"),
                 ("Shard", "1 of 2"),
                 ("Runner", "mac-mini-3"),
+                ("Maestro version", "2.12.1"),
             ]
         );
         let links: Vec<_> =
@@ -736,6 +749,19 @@ mod tests {
         assert_eq!(
             device.href,
             "/devices/00000000-0000-0000-0000-0000000000d1?project=shop"
+        );
+    }
+
+    #[test]
+    fn a_maestro_version_outside_the_supported_profile_is_flagged() {
+        let mut v = view();
+        v.agent_run.maestro_version = Some("2.13.0".into());
+        v.agent_run.maestro_profile_supported = Some(false);
+        let p = FlowPage::build(&v, &ctx());
+        let version = p.ci.facts.iter().find(|f| f.label == "Maestro version");
+        assert_eq!(
+            version.map(Fact::shown),
+            Some("2.13.0 (not in Fleet's supported profile)")
         );
     }
 

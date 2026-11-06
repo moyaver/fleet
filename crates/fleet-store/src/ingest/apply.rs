@@ -12,8 +12,8 @@ use fleet_core::claims::Claim;
 use fleet_protocol::{
     event::{
         AdbState, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        JournalGap, PlanAssigned, ProcessExited, ReportParsed, RunEnded, RunSignal, RunStarted,
-        ShardAssigned, StepEnded, StepStarted, SuiteStarted,
+        JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed, RunEnded, RunSignal,
+        RunStarted, ShardAssigned, StepEnded, StepStarted, SuiteStarted,
     },
     journal::{EventEnvelope, SourceKind},
 };
@@ -167,6 +167,7 @@ impl<'a> Ctx<'a> {
             EventBody::PlanAssigned(b) => self.plan_assigned(tx, &b).await,
             EventBody::DeviceStateObserved(b) => self.device_state(tx, e, &b).await,
             EventBody::JournalGap(b) => self.journal_gap(tx, &b).await,
+            EventBody::MaestroDetected(b) => self.maestro_detected(tx, &b).await,
             // Kept in the journal; projected by later milestones (artifacts: M5).
             EventBody::ArtifactRegistered(_)
             | EventBody::ArtifactUploaded(_)
@@ -826,6 +827,33 @@ impl<'a> Ctx<'a> {
         .await?;
         self.changed
             .extend(released.into_iter().map(EntityRef::Device));
+        self.run_changed();
+        Ok(Effect::Applied)
+    }
+
+    /// Records the Maestro build, and re-derives the run's flows: their condition fingerprint
+    /// reads the version, and it may arrive after the flows have ended.
+    async fn maestro_detected(
+        &mut self,
+        tx: &mut PgConnection,
+        b: &MaestroBuild,
+    ) -> Result<Effect, sqlx::Error> {
+        sqlx::query!(
+            "UPDATE agent_runs SET maestro_version = $2, maestro_profile_supported = $3, rev = rev + 1
+             WHERE id = $1",
+            self.run.agent_run_id,
+            b.version,
+            b.profile_supported
+        )
+        .execute(&mut *tx)
+        .await?;
+        let flows = sqlx::query_scalar!(
+            "SELECT id FROM flow_executions WHERE agent_run_id = $1",
+            self.run.agent_run_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        self.resolve.extend(flows);
         self.run_changed();
         Ok(Effect::Applied)
     }

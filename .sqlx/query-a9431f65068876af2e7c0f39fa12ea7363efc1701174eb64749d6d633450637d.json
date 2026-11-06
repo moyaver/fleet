@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT f.id, f.project_id, f.state, f.finality::text AS \"finality!\", f.failure_message,\n                coalesce(d.repo_path, f.flow_name) AS \"flow!\",\n                (SELECT s.label FROM step_executions s\n                  WHERE s.flow_execution_id = f.id AND s.run_day = r.run_day\n                    AND s.status = 'failed'\n                  ORDER BY s.step_index LIMIT 1) AS failed_step,\n                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider,\n                coalesce(dp.model, dp.avd_or_runtime) AS device_model, dp.api_level AS \"api_level?\",\n                (SELECT h.host_mem_total_bytes FROM host_samples h\n                  WHERE h.agent_run_id = f.agent_run_id AND h.host_mem_total_bytes IS NOT NULL\n                  ORDER BY h.ts DESC LIMIT 1) AS host_memory\n           FROM flow_executions f\n           JOIN agent_runs r ON r.id = f.agent_run_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n           JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n           JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n           LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n           LEFT JOIN device_sessions ds ON ds.id = f.device_session_id\n           LEFT JOIN device_profiles dp ON dp.id = ds.profile_id\n          WHERE f.id = ANY($1)",
+  "query": "SELECT f.id, f.project_id, f.state, f.finality::text AS \"finality!\", f.failure_message,\n                coalesce(d.repo_path, f.flow_name) AS \"flow!\",\n                (SELECT s.label FROM step_executions s\n                  WHERE s.flow_execution_id = f.id AND s.run_day = r.run_day\n                    AND s.status = 'failed'\n                  ORDER BY s.step_index LIMIT 1) AS failed_step,\n                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider, r.maestro_version,\n                coalesce(dp.model, dp.avd_or_runtime) AS device_model, dp.api_level AS \"api_level?\",\n                (SELECT h.host_mem_total_bytes FROM host_samples h\n                  WHERE h.agent_run_id = f.agent_run_id AND h.host_mem_total_bytes IS NOT NULL\n                  ORDER BY h.ts DESC LIMIT 1) AS host_memory\n           FROM flow_executions f\n           JOIN agent_runs r ON r.id = f.agent_run_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n           JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n           JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n           LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n           LEFT JOIN device_sessions ds ON ds.id = f.device_session_id\n           LEFT JOIN device_profiles dp ON dp.id = ds.profile_id\n          WHERE f.id = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -100,12 +100,23 @@
       },
       {
         "ordinal": 10,
+        "name": "maestro_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "maestro_version"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
         "name": "device_model",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "api_level?",
         "type_info": "Int2",
         "origin": {
@@ -116,7 +127,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "host_memory",
         "type_info": "Int8",
         "origin": "Expression"
@@ -138,10 +149,11 @@
       true,
       true,
       false,
+      true,
       null,
       true,
       null
     ]
   },
-  "hash": "03f6dbb5963594b405d446a5494fa2aa62f99168da29dbb37f037d3bd90dcc6e"
+  "hash": "a9431f65068876af2e7c0f39fa12ea7363efc1701174eb64749d6d633450637d"
 }

@@ -16,12 +16,13 @@ expression: result
       "failure": "maestro.android.DeviceServerDiedException: Device server died during 'viewHierarchy' on emulator-5602 (2267ms since last byte, connection age 34368ms): StatusRuntimeException: UNAVAILABLE\n\tat maestro.android.AndroidDeviceConnection.onGrpcDeath(AndroidDeviceConnection.kt:319)\n\tat maestro.android.AndroidDeviceConnection.mapTransport(AndroidDeviceConnection.kt:306)\n\tat maestro.android.AndroidDeviceConnection.execute(AndroidDeviceConnection.kt:122)\n\tat maestro.drivers.AndroidDriver.callViewHierarchy(AndroidDriver.kt:368)\n\tat maestro.drivers.AndroidDriver.contentDescriptor$lambda$16(AndroidDriver.kt:329)\n\tat maestro.utils.Metrics.measured(Metrics.kt:48)\n\tat maestro.drivers.AndroidDriver.contentDescriptor(AndroidDriver.kt:328)\n\tat maestro.ViewHierarchy$Companion.from-8JJjmZI(ViewHierarchy.kt:29)\n\tat maestro.utils.ScreenshotUtils$Companion.viewHierarchy-c1iYVAs(ScreenshotUtils.kt:99)\n\tat maestro.utils.ScreenshotUtils$Companion.waitForAppToSettle-OpTFbEc(ScreenshotUtils.kt:58)\n\tat maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke-prqvCes(AndroidDriver.kt:721)\n\tat maestro.drivers.AndroidDriver$waitForAppToSettle$1.invoke(AndroidDriver.kt:717)\n\tat maestro.utils.Metrics.measured(Metrics.kt:48)\n\tat maestro.drivers.AndroidDriver.waitForAppToSettle-5RpGHs4(AndroidDriver.kt:717)\n\tat maestro.Maestro$waitForAppToSettle$2.invoke-F9mIFpk(Maestro.kt:583)\n\tat maestro.Maestro$waitForAppToSettle$2.invoke(Maestro.kt:582)\n\tat kotlinx.coroutines.InterruptibleKt.runInterruptibleInExpectedContext(Interruptible.kt:48)\n\tat kotlinx.coroutines.InterruptibleKt.access$runInterruptibleInExpectedContext(Interruptible.kt:1)\n\tat kotlinx.coroutines.InterruptibleKt$runInterruptible$2.invokeSuspend(Interruptible.kt:40)\n\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n\tat kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)\n\tat kotlinx.coroutines.scheduling.TaskImp"
     }
   ],
-  "events": 38,
+  "events": 39,
   "event_types": {
     "agent.warning": 1,
     "flow.ended": 1,
     "flow.reported": 1,
     "flow.started": 1,
+    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,

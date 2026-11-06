@@ -548,15 +548,28 @@ impl Observer {
         }
         let deadline = Instant::now() + timeout;
         let mut finalized = false;
+        let mut maestro = None;
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
             match self.control.recv_timeout(left) {
                 Ok(line) if line == "finalized" => {
                     finalized = true;
                     break;
                 }
-                Ok(_) => {}
+                Ok(line) => {
+                    if let Some(version) = line.strip_prefix("maestro-version ") {
+                        maestro = Some(version.to_owned());
+                    }
+                }
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
             }
+        }
+        if let Some(version) = maestro
+            && !fleet_maestro::supports(&version)
+        {
+            warnings.push(format!(
+                "Maestro {version} is not in the version profile Fleet's parsers target ({}): results may degrade",
+                fleet_maestro::PROFILE
+            ));
         }
         if !finalized {
             let _ = self.child.kill();

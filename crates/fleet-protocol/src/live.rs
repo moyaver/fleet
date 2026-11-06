@@ -119,6 +119,12 @@ pub struct AgentRunView {
     pub plan_shard_id: Option<i32>,
     /// Maestro's exit code.
     pub maestro_exit_code: Option<i32>,
+    /// The Maestro version the run's session log named, when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maestro_version: Option<String>,
+    /// Whether the agent's parsers were built for that version. Absent until it is known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maestro_profile_supported: Option<bool>,
     /// Revision.
     pub rev: i64,
     /// Set by the server from live contact (heartbeats never touch the database).

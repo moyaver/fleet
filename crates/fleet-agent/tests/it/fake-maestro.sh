@@ -16,9 +16,19 @@ while [ $# -gt 0 ]; do
   shift
 done
 mkdir -p "$DEBUG"
+# The version line is the fixture's, unless FLEET_FAKE_VERSION names another version (or is empty:
+# then Maestro logs no version at all).
 while IFS= read -r line; do
-  printf '%s\n' "$line" >> "$DEBUG/maestro.log"
-done < "$FIX/run/debug/maestro.log"
+  case "$line" in
+    *"Maestro Version: "*)
+      if [ -z "${FLEET_FAKE_VERSION+x}" ]; then
+        printf '%s\n' "$line"
+      elif [ -n "$FLEET_FAKE_VERSION" ]; then
+        printf '%s\n' "${line%Maestro Version: *}Maestro Version: $FLEET_FAKE_VERSION"
+      fi ;;
+    *) printf '%s\n' "$line" ;;
+  esac
+done < "$FIX/run/debug/maestro.log" >> "$DEBUG/maestro.log"
 bundles() {
   for d in "$FIX"/run/debug/*/; do
     [ -d "$d" ] && cp -R "${d%/}" "$DEBUG/"

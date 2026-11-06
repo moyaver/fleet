@@ -151,6 +151,11 @@ pub enum Event {
         /// Its state.
         state: StepState,
     },
+    /// `MAESTRO.logSystemInfo: Maestro Version: 2.12.1`, written once near the start of a session log.
+    MaestroVersion {
+        /// The version, as Maestro printed it.
+        version: String,
+    },
     /// `Attempt N failed for retry command`.
     RetryAttemptFailed {
         /// Attempt number.
@@ -165,6 +170,8 @@ pub enum Event {
 
 const CONSOLE_LISTENER: &str = "maestro.cli.runner.CliConsoleListener";
 const SUITE_INTERACTOR: &str = "maestro.cli.runner.TestSuiteInteractor";
+/// Logger of Maestro's system info (`MAESTRO.logSystemInfo`, the method is dropped).
+const SYSTEM_INFO: &str = "MAESTRO";
 
 /// Reads the meaning of a record, if it has one Fleet uses.
 #[must_use]
@@ -201,6 +208,15 @@ pub fn classify(record: &Record) -> Option<Event> {
             shard,
             description: description.to_owned(),
             state,
+        });
+    }
+    if record.logger == SYSTEM_INFO {
+        let version = msg
+            .strip_prefix("Maestro Version: ")?
+            .split_whitespace()
+            .next()?;
+        return Some(Event::MaestroVersion {
+            version: version.to_owned(),
         });
     }
     if record.logger.ends_with("Orchestra") {
@@ -359,6 +375,24 @@ mod tests {
     }
 
     #[test]
+    fn the_session_log_names_the_maestro_version_once_in_either_pattern() {
+        for text in [
+            include_str!("../../../fixtures/maestro/2.12.1/pass/run/debug/maestro.log"),
+            include_str!("../../../fixtures/maestro/2.12.1/pass-machine-log/run/debug/maestro.log"),
+        ] {
+            let versions: Vec<_> = records(text)
+                .iter()
+                .filter_map(classify)
+                .filter_map(|e| match e {
+                    Event::MaestroVersion { version } => Some(version),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(versions, ["2.12.1"]);
+        }
+    }
+
+    #[test]
     fn garbage_never_panics() {
         for line in [
             "",
@@ -369,6 +403,7 @@ mod tests {
             "[shard 9999999999] x",
             "é",
             "\u{0}",
+            "MFLT1|1|main|INFO|MAESTRO|Maestro Version: ",
         ] {
             let r = records(line);
             for rec in &r {

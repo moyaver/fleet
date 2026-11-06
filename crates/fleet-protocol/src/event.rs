@@ -122,6 +122,16 @@ pub enum MatchMethod {
     Unmatched,
 }
 
+/// The Maestro build the run's session log named: the payload of `maestro.detected`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct MaestroBuild {
+    /// The version as Maestro logged it, for example `2.12.1`.
+    pub version: String,
+    /// Whether the agent's parsers were built for this version. `false` marks the run degraded.
+    pub profile_supported: bool,
+}
+
 /// `run.started`: the agent began supervising a command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -524,6 +534,9 @@ pub enum EventBody {
     /// See [`ParserUnrecognized`].
     #[serde(rename = "parser.unrecognized")]
     ParserUnrecognized(ParserUnrecognized),
+    /// See [`MaestroBuild`].
+    #[serde(rename = "maestro.detected")]
+    MaestroDetected(MaestroBuild),
 }
 
 /// Payload versions of the known types. Bump one when its payload changes incompatibly.
@@ -549,6 +562,7 @@ const VERSIONS: &[(&str, u16)] = &[
     ("agent.warning", 1),
     ("journal.gap", 1),
     ("parser.unrecognized", 1),
+    ("maestro.detected", 1),
 ];
 
 impl EventBody {
@@ -692,6 +706,10 @@ mod tests {
                 from_seq: 4,
                 to_seq: 9,
                 reason: "spool_full".into(),
+            }),
+            EventBody::MaestroDetected(MaestroBuild {
+                version: "2.12.1".into(),
+                profile_supported: true,
             }),
         ]
     }

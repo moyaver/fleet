@@ -16,10 +16,11 @@ expression: result
       "failure": null
     }
   ],
-  "events": 33,
+  "events": 34,
   "event_types": {
     "flow.ended": 1,
     "flow.started": 1,
+    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,

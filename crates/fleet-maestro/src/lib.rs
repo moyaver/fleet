@@ -22,6 +22,16 @@ use fleet_protocol::event::ExitClass;
 /// The Maestro version profile these parsers implement, for provenance (`maestro-log@2.12`).
 pub const PROFILE: &str = "2.12";
 
+/// Whether `version`, as `maestro --version` prints it, is in [`PROFILE`]: the same `major.minor`
+/// whatever the patch level.
+#[must_use]
+pub fn supports(version: &str) -> bool {
+    version == PROFILE
+        || version
+            .strip_prefix(PROFILE)
+            .is_some_and(|rest| rest.starts_with('.'))
+}
+
 /// Whether a JUnit report was expected from the run, and whether it showed up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReportState {
@@ -61,6 +71,17 @@ pub fn exit_class(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_version_is_supported_by_its_major_minor_profile_only() {
+        assert!(supports("2.12.1"));
+        assert!(supports("2.12.0-rc1"));
+        assert!(supports("2.12"));
+        assert!(!supports("2.120.0"));
+        assert!(!supports("2.13.0"));
+        assert!(!supports("2.1"));
+        assert!(!supports(""));
+    }
 
     #[test]
     fn exit_classes() {
