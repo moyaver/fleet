@@ -163,7 +163,9 @@ fn signal_after_ready(
 #[test]
 fn signals_are_forwarded_to_the_process_group() {
     // The child traps TERM and its own background grandchild proves the group was signalled.
-    let script = "trap 'echo got-term; exit 143' TERM; (trap 'echo grandchild-term; exit 0' TERM; sleep 30 & wait) & echo ready; wait";
+    // The subshell prints `ready` only after its own trap is set: a `ready` printed by the parent
+    // would let TERM arrive first, and the untrapped subshell would die silently.
+    let script = "trap 'echo got-term; exit 143' TERM; (trap 'echo grandchild-term; exit 0' TERM; echo ready; sleep 30 & wait) & wait";
     let (status, took, out) = signal_after_ready(script, "TERM", "10");
     assert_eq!(status.code(), Some(143), "{out}");
     assert!(
