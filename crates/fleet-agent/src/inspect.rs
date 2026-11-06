@@ -116,7 +116,19 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
     for e in &events {
         *event_types.entry(e.kind.clone()).or_default() += 1;
     }
-    let flows = session
+    let inspection = Inspection {
+        flows: flow_results(&session),
+        events: events.len(),
+        event_types,
+        unrecognized_stdout: session.unrecognized_stdout,
+        journal: journal.as_ref().map(journal_status),
+    };
+    Ok((inspection, events))
+}
+
+/// Every flow execution the session saw, resolved, in the order first seen.
+pub(crate) fn flow_results(session: &Session) -> Vec<FlowResult> {
+    session
         .summary()
         .into_iter()
         .map(|(f, r)| FlowResult {
@@ -134,15 +146,71 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
             steps: f.steps,
             failure: f.failure,
         })
-        .collect();
-    let inspection = Inspection {
-        flows,
-        events: events.len(),
-        event_types,
-        unrecognized_stdout: session.unrecognized_stdout,
-        journal: journal.as_ref().map(journal_status),
-    };
-    Ok((inspection, events))
+        .collect()
+}
+
+/// Most flows the job summary lists; the rest are counted, not listed.
+const SUMMARY_ROWS: usize = 50;
+
+/// The job summary: Markdown for `GITHUB_STEP_SUMMARY`. It has the outcome counts, the flows that
+/// did not pass with their provenance and reason, and a link to the dashboard when there is one.
+#[must_use]
+pub(crate) fn job_summary(flows: &[FlowResult], dashboard: Option<&str>) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::from("## Fleet\n\n");
+    if flows.is_empty() {
+        out.push_str("No flow results were recorded.\n");
+    } else {
+        let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+        for f in flows {
+            *counts.entry(f.outcome.as_str()).or_default() += 1;
+        }
+        let parts: Vec<String> = counts
+            .iter()
+            .map(|(outcome, n)| format!("{n} {outcome}"))
+            .collect();
+        let _ = writeln!(
+            out,
+            "Flows: {} ({} in total).",
+            parts.join(", "),
+            flows.len()
+        );
+    }
+    let open: Vec<&FlowResult> = flows.iter().filter(|f| f.outcome != "passed").collect();
+    if !open.is_empty() {
+        out.push_str("\n| Flow | Outcome | Provenance | Reason |\n|---|---|---|---|\n");
+        for f in open.iter().take(SUMMARY_ROWS) {
+            let provenance = match &f.source {
+                Some(source) => format!("{} ({source})", f.finality),
+                None => f.finality.clone(),
+            };
+            let _ = writeln!(
+                out,
+                "| {} | {} | {} | {} |",
+                table_cell(&f.name, 80),
+                f.outcome,
+                provenance,
+                table_cell(f.failure.as_deref().unwrap_or_default(), 200),
+            );
+        }
+        if open.len() > SUMMARY_ROWS {
+            let _ = writeln!(out, "\n{} more not listed.", open.len() - SUMMARY_ROWS);
+        }
+    }
+    if let Some(url) = dashboard {
+        let _ = writeln!(out, "\n[Open the Fleet dashboard]({url})");
+    }
+    out
+}
+
+/// One Markdown table cell: a single line, pipes escaped, at most `max` characters.
+fn table_cell(text: &str, max: usize) -> String {
+    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    one_line
+        .chars()
+        .take(max)
+        .collect::<String>()
+        .replace('|', "\\|")
 }
 
 /// The directory's `journal.jsonl`, if it has one.
