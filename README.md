@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is next.** The first release is [`v0.1.0-alpha.1`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.1); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
+> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is in progress.** The first release is [`v0.1.0-alpha.1`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.1); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -25,11 +25,12 @@ Fleet adds that missing observability layer. **It does not replace Maestro, sche
 
 ### What makes it different
 
-- **See the run as it happens.** The agent observes flow progress, Maestro output, debug bundles, JUnit results when available, and device/host health.
+- **See the run as it happens.** The agent observes flow progress, Maestro output, debug bundles, JUnit results when available, and device and host health: adb state, boot status, and guest CPU and memory for each device Maestro drives, plus per-run Maestro and agent resource use on a shared runner.
 - **Never turn uncertainty into success.** Results carry their evidence source; inferred or missing evidence cannot silently become a passing test.
 - **Keep CI behavior intact.** The supervisor preserves Maestro's output and exit status. A Fleet connection or observer failure does not fail the underlying test.
 - **Recover from interruption.** A bounded local journal/spool and server-authoritative acknowledgments let agents reconnect and replay; gaps are recorded rather than hidden.
 - **Keep your data on your infrastructure.** The server and Postgres are self-hosted. Sensitive values are redacted at the runner before telemetry is sent.
+- **Evidence for a failed flow.** A failed flow keeps its failure screenshot, the failing step's UI hierarchy with on-screen text redacted, a redacted logcat excerpt around the failing step, and Maestro's log opened at that step. Steps nested by `runFlow` and retry attempts are shown as a tree.
 
 The agent, server, and web dashboard are written in **Rust** (the dashboard is Leptos compiled to WebAssembly; no JavaScript). Fleet starts with Maestro; the underlying protocol and domain model are designed to accommodate other test runners later.
 
@@ -81,10 +82,10 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 2. Set `FLEET_SERVER` on your CI runner. Use GitHub Actions OIDC with an approved trust policy or a project API key (`FLEET_TOKEN`).
 3. Wrap your existing command with `fleet-agent run --`. Add `fleet-agent flush` as an always-run cleanup step if desired.
 
-The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.1` agent from its checksum-verified release, runs the Maestro command under it and writes a job summary to the run page.
+The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.1` agent from its checksum-verified release and runs the Maestro command under it. The job summary (failing flows and a dashboard link) needs an agent release that includes it; `v0.1.0-alpha.1` does not.
 
 > [!NOTE]
-> The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots and logs, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).
+> The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots, UI hierarchies, logs and a nested step tree, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).
 
 ## How it works
 
@@ -103,9 +104,17 @@ The supervisor is **fail-open**, the event stream is **resumable**, and the serv
 
 In the [Maestro phase-0 validation](research/08-phase0-results.md), a real emulator run established which progress signals could actually be observed. `cargo xtask bench-overhead` measures the agent's overhead on the captured suite, with and without the agent. On an Apple M1 Pro, a 50-second run used **0.20% of one core** and **17 MiB** of memory, and the agent added about **0.3 seconds** to the run. This is a specific measurement on one machine, **not a general performance guarantee**. See the [runner guide](docs/src/runner-guide.md#cost).
 
+**Against other tools.** A [comparative study](research/10-comparative-diagnosis-study.md) ran the same captured Maestro 2.12.1 runs through CI-only console reporting, Allure 3.33.0 and Fleet. Measured there:
+
+- Fleet reports the same outcome as Maestro's own JUnit report for every captured scenario in the fixture set (13 flows, 10 runs).
+- Allure 3.33.0 shows every failing Maestro flow in the set as passed (5 of 5 in its JUnit file). The study traces this to Allure's JUnit reader, which ignores a failure given as text only.
+- In the captured fixtures, CI-only reporting and Allure 3.33.0 cannot show the screen at a failing step. Fleet keeps the failure screenshot and UI hierarchy for it.
+
+ReportPortal was documented in the study, not run.
+
 ## Roadmap
 
-Fleet is being developed in milestones with tested exit criteria. The agent, server and dashboard are implemented; hardening and the v1.0 release come next.
+Fleet is being developed in milestones with tested exit criteria. The agent, server, dashboard and evidence are implemented; hardening (M6) is in progress, and the v1.0 release comes after it.
 
 | Milestone | Deliverable | Status |
 | --- | --- | --- |
@@ -114,7 +123,7 @@ Fleet is being developed in milestones with tested exit criteria. The agent, ser
 | **M3** | Durable ingest, authentication, live API, Postgres, reference deployment | Complete |
 | **M4** | Usable browser dashboard and end-to-end UI tests | Complete |
 | **M5** | Evidence viewers, history, flaky-test signals, Fleet Planner | Complete |
-| **M6** | Security hardening, RBAC, load tests, v1.0 release | Planned |
+| **M6** | Security hardening, RBAC, load tests, v1.0 release | In progress |
 
 [Milestone checklists and acceptance evidence](docs/ROADMAP.md) · [GitHub milestones](https://github.com/moyaver/fleet/milestones) · [Changelog](CHANGELOG.md)
 
@@ -128,6 +137,7 @@ The M2 agent already accepts **plan manifests and shard assignments**, and the M
 | [Runner guide](docs/src/runner-guide.md) | Device setup, signals, credentials, proxy and TLS behavior |
 | [Operator guide](docs/src/operator-guide.md) | Server configuration, operations, upgrades and load testing |
 | [Compose deployment](deploy/compose/README.md) | Self-hosting with Postgres 18, Caddy and Garage |
+| [Try Fleet on a free VM](docs/src/free-vm.md) | One cloud VM with the reference deployment and free DuckDNS names, for trying Fleet |
 | [Implementation plan](docs/PLAN.md) | Architecture, constraints, milestones and acceptance criteria |
 | [Research](research/00-synthesis.md) | Evidence behind design decisions and Maestro integration |
 | [ADRs](docs/decisions/README.md) | Why the architecture is built this way |

@@ -18,6 +18,8 @@ docker compose ps               # fleet turns healthy once migrations ran and Po
 
 Each release tag publishes the server image to `ghcr.io/moyaver/fleet` (`latest` for stable releases only). The compose file uses `ghcr.io/moyaver/fleet:0.1.0-alpha.1` by default. To run another release instead of building, set `FLEET_IMAGE=ghcr.io/moyaver/fleet:<version>` in `.env`, then `docker compose pull && docker compose up -d` without `--build`.
 
+Generate the Garage values in `.env` with `openssl rand -hex 32` for `GARAGE_RPC_SECRET` and `GARAGE_SECRET_KEY`, and with `GK` followed by `openssl rand -hex 12` for `GARAGE_ACCESS_KEY`.
+
 Fleet migrates on start (`FLEET_DATABASE__MIGRATE=auto`). For change-controlled upgrades set it to `manual` and run `docker compose run --rm fleet migrate`; `serve` then refuses a schema that is behind, or newer than the binary.
 
 ## Credentials for CI
@@ -31,7 +33,7 @@ Fleet migrates on start (`FLEET_DATABASE__MIGRATE=auto`). For change-controlled 
 
 Uploaded files (Maestro HTML reports, screenshots, logs) are served from a second hostname, `FLEET_USERCONTENT_DOMAIN`, which must resolve to the same proxy and have its own certificate; in production use a different registrable domain from `FLEET_DOMAIN`. See the [operator guide](../../docs/src/operator-guide.md#usercontent-domain).
 
-Point agents at `FLEET_SERVER=https://<FLEET_DOMAIN>`. Until browser sign-in arrives (M4), the REST API and live socket take the viewer token in `secrets/viewer_token` as a bearer token.
+Point agents at `FLEET_SERVER=https://<FLEET_DOMAIN>`. The REST API and live socket take the viewer token in `secrets/viewer_token` as a bearer token. Browser sign-in uses the `[login]` section of `fleet.toml` ([operator guide](../../docs/src/operator-guide.md#browser-sign-in)).
 
 With `FLEET_DOMAIN=localhost` Caddy signs with its own CA. Export it for agents (`FLEET_CA_FILE`) and other clients:
 

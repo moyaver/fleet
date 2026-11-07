@@ -15,7 +15,7 @@ Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milest
 | ✅ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
 | ✅ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
 | ✅ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
-| ⬜ | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
+| 🚧 | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
 | ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
 
 ✅ done · 🚧 in progress · ⏭️ next · ⬜ not started
@@ -133,11 +133,11 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 
 Tracking: [#86](https://github.com/moyaver/fleet/issues/86). Items from the [2026-11-06 competitive review](../research/09-competitive-review-2026-11.md) are included.
 
-- [ ] Correct results: nested steps, retry attempts, supervisor passthrough, dashboard and worker fixes, infrastructure exclusions in flaky analysis, Maestro version per run
-- [ ] Evidence Maestro already writes: missing fixtures first, then step artifact links, UI hierarchy, bounded logcat, device samples, host metric series
-- [ ] Install and operate: first pre-release, composite GitHub Action with a job summary, server image, backup and restore
-- [ ] Hardening: rate limits, multi-instance fan-out, bounded journal, remaining agent review items, accessibility
-- [ ] Proof: nightly real-Maestro job, repeatable overhead benchmark, planner planned vs actual, comparative diagnosis study
+- [ ] Correct results: nested steps and retry attempts (#134), the post-exit drain of a backed-up CI log (#128), per-run runner metrics (#129), Maestro version per run (migration 0013). Open: infrastructure exclusions in flaky analysis
+- [ ] Evidence Maestro already writes: missing fixtures (#130), the failing step's UI hierarchy (#132), a bounded logcat excerpt and `app.crashed` (#131), device samples (#136). Open: Maestro's `takeScreenshot` images and recordings (#133), and an ANR fixture (#77; not captured)
+- [ ] Install and operate: composite GitHub Action with a job summary (#125), the server image for amd64 and arm64, backup and restore, and a free-VM guide ([Try Fleet on a free VM](src/free-vm.md)). Open: a release whose agent includes the job summary, which `v0.1.0-alpha.1` does not
+- [ ] Hardening: rate limits for pre-auth, agent and viewer requests (#118, #135), a bounded journal (`FLEET_JOURNAL_MAX_BYTES`). Open: multi-instance fan-out, remaining agent review items, accessibility
+- [ ] Proof: nightly real-Maestro job on the owner's Mac (#127), repeatable overhead benchmark (`cargo xtask bench-overhead`), comparative diagnosis study ([research 10](../research/10-comparative-diagnosis-study.md), #137), planner planned vs actual
 
 ### Owner actions
 
