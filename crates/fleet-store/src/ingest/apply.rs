@@ -11,9 +11,9 @@ use std::collections::BTreeSet;
 use fleet_core::claims::Claim;
 use fleet_protocol::{
     event::{
-        AdbState, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed, RunEnded, RunSignal,
-        RunStarted, ShardAssigned, StepEnded, StepStarted, SuiteStarted,
+        AdbState, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef,
+        FlowReported, JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed,
+        RunEnded, RunSignal, RunStarted, ShardAssigned, StepEnded, StepStarted, SuiteStarted,
     },
     journal::{EventEnvelope, SourceKind},
 };
@@ -168,6 +168,7 @@ impl<'a> Ctx<'a> {
             EventBody::StepEnded(b) => self.step_ended(tx, e, &b).await,
             EventBody::FlowEnded(b) => self.flow_ended(tx, e, &b).await,
             EventBody::FlowReported(b) => self.flow_reported(tx, e, &b).await,
+            EventBody::AppCrashed(b) => self.app_crashed(tx, e, &b).await,
             EventBody::ProcessExited(b) => self.process_exited(tx, e, &b).await,
             EventBody::ReportParsed(b) => self.report_parsed(tx, e, &b).await,
             EventBody::RunSignal(b) => self.run_signal(tx, &b).await,
@@ -182,7 +183,6 @@ impl<'a> Ctx<'a> {
             | EventBody::ArtifactUploaded(_)
             | EventBody::ArtifactRejected(_)
             | EventBody::AgentWarning(_)
-            | EventBody::AppCrashed(_)
             | EventBody::ParserUnrecognized(_) => Ok(Effect::Applied),
         }
     }
@@ -475,6 +475,35 @@ impl<'a> Ctx<'a> {
                 format!("flow execution {id} was never declared"),
             )),
         })
+    }
+
+    /// Records the app's crash on its flow. Evidence only (I3): no claim, and the flow's state,
+    /// outcome and failure are Maestro's. The first report of a crash is kept.
+    async fn app_crashed(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &AppCrashed,
+    ) -> Result<Effect, sqlx::Error> {
+        let flow = match self.owned_flow(tx, e).await? {
+            Ok(f) => f,
+            Err(effect) => return Ok(effect),
+        };
+        sqlx::query!(
+            "UPDATE flow_executions
+                SET crash_package = coalesce(crash_package, $2),
+                    crash_exception = coalesce(crash_exception, $3),
+                    rev = rev + 1
+              WHERE id = $1 AND agent_run_id = $4",
+            flow,
+            b.package,
+            b.exception,
+            self.run.agent_run_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        self.changed.insert(EntityRef::Flow(flow));
+        Ok(Effect::Applied)
     }
 
     async fn step_started(

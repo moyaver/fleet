@@ -7,7 +7,7 @@
     reason = "Leptos's #[component] macro generates the props structs"
 )]
 
-use fleet_protocol::rest::FlowDetailView;
+use fleet_protocol::rest::{CrashView, FlowDetailView};
 use fleet_ui::{
     components::display::{Card, ProvenanceBadge, TableBox},
     steps::view::StepTreeView,
@@ -21,7 +21,7 @@ use crate::{
         common::Ctx,
         device::model::DeviceSessionRow,
         flow::{
-            evidence_view::{EvidenceCard, EvidenceFeed},
+            evidence_view::{EvidenceCard, EvidenceFeed, LogcatLink},
             model::{
                 CiSection, ClaimRow, ClaimsSection, Failure, FailureDetails, FlowHeader, FlowPage,
                 PreviousRow, StepRef, StepsSection,
@@ -75,6 +75,7 @@ pub fn FlowPageView(
                            let page = FlowPage::build(&f, &ctx.get_untracked());
                            view! {
                                <HeaderView header=header />
+                               <CrashNotice crash=page.crash evidence />
                                <FailureCard failure=page.failure />
                                <StepsCard steps=page.steps on_select=Some(on_select_step) />
                                <ClaimsCard claims=page.claims />
@@ -115,6 +116,29 @@ fn HeaderView(
             }
         })
     }
+}
+
+/// The app crash Maestro's run recorded during the flow, above the failure. Evidence, not the
+/// verdict: the failure and its message stay Maestro's, below it.
+#[component]
+fn CrashNotice(
+    /// The crash, when one was recorded.
+    crash: Option<CrashView>,
+    /// What the route fetched, for the logcat excerpt.
+    evidence: EvidenceFeed,
+) -> impl IntoView {
+    crash.map(|c| {
+        view! {
+            <div class="space-y-1 text-sm text-tone-danger-fg">
+                <p class="font-medium" data-testid="crash-message">
+                    {format!("app crashed: {} in {}", c.exception, c.package)}
+                </p>
+                <p class="text-sm">
+                    <LogcatLink feed=evidence />
+                </p>
+            </div>
+        }
+    })
 }
 
 fn step_text(step: Option<StepRef>) -> String {

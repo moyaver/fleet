@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard: a flow whose app crashed shows `app crashed: <exception> in <package>` above Maestro's failure, with a link to the device logcat excerpt (or a note that none was uploaded); the flow's result and failure message stay Maestro's (#152).
+
 ### Changed
 
 - Dashboard: the redesign's foundation: graphite and paper tokens, self-hosted IBM Plex, one Title Case status vocabulary ("Not started" replaces "Pending", a completed step reads "Passed"), monochrome provenance labels, a shared top bar with a live indicator on the pipeline page, and sections without cards.

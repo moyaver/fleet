@@ -130,6 +130,8 @@ pub struct EvidenceFiles {
     pub commands: Option<TextFile>,
     /// Maestro's HTML report, which opens on the usercontent origin, sandboxed.
     pub report: Option<EvidenceLink>,
+    /// The device logcat excerpt, when one was uploaded (it is also in `downloads`).
+    pub logcat: Option<EvidenceLink>,
     /// The other available files, to save.
     pub downloads: Vec<EvidenceLink>,
     /// Uploads the server refused.
@@ -229,6 +231,7 @@ impl Evidence {
             log: None,
             commands: None,
             report: None,
+            logcat: None,
             downloads: Vec::new(),
             refused: Vec::new(),
         };
@@ -290,9 +293,11 @@ impl Evidence {
                     files.commands = Some(text());
                     files.downloads.push(open());
                 }
-                Some(ArtifactClass::Junit | ArtifactClass::DeviceLogcat) | None => {
+                Some(ArtifactClass::DeviceLogcat) => {
+                    files.logcat = Some(open());
                     files.downloads.push(open());
                 }
+                Some(ArtifactClass::Junit) | None => files.downloads.push(open()),
             }
         }
         Self::Files(Box::new(files))
@@ -800,6 +805,7 @@ mod tests {
                 href: "https://uc.example.net/u/p/6/1/s/device-logcat.txt".to_owned(),
             }]
         );
+        assert_eq!(f.logcat, f.downloads.first().cloned());
         assert!(f.log.is_none(), "the excerpt is not the Maestro log");
     }
 

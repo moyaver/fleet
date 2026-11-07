@@ -57,6 +57,34 @@ impl EvidenceFeed {
     }
 }
 
+/// The flow's device logcat excerpt, as a link once the evidence has loaded, or a plain statement
+/// when none was uploaded. Read from the feed, so a renewed link updates it in place.
+#[component]
+pub fn LogcatLink(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+) -> impl IntoView {
+    move || {
+        // `None` while the evidence loads or cannot be opened: the card above says which.
+        let logcat = feed.evidence.with(|e| match e {
+            Evidence::Files(files) => Some(files.logcat.clone()),
+            Evidence::Nothing(_) => Some(None),
+            _ => None,
+        });
+        match logcat {
+            None => ().into_any(),
+            Some(None) => view! { <span>"No logcat excerpt was uploaded for this flow."</span> }.into_any(),
+            Some(Some(link)) => view! {
+                <a class="underline" href=link.href rel="noopener noreferrer" data-testid="crash-logcat">
+                    "Device logcat excerpt"
+                </a>
+                <span class="ml-2 text-muted">{link.size}</span>
+            }
+            .into_any(),
+        }
+    }
+}
+
 /// The evidence card of screen D.
 ///
 /// A signed-link renewal rebuilds the evidence, but the card mounts its parts only when what it

@@ -8,7 +8,7 @@
 use fleet_protocol::{
     event::StepStatus,
     live::AgentRunView,
-    rest::{ClaimView, FlowDetailView, StepView},
+    rest::{ClaimView, CrashView, FlowDetailView, StepView},
 };
 use fleet_ui::{
     charts::format::format_duration,
@@ -164,6 +164,8 @@ pub struct FlowPage {
     pub claims: ClaimsSection,
     /// Why it failed.
     pub failure: Failure,
+    /// The app crash recorded during the flow, if any: evidence beside the failure, not a verdict.
+    pub crash: Option<CrashView>,
     /// The steps.
     pub steps: StepsSection,
     /// Earlier executions of the same flow, newest first.
@@ -252,6 +254,7 @@ impl FlowPage {
                 .map(|d| DeviceSessionRow::build(d, ctx)),
             claims: claims(&view.claims, ctx),
             failure: failure(view),
+            crash: view.crash.clone(),
             steps: steps(view),
             previous: view
                 .previous
@@ -503,6 +506,8 @@ mod tests {
       ],
       "failure": {"message": "Element not found: Done", "failed_step_index": 2,
                   "last_successful_step_index": 1},
+      "crash": {"package": "com.example.shop",
+                "exception": "java.lang.IllegalStateException: cart is empty"},
       "previous": [
         {"flow_id": "00000000-0000-0000-0000-0000000000f0",
          "pipeline_attempt_id": "00000000-0000-0000-0000-0000000000c0", "state": "passed",
@@ -647,6 +652,27 @@ mod tests {
                 label: "Tap on \"Pay\"".to_owned()
             })
         );
+    }
+
+    #[test]
+    fn a_crash_is_carried_beside_the_failure_and_is_absent_when_none_was_recorded() {
+        let crash = page().crash.expect("the fixture records a crash");
+        assert_eq!(crash.package, "com.example.shop");
+        assert_eq!(
+            crash.exception,
+            "java.lang.IllegalStateException: cart is empty"
+        );
+        let Failure::Failed(f) = page().failure else {
+            panic!("the flow failed");
+        };
+        assert_eq!(
+            f.message.as_deref(),
+            Some("Element not found: Done"),
+            "the verdict stays Maestro's failure"
+        );
+        let mut v = view();
+        v.crash = None;
+        assert_eq!(FlowPage::build(&v, &ctx()).crash, None);
     }
 
     #[test]

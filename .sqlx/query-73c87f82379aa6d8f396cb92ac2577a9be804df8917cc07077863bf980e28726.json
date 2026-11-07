@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions\n                SET crash_package = coalesce(crash_package, $2),\n                    crash_exception = coalesce(crash_exception, $3),\n                    rev = rev + 1\n              WHERE id = $1 AND agent_run_id = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "73c87f82379aa6d8f396cb92ac2577a9be804df8917cc07077863bf980e28726"
+}
