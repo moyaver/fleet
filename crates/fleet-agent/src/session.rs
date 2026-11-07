@@ -135,6 +135,8 @@ struct Shard {
     id: Uuid,
     device_session_id: Uuid,
     planned: Vec<String>,
+    /// The device serial Maestro selected for the shard, from its log.
+    serial: Option<String>,
 }
 
 /// Generates entity IDs: UUIDv7 live, deterministic in tests and `inspect`.
@@ -156,7 +158,8 @@ pub(crate) struct Session {
     /// The Maestro build the session log named, once it has.
     maestro: Option<MaestroBuild>,
     pub(crate) unrecognized_stdout: u32,
-    devices: std::collections::BTreeMap<String, fleet_protocol::event::AdbState>,
+    /// adb's latest device list; `None` until adb has pushed one (so no device is known absent).
+    devices: Option<std::collections::BTreeMap<String, fleet_protocol::event::AdbState>>,
     out: Vec<EventEnvelope>,
     /// Files worth uploading that the observer hasn't taken yet.
     uploads: Vec<Candidate>,
@@ -250,7 +253,7 @@ impl Session {
             signalled: false,
             maestro: None,
             unrecognized_stdout: 0,
-            devices: std::collections::BTreeMap::new(),
+            devices: None,
             out: Vec::new(),
             uploads: Vec::new(),
         };
@@ -389,18 +392,19 @@ impl Session {
         list: Vec<(String, fleet_protocol::event::AdbState)>,
     ) {
         use fleet_protocol::event::{AdbState, DeviceStateObserved};
+        let previous = self.devices.take().unwrap_or_default();
         let mut changes: Vec<(String, AdbState)> = list
             .iter()
-            .filter(|(s, st)| self.devices.get(s) != Some(st))
+            .filter(|(s, st)| previous.get(s) != Some(st))
             .cloned()
             .collect();
         changes.extend(
-            self.devices
+            previous
                 .keys()
                 .filter(|s| !list.iter().any(|(l, _)| l == *s))
                 .map(|s| (s.clone(), AdbState::Absent)),
         );
-        self.devices = list.into_iter().collect();
+        self.devices = Some(list.into_iter().collect());
         for (serial, state) in changes {
             self.emit(
                 at,
@@ -423,6 +427,7 @@ impl Session {
                 let suite_execution_id = Some(self.suite_id);
                 let s = self.shard(shard);
                 s.planned.clone_from(&flows);
+                s.serial = Some(serial.clone());
                 let subject = Subject {
                     suite_execution_id,
                     shard_id: Some(s.id),
@@ -1059,6 +1064,30 @@ impl Session {
         );
     }
 
+    /// The device each shard Maestro selected, once per serial (the first shard that selected
+    /// it), with the device session that shard's events name. Only these devices are probed.
+    pub(crate) fn driven_devices(&self) -> Vec<(String, Uuid)> {
+        let mut out: Vec<(String, Uuid)> = Vec::new();
+        for shard in &self.shards {
+            if let Some(serial) = &shard.serial
+                && !out.iter().any(|(s, _)| s == serial)
+            {
+                out.push((serial.clone(), shard.device_session_id));
+            }
+        }
+        out
+    }
+
+    /// adb's state for `serial` in the latest device list: `Absent` when the list lacks it, and
+    /// `None` before any list has arrived.
+    pub(crate) fn adb_state(&self, serial: &str) -> Option<fleet_protocol::event::AdbState> {
+        self.devices.as_ref().map(|list| {
+            list.get(serial)
+                .copied()
+                .unwrap_or(fleet_protocol::event::AdbState::Absent)
+        })
+    }
+
     fn shard(&mut self, number: u32) -> &mut Shard {
         if !self.shards.iter().any(|s| s.number == number) {
             let (id, device_session_id) = ((self.new_id)(), (self.new_id)());
@@ -1067,6 +1096,7 @@ impl Session {
                 id,
                 device_session_id,
                 planned: Vec::new(),
+                serial: None,
             });
         }
         let pos = self
@@ -1384,6 +1414,53 @@ mod tests {
         let mut s = session();
         file(&mut s, "pass/commands.json", Some(FAILED));
         assert_eq!(artifact_outcomes(&s), [FlowOutcome::Failed]);
+    }
+
+    #[test]
+    fn only_the_devices_maestro_selected_are_driven_and_adb_states_come_from_its_list() {
+        let mut s = session();
+        assert_eq!(
+            s.adb_state("emulator-5584"),
+            None,
+            "no list yet: nothing is absent"
+        );
+        s.observe(
+            at(),
+            Observation::Devices(vec![
+                (
+                    "emulator-5584".into(),
+                    fleet_protocol::event::AdbState::Device,
+                ),
+                ("R58M".into(), fleet_protocol::event::AdbState::Device),
+            ]),
+        );
+        assert!(
+            s.driven_devices().is_empty(),
+            "a device nobody selected is not probed"
+        );
+        log_line(
+            &mut s,
+            "maestro.cli.command.TestCommand",
+            "[shard 1] Selected device emulator-5584 using port 54235 with execution plan ExecutionPlan(flowsToRun=[/a/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))",
+        );
+        let driven = s.driven_devices();
+        assert_eq!(driven.len(), 1);
+        assert_eq!(driven[0].0, "emulator-5584");
+        assert_eq!(
+            Some(driven[0].1),
+            s.shards.first().map(|sh| sh.device_session_id),
+            "the samples belong to the device session the shard event names"
+        );
+        assert_eq!(
+            s.adb_state("emulator-5584"),
+            Some(fleet_protocol::event::AdbState::Device)
+        );
+        s.observe(at(), Observation::Devices(Vec::new()));
+        assert_eq!(
+            s.adb_state("emulator-5584"),
+            Some(fleet_protocol::event::AdbState::Absent),
+            "gone from adb's list"
+        );
     }
 
     fn log_line(s: &mut Session, logger: &str, message: &str) {

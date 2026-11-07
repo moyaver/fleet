@@ -79,6 +79,8 @@ enum ProcessCol {
 enum DeviceCol {
     EmuCpu,
     EmuRss,
+    AdbState,
+    BootCompleted,
     GuestCpu,
     GuestMemAvailable,
 }
@@ -233,7 +235,7 @@ const PROCESS: [Def<ProcessCol>; 4] = [
     ),
 ];
 
-const DEVICE: [Def<DeviceCol>; 5] = [
+const DEVICE: [Def<DeviceCol>; 7] = [
     def(
         "emu_cpu_pct",
         "Emulator CPU",
@@ -249,6 +251,22 @@ const DEVICE: [Def<DeviceCol>; 5] = [
         Emulator,
         Some(DeviceCol::EmuRss),
         Some(Max),
+    ),
+    def(
+        "adb_state",
+        "ADB state (0 device, 1 offline, 2 unauthorized, 3 absent, 4 other)",
+        Number,
+        Device,
+        Some(DeviceCol::AdbState),
+        None,
+    ),
+    def(
+        "boot_completed",
+        "Boot completed (1 = yes, 0 = not yet)",
+        Number,
+        Device,
+        Some(DeviceCol::BootCompleted),
+        None,
     ),
     def(
         "guest_cpu_pct",
@@ -304,6 +322,8 @@ fn device_value(c: DeviceCol, r: &DeviceRow) -> Option<f64> {
     match c {
         DeviceCol::EmuCpu => r.emu_cpu_pct,
         DeviceCol::EmuRss => r.emu_rss_bytes,
+        DeviceCol::AdbState => r.adb_state,
+        DeviceCol::BootCompleted => r.boot_completed,
         DeviceCol::GuestCpu => r.guest_cpu_pct,
         DeviceCol::GuestMemAvailable => r.guest_mem_available_bytes,
     }

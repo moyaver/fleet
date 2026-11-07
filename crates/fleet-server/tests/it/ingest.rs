@@ -94,6 +94,7 @@ async fn shutdown_sends_goaway_the_final_telemetry_ack_and_1012() {
         tseq_from: 1,
         tseq_to: 2,
         dropped_since_last: 0,
+        devices: Vec::new(),
         samples: vec![
             Sample {
                 at,
@@ -172,6 +173,7 @@ async fn telemetry_is_acked_after_its_checkpoint() {
         tseq_from: 7,
         tseq_to: 7,
         dropped_since_last: 6,
+        devices: Vec::new(),
         samples: vec![Sample {
             at: ClockSample {
                 wall: OffsetDateTime::now_utc(),

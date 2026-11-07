@@ -24,7 +24,7 @@ use fleet_maestro::{ReportState, stdout::strip_ansi};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{ArtifactRejected, ArtifactUploaded, EventBody, EvidenceSources},
-    frame::Telemetry,
+    frame::{DeviceSample, Telemetry},
     journal::ClockSample,
 };
 use time::OffsetDateTime;
@@ -32,6 +32,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::{
+    device::{Probes, Target},
     ipc::{Control, Frame, Stream},
     journal::Writer,
     metrics::Sampler,
@@ -147,6 +148,10 @@ struct Live {
     tseq: u64,
     dropped_bytes: u64,
     devices: mpsc::Receiver<Vec<(String, fleet_protocol::event::AdbState)>>,
+    /// Device probes for the devices Maestro drives (PLAN §6.5); used only when telemetry is sent.
+    probes: Probes,
+    /// Device samples waiting for the next telemetry frame.
+    pending_devices: Vec<DeviceSample>,
     /// Uploads artifacts (PLAN §6.6); `None` offline or with `FLEET_UPLOAD_ARTIFACTS=off`.
     uploader: Option<Uploader>,
     /// Maestro's debug output directory: where the files to upload are.
@@ -255,8 +260,24 @@ async fn observe() -> io::Result<Option<String>> {
                 if let Some(l) = live.as_mut() {
                     let s = l.sampler.sample(clock());
                     l.tseq += 1;
+                    l.pending_devices.extend(l.probes.take());
+                    if l.telemetry.is_some() {
+                        let at = clock();
+                        let targets: Vec<Target> = l
+                            .session
+                            .driven_devices()
+                            .into_iter()
+                            .map(|(serial, device_session_id)| Target {
+                                adb_state: l.session.adb_state(&serial),
+                                serial,
+                                device_session_id,
+                            })
+                            .collect();
+                        l.probes.start_due(Instant::now(), &at, &targets);
+                    }
+                    let devices = std::mem::take(&mut l.pending_devices);
                     if let Some(t) = &l.telemetry {
-                        let _ = t.try_send(Telemetry { tseq_from: l.tseq, tseq_to: l.tseq, dropped_since_last: 0, samples: vec![s] });
+                        let _ = t.try_send(Telemetry { tseq_from: l.tseq, tseq_to: l.tseq, dropped_since_last: 0, samples: vec![s], devices });
                     }
                 }
             }
@@ -385,6 +406,8 @@ fn start(
         tseq: 0,
         dropped_bytes: 0,
         devices,
+        probes: Probes::new(crate::adb::server_addr()),
+        pending_devices: Vec::new(),
     }
 }
 

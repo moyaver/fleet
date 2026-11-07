@@ -656,6 +656,7 @@ async fn stream(
             tseq_from: tseq,
             tseq_to: tseq,
             dropped_since_last: 0,
+            devices: Vec::new(),
             samples: vec![host_sample(t0)],
         })))
         .await?;

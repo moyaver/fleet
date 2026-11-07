@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,\n                            emu_rss_max::float8 AS emu_rss_bytes,\n                            NULL::float8 AS guest_cpu_pct,\n                            NULL::float8 AS guest_mem_available_bytes\n                       FROM device_rollup_1h\n                      WHERE project_id = $1 AND device_session_id = $2\n                        AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket LIMIT $5",
+  "query": "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,\n                            emu_rss_max::float8 AS emu_rss_bytes,\n                            NULL::float8 AS adb_state, NULL::float8 AS boot_completed,\n                            NULL::float8 AS guest_cpu_pct,\n                            NULL::float8 AS guest_mem_available_bytes\n                       FROM device_rollup_1h\n                      WHERE project_id = $1 AND device_session_id = $2\n                        AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -28,12 +28,24 @@
       },
       {
         "ordinal": 3,
-        "name": "guest_cpu_pct",
+        "name": "adb_state",
         "type_info": "Float8",
         "origin": "Expression"
       },
       {
         "ordinal": 4,
+        "name": "boot_completed",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "guest_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
         "name": "guest_mem_available_bytes",
         "type_info": "Float8",
         "origin": "Expression"
@@ -53,8 +65,10 @@
       null,
       null,
       null,
+      null,
+      null,
       null
     ]
   },
-  "hash": "4316b3e557b5211ebc414ddda11d58939ce701740b1520f6c899bcbc83e78496"
+  "hash": "003d24ab2c19ce3dd2370c307968a69f6e658dcfb2b90a42f075e48d1e5341ed"
 }

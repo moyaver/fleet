@@ -1,5 +1,35 @@
 {
   "$defs": {
+    "AdbState": {
+      "description": "adb's view of a device.",
+      "oneOf": [
+        {
+          "const": "device",
+          "description": "Online and usable.",
+          "type": "string"
+        },
+        {
+          "const": "offline",
+          "description": "Connected but not responding.",
+          "type": "string"
+        },
+        {
+          "const": "unauthorized",
+          "description": "Needs authorization on the device.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "Gone from adb's list.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "Another state adb reported.",
+          "type": "string"
+        }
+      ]
+    },
     "AgentInfo": {
       "description": "The agent build.",
       "properties": {
@@ -125,6 +155,64 @@
       "required": [
         "wall",
         "mono_ms"
+      ],
+      "type": "object"
+    },
+    "DeviceSample": {
+      "description": "One device's sample: what adb and the guest reported about a device session at one time.\n`None` means that reading was not observed; a device that could not be reached has `None`\nreadings, never zeros.",
+      "properties": {
+        "adb_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AdbState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "adb's state for the device at sampling time, from the device list adb pushed. `Absent`\nmeans the list did not contain it."
+        },
+        "at": {
+          "$ref": "#/$defs/ClockSample",
+          "description": "When the probe was started."
+        },
+        "boot_completed": {
+          "default": null,
+          "description": "Whether `sys.boot_completed` was `1` when the probe ran. `None`: the probe did not answer.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "device_session_id": {
+          "description": "The device session the sample belongs to (its `shard.assigned` event names it).",
+          "format": "uuid",
+          "type": "string"
+        },
+        "guest_cpu_pct": {
+          "default": null,
+          "description": "The guest's CPU use since the previous probe of this device, percent of all its cores.\n`None` for the first probe and when the probe did not answer.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "guest_mem_available_bytes": {
+          "default": null,
+          "description": "The guest's `MemAvailable`, bytes. `None` when the probe did not answer.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "at",
+        "device_session_id"
       ],
       "type": "object"
     },
@@ -552,6 +640,13 @@
     "Telemetry": {
       "description": "A batch of metric samples.",
       "properties": {
+        "devices": {
+          "description": "Device samples taken since the previous batch, one per device per sampling interval\n(PLAN §6.5). Absent from older agents.",
+          "items": {
+            "$ref": "#/$defs/DeviceSample"
+          },
+          "type": "array"
+        },
         "dropped_since_last": {
           "default": 0,
           "description": "Samples dropped since the previous batch (the ring was full).",

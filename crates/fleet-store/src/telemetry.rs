@@ -6,7 +6,7 @@
 //! primary key is `(agent_run_id, ts)`), and every loss is recorded: samples the agent dropped
 //! (`dropped_since_last`) and samples whose clock is too far off to store.
 
-use fleet_protocol::frame::Telemetry;
+use fleet_protocol::{event::AdbState, frame::Telemetry};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -34,6 +34,7 @@ impl Store {
         let now = OffsetDateTime::now_utc();
         let mut tx = self.pool().begin().await?;
         let mut cols = Columns::default();
+        let mut devices = DeviceColumns::default();
         let mut through: Vec<(Uuid, u64)> = Vec::new();
         for b in batches {
             let t = &b.batch;
@@ -56,12 +57,20 @@ impl Store {
             if let Some((from, to)) = skewed {
                 gap(&mut tx, b.agent_run_id, from, to, "clock_skew").await?;
             }
+            for d in &t.devices {
+                // Device rows have no tseq of their own, so a skewed one is dropped, not recorded
+                // as a gap (the gap ranges count the host samples of the frame).
+                if (d.at.wall - now).abs() <= MAX_SKEW {
+                    devices.push(b, d);
+                }
+            }
             match through.iter_mut().find(|(r, _)| *r == b.agent_run_id) {
                 Some((_, t0)) => *t0 = (*t0).max(t.tseq_to),
                 None => through.push((b.agent_run_id, t.tseq_to)),
             }
         }
         cols.insert(&mut tx).await?;
+        devices.insert(&mut tx).await?;
         for (run, t) in &through {
             sqlx::query!(
                 "UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2)
@@ -123,12 +132,75 @@ struct Columns {
     psi_io: Vec<Option<f32>>,
 }
 
+/// adb's state as the `device_samples.adb_state` code: 0 device, 1 offline, 2 unauthorized,
+/// 3 absent, 4 another state. NULL means adb did not report one.
+fn adb_code(state: AdbState) -> i16 {
+    match state {
+        AdbState::Device => 0,
+        AdbState::Offline => 1,
+        AdbState::Unauthorized => 2,
+        AdbState::Absent => 3,
+        AdbState::Other => 4,
+    }
+}
+
 fn opt_i64(v: Option<u64>) -> Option<i64> {
     v.and_then(|v| i64::try_from(v).ok())
 }
 
 fn opt_i32(v: Option<u32>) -> Option<i32> {
     v.and_then(|v| i32::try_from(v).ok())
+}
+
+/// One device sample per row of `device_samples`, for an insert with `unnest`.
+#[derive(Default)]
+struct DeviceColumns {
+    ts: Vec<OffsetDateTime>,
+    session: Vec<Uuid>,
+    run: Vec<Uuid>,
+    project: Vec<Uuid>,
+    adb_state: Vec<Option<i16>>,
+    boot_completed: Vec<Option<bool>>,
+    guest_cpu: Vec<Option<f32>>,
+    guest_mem: Vec<Option<i64>>,
+}
+
+impl DeviceColumns {
+    fn push(&mut self, b: &TelemetryBatch, d: &fleet_protocol::frame::DeviceSample) {
+        self.ts.push(d.at.wall);
+        self.session.push(d.device_session_id);
+        self.run.push(b.agent_run_id);
+        self.project.push(b.project_id);
+        self.adb_state.push(d.adb_state.map(adb_code));
+        self.boot_completed.push(d.boot_completed);
+        self.guest_cpu.push(d.guest_cpu_pct);
+        self.guest_mem.push(opt_i64(d.guest_mem_available_bytes));
+    }
+
+    async fn insert(&self, tx: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
+        if self.ts.is_empty() {
+            return Ok(());
+        }
+        sqlx::query!(
+            "INSERT INTO device_samples (ts, device_session_id, agent_run_id, project_id,
+                                         adb_state, boot_completed, guest_cpu_pct,
+                                         guest_mem_available_bytes)
+             SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],
+                                  $5::smallint[], $6::boolean[], $7::real[], $8::bigint[])
+             ON CONFLICT DO NOTHING",
+            &self.ts,
+            &self.session,
+            &self.run,
+            &self.project,
+            &self.adb_state as &[Option<i16>],
+            &self.boot_completed as &[Option<bool>],
+            &self.guest_cpu as &[Option<f32>],
+            &self.guest_mem as &[Option<i64>]
+        )
+        .execute(&mut *tx)
+        .await?;
+        Ok(())
+    }
 }
 
 impl Columns {
@@ -194,5 +266,93 @@ impl Columns {
         .execute(&mut *tx)
         .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fleet_protocol::{frame::DeviceSample, journal::ClockSample};
+    use sqlx::PgPool;
+
+    use super::*;
+
+    fn device(wall: OffsetDateTime, session: Uuid) -> DeviceSample {
+        DeviceSample {
+            at: ClockSample { wall, mono_ms: 0 },
+            device_session_id: session,
+            adb_state: None,
+            boot_completed: None,
+            guest_cpu_pct: None,
+            guest_mem_available_bytes: None,
+        }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn device_samples_keep_adbs_state_and_leave_unknown_readings_null(pool: PgPool) {
+        let store = Store {
+            pool,
+            origin: Uuid::now_v7(),
+        };
+        let project = store.upsert_project("app", "App").await.unwrap();
+        let worker = sqlx::query_scalar!(
+            "INSERT INTO workers (project_id, identity_key) VALUES ($1, 'runner-a') RETURNING id",
+            project
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        let (run, session) = (Uuid::now_v7(), Uuid::now_v7());
+        let now = OffsetDateTime::now_utc();
+        let mut answered = device(now - time::Duration::seconds(60), session);
+        answered.adb_state = Some(AdbState::Device);
+        answered.boot_completed = Some(true);
+        answered.guest_cpu_pct = Some(12.5);
+        answered.guest_mem_available_bytes = Some(2 << 30);
+        let mut unreachable = device(now - time::Duration::seconds(30), session);
+        unreachable.adb_state = Some(AdbState::Offline);
+        // A clock two days off is not stored: there is no partition for it.
+        let skewed = device(now - time::Duration::days(2), session);
+        let batch = TelemetryBatch {
+            agent_run_id: run,
+            project_id: project,
+            worker_id: worker,
+            batch: Telemetry {
+                tseq_from: 1,
+                tseq_to: 1,
+                dropped_since_last: 0,
+                samples: Vec::new(),
+                devices: vec![answered, unreachable, skewed],
+            },
+        };
+
+        store.store_telemetry(&[batch]).await.unwrap();
+
+        let rows = sqlx::query!(
+            "SELECT adb_state, boot_completed, guest_cpu_pct, guest_mem_available_bytes
+               FROM device_samples WHERE device_session_id = $1 ORDER BY ts",
+            session
+        )
+        .fetch_all(store.pool())
+        .await
+        .unwrap();
+        let rows: Vec<_> = rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.adb_state,
+                    r.boot_completed,
+                    r.guest_cpu_pct,
+                    r.guest_mem_available_bytes,
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                (Some(0), Some(true), Some(12.5), Some(2_i64 << 30)),
+                (Some(1), None, None, None),
+            ],
+            "device, offline; the unknowns are NULL, never zero"
+        );
     }
 }

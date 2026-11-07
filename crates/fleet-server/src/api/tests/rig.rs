@@ -595,6 +595,7 @@ pub(super) fn telemetry(tseq_from: u64, samples: Vec<Sample>) -> Telemetry {
         tseq_to: tseq_from + samples.len() as u64 - 1,
         dropped_since_last: 0,
         samples,
+        devices: Vec::new(),
     }
 }
 
