@@ -586,6 +586,12 @@ pub struct RateLimits {
     pub events_per_second: u32,
     /// Events one agent socket may send at once before it is slowed.
     pub event_burst: u32,
+    /// Viewer requests per credential, per minute: REST reads and live socket upgrades. The
+    /// credential is a configured viewer token or a browser session; a request without an
+    /// accepted credential is not counted.
+    pub viewer_requests_per_minute: u32,
+    /// Viewer requests per credential that may arrive at once.
+    pub viewer_burst: u32,
     /// Keys tracked by each limiter. A new key beyond this waits one second and is retried,
     /// until an idle key has aged out.
     pub max_tracked_keys: usize,
@@ -600,6 +606,8 @@ impl Default for RateLimits {
             credential_burst: 300,
             events_per_second: 1_000,
             event_burst: 5_000,
+            viewer_requests_per_minute: 3_000,
+            viewer_burst: 600,
             max_tracked_keys: 100_000,
         }
     }
@@ -617,6 +625,11 @@ impl RateLimits {
             ("credential_burst", self.credential_burst),
             ("events_per_second", self.events_per_second),
             ("event_burst", self.event_burst),
+            (
+                "viewer_requests_per_minute",
+                self.viewer_requests_per_minute,
+            ),
+            ("viewer_burst", self.viewer_burst),
         ] {
             anyhow::ensure!(value > 0, "rate_limits.{key} must be above 0");
         }
@@ -1170,6 +1183,19 @@ mod tests {
         let d = Config::load(None, &[]).unwrap().rate_limits;
         assert_eq!((d.ip_requests_per_minute, d.ip_burst), (120, 60));
         assert_eq!((d.events_per_second, d.event_burst), (1_000, 5_000));
+        assert_eq!((d.viewer_requests_per_minute, d.viewer_burst), (3_000, 600));
+        let viewer = Config::load(None, &env(&[("FLEET_RATE_LIMITS__VIEWER_BURST", "7")])).unwrap();
+        assert_eq!(viewer.rate_limits.viewer_burst, 7);
+        assert_eq!(viewer.rate_limits.viewer_requests_per_minute, 3_000);
+        let viewer_zero = Config::load(
+            None,
+            &env(&[("FLEET_RATE_LIMITS__VIEWER_REQUESTS_PER_MINUTE", "0")]),
+        )
+        .unwrap_err();
+        assert!(
+            format!("{viewer_zero:#}").contains("rate_limits.viewer_requests_per_minute"),
+            "{viewer_zero:#}"
+        );
         let tuned = Config::load(None, &env(&[("FLEET_RATE_LIMITS__IP_BURST", "3")])).unwrap();
         assert_eq!(tuned.rate_limits.ip_burst, 3);
         let zero =

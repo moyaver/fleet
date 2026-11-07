@@ -25,6 +25,13 @@ pub enum ApiError {
     /// The session's role does not allow it.
     #[error("your role does not allow this")]
     Forbidden,
+    /// Too many requests for this credential. The server said when to try again; the dashboard
+    /// waits that long and keeps the data it has, so this is not shown to the person.
+    #[error("too many requests; try again in {retry_after_secs} s")]
+    RateLimited {
+        /// The server's `Retry-After`, in seconds.
+        retry_after_secs: u64,
+    },
     /// There is no such thing (or the caller may not know it exists).
     #[error("not found")]
     NotFound,
@@ -44,9 +51,14 @@ pub enum ApiError {
     Decode(String),
 }
 
-/// The error for an HTTP answer, or `None` for a success.
+/// The wait a `429` asks for when its `Retry-After` is missing or unreadable. The server always
+/// sends one, and never less than a second.
+const DEFAULT_RETRY_AFTER_SECS: u64 = 1;
+
+/// The error for an HTTP answer, or `None` for a success. `retry_after` is the `Retry-After` header
+/// in whole seconds.
 #[must_use]
-pub fn classify(status: u16, body: &str) -> Option<ApiError> {
+pub fn classify(status: u16, body: &str, retry_after: Option<u64>) -> Option<ApiError> {
     if (200..300).contains(&status) {
         return None;
     }
@@ -54,11 +66,19 @@ pub fn classify(status: u16, body: &str) -> Option<ApiError> {
         401 => ApiError::Unauthorized,
         403 => ApiError::Forbidden,
         404 => ApiError::NotFound,
+        429 => ApiError::RateLimited {
+            retry_after_secs: retry_after.unwrap_or(DEFAULT_RETRY_AFTER_SECS),
+        },
         _ => ApiError::Status {
             status,
             message: error_text(body).unwrap_or_else(|| format!("HTTP {status}")),
         },
     })
+}
+
+/// The `Retry-After` of a response in whole seconds, when it has one this build can read.
+fn retry_after(headers: &gloo_net::http::Headers) -> Option<u64> {
+    headers.get("retry-after")?.trim().parse().ok()
 }
 
 /// The `error` field of the server's JSON error body.
@@ -76,11 +96,12 @@ async fn get<T: DeserializeOwned>(path: &str) -> Result<T, ApiError> {
         .await
         .map_err(|e| ApiError::Network(e.to_string()))?;
     let status = response.status();
+    let retry = retry_after(&response.headers());
     let body = response
         .text()
         .await
         .map_err(|e| ApiError::Network(e.to_string()))?;
-    if let Some(error) = classify(status, &body) {
+    if let Some(error) = classify(status, &body, retry) {
         return Err(error);
     }
     serde_json::from_str(&body).map_err(|e| ApiError::Decode(e.to_string()))
@@ -208,6 +229,7 @@ pub async fn fetch_text(link: &str) -> Result<String, ApiError> {
         .await
         .map_err(|e| ApiError::Network(e.to_string()))?;
     let status = response.status();
+    let retry = retry_after(&response.headers());
     let body = response
         .text()
         .await
@@ -217,7 +239,7 @@ pub async fn fetch_text(link: &str) -> Result<String, ApiError> {
             status,
             message: "the link has expired".to_owned(),
         }),
-        _ => classify(status, &body).map_or(Ok(body), Err),
+        _ => classify(status, &body, retry).map_or(Ok(body), Err),
     }
 }
 
@@ -263,8 +285,9 @@ pub async fn logout(csrf_token: &str) -> Result<(), ApiError> {
         .send()
         .await
         .map_err(|e| ApiError::Network(e.to_string()))?;
+    let retry = retry_after(&response.headers());
     let body = response.text().await.unwrap_or_default();
-    classify(response.status(), &body).map_or(Ok(()), Err)
+    classify(response.status(), &body, retry).map_or(Ok(()), Err)
 }
 
 /// A project slug as one path segment.
@@ -279,19 +302,36 @@ mod tests {
     #[test]
     fn success_statuses_are_not_errors() {
         for status in [200, 201, 204] {
-            assert_eq!(classify(status, ""), None, "{status}");
+            assert_eq!(classify(status, "", None), None, "{status}");
         }
+    }
+
+    #[test]
+    fn a_429_carries_the_servers_retry_after() {
+        assert_eq!(
+            classify(429, r#"{"error":"too many requests"}"#, Some(7)),
+            Some(ApiError::RateLimited {
+                retry_after_secs: 7
+            })
+        );
+        assert_eq!(
+            classify(429, "", None),
+            Some(ApiError::RateLimited {
+                retry_after_secs: 1
+            }),
+            "a 429 without a readable Retry-After still waits a second, never zero"
+        );
     }
 
     #[test]
     fn the_statuses_the_dashboard_reacts_to_have_their_own_error() {
         assert_eq!(
-            classify(401, r#"{"error":"sign in"}"#),
+            classify(401, r#"{"error":"sign in"}"#, None),
             Some(ApiError::Unauthorized)
         );
-        assert_eq!(classify(403, "{}"), Some(ApiError::Forbidden));
+        assert_eq!(classify(403, "{}", None), Some(ApiError::Forbidden));
         assert_eq!(
-            classify(404, r#"{"error":"no such project"}"#),
+            classify(404, r#"{"error":"no such project"}"#, None),
             Some(ApiError::NotFound)
         );
     }
@@ -299,14 +339,14 @@ mod tests {
     #[test]
     fn other_failures_carry_the_servers_message_or_the_status() {
         assert_eq!(
-            classify(500, r#"{"error":"internal error"}"#),
+            classify(500, r#"{"error":"internal error"}"#, None),
             Some(ApiError::Status {
                 status: 500,
                 message: "internal error".into()
             })
         );
         assert_eq!(
-            classify(502, "<html>Bad Gateway</html>"),
+            classify(502, "<html>Bad Gateway</html>", None),
             Some(ApiError::Status {
                 status: 502,
                 message: "HTTP 502".into()

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Rate limits over the wire (research 03 §11; issue #35): per-IP limits on the pre-auth token
 //! exchange (trusted `X-Forwarded-For` only from a trusted proxy), per-credential limits on agent
-//! connections, and events paced on a socket, never dropped.
+//! connections and on viewer reads and live upgrades, and events paced on a socket, never dropped.
 
-use std::time::{Duration, Instant};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use fleet_protocol::{brand::WS_SUBPROTOCOL, frame::BatchRequest};
 use reqwest::{Response, StatusCode};
@@ -11,7 +14,7 @@ use tokio_tungstenite::tungstenite::{
     Error as WsError, client::IntoClientRequest, http::HeaderValue,
 };
 
-use crate::support::{Agent, Harness};
+use crate::support::{Agent, Harness, VIEWER};
 
 const TOKEN: &str = "/api/v1/agent/token";
 
@@ -189,4 +192,79 @@ async fn a_fast_agent_is_slowed_and_no_event_is_dropped() {
     // Four events a second: a quarter second each.
     let floor = Duration::from_millis(250 * u64::try_from(total - last - 1).unwrap());
     assert!(elapsed >= floor, "{elapsed:?} is under {floor:?}");
+}
+
+/// Viewer reads and live upgrades share one bucket per viewer token.
+fn tight_viewer_limit(c: &mut fleet_server::config::Config) {
+    c.rate_limits.viewer_burst = 2;
+    c.rate_limits.viewer_requests_per_minute = 1;
+}
+
+/// Opens `/api/v1/live` as `token`; the socket is dropped at once.
+async fn live_upgrade(addr: SocketAddr, token: &str) -> Result<(), WsError> {
+    let mut req = format!("ws://{addr}/api/v1/live")
+        .into_client_request()
+        .unwrap();
+    req.headers_mut().insert(
+        "Authorization",
+        HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
+    );
+    tokio_tungstenite::connect_async(req).await.map(|_| ())
+}
+
+#[tokio::test]
+async fn a_viewer_token_is_limited_on_reads_and_says_when_to_retry() {
+    let h = Harness::start_with(tight_viewer_limit).await;
+    let read = || {
+        reqwest::Client::new()
+            .get(format!("http://{}/api/v1/projects", h.addr()))
+            .bearer_auth(VIEWER)
+            .send()
+    };
+    assert_eq!(read().await.unwrap().status(), StatusCode::OK);
+    assert_eq!(read().await.unwrap().status(), StatusCode::OK);
+    let refused = read().await.unwrap();
+    assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(retry_after(&refused), 60, "one token a minute");
+}
+
+#[tokio::test]
+async fn a_viewer_token_is_limited_on_live_upgrades_and_says_when_to_retry() {
+    let h = Harness::start_with(tight_viewer_limit).await;
+    assert!(live_upgrade(h.addr(), VIEWER).await.is_ok());
+    assert!(live_upgrade(h.addr(), VIEWER).await.is_ok());
+    let Err(WsError::Http(refused)) = live_upgrade(h.addr(), VIEWER).await else {
+        panic!("the third live upgrade is refused");
+    };
+    assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(refused.headers().contains_key("retry-after"));
+}
+
+#[tokio::test]
+async fn two_viewer_tokens_have_separate_buckets() {
+    let h = Harness::start_with(|c| {
+        tight_viewer_limit(c);
+        c.api
+            .viewer_tokens
+            .push(fleet_server::config::Secret::from("second-viewer"));
+    })
+    .await;
+    let read = |token: &'static str| {
+        reqwest::Client::new()
+            .get(format!("http://{}/api/v1/projects", h.addr()))
+            .bearer_auth(token)
+            .send()
+    };
+    for _ in 0..2 {
+        assert_eq!(read(VIEWER).await.unwrap().status(), StatusCode::OK);
+    }
+    assert_eq!(
+        read(VIEWER).await.unwrap().status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        read("second-viewer").await.unwrap().status(),
+        StatusCode::OK,
+        "the other viewer has its own bucket"
+    );
 }

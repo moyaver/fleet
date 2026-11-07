@@ -19,7 +19,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
 
-use crate::{api::error, ingest::bearer, state::AppState};
+use crate::{
+    api::error,
+    ingest::bearer,
+    limits::{Viewer, too_many_requests},
+    state::AppState,
+};
 
 /// The cookie's name.
 pub(crate) const COOKIE: &str = "__Host-fleet_session";
@@ -205,6 +210,11 @@ fn viewer() -> Principal {
 /// Who a request is, or the refusal. In order: a configured viewer token (reads everything), a
 /// session cookie (the roles resolved at sign-in), then anonymous reads if the operator turned
 /// them on for development.
+///
+/// The viewer token and the session are limited per credential (`rate_limits.viewer_*`), so a
+/// request that is refused for its rate gets `429` here, before any data is read. Only an accepted
+/// credential is counted: a made-up token or cookie never gets a bucket. Anonymous reads have no
+/// credential to count.
 pub(crate) async fn principal(
     state: &AppState,
     method: &Method,
@@ -220,13 +230,18 @@ pub(crate) async fn principal(
             .iter()
             .fold(false, |ok, t| ok | (digest(t.expose()) == given));
         if known {
-            return Ok(viewer());
+            return admit(state, Viewer::Token(given), viewer());
         }
     }
     if let Some(active) = checked_session(state, method, headers).await? {
-        return Ok(Principal::User {
-            grants: active.data.grants,
-        });
+        let key = Viewer::Session(digest(&active.cookie));
+        return admit(
+            state,
+            key,
+            Principal::User {
+                grants: active.data.grants,
+            },
+        );
     }
     if state.config.api.anonymous_read {
         return Ok(viewer());
@@ -235,6 +250,14 @@ pub(crate) async fn principal(
         StatusCode::UNAUTHORIZED,
         "sign in, or send a viewer token",
     )))
+}
+
+/// Counts one request against `key`'s bucket: the principal, or `429` with `Retry-After`.
+fn admit(state: &AppState, key: Viewer, principal: Principal) -> Result<Principal, Box<Response>> {
+    match state.limits.viewer.check(key, std::time::Instant::now()) {
+        Ok(()) => Ok(principal),
+        Err(wait) => Err(Box::new(too_many_requests(wait))),
+    }
 }
 
 /// The caller of a request, as a policy principal.

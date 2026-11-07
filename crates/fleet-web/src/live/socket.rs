@@ -6,6 +6,10 @@
 //! several things opens several of these. A `resync` frame, a refusal or a closed socket all end
 //! in a new socket and a new subscribe, which brings a fresh snapshot. So does a delta that skips
 //! a version: the live store stops applying deltas at a gap, and only a new snapshot resumes it.
+//!
+//! A socket the server refuses with `429` cannot say so: a browser does not show the status of a
+//! refused upgrade. The reconnect that never got live therefore asks the same credential's REST
+//! read how long to wait, and waits at least that long.
 
 use std::{
     cell::{Cell, RefCell},
@@ -27,6 +31,7 @@ use leptos::{prelude::*, task::spawn_local};
 use uuid::Uuid;
 
 use crate::{
+    api::{self, ApiError},
     live::{
         backoff::Backoff,
         queue::FrameQueue,
@@ -155,9 +160,26 @@ async fn run(
         let delay = match ended {
             // A resync is the server asking for a new snapshot, not a failure: ask at once.
             Ended::Resync => 0,
-            Ended::Closed => backoff.next_delay_ms(js_sys::Math::random()),
+            Ended::Closed => {
+                let delay = backoff.next_delay_ms(js_sys::Math::random());
+                if reached_live.get() {
+                    delay
+                } else {
+                    delay.max(refused_for_ms().await)
+                }
+            }
         };
         TimeoutFuture::new(u32::try_from(delay).unwrap_or(u32::MAX)).await;
+    }
+}
+
+/// How long the server asks us to wait before the next connect, in milliseconds: the `Retry-After`
+/// of a REST read with the same credential, which the server answers with the same `429` it gave
+/// the refused upgrade. `0` when that read is not refused, or cannot be made.
+async fn refused_for_ms() -> u64 {
+    match api::projects().await {
+        Err(ApiError::RateLimited { retry_after_secs }) => retry_after_secs.saturating_mul(1000),
+        _ => 0,
     }
 }
 
