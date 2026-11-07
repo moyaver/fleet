@@ -24,6 +24,7 @@ fleet-core.workspace = true
 fleet-maestro.workspace = true
 fleet-protocol.workspace = true
 futures-util.workspace = true
+getrandom.workspace = true
 nix.workspace = true
 reqwest = { workspace = true, features = ["stream"] }
 rustls.workspace = true
