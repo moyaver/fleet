@@ -458,6 +458,11 @@ async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
         boot_completed: Some(true),
         guest_cpu_pct: Some(12.5),
         guest_mem_available_bytes: Some(2 << 30),
+        emu_cpu_pct: None,
+        emu_rss_bytes: None,
+        avd_name: None,
+        api_level: None,
+        foreground_activity: None,
     };
     let later = DeviceSample {
         guest_cpu_pct: Some(40.0),
@@ -522,6 +527,61 @@ async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
         values("boot_completed"),
         [json!(1.0), json!(1.0), Value::Null]
     );
+}
+
+/// The overview's "active emulators" readout (issue #123): an emulator counts when adb reported it
+/// online in the last two minutes. A physical device, an offline emulator and a stale one do not.
+#[tokio::test]
+async fn the_overview_counts_the_emulators_online_now() {
+    let rig = rig().await;
+    let mut agent = Agent::new("621", "build", "runner-a");
+    agent.started();
+    let mut session = |serial: &str| {
+        agent
+            .shard(serial, &["login"])
+            .device_session_id
+            .expect("a shard names its device session")
+    };
+    let online = session("emulator-5584");
+    let physical = session("R58M");
+    let offline = session("emulator-5586");
+    let stale = session("emulator-5588");
+    let now = OffsetDateTime::now_utc();
+    let at = |session, adb_state, seconds_ago: i64| DeviceSample {
+        at: ClockSample {
+            wall: now - Duration::seconds(seconds_ago),
+            mono_ms: 0,
+        },
+        device_session_id: session,
+        adb_state: Some(adb_state),
+        boot_completed: None,
+        guest_cpu_pct: None,
+        guest_mem_available_bytes: None,
+        emu_cpu_pct: None,
+        emu_rss_bytes: None,
+        avd_name: None,
+        api_level: None,
+        foreground_activity: None,
+    };
+    rig.publish(
+        &mut agent,
+        vec![Telemetry {
+            tseq_from: 1,
+            tseq_to: 1,
+            dropped_since_last: 0,
+            samples: Vec::new(),
+            devices: vec![
+                at(online, AdbState::Device, 5),
+                at(physical, AdbState::Device, 5),
+                at(offline, AdbState::Offline, 5),
+                at(stale, AdbState::Device, 10 * 60),
+            ],
+        }],
+    )
+    .await;
+
+    let overview = rig.json("/api/v1/projects/app/overview").await;
+    assert_eq!(overview["active_emulators"], 1);
 }
 
 #[tokio::test]
