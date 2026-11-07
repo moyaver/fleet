@@ -133,10 +133,10 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 
 Tracking: [#86](https://github.com/moyaver/fleet/issues/86). Items from the [2026-11-06 competitive review](../research/09-competitive-review-2026-11.md) are included.
 
-- [ ] Correct results: nested steps and retry attempts (#134), the post-exit drain of a backed-up CI log (#128), per-run runner metrics (#129), Maestro version per run (migration 0013). Open: infrastructure exclusions in flaky analysis
+- [x] Correct results: nested steps and retry attempts (#134), the post-exit drain of a backed-up CI log (#128), per-run runner metrics (#129), Maestro version per run (migration 0013), infrastructure failures left out of flaky analysis (#72, merged as #97), and the runs a lost device excluded from it shown (#119)
 - [ ] Evidence Maestro already writes: missing fixtures (#130), the failing step's UI hierarchy (#132), a bounded logcat excerpt and `app.crashed` (#131), device samples (#136). Open: Maestro's `takeScreenshot` images and recordings (#133), and an ANR fixture (#77; not captured)
 - [ ] Install and operate: composite GitHub Action with a job summary (#125), the server image for amd64 and arm64, backup and restore, and a free-VM guide ([Try Fleet on a free VM](src/free-vm.md)). Open: verify the job summary on a real run (#71)
-- [ ] Hardening: rate limits for pre-auth, agent and viewer requests (#118, #135), a bounded journal (`FLEET_JOURNAL_MAX_BYTES`). Open: multi-instance fan-out, remaining agent review items, accessibility
+- [ ] Hardening: rate limits for pre-auth, agent and viewer requests (#118, #135), a bounded journal (`FLEET_JOURNAL_MAX_BYTES`), live updates fanned out across instances (#106). Open: remaining agent review items, accessibility
 - [ ] Proof: nightly real-Maestro job on the owner's Mac (#127), repeatable overhead benchmark (`cargo xtask bench-overhead`), comparative diagnosis study ([research 10](../research/10-comparative-diagnosis-study.md), #137), planner planned vs actual
 
 ### Owner actions
