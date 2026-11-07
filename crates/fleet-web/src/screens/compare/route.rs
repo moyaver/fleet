@@ -35,8 +35,7 @@ const PICKABLE: u32 = 100;
 #[component]
 pub fn CompareRoute() -> impl IntoView {
     view! {
-        <div class="space-y-4" data-testid="compare-page">
-            <h2 class="text-xl font-semibold">"Compare attempts"</h2>
+        <div data-testid="compare-page">
             <InProject
                 path="/compare"
                 body=Callback::new(|project: String| view! { <CompareBody project /> }.into_any())
@@ -57,6 +56,7 @@ fn ctx(project: &str) -> Ctx {
 fn CompareBody(project: String) -> impl IntoView {
     let (query, set_query) = use_url_query();
     let chosen = Memo::new(move |_| CompareQuery::parse(&query.get()));
+    let header_project = project.clone();
     let attempts = {
         let project = project.clone();
         remote(1000, move || {
@@ -77,6 +77,14 @@ fn CompareBody(project: String) -> impl IntoView {
             value.as_deref(),
         ));
     });
+    // Swapping rewrites both parameters in one step, so the history gets one entry.
+    let on_swap = Callback::new(move |()| {
+        let CompareQuery { a, b } = chosen.get_untracked();
+        let id = |v: Option<Uuid>| v.map(|i| i.to_string());
+        let (a, b) = (id(a), id(b));
+        let q = with_query_param(&query.get_untracked(), PARAM_A, b.as_deref());
+        set_query.run(with_query_param(&q, PARAM_B, a.as_deref()));
+    });
     let a = Signal::derive(move || chosen.get().a);
     let b = Signal::derive(move || chosen.get().b);
     let pickers = {
@@ -84,18 +92,24 @@ fn CompareBody(project: String) -> impl IntoView {
         move || {
             loaded(fetched, |list| {
                 let options = attempt_options(&list, &ctx(&project));
-                view! { <AttemptPickers options a b on_pick /> }.into_any()
+                view! { <AttemptPickers options a b on_pick on_swap /> }.into_any()
             })
         }
     };
     view! {
+        <div class="page-h">
+            <div>
+                <h2 class="text-[26px] font-semibold leading-[1.2] tracking-[-0.015em] max-[720px]:text-[21px]">"Compare runs"</h2>
+                <p class="meta"><span>"Project " <b>{header_project}</b></span></p>
+            </div>
+        </div>
         <ErrorNotice error=fetched.error />
         {pickers}
         {move || match chosen.get().both() {
             Some((a, b)) => view! { <Comparison project=project.clone() a b /> }.into_any(),
             None => view! {
                 <EmptyState
-                    title="Choose two attempts"
+                    title="Choose two runs"
                     description="Pick the baseline as A and the run to check as B."
                 />
             }

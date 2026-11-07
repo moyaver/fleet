@@ -7,21 +7,27 @@
     reason = "Leptos's #[component] macro generates the props structs"
 )]
 
-use fleet_ui::components::display::{Card, EmptyState, ProvenanceBadge, StatTile, TableBox};
+use fleet_protocol::rest::history::ChangeKind;
+use fleet_ui::{
+    components::display::{
+        EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutStrip, StatTile, TableBox,
+    },
+    provenance::Provenance,
+    tone::Tone,
+};
 use leptos::prelude::*;
 use uuid::Uuid;
 
-use crate::{
-    screens::compare::model::{
+use crate::screens::{
+    compare::model::{
         AttemptOption, CompareModel, ExplanationText, Row, Section, SideCell, SideSummary,
     },
-    screens::parts::{Notice, PillView},
+    history::view::FailureFingerprint,
+    parts::{Notice, PillView},
 };
-use fleet_ui::tone::Tone;
 
-const TH: &str = "px-2 py-1 text-left font-semibold";
-const TD: &str = "px-2 py-1 align-top";
-const SELECT: &str = "rounded border border-border bg-surface px-2 py-1";
+const SELECT: &str = "min-h-8 w-[330px] rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1 text-sm text-fg max-[720px]:w-full";
+const BUTTON: &str = "inline-flex min-h-8 items-center rounded border border-line-strong px-3 text-sm text-fg hover:bg-band max-[720px]:min-h-11";
 
 /// Which picker was changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,8 +38,8 @@ pub enum Which {
     B,
 }
 
-/// Two attempt pickers. `on_pick` gets the picker and the chosen attempt, `None` for the blank
-/// entry.
+/// Two run pickers, labelled underlined, with the swap between them. `on_pick` gets the picker
+/// and the chosen attempt, `None` for the blank entry; `on_swap` is asked to exchange A and B.
 #[component]
 pub fn AttemptPickers(
     /// The attempts to choose from, newest first.
@@ -46,6 +52,8 @@ pub fn AttemptPickers(
     b: Signal<Option<Uuid>>,
     /// Called when a picker changes.
     on_pick: Callback<(Which, Option<Uuid>)>,
+    /// Called when the swap button is pressed.
+    on_swap: Callback<()>,
 ) -> impl IntoView {
     let picker = move |which: Which,
                        id: &'static str,
@@ -53,15 +61,15 @@ pub fn AttemptPickers(
                        current: Signal<Option<Uuid>>| {
         let options = options.clone();
         view! {
-            <div>
-                <label for=id class="block text-sm">{label}</label>
+            <div class="flex min-w-0 flex-col gap-1">
+                <label for=id class="text-xs text-muted">{label}</label>
                 <select
                     id=id
                     class=SELECT
                     data-testid=id
                     on:change=move |ev| on_pick.run((which, event_target_value(&ev).parse().ok()))
                 >
-                    <option value="" selected=move || current.get().is_none()>"Choose an attempt"</option>
+                    <option value="" selected=move || current.get().is_none()>"Choose a run"</option>
                     {options
                         .into_iter()
                         .map(|o| {
@@ -79,14 +87,26 @@ pub fn AttemptPickers(
         }
     };
     view! {
-        <form class="flex flex-wrap items-end gap-4" aria-label="Attempts to compare" on:submit=|ev| ev.prevent_default()>
-            {picker(Which::A, "compare-a", "Attempt A", a)}
-            {picker(Which::B, "compare-b", "Attempt B", b)}
+        <form
+            class="flex flex-wrap items-end gap-x-7 gap-y-5 border-y border-line py-4"
+            aria-label="Attempts to compare"
+            on:submit=|ev| ev.prevent_default()
+        >
+            {picker(Which::A, "compare-a", "Baseline (A)", a)}
+            <button
+                type="button"
+                class=BUTTON
+                aria-label="Swap baseline (A) and run to check (B)"
+                on:click=move |_| on_swap.run(())
+            >
+                "Swap A and B"
+            </button>
+            {picker(Which::B, "compare-b", "Run to check (B)", b)}
         </form>
     }
 }
 
-/// The comparison: the two attempts, the counts, then a section per kind of change.
+/// The comparison: the two runs, the answer, the counts, then a section per kind of change.
 #[component]
 pub fn ComparisonView(
     /// What to show.
@@ -95,18 +115,40 @@ pub fn ComparisonView(
     let CompareModel {
         a,
         b,
+        failures_only_in_b,
         summary,
+        conditions_changed,
+        running,
         sections,
         truncated_note,
     } = model;
     view! {
-        <div class="space-y-4" data-testid="comparison">
+        <div data-testid="comparison">
             {truncated_note.map(|t| view! { <Notice tone=Tone::Warning text=t /> })}
-            <div class="grid gap-3 md:grid-cols-2">
-                <SideCard side=a />
-                <SideCard side=b />
+            {running.then(|| view! {
+                <p class="note mt-4" data-testid="running-run-note">
+                    "A run still in progress can be chosen. Its side then reads Provisional and its results may still change."
+                </p>
+            })}
+            <div class="mt-5 flex flex-wrap gap-x-10 gap-y-2" data-testid="compare-sides">
+                <SideLink side=a />
+                <SideLink side=b />
             </div>
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+            <div class="mt-9">
+                <ProvenanceStatement provenance=Provenance::Derived>
+                    "Computed from the results of both runs."
+                </ProvenanceStatement>
+            </div>
+            <div class="mt-4 flex flex-wrap items-baseline gap-5" data-testid="failures-only-in-b">
+                <span class="text-[15px] font-semibold">"Failures only in B"</span>
+                <span class=move || {
+                    if failures_only_in_b > 0 { "font-mono text-[34px] font-medium tracking-[-0.02em] text-fail" } else { "font-mono text-[34px] font-medium tracking-[-0.02em]" }
+                }>
+                    {(failures_only_in_b > 0).then(|| view! { <span aria-hidden="true" class="mr-2 text-[20px]">"✕"</span> })}
+                    {failures_only_in_b.to_string()}
+                </span>
+            </div>
+            <ReadoutStrip>
                 {summary
                     .into_iter()
                     .map(|s| {
@@ -117,9 +159,18 @@ pub fn ComparisonView(
                         }
                     })
                     .collect_view()}
-            </div>
+            </ReadoutStrip>
+            {(conditions_changed > 0).then(|| view! {
+                <p class="meta" data-testid="conditions-note">
+                    {format!(
+                        "Ran under different conditions: {} {}",
+                        conditions_changed,
+                        if conditions_changed == 1 { "flow" } else { "flows" }
+                    )}
+                </p>
+            })}
             {if sections.is_empty() {
-                view! { <EmptyState title="Nothing to compare" description="Neither attempt has executed a flow." /> }
+                view! { <EmptyState title="Nothing to compare" description="Neither run has executed a flow." /> }
                     .into_any()
             } else {
                 sections.into_iter().map(section).collect_view().into_any()
@@ -128,49 +179,78 @@ pub fn ComparisonView(
     }
 }
 
+/// One compared run, as a link to its pipeline with its flow count.
 #[component]
-fn SideCard(side: SideSummary) -> impl IntoView {
+fn SideLink(side: SideSummary) -> impl IntoView {
     view! {
-        <Card title=format!("Attempt {}", side.name)>
-            <div data-testid="compare-side" data-side=side.name>
-                <a class="font-medium text-primary hover:underline" href=side.href>{side.label}</a>
-                <p class="text-sm text-muted" data-testid="compare-side-flows">{side.flows}</p>
-            </div>
-        </Card>
+        <a
+            href=side.href
+            class="text-sm"
+            data-testid="compare-side"
+            data-side=side.name.to_lowercase()
+        >
+            <span class="text-muted">{format!("{}: ", side.name)}</span>
+            <span class="font-medium">{side.label}</span>
+            <span class="block text-sm text-muted" data-testid="compare-side-flows">{side.flows}</span>
+        </a>
     }
 }
 
+/// One kind of change: its heading and rule on the line, the rows behind a toggle.
 fn section(s: Section) -> impl IntoView {
     let title_id = format!("section-{}", s.id);
+    let show_why = s.change != ChangeKind::Unchanged;
+    let verified = s.verified;
+    let heading = format!("{} ({})", s.heading, s.rows.len());
     view! {
-        <details open=s.open data-testid="compare-section" data-section=s.id class="rounded-lg border border-border bg-surface p-3">
-            <summary class="cursor-pointer text-base font-semibold" id=title_id>
-                {format!("{} ({})", s.heading, s.rows.len())}
-                <span class="ml-2 text-sm font-normal text-muted">{s.meaning}</span>
-            </summary>
-            <TableBox label=s.heading>
-                <table class="mt-2 w-full border-collapse text-sm">
-                    <caption class="sr-only">{s.heading}</caption>
-                    <thead class="border-b border-border">
-                        <tr>
-                            {["Flow", "A", "B", "Duration", "Why they differ"]
-                                .map(|h| view! { <th scope="col" class=TH>{h}</th> })}
-                        </tr>
-                    </thead>
-                    <tbody>{s.rows.into_iter().map(compare_row).collect_view()}</tbody>
-                </table>
-            </TableBox>
-        </details>
+        <div class="sec-block">
+            <div class="sec-h">
+                <h2 id=title_id>{heading}</h2>
+                <span class="note">
+                    {s.meaning}
+                    {verified.then(|| view! {
+                        " · results "
+                        <ProvenanceBadge provenance=Provenance::Final />
+                    })}
+                </span>
+            </div>
+            <details open=s.open data-testid="compare-section" data-section=s.id class="mt-1">
+                <summary>
+                    <span class="t-hide">"Hide"<span class="sr-only">{format!(" {}", s.heading)}</span></span>
+                    <span class="t-show">"Show"<span class="sr-only">{format!(" {}", s.heading)}</span></span>
+                </summary>
+                <TableBox label=s.heading>
+                    <table class="tbl tbl-cards">
+                        <caption class="sr-only">{s.heading}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">"Flow"</th>
+                                <th scope="col">"A"</th>
+                                <th scope="col">"B"</th>
+                                <th scope="col" class="num">"Duration A to B"</th>
+                                {show_why.then(|| view! { <th scope="col">"Why they differ"</th> })}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {s.rows
+                                .into_iter()
+                                .map(|r| compare_row(r, verified, show_why))
+                                .collect_view()}
+                        </tbody>
+                    </table>
+                </TableBox>
+            </details>
+        </div>
     }
 }
 
-fn compare_row(r: Row) -> impl IntoView {
+fn compare_row(r: Row, verified: bool, show_why: bool) -> impl IntoView {
     view! {
-        <tr class="border-b border-border" data-testid="compare-row" data-flow=r.flow.clone() data-change=format!("{:?}", r.change)>
-            <td class=TD>{r.flow.clone()}</td>
-            <td class=TD data-side="A">{side_cell(r.a)}</td>
-            <td class=TD data-side="B">{side_cell(r.b)}</td>
-            <td class=TD>
+        <tr data-testid="compare-row" data-flow=r.flow.clone() data-change=format!("{:?}", r.change)>
+            <td data-label="Flow">{r.flow.clone()}</td>
+            <td data-label="A" data-side="A">{side_cell(r.a, !verified)}</td>
+            <td data-label="B" data-side="B">{side_cell(r.b, !verified)}</td>
+            <td data-label="Duration A to B" class="num">
                 {r
                     .duration
                     .map(|d| {
@@ -180,23 +260,23 @@ fn compare_row(r: Row) -> impl IntoView {
                         }
                     })}
             </td>
-            <td class=TD>{explanations(r.explanations)}</td>
+            {show_why.then(|| view! { <td data-label="Why they differ">{explanations(r.explanations)}</td> })}
         </tr>
     }
 }
 
-fn side_cell(cell: Option<SideCell>) -> AnyView {
+/// One run's result for a flow. Its provenance shows when the section does not state it once
+/// (`show_provenance`), so no value is left without its label.
+fn side_cell(cell: Option<SideCell>, show_provenance: bool) -> AnyView {
     match cell {
-        None => view! { <span class="italic text-muted">"Not executed"</span> }.into_any(),
+        None => view! { <span class="text-muted">"Not executed"</span> }.into_any(),
         Some(c) => view! {
-            <span class="inline-flex flex-wrap items-center gap-2" title=c.finality_note>
-                <PillView pill=c.state />
-                <ProvenanceBadge provenance=c.provenance />
-                <a class="text-xs text-primary underline" href=c.href>"Open"</a>
-            </span>
-            {c
-                .failure_fingerprint
-                .map(|f| view! { <div><code class="text-xs">{f}</code></div> })}
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span title=c.finality_note><PillView pill=c.state /></span>
+                {show_provenance.then(|| view! { <ProvenanceBadge provenance=c.provenance /> })}
+                <a class="text-sm text-primary underline" href=c.href>"Open"</a>
+            </div>
+            {c.failure_fingerprint.map(|f| view! { <FailureFingerprint fingerprint=f /> })}
             {c.executions_note.map(|n| view! { <div class="text-xs text-muted">{n}</div> })}
         }
         .into_any(),

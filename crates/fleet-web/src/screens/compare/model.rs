@@ -151,12 +151,15 @@ pub struct SideCell {
     pub failure_fingerprint: Option<String>,
     /// More than one execution in the attempt: the latest is shown.
     pub executions_note: Option<String>,
+    /// Whether the run failed.
+    pub failed: bool,
 }
 
 fn cell(f: &CompareFlowView, ctx: &Ctx) -> SideCell {
     SideCell {
         href: crate::paths::flow_href(&ctx.project, f.flow_id),
         state: flow_state_pill(&f.state),
+        failed: f.state == "failed",
         provenance: flow_provenance(&f.finality, &f.state, None),
         finality_note: finality_note(&f.finality),
         duration: f.duration_ms.map(format_duration),
@@ -215,6 +218,8 @@ pub struct Section {
     pub meaning: &'static str,
     /// Whether the section starts open: the unchanged rows don't.
     pub open: bool,
+    /// Whether every result in the section is verified: then the heading says so once.
+    pub verified: bool,
     /// The rows, by flow.
     pub rows: Vec<Row>,
 }
@@ -237,8 +242,14 @@ pub struct CompareModel {
     pub a: SideSummary,
     /// Attempt B.
     pub b: SideSummary,
-    /// The counts.
+    /// Flows that failed in B and not in A: the answer to "what did this run break?".
+    pub failures_only_in_b: usize,
+    /// The counts that matter: newly failing always, the others only when not zero.
     pub summary: Vec<SummaryItem>,
+    /// How many flows ran under different conditions in the two attempts.
+    pub conditions_changed: usize,
+    /// Whether either attempt is still open, so its results may still change.
+    pub running: bool,
     /// The non-empty sections, the changes first.
     pub sections: Vec<Section>,
     /// Set when the server cut a side short.
@@ -303,14 +314,7 @@ impl CompareModel {
                 label,
                 count: rows.iter().filter(|r| r.change == *change).count(),
             })
-            .chain([SummaryItem {
-                id: "condition-changed",
-                label: "Ran under different conditions",
-                count: rows
-                    .iter()
-                    .filter(|r| r.explanations.iter().any(|e| e.kind == "condition_changed"))
-                    .count(),
-            }])
+            .filter(|item| item.id == "newly-failing" || item.count > 0)
             .collect();
         let sections = SECTIONS
             .iter()
@@ -320,12 +324,18 @@ impl CompareModel {
                     .filter(|r| r.change == *change)
                     .cloned()
                     .collect();
+                let verified = rows.iter().all(|r| {
+                    r.a.iter()
+                        .chain(r.b.iter())
+                        .all(|c| c.provenance == Provenance::Final)
+                });
                 (!rows.is_empty()).then_some(Section {
                     change: *change,
                     id,
                     heading,
                     meaning,
                     open: *open,
+                    verified,
                     rows,
                 })
             })
@@ -333,6 +343,18 @@ impl CompareModel {
         Self {
             a: side_summary("A", &view.a, ctx),
             b: side_summary("B", &view.b, ctx),
+            failures_only_in_b: rows
+                .iter()
+                .filter(|r| {
+                    r.b.as_ref().is_some_and(|b| b.failed)
+                        && !r.a.as_ref().is_some_and(|a| a.failed)
+                })
+                .count(),
+            conditions_changed: rows
+                .iter()
+                .filter(|r| r.explanations.iter().any(|e| e.kind == "condition_changed"))
+                .count(),
+            running: view.a.attempt.open_jobs > 0 || view.b.attempt.open_jobs > 0,
             summary,
             sections,
             truncated_note: view
@@ -573,16 +595,12 @@ mod tests {
         let counts: Vec<_> = m.summary.iter().map(|s| (s.id, s.count)).collect();
         assert_eq!(
             counts,
-            [
-                ("newly-failing", 1),
-                ("recovered", 0),
-                ("changed", 0),
-                ("only-in-a", 1),
-                ("only-in-b", 0),
-                ("unchanged", 1),
-                ("condition-changed", 1),
-            ]
+            [("newly-failing", 1), ("only-in-a", 1), ("unchanged", 1)],
+            "newly failing is always there; the other counts only when not zero"
         );
+        assert_eq!(m.failures_only_in_b, 1);
+        assert_eq!(m.conditions_changed, 1);
+        assert!(!m.running, "both attempts are finished");
         assert_eq!(m.truncated_note, None);
     }
 
@@ -633,6 +651,37 @@ mod tests {
             m.sections[1].rows[0].duration, None,
             "one side has no duration"
         );
+    }
+
+    #[test]
+    fn a_section_is_verified_as_a_whole_only_when_every_result_in_it_is() {
+        let m = CompareModel::build(&view(), &ctx());
+        let verified: Vec<_> = m.sections.iter().map(|s| (s.id, s.verified)).collect();
+        // The newly failing row's B side is provisional (read live); the others are final.
+        assert_eq!(
+            verified,
+            [
+                ("newly-failing", false),
+                ("only-in-a", true),
+                ("unchanged", true)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_run_still_open_is_said_so_because_its_results_may_change() {
+        let mut v = view();
+        v.b.attempt.open_jobs = 1;
+        assert!(CompareModel::build(&v, &ctx()).running);
+    }
+
+    #[test]
+    fn a_failure_in_b_that_a_did_not_have_counts_even_when_a_was_not_run() {
+        let mut v = view();
+        // The only-in-A row failed in B instead of being absent there: a failure only B has.
+        v.rows[1].b = v.rows[0].b.clone();
+        let m = CompareModel::build(&v, &ctx());
+        assert_eq!(m.failures_only_in_b, 2, "the new failure and this one");
     }
 
     #[test]
