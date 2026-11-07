@@ -14,7 +14,7 @@ inputs:
   version:
     description: fleet-agent release tag to install.
     required: false
-    default: v0.1.0-alpha.1
+    default: v0.1.0-alpha.2
   server:
     description: >-
       Fleet server URL (FLEET_SERVER). Empty keeps the job's own setting; unset means offline.
@@ -37,7 +37,7 @@ runs:
       run: |
         set -euo pipefail
         if ! [[ "$AGENT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
-          echo "::error::version must be a release tag such as v0.1.0-alpha.1, not '$AGENT_VERSION'"
+          echo "::error::version must be a release tag such as v0.1.0-alpha.2, not '$AGENT_VERSION'"
           exit 1
         fi
         case "$(uname -s)-$(uname -m)" in

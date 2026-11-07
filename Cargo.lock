@@ -1226,7 +1226,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-agent"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1262,7 +1262,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-blob"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-core"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "fleet-protocol",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-e2e"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1324,7 +1324,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-loadgen"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-maestro"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "fleet-protocol",
  "insta",
@@ -1351,7 +1351,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-planner"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1372,7 +1372,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-protocol"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "jsonschema",
  "schemars",
@@ -1385,7 +1385,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-server"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -1430,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-store"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "fleet-core",
@@ -1450,7 +1450,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-ui"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "fleet-core",
  "fleet-protocol",
@@ -1466,7 +1466,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-web"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "console_error_panic_hook",
  "fleet-protocol",
@@ -1487,7 +1487,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-web-assets"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "rust-embed",
 ]
@@ -5783,7 +5783,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "anyhow",
  "fleet-protocol",

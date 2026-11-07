@@ -2,10 +2,10 @@
 
 ## Install
 
-This installs the alpha pre-release `v0.1.0-alpha.1` (pinned, because `latest` skips pre-releases):
+This installs the alpha pre-release `v0.1.0-alpha.2` (pinned, because `latest` skips pre-releases):
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.1/fleet-agent-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.2/fleet-agent-installer.sh | sh
 ```
 
 Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum (also listed in `sha256.sum`), a GitHub artifact attestation, the license and the third-party notices. To verify a downloaded archive with the [GitHub CLI](https://cli.github.com/):
@@ -24,7 +24,7 @@ The [composite action](https://github.com/moyaver/fleet/blob/main/examples/githu
     command: maestro test .maestro/
 ```
 
-The summary needs an agent release that includes it: `v0.1.0-alpha.1` predates it. The example workflow is [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).
+The summary is included from `v0.1.0-alpha.2`; `v0.1.0-alpha.1` predates it. The example workflow is [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).
 
 ## Check the setup
 

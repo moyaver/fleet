@@ -21,4 +21,4 @@ Especially welcome: anything that breaks an invariant in [PLAN §3](docs/PLAN.md
 
 ## Supported versions
 
-The only release so far is the alpha pre-release `v0.1.0-alpha.1`. Once 1.0.0 ships, the latest minor release gets security fixes.
+There are alpha pre-releases; the latest is `v0.1.0-alpha.2`. Once 1.0.0 ships, the latest minor release gets security fixes.

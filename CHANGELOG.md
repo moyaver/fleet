@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-11-07
+
 ### Added
 
 - Agent: a failed flow's device logcat is uploaded as an excerpt: the lines of the failing step's window (10 s before it to 2 s after it), redacted line by line, at most 512 KiB, keeping the newest lines and saying when older ones were cut. The window is placed on UTC by the log's own last line, so a log whose clock cannot be told from the failure's is not sent (#75).

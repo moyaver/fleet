@@ -135,7 +135,7 @@ Tracking: [#86](https://github.com/moyaver/fleet/issues/86). Items from the [202
 
 - [ ] Correct results: nested steps and retry attempts (#134), the post-exit drain of a backed-up CI log (#128), per-run runner metrics (#129), Maestro version per run (migration 0013). Open: infrastructure exclusions in flaky analysis
 - [ ] Evidence Maestro already writes: missing fixtures (#130), the failing step's UI hierarchy (#132), a bounded logcat excerpt and `app.crashed` (#131), device samples (#136). Open: Maestro's `takeScreenshot` images and recordings (#133), and an ANR fixture (#77; not captured)
-- [ ] Install and operate: composite GitHub Action with a job summary (#125), the server image for amd64 and arm64, backup and restore, and a free-VM guide ([Try Fleet on a free VM](src/free-vm.md)). Open: a release whose agent includes the job summary, which `v0.1.0-alpha.1` does not
+- [ ] Install and operate: composite GitHub Action with a job summary (#125), the server image for amd64 and arm64, backup and restore, and a free-VM guide ([Try Fleet on a free VM](src/free-vm.md)). Open: verify the job summary on a real run (#71)
 - [ ] Hardening: rate limits for pre-auth, agent and viewer requests (#118, #135), a bounded journal (`FLEET_JOURNAL_MAX_BYTES`). Open: multi-instance fan-out, remaining agent review items, accessibility
 - [ ] Proof: nightly real-Maestro job on the owner's Mac (#127), repeatable overhead benchmark (`cargo xtask bench-overhead`), comparative diagnosis study ([research 10](../research/10-comparative-diagnosis-study.md), #137), planner planned vs actual
 
