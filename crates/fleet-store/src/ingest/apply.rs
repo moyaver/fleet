@@ -48,6 +48,15 @@ fn reject(code: &'static str, message: impl Into<String>) -> Effect {
     Effect::Rejected(code, message.into())
 }
 
+/// Where a step sits in its flow's nesting (issue #38). `None` where the event doesn't say, which
+/// keeps what an earlier event stored.
+#[derive(Debug, Default)]
+struct Nesting {
+    depth: Option<i32>,
+    parent: Option<i32>,
+    attempt: Option<i32>,
+}
+
 /// The snake-case wire name of a serde enum value.
 pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
     serde_json::to_value(v)
@@ -474,7 +483,24 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &StepStarted,
     ) -> Result<Effect, sqlx::Error> {
-        self.step(tx, e, Some(&b.description), "running").await
+        // A top-level step has no depth or attempt, and an attempt counts from 1: zero is no value
+        // an agent can mean.
+        if b.depth == Some(0) || b.attempt == Some(0) {
+            return Ok(reject(
+                "invalid",
+                "step.started has a zero depth or attempt",
+            ));
+        }
+        let nesting = Nesting {
+            depth: b.depth.map(|d| i32::try_from(d).unwrap_or(i32::MAX)),
+            parent: b
+                .parent
+                .as_ref()
+                .map(|p| i32::try_from(p.index).unwrap_or(i32::MAX)),
+            attempt: b.attempt.map(|a| i32::try_from(a).unwrap_or(i32::MAX)),
+        };
+        self.step(tx, e, Some(&b.description), "running", nesting)
+            .await
     }
 
     async fn step_ended(
@@ -483,7 +509,8 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &StepEnded,
     ) -> Result<Effect, sqlx::Error> {
-        self.step(tx, e, None, &wire(b.status)).await
+        self.step(tx, e, None, &wire(b.status), Nesting::default())
+            .await
     }
 
     async fn step(
@@ -492,6 +519,7 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         label: Option<&str>,
         status: &str,
+        nesting: Nesting,
     ) -> Result<Effect, sqlx::Error> {
         let Some(step) = &e.subject.step else {
             return Ok(reject("invalid", format!("{} needs a step", e.kind)));
@@ -503,15 +531,20 @@ impl<'a> Ctx<'a> {
         let running = status == "running";
         sqlx::query!(
             "INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status,
-                                          source, started_at, ended_at)
+                                          source, started_at, ended_at, depth, parent_step_index,
+                                          attempt)
              VALUES ($1, $2, $3, $4, $5, $6,
-                     CASE WHEN $7 THEN $8::timestamptz END, CASE WHEN NOT $7 THEN $8::timestamptz END)
+                     CASE WHEN $7 THEN $8::timestamptz END, CASE WHEN NOT $7 THEN $8::timestamptz END,
+                     $9, $10, $11)
              ON CONFLICT (run_day, flow_execution_id, step_index) DO UPDATE
                SET label = coalesce(EXCLUDED.label, step_executions.label),
                    status = CASE WHEN $7 THEN step_executions.status ELSE EXCLUDED.status END,
                    source = EXCLUDED.source,
                    started_at = coalesce(step_executions.started_at, EXCLUDED.started_at),
-                   ended_at = coalesce(EXCLUDED.ended_at, step_executions.ended_at)",
+                   ended_at = coalesce(EXCLUDED.ended_at, step_executions.ended_at),
+                   depth = coalesce(EXCLUDED.depth, step_executions.depth),
+                   parent_step_index = coalesce(EXCLUDED.parent_step_index, step_executions.parent_step_index),
+                   attempt = coalesce(EXCLUDED.attempt, step_executions.attempt)",
             self.run.run_day,
             flow,
             i32::try_from(step.index).unwrap_or(i32::MAX),
@@ -519,7 +552,10 @@ impl<'a> Ctx<'a> {
             status,
             wire(e.src.kind),
             running,
-            e.at.wall
+            e.at.wall,
+            nesting.depth,
+            nesting.parent,
+            nesting.attempt
         )
         .execute(&mut *tx)
         .await?;

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen D: `GET /api/v1/projects/{project}/flows/{execution_id}`.
 
-use fleet_protocol::event::{FlowOutcome, StepStatus};
+use fleet_protocol::{
+    event::{FlowOutcome, StepStarted, StepStatus},
+    journal::StepRef,
+};
 use serde_json::{Value, json};
 
 use super::rig::{Agent, Rig, rig};
@@ -55,6 +58,109 @@ async fn failed_checkout(rig: &Rig, ci_run: &str) -> String {
         .unwrap()
         .to_owned();
     flow_id(rig, &attempt, "checkout").await
+}
+
+/// `checkout` runs `pay` (a block with one step) and retries an assertion once, passing on the
+/// second attempt; its failing first attempt is the flow's failed step (issue #38).
+async fn nested_checkout(rig: &Rig, ci_run: &str) -> String {
+    let mut agent = Agent::new(ci_run, "build", "runner-a");
+    agent.started();
+    let shard = agent.shard("emulator-5554", &["checkout"]);
+    let checkout = agent.flow_started(&shard, "checkout", 0);
+    let top = |label: &str| StepStarted {
+        description: label.into(),
+        depth: None,
+        parent: None,
+        attempt: None,
+    };
+    let inside = |parent: u32, attempt: Option<u32>, label: &str| StepStarted {
+        description: label.into(),
+        depth: Some(1),
+        parent: Some(StepRef { index: parent }),
+        attempt,
+    };
+    agent.nested_step(
+        &checkout,
+        0,
+        top("Run subflows/pay.yaml"),
+        StepStatus::Completed,
+    );
+    agent.nested_step(
+        &checkout,
+        1,
+        inside(0, None, "Tap on \"Pay\""),
+        StepStatus::Completed,
+    );
+    agent.nested_step(&checkout, 2, top("Retry 2 times"), StepStatus::Completed);
+    agent.nested_step(
+        &checkout,
+        3,
+        inside(2, Some(1), "Assert visible \"Done\""),
+        StepStatus::Failed,
+    );
+    agent.nested_step(
+        &checkout,
+        4,
+        inside(2, Some(2), "Assert visible \"Done\""),
+        StepStatus::Completed,
+    );
+    agent.flow_ended(&checkout, FlowOutcome::Passed, None);
+    agent.suite_finished(&shard, true);
+    rig.publish(&mut agent, vec![]).await;
+    let attempts = rig.json("/api/v1/projects/app/attempts").await;
+    let attempt = attempts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["run_key"] == format!("o/r:{ci_run}"))
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    flow_id(rig, &attempt, "checkout").await
+}
+
+#[tokio::test]
+async fn the_steps_of_a_flow_come_back_nested_under_the_block_that_ran_them() {
+    let rig = rig().await;
+    let flow = nested_checkout(&rig, "710").await;
+    let view = rig
+        .json(&format!("/api/v1/projects/app/flows/{flow}"))
+        .await;
+
+    // Top-level steps are the roots; nested ones sit under their block, in the order they ran.
+    let roots = view["steps"].as_array().unwrap();
+    let shape = |s: &Value| {
+        (
+            s["index"].as_i64().unwrap(),
+            s["depth"].clone(),
+            s["attempt"].clone(),
+        )
+    };
+    assert_eq!(
+        roots.iter().map(shape).collect::<Vec<_>>(),
+        [(0, Value::Null, Value::Null), (2, Value::Null, Value::Null),]
+    );
+    assert_eq!(roots[0]["children"][0]["index"], 1);
+    assert_eq!(roots[0]["children"][0]["depth"], 1);
+    assert_eq!(roots[0]["children"][0]["parent_index"], 0);
+    let retried: Vec<_> = roots[1]["children"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| {
+            (
+                s["index"].as_i64().unwrap(),
+                s["parent_index"].as_i64().unwrap(),
+                s["attempt"].as_i64(),
+            )
+        })
+        .collect();
+    assert_eq!(retried, [(3, 2, Some(1)), (4, 2, Some(2))]);
+    assert!(
+        view["failure"].is_null(),
+        "the retry passed, so the flow did not fail"
+    );
 }
 
 #[tokio::test]

@@ -520,8 +520,9 @@ pub struct ClaimView {
 
 /// One step of a flow execution, in the order Maestro ran them.
 ///
-/// Steps are flat: the journal doesn't carry a step's parent or retry count yet, so nesting
-/// (`runFlow` depth) and attempts can't be shown without inventing them.
+/// Steps nest like the blocks around them: a `runFlow`, `retry` or `repeat` step lists the steps
+/// it ran in `children`. A step that Maestro's log doesn't place (older agents, or no nesting
+/// shown) has no `parent_index`, `depth` or `attempt`, and is a top-level step with no children.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct StepView {
@@ -541,6 +542,33 @@ pub struct StepView {
     pub ended_at: Option<OffsetDateTime>,
     /// `ended_at - started_at`, when both are known (agent wall clock).
     pub duration_ms: Option<i64>,
+    /// The index of the enclosing step, when this one is nested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_index: Option<i32>,
+    /// How many blocks enclose the step, when nested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<i32>,
+    /// The attempt of the `retry` block that ran the step, from 1, when it ran in one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<i32>,
+    /// The steps this block ran, in the order Maestro ran them. Empty for a step that ran none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<StepView>,
+}
+
+impl StepView {
+    /// Every step in `steps` and their children, depth first, so a parent comes before the steps
+    /// it ran.
+    #[must_use]
+    pub fn flatten(steps: &[StepView]) -> Vec<&StepView> {
+        let mut out = Vec::new();
+        let mut stack: Vec<&StepView> = steps.iter().rev().collect();
+        while let Some(step) = stack.pop() {
+            out.push(step);
+            stack.extend(step.children.iter().rev());
+        }
+        out
+    }
 }
 
 /// Why a flow failed, and where.

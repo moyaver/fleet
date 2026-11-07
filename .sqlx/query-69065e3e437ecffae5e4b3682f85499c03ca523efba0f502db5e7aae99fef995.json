@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status,\n                                          source, started_at, ended_at, depth, parent_step_index,\n                                          attempt)\n             VALUES ($1, $2, $3, $4, $5, $6,\n                     CASE WHEN $7 THEN $8::timestamptz END, CASE WHEN NOT $7 THEN $8::timestamptz END,\n                     $9, $10, $11)\n             ON CONFLICT (run_day, flow_execution_id, step_index) DO UPDATE\n               SET label = coalesce(EXCLUDED.label, step_executions.label),\n                   status = CASE WHEN $7 THEN step_executions.status ELSE EXCLUDED.status END,\n                   source = EXCLUDED.source,\n                   started_at = coalesce(step_executions.started_at, EXCLUDED.started_at),\n                   ended_at = coalesce(EXCLUDED.ended_at, step_executions.ended_at),\n                   depth = coalesce(EXCLUDED.depth, step_executions.depth),\n                   parent_step_index = coalesce(EXCLUDED.parent_step_index, step_executions.parent_step_index),\n                   attempt = coalesce(EXCLUDED.attempt, step_executions.attempt)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Uuid",
+        "Int4",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "source_t",
+            "kind": {
+              "Domain": "Text"
+            }
+          }
+        },
+        "Bool",
+        "Timestamptz",
+        "Int4",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "69065e3e437ecffae5e4b3682f85499c03ca523efba0f502db5e7aae99fef995"
+}

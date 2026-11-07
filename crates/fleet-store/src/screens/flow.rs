@@ -121,7 +121,7 @@ impl Store {
             agent_run,
             device,
             claims,
-            steps,
+            steps: nest(steps),
             failure,
             previous,
             artifacts,
@@ -164,11 +164,11 @@ async fn claims_of(
     Ok(claims)
 }
 
-/// A flow's steps in the order they were observed.
+/// A flow's steps in the order they were observed, flat: the nesting is [`nest`]'s job.
 async fn steps_of(c: &mut sqlx::PgConnection, flow_id: Uuid) -> Result<Vec<StepView>> {
     Ok(sqlx::query!(
         "SELECT st.step_index, st.label, st.status, st.source::text AS \"source!\",
-                st.started_at, st.ended_at
+                st.started_at, st.ended_at, st.depth, st.parent_step_index, st.attempt
            FROM step_executions st
            JOIN flow_executions f ON f.id = st.flow_execution_id
            JOIN agent_runs r ON r.id = f.agent_run_id
@@ -190,8 +190,40 @@ async fn steps_of(c: &mut sqlx::PgConnection, flow_id: Uuid) -> Result<Vec<StepV
             (Some(a), Some(b)) => i64::try_from((b - a).whole_milliseconds()).ok(),
             _ => None,
         },
+        parent_index: s.parent_step_index,
+        depth: s.depth,
+        attempt: s.attempt,
+        children: Vec::new(),
     })
     .collect())
+}
+
+/// Nests flat steps under the steps that ran them (issue #38). A step whose parent is missing, or
+/// not earlier, stays at the top, so no step is lost. Children keep their observed order.
+fn nest(flat: Vec<StepView>) -> Vec<StepView> {
+    let present: std::collections::HashSet<i32> = flat.iter().map(|s| s.index).collect();
+    // A block starts before the steps it runs, so reading the steps backwards meets every child
+    // before its block, and each block is complete when it is placed.
+    let mut under = std::collections::BTreeMap::<i32, Vec<StepView>>::new();
+    let mut roots = Vec::new();
+    for mut step in flat.into_iter().rev() {
+        step.children = under
+            .remove(&step.index)
+            .map(|mut c| {
+                c.reverse();
+                c
+            })
+            .unwrap_or_default();
+        match step
+            .parent_index
+            .filter(|p| *p < step.index && present.contains(p))
+        {
+            Some(parent) => under.entry(parent).or_default().push(step),
+            None => roots.push(step),
+        }
+    }
+    roots.reverse();
+    roots
 }
 
 /// Why a flow failed and where: the first failed step and the last good one before it.

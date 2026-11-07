@@ -187,13 +187,13 @@ fn step_label(s: &StepView) -> String {
         .unwrap_or_else(|| format!("Step {}", s.index))
 }
 
-fn step_ref(steps: &[StepView], index: i32) -> StepRef {
+fn step_ref(steps: &[&StepView], index: i32) -> StepRef {
     StepRef {
         index,
         label: steps
             .iter()
             .find(|s| s.index == index)
-            .map_or_else(|| format!("Step {index}"), step_label),
+            .map_or_else(|| format!("Step {index}"), |s| step_label(s)),
     }
 }
 
@@ -201,9 +201,8 @@ fn step_ref(steps: &[StepView], index: i32) -> StepRef {
 /// Maestro's description only when the server has one.
 #[must_use]
 pub fn evidence_steps(view: &FlowDetailView) -> (Vec<StepKey>, Option<StepKey>) {
-    let steps: Vec<StepKey> = view
-        .steps
-        .iter()
+    let steps: Vec<StepKey> = StepView::flatten(&view.steps)
+        .into_iter()
         .map(|s| StepKey {
             id: s.index.to_string(),
             label: s.label.clone(),
@@ -387,29 +386,31 @@ fn failure(view: &FlowDetailView) -> Failure {
             .or_else(|| view.flow.failure_message.clone()),
         failed_step: f
             .and_then(|f| f.failed_step_index)
-            .map(|i| step_ref(&view.steps, i)),
+            .map(|i| step_ref(&StepView::flatten(&view.steps), i)),
         last_successful_step: f
             .and_then(|f| f.last_successful_step_index)
-            .map(|i| step_ref(&view.steps, i)),
+            .map(|i| step_ref(&StepView::flatten(&view.steps), i)),
     })
 }
 
 fn steps(view: &FlowDetailView) -> StepsSection {
-    let execs: Vec<StepExec> = view
-        .steps
+    // Pre-order, so a block precedes the steps it ran, as the tree needs.
+    let flat = StepView::flatten(&view.steps);
+    let execs: Vec<StepExec> = flat
         .iter()
         .map(|s| StepExec {
             id: s.index.to_string(),
-            parent: None,
+            parent: s.parent_index.map(|p| p.to_string()),
             label: step_label(s),
             status: step_status(&s.status),
             source: parse_source(&s.source),
             duration_ms: s.duration_ms.and_then(|d| u64::try_from(d).ok()),
-            attempt: 1,
+            // Unknown attempts count as the first, which is what a step outside a retry is.
+            attempt: s.attempt.and_then(|a| u32::try_from(a).ok()).unwrap_or(1),
         })
         .collect();
     let tree = StepTree::build(&execs);
-    let n = view.steps.len();
+    let n = flat.len();
     let open = matches!(view.flow.state.as_str(), "running" | "pending");
     let summary = match (n, open) {
         (0, true) => "No steps reported yet".to_owned(),
@@ -424,7 +425,7 @@ fn steps(view: &FlowDetailView) -> StepsSection {
         tree,
         summary,
         note: (n > 0).then_some(
-            "Listed in the order Maestro ran them. Nesting (runFlow) and retries are not reported yet.",
+            "Listed in the order Maestro ran them. A block (runFlow, retry, repeat) holds the steps it ran; a retried step shows its attempt.",
         ),
     }
 }
@@ -663,6 +664,53 @@ mod tests {
         assert_eq!(FlowPage::build(&v, &ctx()).failure, Failure::NotFailed);
     }
 
+    /// A `runFlow` (0) that runs a tap (1) and a `retry` block (2); the block's assertion failed
+    /// once, then passed (issue #38). Maestro's log gave the depths, parents and attempts.
+    #[test]
+    fn nested_steps_sit_under_their_block_and_a_retried_step_shows_its_attempt() {
+        let mut v = view();
+        v.steps = serde_json::from_str(
+            r#"[
+              {"index": 0, "label": "Run subflows/checkout.yaml", "status": "failed",
+               "source": "debug_log", "started_at": null, "ended_at": null, "duration_ms": null,
+               "children": [
+                 {"index": 1, "label": "Tap on \"Pay\"", "status": "completed",
+                  "source": "debug_log", "started_at": null, "ended_at": null, "duration_ms": null,
+                  "parent_index": 0, "depth": 1},
+                 {"index": 2, "label": "Retry 2 times", "status": "failed",
+                  "source": "debug_log", "started_at": null, "ended_at": null, "duration_ms": null,
+                  "parent_index": 0, "depth": 1, "children": [
+                    {"index": 3, "label": "Assert visible \"Done\"", "status": "failed",
+                     "source": "debug_log", "started_at": null, "ended_at": null,
+                     "duration_ms": null, "parent_index": 2, "depth": 2, "attempt": 1},
+                    {"index": 4, "label": "Assert visible \"Done\"", "status": "failed",
+                     "source": "debug_log", "started_at": null, "ended_at": null,
+                     "duration_ms": null, "parent_index": 2, "depth": 2, "attempt": 2}
+                  ]}
+               ]}
+            ]"#,
+        )
+        .unwrap();
+        let steps = FlowPage::build(&v, &ctx()).steps;
+        assert_eq!(steps.summary, "5 steps");
+        let tree = steps.tree;
+        let rows = fleet_ui::steps::tree::TreeState::open_to_attention(&tree).rows(&tree);
+        let shape: Vec<_> = rows
+            .iter()
+            .map(|r| (r.id.as_str(), r.level, r.attempt.as_deref()))
+            .collect();
+        assert_eq!(
+            shape,
+            [
+                ("0", 1, None),
+                ("1", 2, None),
+                ("2", 2, None),
+                ("3", 3, Some("attempt 1 of 2")),
+                ("4", 3, Some("attempt 2 of 2")),
+            ]
+        );
+    }
+
     #[test]
     fn steps_are_a_flat_tree_in_order_with_status_source_and_duration() {
         let steps = page().steps;
@@ -670,7 +718,7 @@ mod tests {
         assert_eq!(
             steps.note,
             Some(
-                "Listed in the order Maestro ran them. Nesting (runFlow) and retries are not reported yet."
+                "Listed in the order Maestro ran them. A block (runFlow, retry, repeat) holds the steps it ran; a retried step shows its attempt."
             )
         );
         let state = fleet_ui::steps::tree::TreeState::open_to_attention(&steps.tree);

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT st.step_index, st.label, st.status, st.source::text AS \"source!\",\n                st.started_at, st.ended_at\n           FROM step_executions st\n           JOIN flow_executions f ON f.id = st.flow_execution_id\n           JOIN agent_runs r ON r.id = f.agent_run_id\n          WHERE st.flow_execution_id = $1 AND st.run_day = r.run_day\n          ORDER BY st.step_index",
+  "query": "SELECT st.step_index, st.label, st.status, st.source::text AS \"source!\",\n                st.started_at, st.ended_at, st.depth, st.parent_step_index, st.attempt\n           FROM step_executions st\n           JOIN flow_executions f ON f.id = st.flow_execution_id\n           JOIN agent_runs r ON r.id = f.agent_run_id\n          WHERE st.flow_execution_id = $1 AND st.run_day = r.run_day\n          ORDER BY st.step_index",
   "describe": {
     "columns": [
       {
@@ -63,6 +63,39 @@
             "name": "ended_at"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "depth",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "depth"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "parent_step_index",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "parent_step_index"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "attempt",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "step_executions",
+            "name": "attempt"
+          }
+        }
       }
     ],
     "parameters": {
@@ -76,8 +109,11 @@
       false,
       null,
       true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "29c459bcbeaebd7aab697899dd15e1a63351ae484b58f3fc3a88bbb34292b04c"
+  "hash": "2ee2f0028307839576e65a734e005537d308f90f92d87b82a17a3ad5073f66c9"
 }

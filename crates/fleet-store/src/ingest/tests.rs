@@ -223,6 +223,9 @@ pub(crate) fn suite_run_scripted(
                 SourceKind::LiveConsole,
                 &EventBody::StepStarted(StepStarted {
                     description: step.into(),
+                    depth: None,
+                    parent: None,
+                    attempt: None,
                 }),
             ));
             out.push(a.event(
