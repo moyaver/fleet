@@ -493,6 +493,11 @@
   flex-wrap: wrap;
 }
 
+/* A page title row: the wider gap the design gives a heading and its pill (no inline style, CSP). */
+.row-head {
+  gap: 14px;
+}
+
 .page-h {
   display: flex;
   align-items: flex-end;

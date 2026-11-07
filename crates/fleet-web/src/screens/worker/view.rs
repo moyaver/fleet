@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The worker page (screen C): header, health now, correlated charts with the device timeline,
-//! runs and devices. Data arrives through props; the router and data layer fetch it.
+//! The runner page (screen C for a worker): the machine's name and sample, health now, its charts,
+//! the flows on its devices, its runs and its devices. Data arrives through props; the router and
+//! data layer fetch it, and keep it fresh while the page is open.
 
 #![expect(
     clippy::must_use_candidate,
@@ -9,11 +10,11 @@
 
 use fleet_protocol::rest::{MetricsView, TimelineView, WorkerRunPage, WorkerView};
 use fleet_ui::{
-    charts::series::Reading,
-    components::display::{Card, EmptyState, ProvenanceBadge, TableBox},
-    tone::Tone,
+    components::display::{Card, EmptyState, ProvenanceBadge, ReadoutStrip, TableBox},
+    provenance::Provenance,
 };
 use leptos::prelude::*;
+use leptos_router::components::A;
 
 use crate::{
     app::ErrorNotice,
@@ -21,12 +22,12 @@ use crate::{
         common::Ctx,
         device::model::DeviceSessionRow,
         metrics::{MetricsPanel, RangeSelection},
-        parts::{
-            FactList, Fetched, MetricsCharts, Notice, PillView, RangePicker, TimelineSection,
-            loaded,
-        },
+        parts::{Fetched, MetricsCharts, PillView, RangePicker, TimelineSection, loaded},
         timeline::TimelineScope,
-        worker::model::{HostHealth, NextPage, RunRow, RunsList, WorkerHeader, device_rows},
+        worker::model::{
+            CHARTED, HealthCell, HealthValue, NextPage, RunRow, RunsList, WorkerHeader,
+            device_rows, health_cells,
+        },
     },
 };
 
@@ -79,65 +80,86 @@ pub fn WorkerPage(
             .get()
             .map(|w| WorkerHeader::build(&w, &ctx.read()))
     });
+    let panel = Memo::new(move |_| {
+        metrics
+            .data
+            .get()
+            .map(|m| MetricsPanel::build(&m).only(&CHARTED))
+    });
     let health = Memo::new(move |_| {
         worker
             .data
             .get()
-            .map(|w| HostHealth::build(&w, &ctx.read()))
+            .map(|w| health_cells(&w, panel.read().as_ref()))
     });
     view! {
-           <article class="space-y-4" aria-labelledby="worker-title" data-testid="worker-page">
-               <ErrorNotice error=worker_error />
-               {move || {
-                   loaded(
-    worker,
-                       |w| {
-                           let ctx = ctx.get_untracked();
-                           let devices = device_rows(&w, &ctx);
-                           let scope = TimelineScope::of_sessions(&w.devices);
-                           view! {
-                               <HeaderView header=header />
-                               <HealthCard health=health />
-                               <section aria-labelledby="charts-title" class="space-y-3">
-                                   <h3 id="charts-title" class="text-lg font-semibold">"Machine health over time"</h3>
-                                   <RangePicker range=range />
-                                   <ErrorNotice error=metrics_error />
-                                   {move || {
-                                       loaded(
-    metrics,
-                                           |m| {
-                                               view! {
-                                                   <MetricsCharts
-                                                       panel=MetricsPanel::build(&m)
-                                                       cursor=cursor
-                                                       utc_offset_minutes=utc_offset_minutes
-                                                   />
-                                               }
-                                                   .into_any()
-                                           },
-                                       )
-                                   }}
-                               </section>
-                               <TimelineSection
-                                   scope=scope
-                                   timelines=timelines
-                                   now_ms=now_ms
-                                   utc_offset_minutes=utc_offset_minutes
-                                   cursor=cursor
-                                   on_open_flow=on_open_flow.unwrap_or_else(|| Callback::new(|_| {}))
-                               />
-                               <RunsSection worker=w ctx=ctx more_runs=more_runs on_more_runs=on_more_runs />
-                               <DevicesSection devices=devices />
-                           }
-                               .into_any()
-                       },
-                   )
-               }}
-           </article>
-       }
+        <article class="stack" aria-labelledby="worker-title" data-testid="worker-page">
+            <ErrorNotice error=worker_error />
+            <HeaderView header=header />
+            <HealthCard health=health />
+            <section class="card" aria-labelledby="charts-title">
+                <div class="card-h"><h2 id="charts-title">"Machine health over time"</h2></div>
+                <div class="card-b space-y-4">
+                    {move || {
+                        panel
+                            .get()
+                            .map(|p| {
+                                let note = format!("{} · {}", p.window_label(utc_offset_minutes), p.resolution_note);
+                                view! {
+                                    <p class="pv-statement">
+                                        <span>{note}</span>
+                                        <ProvenanceBadge provenance=Signal::stored(p.provenance) />
+                                    </p>
+                                }
+                            })
+                    }}
+                    <RangePicker range=range />
+                    <ErrorNotice error=metrics_error />
+                    {move || {
+                        loaded(
+                            metrics,
+                            |m| {
+                                view! {
+                                    <MetricsCharts
+                                        panel=MetricsPanel::build(&m).only(&CHARTED)
+                                        cursor=cursor
+                                        utc_offset_minutes=utc_offset_minutes
+                                    />
+                                }
+                                    .into_any()
+                            },
+                        )
+                    }}
+                </div>
+            </section>
+            {move || {
+                loaded(
+                    worker,
+                    |w| {
+                        let ctx = ctx.get_untracked();
+                        let devices = device_rows(&w, &ctx);
+                        let scope = TimelineScope::of_sessions(&w.devices);
+                        view! {
+                            <TimelineSection
+                                scope=scope
+                                timelines=timelines
+                                now_ms=now_ms
+                                utc_offset_minutes=utc_offset_minutes
+                                cursor=cursor
+                                on_open_flow=on_open_flow.unwrap_or_else(|| Callback::new(|_| {}))
+                            />
+                            <RunsSection worker=w ctx=ctx more_runs=more_runs on_more_runs=on_more_runs />
+                            <DevicesSection devices=devices />
+                        }
+                            .into_any()
+                    },
+                )
+            }}
+        </article>
+    }
 }
 
-/// The machine's name, liveness and facts.
+/// The runner's name, its liveness, when it was last sampled, and its facts on one meta line.
 #[component]
 fn HeaderView(
     /// The header, once the worker is loaded.
@@ -145,78 +167,73 @@ fn HeaderView(
 ) -> impl IntoView {
     move || {
         header.get().map(|h| {
+            let (sampled_now, stale) = (h.sampled.is_some(), h.provenance == Provenance::Stale);
             view! {
-                <header class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-3">
+                <header class="space-y-1">
+                    <nav class="text-sm text-muted" aria-label="Breadcrumb">
+                        <A href="/">"Overview"</A>
+                        <span aria-hidden="true">" / "</span>
+                        <span aria-current="page">{h.title.clone()}</span>
+                    </nav>
+                    <div class="row row-head">
                         <h2 id="worker-title" class="text-xl font-semibold">{h.title}</h2>
-                        <PillView pill=h.liveness />
+                        <span data-testid="runner-liveness"><PillView pill=h.liveness /></span>
+                        {h.sampled.map(|s| view! { <span class="note">{s}</span> })}
+                        {(sampled_now || stale)
+                            .then(|| view! { <ProvenanceBadge provenance=Signal::stored(h.provenance) /> })}
                     </div>
-                    <FactList facts=h.facts />
+                    <p class="meta">{h.meta}</p>
                 </header>
             }
         })
     }
 }
 
-/// The newest host sample: every metric with its unit, or why it has none.
+/// Health now: a readout strip of the newest values, each with its unit or the word Missing.
 #[component]
 fn HealthCard(
-    /// The health, once the worker is loaded.
-    health: Memo<Option<HostHealth>>,
+    /// The cells, once the worker is loaded.
+    health: Memo<Option<Vec<HealthCell>>>,
 ) -> impl IntoView {
-    let body = move || match health.get() {
-        None => ().into_any(),
-        Some(health) => health_body(health),
+    let body = move || {
+        health.get().map(|cells| {
+            view! {
+                <ReadoutStrip>
+                    {cells.into_iter().map(health_cell).collect_view()}
+                </ReadoutStrip>
+            }
+        })
     };
     view! { <Card title="Health now">{body}</Card> }
 }
 
-fn health_body(health: HostHealth) -> AnyView {
-    match health {
-        HostHealth::NoRecentSample => view! {
-            <EmptyState
-                title="No recent host sample"
-                description="The server has no host sample from the last hour. That says nothing about how the machine is doing."
-            />
-        }
-        .into_any(),
-        HostHealth::Sample(s) => view! {
-            <p class="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-                <span>{format!("Sampled {}", s.taken)}</span>
-                <ProvenanceBadge provenance=s.provenance />
-            </p>
-            <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {s
-                    .tiles
-                    .into_iter()
-                    .map(|t| {
-                        let unavailable = matches!(t.reading, Reading::Unavailable { .. });
-                        let text = t.text();
-                        view! {
-                            <li class="rounded border border-border p-3" data-testid="health-tile" data-metric=t.id>
-                                <p class="text-sm text-muted">{t.label}</p>
-                                <p
-                                    class=if unavailable {
-                                        "mt-1 italic text-muted"
-                                    } else {
-                                        "mt-1 text-xl font-semibold tabular-nums"
-                                    }
-                                    data-testid="health-value"
-                                    data-unavailable=unavailable.then_some("")
-                                >
-                                    {text}
-                                </p>
-                            </li>
-                        }
-                    })
-                    .collect_view()}
-            </ul>
-        }
-        .into_any(),
+fn health_cell(cell: HealthCell) -> impl IntoView {
+    let (value, unavailable) = match cell.value {
+        HealthValue::Value(text) => (
+            view! { <span class="tile-n tabular-nums">{text}</span> }.into_any(),
+            false,
+        ),
+        HealthValue::Missing(reason) => (
+            view! {
+                <span class="flex flex-wrap items-center gap-2">
+                    <ProvenanceBadge provenance=Signal::stored(Provenance::Missing) />
+                    {reason.map(|r| view! { <span class="note">{r}</span> })}
+                </span>
+            }
+            .into_any(),
+            true,
+        ),
+    };
+    view! {
+        <div class="tile" data-testid="health-tile" data-metric=cell.id>
+            <p class="tile-l">{cell.label}</p>
+            <p data-testid="health-value" data-unavailable=unavailable.then_some("")>{value}</p>
+            {cell.note.map(|n| view! { <p class="note mt-1">{n}</p> })}
+        </div>
     }
 }
 
-/// The worker's runs, with a button for older ones.
+/// The worker's runs, with a button for older ones. A run's verdict comes from its exit status.
 #[component]
 fn RunsSection(
     /// The worker.
@@ -236,23 +253,26 @@ fn RunsSection(
         list
     });
     view! {
-        <section aria-labelledby="runs-title" class="space-y-2">
-            <h3 id="runs-title" class="text-lg font-semibold">"Runs"</h3>
+        <Card title="Runs">
             {move || {
                 let list = list.get();
                 if list.rows().is_empty() {
-                    return view! { <EmptyState title="No runs yet" description="No agent run has used this worker." /> }
+                    return view! { <EmptyState title="No runs yet" description="No agent run has used this runner." /> }
                         .into_any();
                 }
                 let next = list.next_page();
                 view! {
-                    <TableBox label="Runs on this worker">
-                        <table class="w-full text-left text-sm">
-                            <caption class="sr-only">"Runs on this worker, newest first"</caption>
-                            <thead class="border-b border-border text-muted">
+                    <p class="pv-statement">
+                        <span>"Verdict from each run's Maestro exit status, newest first"</span>
+                        <ProvenanceBadge provenance=Signal::stored(Provenance::Derived) />
+                    </p>
+                    <TableBox label="Runs on this runner">
+                        <table class="tbl tbl-cards">
+                            <caption class="sr">"Runs on this runner, newest first"</caption>
+                            <thead>
                                 <tr>
-                                    {["Job", "State", "Started", "Duration", "Exit code", "Data gaps"]
-                                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                                    {["Run", "State", "Started", "Duration"]
+                                        .map(|h| view! { <th scope="col">{h}</th> })}
                                 </tr>
                             </thead>
                             <tbody>{list.rows().iter().map(run_row).collect_view()}</tbody>
@@ -263,7 +283,7 @@ fn RunsSection(
                             view! {
                                 <button
                                     type="button"
-                                    class="rounded border border-border bg-surface px-3 py-1.5 text-sm"
+                                    class="btn btn-sm"
                                     on:click=move |_| on_more_runs.run(next.clone())
                                 >
                                     "Load older runs"
@@ -273,29 +293,28 @@ fn RunsSection(
                 }
                     .into_any()
             }}
-        </section>
+        </Card>
     }
 }
 
 fn run_row(r: &RunRow) -> impl IntoView + use<> {
+    let open = r.open.then(|| {
+        view! {
+            <ProvenanceBadge provenance=Signal::stored(Provenance::Provisional) />
+        }
+    });
     view! {
-        <tr class="border-b border-border">
-            <td class="px-2 py-1"><a class="underline" href=r.href.clone()>{r.job_key.clone()}</a></td>
-            <td class="px-2 py-1">
-                <span class="mr-2">{r.state.clone()}</span>
-                <PillView pill=r.liveness />
+        <tr data-testid="run-row">
+            <td data-label="Run"><a class="cell-title" href=r.href.clone()>{r.job_key.clone()}</a></td>
+            <td data-label="State">
+                <span class="flex flex-wrap items-center gap-2">
+                    <PillView pill=r.verdict />
+                    {open}
+                    <span class="note">{r.outcome.clone()}</span>
+                </span>
             </td>
-            <td class="px-2 py-1 tabular-nums">{r.started.clone()}</td>
-            <td class="px-2 py-1">{r.duration.clone().unwrap_or_else(|| "—".to_owned())}</td>
-            <td class="px-2 py-1">
-                {r.exit_code.map_or_else(|| "—".to_owned(), |c| c.to_string())}
-            </td>
-            <td class="px-2 py-1">
-                {match r.gaps.clone() {
-                    Some(g) => view! { <Notice tone=Tone::Warning text=g /> }.into_any(),
-                    None => view! { <span class="text-muted">"None"</span> }.into_any(),
-                }}
-            </td>
+            <td data-label="Started" class="num">{r.started.clone()}</td>
+            <td data-label="Duration" class="num">{r.duration.clone()}</td>
         </tr>
     }
 }
@@ -307,20 +326,19 @@ fn DevicesSection(
     devices: Vec<DeviceSessionRow>,
 ) -> impl IntoView {
     view! {
-        <section aria-labelledby="devices-title" class="space-y-2">
-            <h3 id="devices-title" class="text-lg font-semibold">"Devices"</h3>
+        <Card title="Devices">
             {if devices.is_empty() {
-                view! { <EmptyState title="No devices" description="This worker has not reported any device." /> }
+                view! { <EmptyState title="No devices" description="This runner has not reported any device." /> }
                     .into_any()
             } else {
                 view! {
                     <TableBox label="Devices on this runner">
-                        <table class="w-full text-left text-sm">
-                            <caption class="sr-only">"Devices hosted by this worker"</caption>
-                            <thead class="border-b border-border text-muted">
+                        <table class="tbl tbl-cards">
+                            <caption class="sr">"Devices hosted by this runner"</caption>
+                            <thead>
                                 <tr>
-                                    {["Device", "State", "Profile", "Job", "Last seen"]
-                                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                                    {["Device", "State", "Profile", "Job"]
+                                        .map(|h| view! { <th scope="col">{h}</th> })}
                                 </tr>
                             </thead>
                             <tbody>
@@ -328,16 +346,15 @@ fn DevicesSection(
                                     .into_iter()
                                     .map(|d| {
                                         view! {
-                                            <tr class="border-b border-border">
-                                                <td class="px-2 py-1">
-                                                    <a class="underline" href=d.href>{d.serial}</a>
+                                            <tr>
+                                                <td data-label="Device">
+                                                    <a class="cell-title" href=d.href>{d.serial}</a>
                                                 </td>
-                                                <td class="px-2 py-1"><PillView pill=d.state /></td>
-                                                <td class="px-2 py-1">
+                                                <td data-label="State"><PillView pill=d.state /></td>
+                                                <td data-label="Profile">
                                                     {d.profile.unwrap_or_else(|| "Not reported".to_owned())}
                                                 </td>
-                                                <td class="px-2 py-1">{d.job_key}</td>
-                                                <td class="px-2 py-1">{d.last_seen}</td>
+                                                <td data-label="Job">{d.job_key}</td>
                                             </tr>
                                         }
                                     })
@@ -348,6 +365,6 @@ fn DevicesSection(
                 }
                     .into_any()
             }}
-        </section>
+        </Card>
     }
 }

@@ -4,31 +4,35 @@
 //! A value the agent doesn't report is a [`Fact`] with no value ("Not reported"), and a host
 //! sample that is too old to trust turns stale instead of passing for current (invariant I4).
 
-use fleet_protocol::rest::{
-    MetricReading, WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
-};
+use fleet_protocol::rest::{WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView};
 use fleet_ui::{
-    charts::{
-        format::{Unit, format_duration},
-        series::Reading,
-    },
+    charts::format::{Unit, format_duration},
+    mark::Mark,
     provenance::{Provenance, STALE_AFTER_MS},
 };
 use uuid::Uuid;
 
 use crate::{
     clock::unix_ms,
+    format::time_of_day,
     paths::pipeline_href,
     screens::{
         common::{Ctx, Fact},
         device::model::DeviceSessionRow,
-        metrics::unit_of,
+        metrics::{Latest, MetricsPanel},
     },
     status::{Pill, liveness_pill},
 };
 
 const MEM_TOTAL: &str = "host_mem_total_bytes";
 const CPU_CORES: &str = "host_cpu_cores";
+const HOST_CPU: &str = "host_cpu_pct";
+const HOST_MEM: &str = "host_mem_used_bytes";
+const MAESTRO_CPU: &str = "maestro_cpu_pct";
+const AGENT_CPU: &str = "agent_cpu_pct";
+
+/// The metrics the Runner page charts, in the order its design shows them.
+pub const CHARTED: [&str; 5] = [HOST_CPU, HOST_MEM, MAESTRO_CPU, AGENT_CPU, "emu_cpu_pct"];
 
 /// The newest host sample's value for `metric`, when the agent reported one.
 fn latest_value(w: &WorkerSummaryView, metric: &str) -> Option<f64> {
@@ -41,15 +45,19 @@ fn latest_value(w: &WorkerSummaryView, metric: &str) -> Option<f64> {
         .and_then(|r| r.value)
 }
 
-/// The machine at a glance.
+/// The machine at a glance: its name, how it is doing, when it was last sampled and what it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerHeader {
     /// The runner's name, or its id when it has none.
     pub title: String,
     /// How it is doing now.
     pub liveness: Pill,
-    /// What it is.
-    pub facts: Vec<Fact>,
+    /// `sampled 07:31:39, 4 s ago`, or `None` when no sample was taken in the last hour.
+    pub sampled: Option<String>,
+    /// How fresh the host sample is: observed, or stale once it is old; missing without a sample.
+    pub provenance: Provenance,
+    /// `macos · aarch64 · 8 cores · 16 GiB`; a fact the agent did not report reads "Not reported".
+    pub meta: String,
 }
 
 impl WorkerHeader {
@@ -62,97 +70,113 @@ impl WorkerHeader {
             format!("Worker {}", id.chars().take(8).collect::<String>())
         });
         let memory = latest_value(w, MEM_TOTAL).map(|bytes| Unit::Bytes.format(bytes));
-        let cores = latest_value(w, CPU_CORES).map(|n| Unit::Number.format(n));
+        let cores = latest_value(w, CPU_CORES).map(|n| format!("{} cores", Unit::Number.format(n)));
+        let facts = [
+            Fact::maybe("Operating system", w.os.clone()),
+            Fact::maybe("Architecture", w.arch.clone()),
+            Fact::maybe("CPU cores", cores),
+            Fact::maybe("Memory", memory),
+        ];
+        let at = w.latest.as_ref().map(|l| unix_ms(l.at));
         Self {
             title,
             liveness: liveness_pill(w.liveness),
-            facts: vec![
-                Fact::maybe("Operating system", w.os.clone()),
-                Fact::maybe("Architecture", w.arch.clone()),
-                Fact::maybe("Memory", memory),
-                Fact::maybe("CPU cores", cores),
-                Fact::known("First seen", ctx.time(unix_ms(w.first_seen_at))),
-                Fact::known("Last seen", ctx.ago(unix_ms(w.last_seen_at))),
-            ],
-        }
-    }
-}
-
-/// One metric's latest value: a number with its unit, or why there is none.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ReadingTile {
-    /// The server's stable metric id.
-    pub id: String,
-    /// The server's label.
-    pub label: String,
-    /// What it is measured in.
-    pub unit: Unit,
-    /// The reading.
-    pub reading: Reading,
-}
-
-impl ReadingTile {
-    fn from_reading(r: &MetricReading) -> Self {
-        let unit = unit_of(r.unit, r.scope);
-        let reading = match (r.available, r.value) {
-            (true, Some(v)) => Reading::Value(v),
-            _ => Reading::Unavailable {
-                reason: r.reason.clone(),
-            },
-        };
-        Self {
-            id: r.metric.clone(),
-            label: r.label.clone(),
-            unit,
-            reading,
-        }
-    }
-
-    /// `37.5%`, `6 GiB`, or `unavailable (reason)`: an unavailable reading shows no number.
-    #[must_use]
-    pub fn text(&self) -> String {
-        self.reading.label(self.unit)
-    }
-}
-
-/// The newest host sample.
-#[derive(Debug, Clone, PartialEq)]
-pub struct HostSample {
-    /// When it was taken and how long ago.
-    pub taken: String,
-    /// Observed, or stale once it is older than the freshness threshold.
-    pub provenance: Provenance,
-    /// Every host metric.
-    pub tiles: Vec<ReadingTile>,
-}
-
-/// The worker's health now.
-#[derive(Debug, Clone, PartialEq)]
-pub enum HostHealth {
-    /// The server has no host sample from the last hour: that says nothing about the machine.
-    NoRecentSample,
-    /// The newest sample.
-    Sample(HostSample),
-}
-
-impl HostHealth {
-    /// The health in `view`.
-    #[must_use]
-    pub fn build(view: &WorkerView, ctx: &Ctx) -> Self {
-        let Some(latest) = &view.worker.latest else {
-            return Self::NoRecentSample;
-        };
-        let at = unix_ms(latest.at);
-        Self::Sample(HostSample {
-            taken: format!("{} ({})", ctx.time(at), ctx.ago(at)),
-            provenance: Provenance::Observed.displayed(ctx.age_ms(at), STALE_AFTER_MS),
-            tiles: latest
-                .readings
+            sampled: at.map(|at| {
+                format!(
+                    "sampled {}, {}",
+                    time_of_day(at, ctx.utc_offset_minutes),
+                    ctx.ago(at)
+                )
+            }),
+            provenance: at.map_or(Provenance::Missing, |at| {
+                Provenance::Observed.displayed(ctx.age_ms(at), STALE_AFTER_MS)
+            }),
+            meta: facts
                 .iter()
-                .map(ReadingTile::from_reading)
-                .collect(),
-        })
+                .map(|f| f.shown().to_owned())
+                .collect::<Vec<_>>()
+                .join(" · "),
+        }
     }
+}
+
+/// A health cell's value: a number with its unit, or the word Missing with the reason.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthValue {
+    /// The value, in its unit, such as `25%`.
+    Value(String),
+    /// No value, and why, when the agent or the range says.
+    Missing(Option<String>),
+}
+
+/// One cell of Health now: a metric, its value, and what it is about.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealthCell {
+    /// The server's stable metric id.
+    pub id: &'static str,
+    /// What it is, with its unit in the label.
+    pub label: &'static str,
+    /// The value, or why it is missing.
+    pub value: HealthValue,
+    /// What the value is about, such as `of 16 GiB`.
+    pub note: Option<String>,
+}
+
+/// The host metric `id` of the newest sample, as a health value.
+fn host_value(view: &WorkerView, id: &str, unit: Unit) -> HealthValue {
+    let Some(latest) = &view.worker.latest else {
+        return HealthValue::Missing(Some("no host sample in the last hour".to_owned()));
+    };
+    match latest.readings.iter().find(|r| r.metric == id) {
+        Some(r) if r.available => match r.value {
+            Some(v) => HealthValue::Value(unit.format(v)),
+            None => HealthValue::Missing(r.reason.clone()),
+        },
+        Some(r) => HealthValue::Missing(r.reason.clone()),
+        None => HealthValue::Missing(Some("the agent does not report this metric".to_owned())),
+    }
+}
+
+/// Health now: the host's CPU and memory from the newest sample, and while a run is active the
+/// Maestro and agent CPU, the newest point of each process chart in the range. Metrics the agent
+/// never reports (such as temperature) are not cells at all.
+#[must_use]
+pub fn health_cells(view: &WorkerView, processes: Option<&MetricsPanel>) -> Vec<HealthCell> {
+    let mut cells = vec![
+        HealthCell {
+            id: HOST_CPU,
+            label: "Host CPU (%)",
+            value: host_value(view, HOST_CPU, Unit::Percent),
+            note: None,
+        },
+        HealthCell {
+            id: HOST_MEM,
+            label: "Memory used",
+            value: host_value(view, HOST_MEM, Unit::Bytes),
+            note: latest_value(&view.worker, MEM_TOTAL)
+                .map(|total| format!("of {}", Unit::Bytes.format(total))),
+        },
+    ];
+    if view.worker.active_runs > 0 {
+        let process = |id: &str| match processes.and_then(|p| p.newest(id)) {
+            Some(Latest::Value(v)) => HealthValue::Value(v.clone()),
+            Some(Latest::Missing(reason)) => HealthValue::Missing(reason.clone()),
+            None => HealthValue::Missing(Some("no samples in this range".to_owned())),
+        };
+        cells.push(HealthCell {
+            id: MAESTRO_CPU,
+            label: "Maestro CPU (% of one core)",
+            value: process(MAESTRO_CPU),
+            note: Some("while a run is active".to_owned()),
+        });
+        cells.push(HealthCell {
+            id: AGENT_CPU,
+            label: "Agent CPU (% of one core)",
+            value: process(AGENT_CPU),
+            note: Some("Fleet agent".to_owned()),
+        });
+    }
+    cells
 }
 
 /// How many runs `WorkerView::recent_runs` carries at most (see its documentation).
@@ -165,18 +189,16 @@ pub struct RunRow {
     pub id: Uuid,
     /// Its CI job's key.
     pub job_key: String,
-    /// What state the run is in.
-    pub state: String,
-    /// Display liveness.
-    pub liveness: Pill,
+    /// The run's verdict, from its exit status: Failed, No failures, Interrupted or Running.
+    pub verdict: Pill,
+    /// Whether the run is still open, so its verdict may still change.
+    pub open: bool,
     /// When it started, in the viewer's zone.
     pub started: String,
-    /// How long it ran; `None` until it ends.
-    pub duration: Option<String>,
-    /// Maestro's exit code; `None` until Maestro exits.
-    pub exit_code: Option<i32>,
-    /// Explicitly recorded gaps in its data (invariant I5), when there are any.
-    pub gaps: Option<String>,
+    /// How long it ran, or how long it has run so far.
+    pub duration: String,
+    /// `Ended · exit 1`, or `exit —, still running`, with any recorded gaps.
+    pub outcome: String,
     /// The pipeline page.
     pub href: String,
     started_ms: i64,
@@ -185,30 +207,61 @@ pub struct RunRow {
 impl RunRow {
     fn build(r: &WorkerRunView, ctx: &Ctx) -> Self {
         let started_ms = unix_ms(r.started_at);
-        let state = match r.run.state.as_str() {
-            "active" => "Active",
-            "detached" => "Detached",
-            "finalizing" => "Finalizing",
-            "ended" => "Ended",
-            "abandoned" => "Abandoned",
-            other => other,
+        let exit = r.run.maestro_exit_code;
+        let (verdict, open, duration, mut outcome) = match r.ended_at {
+            None => (
+                Pill {
+                    label: "Running",
+                    mark: Mark::Running,
+                },
+                true,
+                format!(
+                    "Running for {}",
+                    format_duration(ctx.now_ms.saturating_sub(started_ms).max(0))
+                ),
+                "exit —, still running".to_owned(),
+            ),
+            Some(end) => {
+                let took = format_duration(unix_ms(end).saturating_sub(started_ms));
+                let (verdict, exit_text) = match exit {
+                    Some(0) => (
+                        Pill {
+                            label: "No failures",
+                            mark: Mark::End,
+                        },
+                        "0".to_owned(),
+                    ),
+                    Some(code) => (
+                        Pill {
+                            label: "Failed",
+                            mark: Mark::Failed,
+                        },
+                        code.to_string(),
+                    ),
+                    None => (
+                        Pill {
+                            label: "Interrupted",
+                            mark: Mark::Interrupted,
+                        },
+                        "—".to_owned(),
+                    ),
+                };
+                (verdict, false, took, format!("Ended · exit {exit_text}"))
+            }
         };
-        let gaps = match r.run.gaps {
-            ..=0 => None,
-            1 => Some("1 recorded gap".to_owned()),
-            n => Some(format!("{n} recorded gaps")),
-        };
+        match r.run.gaps {
+            ..=0 => {}
+            1 => outcome.push_str(" · 1 recorded gap"),
+            n => outcome = format!("{outcome} · {n} recorded gaps"),
+        }
         Self {
             id: r.run.id,
             job_key: r.job_key.clone(),
-            state: state.to_owned(),
-            liveness: liveness_pill(r.run.liveness),
+            verdict,
+            open,
             started: ctx.time(started_ms),
-            duration: r
-                .ended_at
-                .map(|end| format_duration(unix_ms(end).saturating_sub(started_ms))),
-            exit_code: r.run.maestro_exit_code,
-            gaps,
+            duration,
+            outcome,
             href: pipeline_href(&ctx.project, r.pipeline_attempt_id),
             started_ms,
         }
@@ -296,8 +349,6 @@ pub fn device_rows(view: &WorkerView, ctx: &Ctx) -> Vec<DeviceSessionRow> {
 
 #[cfg(test)]
 mod tests {
-    use fleet_ui::mark::Mark;
-
     use super::*;
 
     const WORKER: &str = r#"{
@@ -347,25 +398,16 @@ mod tests {
     }
 
     #[test]
-    fn the_header_names_the_machine_and_says_how_it_is_doing() {
+    fn the_header_names_the_machine_and_says_when_it_was_sampled() {
         let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:00Z"));
         assert_eq!(h.title, "mac-mini-3");
         assert_eq!(
             (h.liveness.label, h.liveness.mark),
             ("Online", Mark::Passed)
         );
-        let facts: Vec<_> = h.facts.iter().map(|f| (f.label, f.shown())).collect();
-        assert_eq!(
-            facts,
-            [
-                ("Operating system", "macos"),
-                ("Architecture", "aarch64"),
-                ("Memory", "16 GiB"),
-                ("CPU cores", "8"),
-                ("First seen", "2026-01-01 08:00:00"),
-                ("Last seen", "5 s ago"),
-            ]
-        );
+        assert_eq!(h.sampled.as_deref(), Some("sampled 10:59:55, 5 s ago"));
+        assert_eq!(h.provenance, Provenance::Observed);
+        assert_eq!(h.meta, "macos · aarch64 · 8 cores · 16 GiB");
     }
 
     #[test]
@@ -379,66 +421,103 @@ mod tests {
         let h = WorkerHeader::build(&v, &ctx("2026-01-01T11:00:00Z"));
         assert_eq!(h.title, "Worker 00000000");
         assert_eq!(h.liveness.label, "Unknown");
-        let os = h
-            .facts
-            .iter()
-            .find(|f| f.label == "Operating system")
-            .unwrap();
-        let mem = h.facts.iter().find(|f| f.label == "Memory").unwrap();
-        assert_eq!((os.value.clone(), mem.value.clone()), (None, None));
-        assert_eq!(mem.shown(), "Not reported");
+        assert_eq!(h.sampled, None, "no sample, no sampled line");
+        assert_eq!(h.provenance, Provenance::Missing);
+        assert_eq!(
+            h.meta,
+            "Not reported · Not reported · Not reported · Not reported"
+        );
     }
 
     #[test]
-    fn host_health_shows_every_metric_with_its_unit_and_thermal_as_unavailable() {
-        let health = HostHealth::build(&view(WORKER), &ctx("2026-01-01T11:00:00Z"));
-        let HostHealth::Sample(s) = health else {
-            panic!("a recent sample exists");
-        };
-        let tiles: Vec<_> = s
-            .tiles
-            .iter()
-            .map(|t| (t.label.as_str(), t.text()))
+    fn health_now_is_the_host_cpu_and_memory_and_thermal_is_not_a_cell() {
+        let mut v = view(WORKER);
+        v.worker.active_runs = 0;
+        let cells: Vec<_> = health_cells(&v, None)
+            .into_iter()
+            .map(|c| (c.id, c.label, c.value, c.note))
             .collect();
         assert_eq!(
-            tiles,
+            cells,
             [
-                ("Host CPU", "37.5%".to_owned()),
-                ("Host memory used", "6 GiB".to_owned()),
-                ("Host memory total", "16 GiB".to_owned()),
-                ("Host CPU cores", "8".to_owned()),
-                ("Host load (1 min)", "1.5".to_owned()),
-                ("Host swap used", "1 GiB".to_owned()),
-                ("Host CPU pressure", "0.25%".to_owned()),
                 (
-                    "Host temperature",
-                    "unavailable (the agent does not report this metric yet)".to_owned()
+                    "host_cpu_pct",
+                    "Host CPU (%)",
+                    HealthValue::Value("37.5%".to_owned()),
+                    None
                 ),
-            ]
+                (
+                    "host_mem_used_bytes",
+                    "Memory used",
+                    HealthValue::Value("6 GiB".to_owned()),
+                    Some("of 16 GiB".to_owned())
+                ),
+            ],
+            "no run is active, so no process cells; the thermal sensor the agent never reports is absent"
         );
-        assert_eq!(s.taken, "2026-01-01 10:59:55 (5 s ago)");
-        assert_eq!(s.provenance, Provenance::Observed);
+    }
+
+    #[test]
+    fn process_cells_show_only_while_a_run_is_active_and_take_the_newest_point() {
+        let panel = MetricsPanel::build(
+            &serde_json::from_str(
+                r#"{"subject": {"kind": "worker", "id": "00000000-0000-0000-0000-0000000000a1"},
+                "from": "2026-01-01T10:00:00Z", "to": "2026-01-01T11:00:00Z",
+                "resolution": "raw", "truncated": false,
+                "series": [{"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+                  "scope": "maestro", "available": true,
+                  "points": [{"at_ms": 1767261600000, "value": 12.0, "available": true},
+                             {"at_ms": 1767261660000, "value": 180.0, "available": true}]}]}"#,
+            )
+            .unwrap(),
+        );
+        let cells = health_cells(&view(WORKER), Some(&panel));
+        let maestro = cells.iter().find(|c| c.id == "maestro_cpu_pct").unwrap();
+        assert_eq!(
+            maestro.value,
+            HealthValue::Value(Unit::PercentOfCore.format(180.0))
+        );
+        assert_eq!(maestro.label, "Maestro CPU (% of one core)");
+        // The agent has no series in this range: missing, with the reason, not a guess.
+        let agent = cells.iter().find(|c| c.id == "agent_cpu_pct").unwrap();
+        assert_eq!(
+            agent.value,
+            HealthValue::Missing(Some("no samples in this range".to_owned()))
+        );
+    }
+
+    #[test]
+    fn a_host_reading_the_agent_did_not_send_is_missing_with_its_reason() {
+        let mut v = view(WORKER);
+        v.worker.latest.as_mut().unwrap().readings[0].available = false;
+        v.worker.latest.as_mut().unwrap().readings[0].value = None;
+        v.worker.latest.as_mut().unwrap().readings[0].reason = Some("sensor busy".to_owned());
+        let cpu = health_cells(&v, None)
+            .into_iter()
+            .find(|c| c.id == "host_cpu_pct")
+            .unwrap();
+        assert_eq!(
+            cpu.value,
+            HealthValue::Missing(Some("sensor busy".to_owned()))
+        );
+        // No sample at all says so, rather than showing a healthy machine.
+        v.worker.latest = None;
+        let cpu = health_cells(&v, None)
+            .into_iter()
+            .find(|c| c.id == "host_cpu_pct")
+            .unwrap();
+        assert_eq!(
+            cpu.value,
+            HealthValue::Missing(Some("no host sample in the last hour".to_owned()))
+        );
     }
 
     #[test]
     fn an_old_host_sample_is_stale_not_current() {
         // 25 s without an update is stale (fleet_ui::provenance::STALE_AFTER_MS).
-        let HostHealth::Sample(s) = HostHealth::build(&view(WORKER), &ctx("2026-01-01T11:00:20Z"))
-        else {
-            panic!("a sample exists");
-        };
-        assert_eq!(s.provenance, Provenance::Stale);
-        assert_eq!(s.taken, "2026-01-01 10:59:55 (25 s ago)");
-    }
-
-    #[test]
-    fn no_recent_sample_is_stated_not_shown_as_a_healthy_machine() {
-        let mut v = view(WORKER);
-        v.worker.latest = None;
-        assert_eq!(
-            HostHealth::build(&v, &ctx("2026-01-01T11:00:00Z")),
-            HostHealth::NoRecentSample
-        );
+        let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:20Z"));
+        assert_eq!(h.provenance, Provenance::Stale);
+        assert_eq!(h.sampled.as_deref(), Some("sampled 10:59:55, 25 s ago"));
     }
 
     fn run(id: u8, started: &str, ended: Option<&str>) -> serde_json::Value {
@@ -468,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn a_run_row_says_how_it_went_and_links_to_its_pipeline() {
+    fn a_run_row_takes_its_verdict_from_the_exit_status_and_links_to_its_pipeline() {
         let v = worker_with_runs(vec![
             run(2, "2026-01-01T09:00:00Z", Some("2026-01-01T09:04:05Z")),
             run(1, "2026-01-01T10:30:00Z", None),
@@ -478,20 +557,37 @@ mod tests {
         // Newest first, whatever order the response came in.
         assert_eq!(rows[0].job_key, "e2e-shard-1");
         assert_eq!(rows[0].started, "2026-01-01 10:30:00");
-        assert_eq!(
-            rows[0].duration, None,
-            "a run that has not ended has no duration"
-        );
-        assert_eq!(rows[0].exit_code, None);
-        assert_eq!(rows[0].liveness.label, "Online");
-        assert_eq!(rows[1].duration.as_deref(), Some("4 min 5 s"));
-        assert_eq!(rows[1].exit_code, Some(1));
-        assert_eq!(rows[1].gaps.as_deref(), Some("2 recorded gaps"));
-        assert_eq!(rows[0].gaps, None);
+        assert_eq!((rows[0].verdict.label, rows[0].open), ("Running", true));
+        assert!(rows[0].duration.starts_with("Running for"));
+        assert_eq!(rows[0].outcome, "exit —, still running");
+        assert_eq!(rows[1].duration, "4 min 5 s");
+        assert_eq!((rows[1].verdict.label, rows[1].open), ("Failed", false));
+        assert_eq!(rows[1].outcome, "Ended · exit 1 · 2 recorded gaps");
         assert_eq!(
             rows[1].href,
             "/p/shop/pipelines/00000000-0000-0000-0000-0000000000c1"
         );
+    }
+
+    #[test]
+    fn a_run_that_ended_clean_is_no_failures_and_one_without_an_exit_is_interrupted() {
+        let mut clean = run(3, "2026-01-01T09:00:00Z", Some("2026-01-01T09:04:05Z"));
+        clean["run"]["maestro_exit_code"] = serde_json::json!(0);
+        let mut cut_short = run(4, "2026-01-01T10:00:00Z", Some("2026-01-01T10:01:00Z"));
+        cut_short["run"]["maestro_exit_code"] = serde_json::Value::Null;
+        let v = worker_with_runs(vec![clean, cut_short]);
+        let list = RunsList::from_view(&v, &ctx("2026-01-01T11:00:00Z"));
+        let rows = list.rows();
+        assert_eq!(
+            (rows[0].verdict.label, rows[0].verdict.mark),
+            ("Interrupted", Mark::Interrupted)
+        );
+        assert_eq!(rows[0].outcome, "Ended · exit —");
+        assert_eq!(
+            (rows[1].verdict.label, rows[1].verdict.mark),
+            ("No failures", Mark::End)
+        );
+        assert_eq!(rows[1].outcome, "Ended · exit 0");
     }
 
     #[test]
