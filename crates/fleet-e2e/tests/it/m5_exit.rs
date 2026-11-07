@@ -695,6 +695,24 @@ async fn i7_an_uploaded_html_report_never_runs_on_the_app_origin() {
     browser.quit().await;
 }
 
+/// The final report settled every row, so the table's caption says so once.
+async fn assert_verified_once_in_caption(page: &Page<'_>, what: &str) {
+    let verified = page
+        .texts(&format!("{} caption", q("history-table")))
+        .await
+        .concat();
+    assert!(verified.contains("4 flow executions"), "{what}: {verified}");
+    assert_eq!(
+        page.count(&format!(
+            "{} caption [aria-label=\"Provenance: verified\"]",
+            q("history-table")
+        ))
+        .await,
+        1,
+        "{what}: verified once"
+    );
+}
+
 /// Opens the history, finds the failed flow there and follows it to its page, then checks that
 /// the page still shows the failure and its evidence: the screenshot loaded from the usercontent
 /// origin and the log at the failing step.
@@ -720,16 +738,15 @@ async fn diagnose_from_history(port: u16, what: &str) {
         .eval(
             &format!(
                 "return Array.from(document.querySelectorAll('{}')).map(r => [\
-                 r.querySelector('a').textContent.trim(), r.dataset.state, \
-                 (r.querySelector('[role=img]') || document.body).getAttribute('aria-label')]);",
+                 r.querySelector('a').textContent.trim(), r.dataset.state]);",
                 q("history-row")
             ),
             vec![],
         )
         .await;
-    let mut rows: Vec<(String, String, String)> = serde_json::from_value(rows).unwrap();
+    let mut rows: Vec<(String, String)> = serde_json::from_value(rows).unwrap();
     rows.sort();
-    let expected: Vec<(String, String, String)> = junit_outcomes()
+    let expected: Vec<(String, String)> = junit_outcomes()
         .into_iter()
         .map(|(name, outcome)| {
             let state = if outcome == "passed" {
@@ -737,14 +754,17 @@ async fn diagnose_from_history(port: u16, what: &str) {
             } else {
                 "Failed"
             };
-            (name, state.to_owned(), "Provenance: verified".to_owned())
+            (name, state.to_owned())
         })
         .collect();
     assert_eq!(
         rows, expected,
         "{what}: history is the report, outcome for outcome"
     );
-    let fingerprints = page.texts(&q("failure-fingerprint")).await;
+    assert_verified_once_in_caption(&page, what).await;
+    let fingerprints = page
+        .texts(&format!("{} code", q("failure-fingerprint")))
+        .await;
     assert_eq!(fingerprints.len(), 1, "{what}: only the failure has one");
     assert!(
         fingerprints[0].starts_with("v1:"),

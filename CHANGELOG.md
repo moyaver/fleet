@@ -11,6 +11,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: the pipeline page's verdict is derived from its flows (Failed, Passed only with a plan total every flow accounts for, else No failures); readouts filter the flows, failures group by message, flows group by job and device with the plan's shard per device, and the activity shows only while the run is open.
 - Dashboard: the runner and device pages follow the redesign: a header with the name, a liveness pill and the age of the newest sample, one readout strip for host and Maestro CPU and memory, charts that state their window and resolution once, runs with verdicts from their exit status, and a live bar that shows the connection and can pause updates. Temperature is no longer charted, since no agent reports it (for a device too); the API still returns it as unavailable.
 - Dashboard: the Overview is redesigned. The readouts filter one Pipelines table whose verdicts are derived from the flows, "Needs attention" lists the last day's failed flows with their message, step, device and run, and the runners show their CPU and freshness.
+- Dashboard: history and compare follow the redesign: a filter band with underlined fields, one "Verified" for a table whose rows are all final, a stats panel that shows only the figures that say something, an answer first on compare ("Failures only in B") with a Swap button, and sections that state their provenance once.
 
 ## [0.1.0-alpha.2] - 2026-11-07
 

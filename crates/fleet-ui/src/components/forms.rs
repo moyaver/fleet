@@ -12,6 +12,12 @@ use crate::{
 };
 
 const INPUT_CLASS: &str = "rounded border border-line-strong bg-bg px-2 py-1 text-sm text-fg";
+/// A filter field is underlined, not boxed: the redesign's filter band (Foundations, History).
+const FILTER_TEXT_CLASS: &str = "min-h-8 w-[200px] rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1 text-sm text-fg max-[720px]:w-full";
+/// A select in the filter band.
+const FILTER_SELECT_CLASS: &str = "min-h-8 w-[150px] rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1 text-sm text-fg max-[720px]:w-full";
+/// A date-time field in the filter band: its numbers are monospace, like every number.
+const FILTER_INSTANT_CLASS: &str = "min-h-8 w-[210px] rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1 font-mono text-[13px] text-fg max-[720px]:w-full";
 
 /// An APG editable combobox with a listbox popup. `on_select` gets the chosen option's value, or
 /// `None` when the selection is lost by editing.
@@ -217,15 +223,15 @@ pub fn FilterBar(
     };
     let fields = spec.with_value(|s| s.fields().to_vec());
     view! {
-        <form role="search" aria-label="Filters" class="flex flex-wrap items-end gap-3" on:submit=|ev| ev.prevent_default()>
+        <form role="search" aria-label="Filters" class="flex flex-wrap items-end gap-x-7 gap-y-5" on:submit=|ev| ev.prevent_default()>
             {fields
                 .into_iter()
                 .map(|f| {
                     let label = label_of(&f.key);
                     let for_id = format!("filter-{}", f.key);
                     view! {
-                        <div>
-                            <label for=for_id class="block text-sm">{label}</label>
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <label for=for_id class="text-xs text-muted">{label}</label>
                             {filter_control(f, spec, state, edit)}
                         </div>
                     }
@@ -233,7 +239,7 @@ pub fn FilterBar(
                 .collect_view()}
             <button
                 type="button"
-                class="rounded px-3 py-1.5 text-sm hover:bg-tone-neutral-bg"
+                class="inline-flex min-h-8 items-center rounded px-3 py-1.5 text-sm text-fg hover:bg-band max-[720px]:min-h-11"
                 disabled=move || state.with(|s| s.active() == 0)
                 on:click=clear
             >
@@ -261,7 +267,7 @@ fn filter_control(
             <input
                 id=id
                 type="search"
-                class=INPUT_CLASS
+                class=FILTER_TEXT_CLASS
                 prop:value=value
                 on:change=move |ev| edit.run((key.clone(), event_target_value(&ev)))
             />
@@ -272,7 +278,7 @@ fn filter_control(
             view! {
                 <select
                     id=id
-                    class=INPUT_CLASS
+                    class=FILTER_SELECT_CLASS
                     on:change=move |ev| edit.run((key.clone(), event_target_value(&ev)))
                 >
                     <option value="" selected=value().is_empty()>"Any"</option>
@@ -296,7 +302,7 @@ fn filter_control(
             <input
                 id=id
                 type="datetime-local"
-                class=INPUT_CLASS
+                class=FILTER_INSTANT_CLASS
                 prop:value=move || {
                     let mut r = RangeModel::new(UtcOffset::UTC);
                     r.set_start_rfc3339(&value());
@@ -313,8 +319,12 @@ fn filter_control(
     }
 }
 
-/// A label for a query key: the key with its first letter capitalised.
+/// A label for a query key: the key with its first letter capitalised, except the outcome, which
+/// the redesign calls its result.
 fn label_of(key: &str) -> String {
+    if key == "outcome" {
+        return "Result".to_owned();
+    }
     let mut c = key.chars();
     c.next()
         .map(|f| f.to_uppercase().chain(c).collect())

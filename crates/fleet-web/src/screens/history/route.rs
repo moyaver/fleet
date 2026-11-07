@@ -33,8 +33,7 @@ use crate::{
 #[component]
 pub fn HistoryRoute() -> impl IntoView {
     view! {
-        <div class="space-y-4" data-testid="history-page">
-            <h2 class="text-xl font-semibold">"Test history"</h2>
+        <div data-testid="history-page">
             <InProject
                 path="/history"
                 body=Callback::new(|project: String| view! { <HistoryBody project /> }.into_any())
@@ -125,11 +124,26 @@ fn HistoryBody(project: String) -> impl IntoView {
     let history_fetched = Fetched::from(&history);
     let stats_flow = Memo::new(move |_| parsed.with(|p| p.stats.clone()));
     let window = Memo::new(move |_| parsed.with(HistoryQuery::window_query));
+    let shown_window = Memo::new(move |_| table.with(|t| t.as_ref().map(|t| t.window.clone())));
     let on_stats = Callback::new(move |q: String| set_query.run(q));
     let on_close = Callback::new(move |()| {
         set_query.run(with_query_param(&query.get_untracked(), STATS_PARAM, None));
     });
+    let header_project = project.clone();
     view! {
+        <div class="page-h">
+            <div>
+                <h2 class="text-[26px] font-semibold leading-[1.2] tracking-[-0.015em] max-[720px]:text-[21px]">"History"</h2>
+                <p class="meta">
+                    <span>"Project " <b>{header_project}</b></span>
+                    {move || {
+                        shown_window
+                            .get()
+                            .map(|w| view! { <span>"Window " <b>{w}</b>", local time"</span> })
+                    }}
+                </p>
+            </div>
+        </div>
         <HistoryFilters query=query on_change=set_query />
         <ErrorNotice error=history_fetched.error />
         {move || {

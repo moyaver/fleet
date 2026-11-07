@@ -26,7 +26,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
 uuid.workspace = true
-web-sys = { workspace = true, features = ["History", "Location", "Window"] }
+web-sys = { workspace = true, features = ["Clipboard", "History", "Location", "Navigator", "Window"] }
 
 [package.metadata.dist]
 # Not released by cargo-dist: the agent is (M2); the server ships as a container (M3).
