@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Screen B: one pipeline attempt (spec §8): header, progress, jobs → suites → flows, the
-//! timeline, live activity and failures.
+//! Screen B: one pipeline attempt (spec §8, the redesign's Pipeline page): the verdict derived
+//! from the flows, readouts that filter them, failures grouped by message, flows grouped by job
+//! and device with the plan's shards and the timeline, and the activity while the run is open.
 //!
-//! The view-models are pure: [`model`] (the tree, the header, failures), [`activity`] (the live
-//! event stream derived from what changed) and [`timeline`] (the REST timeline as the kit's
-//! swimlane data). The page follows one attempt over a live socket: the snapshot and every
-//! delta go through [`LiveModel`], whose per-entity signals keep a changing flow from
-//! re-rendering the whole list.
+//! The view-models are pure: [`model`] (the tree, the header, the verdict, failures), [`activity`]
+//! (the live event stream derived from what changed), [`plans`] (the shards' planned against actual
+//! times) and [`timeline`] (the REST timeline as the swimlane's data). The page follows one attempt
+//! over a live socket: the snapshot and every delta go through [`LiveModel`], whose per-entity
+//! signals keep a changing flow from re-rendering the whole list.
 
 #![expect(
     clippy::must_use_candidate,
@@ -21,15 +22,16 @@ pub mod timeline;
 #[cfg(test)]
 mod fixtures;
 
-use std::time::Duration;
+use std::{collections::BTreeSet, time::Duration};
 
-use fleet_protocol::live::{LiveFrame, PlanView};
+use fleet_protocol::live::{FlowView, LiveFrame, PlanView};
 use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
     components::{
-        display::{Badge, Card, EmptyState, ProvenanceBadge, Skeleton, StatusPill, TableBox},
+        display::{EmptyState, ProvenanceBadge, ReadoutStrip, Skeleton, StatusPill, TableBox},
         live::LiveState,
     },
+    provenance::Provenance,
     timeline::{model::TimelineData, view::SwimlaneTimeline},
 };
 use leptos::prelude::*;
@@ -37,24 +39,22 @@ use leptos_router::{components::A, hooks::use_params_map};
 use uuid::Uuid;
 
 use self::{
-    model::{LiveInputs, live_view},
-    plans::{PlanComparison, show, signed},
+    model::{FailureRow, LiveInputs, bucket, failure_key, live_view, message_groups, row_mark},
+    plans::{PlanComparison, ShardRow, show, signed},
     timeline::timeline_data,
 };
 use crate::{
-    api::{self, ApiError},
+    api,
     app::{ErrorNotice, LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
     live::{
         model::LiveModel,
         socket::{Event, Subscription, connect},
     },
-    paths::flow_href,
+    paths::{device_href, flow_href},
     progress::Progress,
     remote::remote,
-    status::{
-        flow_provenance, flow_state_pill, job_pill, liveness_pill, source_provenance, suite_pill,
-    },
+    status::{flow_provenance, flow_state_pill, job_pill, liveness_pill, source_provenance},
 };
 
 /// Screen B at `/p/:project/pipelines/:id`.
@@ -82,7 +82,23 @@ pub fn PipelineDetail() -> impl IntoView {
     }
 }
 
-const CARD_GAP: &str = "space-y-4";
+/// The flow states the readouts count, in the order they are shown. A state this build does not
+/// know counts under Unknown.
+const READOUTS: [&str; 7] = [
+    "passed",
+    "failed",
+    "running",
+    "interrupted",
+    "pending",
+    "skipped",
+    "unknown",
+];
+
+/// How many activity entries the page shows: the newest.
+const ACTIVITY_SHOWN: usize = 5;
+
+/// A flow of one device with its number in run order, from 1.
+type Numbered = (usize, Uuid);
 
 #[component]
 fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
@@ -210,414 +226,732 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
         ),
         None => TimelineData::new(Vec::new(), Vec::new()),
     });
-    let not_started = move || timeline_view.with(|t| t.as_ref().map_or(0, |t| t.not_started));
+    let data = Signal::derive(move || data.get());
     let project = StoredValue::new(project);
-    view! {
-        <div class=CARD_GAP data-testid="pipeline-page">
-            <ErrorNotice error=timeline.error />
-            {move || model.error.get().map(|e| view! {
-                <p role="alert" data-testid="error" class="rounded-lg border border-tone-danger-fg/30 bg-tone-danger-bg p-3 text-tone-danger-fg">{e}</p>
-            })}
-            {move || match model.header.get() {
-                None => view! { <Skeleton lines=6 /> }.into_any(),
-                Some(header) => {
-                    view! {
-                        <PageHeader header=header now=now />
-                        <Show when=move || model.awaiting_snapshot.get()>
-                            <p role="status" data-testid="resync" class="rounded border border-border bg-tone-warning-bg p-2 text-sm text-tone-warning-fg">
-                                "Reconnecting to the live feed. This is the last known state; it is updating."
-                            </p>
-                        </Show>
-                        <ProgressCard model=model plans=plans.data plans_error=plans.error />
-                        <FailuresCard model=model />
-                        <Jobs model=model project=project />
-                        <Card title="Execution timeline">
-                            <SwimlaneTimeline
-                                data=data
-                                now_ms=now
-                                utc_offset_minutes=utc_offset_minutes()
-                            />
-                            <Show when=move || not_started() != 0>
-                                <p class="mt-2 text-sm text-muted" data-testid="not-started">
-                                    {move || format!("{} planned flows have not started yet.", not_started())}
-                                </p>
-                            </Show>
-                        </Card>
-                        <ActivityCard model=model project=project />
-                    }
-                        .into_any()
+    let settled =
+        Signal::derive(move || model.header.with(|h| h.as_ref().is_some_and(|h| h.settled)));
+    let filter: RwSignal<Option<&'static str>> = RwSignal::new(None);
+    // The one polite announcement on the page: the verdict, when it changes. Cells update silently.
+    let announce = RwSignal::new(String::new());
+    Effect::new(move |prev: Option<Option<&'static str>>| {
+        let current = model
+            .header
+            .with(|h| h.as_ref().map(|h| (h.title.clone(), h.result.label)));
+        match current {
+            None => prev.flatten(),
+            Some((title, label)) => {
+                if let Some(Some(before)) = prev
+                    && before != label
+                {
+                    announce.set(format!("{title}: {label}."));
                 }
-            }}
+                Some(label)
+            }
+        }
+    });
+    let chosen = Memo::new(move |_| {
+        filter
+            .get()
+            .filter(|b| count_in(model.progress.get(), b) > 0)
+    });
+    view! {
+        <div class="stack" data-testid="pipeline-page">
+            <p class="sr-only" role="status">{move || announce.get()}</p>
+            <ErrorNotice error=timeline.error />
+            <ErrorNotice error=plans.error />
+            {move || model.error.get().map(|e| view! {
+                <p role="alert" data-testid="error" class="banner">{e}</p>
+            })}
+            <Show when=move || model.awaiting_snapshot.get()>
+                <p data-testid="resync" class="note">
+                    "Reconnecting to the live feed. This is the last known state; it is updating."
+                </p>
+            </Show>
+            <Show
+                when=move || model.header.with(Option::is_some)
+                fallback=|| view! { <Skeleton lines=6 /> }
+            >
+                <PageHeader model=model now=now />
+                <Progressline model=model settled=settled />
+                <Readouts model=model filter=filter chosen=chosen />
+                <div class=move || if settled.get() { "stack" } else { "grid gap-9 min-[720px]:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)]" }>
+                    <div class="stack min-w-0">
+                        <Failures model=model project=project settled=settled />
+                        <Flows
+                            model=model
+                            project=project
+                            settled=settled
+                            chosen=chosen
+                            plans=plans.data
+                            timeline=data
+                            now=now
+                        />
+                    </div>
+                    <Show when=move || !settled.get()>
+                        <aside class="min-w-0" aria-label="Activity">
+                            <Activity model=model project=project />
+                        </aside>
+                    </Show>
+                </div>
+            </Show>
         </div>
     }
 }
 
-#[component]
-fn PageHeader(header: model::Header, now: RwSignal<i64>) -> impl IntoView {
-    let result = header.result;
-    let running = result.label == "Running";
-    let started = header.started_ms;
-    let facts = {
-        let mut parts: Vec<String> = Vec::new();
-        parts.extend(header.git_ref.clone());
-        parts.extend(header.commit.clone());
-        parts.push(format!("attempt {}", header.attempt_number));
-        parts.push(format!(
-            "started {}",
-            format_timestamp(started, utc_offset_minutes())
-        ));
-        parts.join(" · ")
-    };
-    view! {
-        <header data-testid="pipeline-header" class="space-y-1">
-            <div class="flex flex-wrap items-center gap-3">
-                <h2 class="text-xl font-semibold" data-testid="pipeline-title">{header.title}</h2>
-                <span data-testid="pipeline-result">
-                    <StatusPill mark=result.mark label=result.label />
-                </span>
-                <ProvenanceBadge provenance=header.result_provenance />
-            </div>
-            <p class="text-sm text-muted">
-                {facts}
-                {running.then(|| view! {
-                    <span>{move || format!(" · running for {}", format_duration(now.get() - started))}</span>
-                })}
-            </p>
-            {header.ci_url.map(|url| view! {
-                <a class="text-sm text-primary hover:underline" href=url target="_blank" rel="noopener noreferrer">
-                    "Open the CI run"
-                </a>
-            })}
-        </header>
+/// The count a readout shows for one flow state of the progress.
+fn count_in(progress: Option<Progress>, state: &str) -> u64 {
+    progress.map_or(0, |p| match state {
+        "passed" => p.passed,
+        "failed" => p.failed,
+        "running" => p.running,
+        "interrupted" => p.interrupted,
+        "pending" => p.pending,
+        "skipped" => p.skipped,
+        _ => p.unknown,
+    })
+}
+
+/// Whether a flow state has any flows, so it has a readout.
+fn has_flows(progress: Option<Progress>, state: &str) -> bool {
+    count_in(progress, state) > 0
+}
+
+/// The test id of a readout's count.
+fn count_testid(state: &str) -> &'static str {
+    match state {
+        "passed" => "count-passed",
+        "failed" => "count-failed",
+        "running" => "count-running",
+        "interrupted" => "count-interrupted",
+        "pending" => "count-not-started",
+        "skipped" => "count-skipped",
+        _ => "count-unknown",
     }
 }
 
 #[component]
-fn ProgressCard(
-    model: LiveModel,
-    plans: RwSignal<Option<Vec<PlanView>>>,
-    plans_error: RwSignal<Option<ApiError>>,
-) -> impl IntoView {
-    view! {
-        <Card title="Test progress">
-            {move || {
-                model
-                    .progress
-                    .get()
-                    .map(|p| {
-                        let uncertain = if p.is_uncertain() { "uncertain" } else { "known" };
-                        view! {
-                            <p data-testid="progress-text" data-progress=uncertain class="font-medium">
-                                {p.text()}
-                            </p>
-                            {p.fraction().map(|f| view! {
-                                <progress class="mt-2 h-2 w-full" max="100" value=(f * 100.0).round() aria-label="Test progress"></progress>
-                            })}
-                            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                                {counts(&p).into_iter().map(|(label, n)| view! {
-                                    <div class="flex gap-1.5">
-                                        <dt class="text-muted">{label}</dt>
-                                        <dd class="tabular-nums font-medium" data-testid=format!("count-{}", label.to_lowercase())>{n}</dd>
-                                    </div>
-                                }).collect_view()}
-                            </dl>
-                            <ErrorNotice error=plans_error />
-                            <PlanTable plans=plans />
-                        }
-                    })
-            }}
-        </Card>
-    }
-}
-
-/// The attempt's plans: each shard planned against its actual time, and the slowest shard
-/// against an equal-count split. Nothing shows for an attempt with no plan.
-#[component]
-fn PlanTable(plans: RwSignal<Option<Vec<PlanView>>>) -> impl IntoView {
+fn PageHeader(model: LiveModel, now: RwSignal<i64>) -> impl IntoView {
     move || {
-        plans.with(|plans| {
-            plans
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(|plan| {
-                    let view = PlanComparison::new(plan);
-                    let summary = view.summary();
-                    view! {
-                        <div class="mt-4 space-y-2" data-testid="plan">
-                            <p class="text-xs text-muted">{format!("Plan {}", view.plan_id)}</p>
-                            <TableBox label="Plan shards">
-                                <table class="w-full text-sm" data-testid="plan-shards">
-                                    <thead class="text-left text-xs text-muted">
-                                        <tr>
-                                            <th class="font-medium">"Shard"</th>
-                                            <th class="font-medium">"Flows"</th>
-                                            <th class="font-medium">"Planned"</th>
-                                            <th class="font-medium">"Actual"</th>
-                                            <th class="font-medium">"Difference"</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="tabular-nums">
-                                        {view.shards.iter().map(|row| view! {
-                                            <tr data-testid="plan-shard">
-                                                <td>{row.shard_id}</td>
-                                                <td>{row.flows}</td>
-                                                <td>{show(row.planned_ms)}</td>
-                                                <td>{show(row.actual_ms)}</td>
-                                                <td>{row.difference_ms().map_or_else(|| "—".to_owned(), signed)}</td>
-                                            </tr>
-                                        }).collect_view()}
-                                    </tbody>
-                                </table>
-                            </TableBox>
-                            <ul class="space-y-1 text-sm text-muted" data-testid="plan-summary">
-                                {summary.into_iter().map(|line| view! { <li>{line}</li> }).collect_view()}
-                            </ul>
+        model.header.get().map(|header| {
+            let running = header.result.label == "Running";
+            let started = header.started_ms;
+            let offset = utc_offset_minutes();
+            let facts = {
+                let mut parts: Vec<String> = Vec::new();
+                parts.extend(header.git_ref.clone());
+                parts.extend(header.commit.clone());
+                parts.push(format!("attempt {}", header.attempt_number));
+                parts.push(format!("started {}", format_timestamp(started, offset)));
+                parts.join(" · ")
+            };
+            let derived = header.result_provenance == Provenance::Derived;
+            let flows = header.flows;
+            view! {
+                <header data-testid="pipeline-header" class="page-h">
+                    <div class="min-w-0">
+                        <div class="row items-baseline gap-3.5">
+                            <h2 class="m-0 text-[26px] font-semibold leading-[1.2] tracking-[-0.015em] max-[720px]:text-[21px]" data-testid="pipeline-title">
+                                {header.title}
+                            </h2>
+                            <span data-testid="pipeline-result">
+                                <StatusPill mark=header.result.mark label=header.result.label />
+                            </span>
+                            <span class="pv-statement">
+                                <ProvenanceBadge provenance=Signal::stored(header.result_provenance) />
+                                {derived.then(|| format!("from {flows} flows"))}
+                            </span>
                         </div>
-                    }
-                })
-                .collect_view()
+                        <p class="meta">
+                            <span>{facts}</span>
+                            {running.then(|| view! {
+                                <span>{move || format!("running for {}", format_duration(now.get() - started))}</span>
+                            })}
+                            {header.ci_url.map(|url| view! {
+                                <a class="text-link underline" href=url target="_blank" rel="noopener noreferrer">
+                                    "Open the CI run"
+                                </a>
+                            })}
+                        </p>
+                    </div>
+                </header>
+            }
         })
     }
 }
 
-fn counts(p: &Progress) -> [(&'static str, u64); 6] {
-    [
-        ("Passed", p.passed),
-        ("Failed", p.failed),
-        ("Running", p.running),
-        ("Pending", p.pending),
-        ("Skipped", p.skipped),
-        ("Interrupted", p.interrupted + p.unknown),
-    ]
+/// The progress of an attempt with a plan: a bar with a known total only. While the run is open
+/// the sentence is the live progress (and says so when there is no plan); once it has settled, a
+/// plan's total is said as accounted for.
+#[component]
+fn Progressline(model: LiveModel, settled: Signal<bool>) -> impl IntoView {
+    view! {
+        {move || model.progress.get().and_then(|p| p.fraction().map(|f| view! {
+            <progress class="mb-3 block h-1.5 w-full" max="100" value=(f * 100.0).round() aria-label="Test progress"></progress>
+        }))}
+        <Show when=move || !settled.get()>
+            {move || model.progress.get().map(|p| {
+                let known = if p.is_uncertain() { "uncertain" } else { "known" };
+                view! {
+                    <p class="note" data-testid="progress-text" data-progress=known>
+                        {p.text()}
+                    </p>
+                }
+            })}
+        </Show>
+        <Show when=move || settled.get() && model.progress.with(|p| p.is_some_and(|p| !p.is_uncertain()))>
+            {move || model.progress.get().map(|p| {
+                let finished = p.finished();
+                let total = p.total().unwrap_or_default();
+                view! {
+                    <p class="note" data-testid="plan-progress">
+                        {format!("{finished} of {total} planned flows accounted for")}
+                    </p>
+                }
+            })}
+        </Show>
+    }
 }
 
+/// The filter: one readout per flow state that has flows, and "All flows". The chosen readout is
+/// a radio, so the flows below show only its state.
 #[component]
-fn FailuresCard(model: LiveModel) -> impl IntoView {
+fn Readouts(
+    model: LiveModel,
+    filter: RwSignal<Option<&'static str>>,
+    chosen: Memo<Option<&'static str>>,
+) -> impl IntoView {
     view! {
-        <Card title="Failures">
+        <fieldset class="m-0 mb-9 min-w-0 border-0 p-0">
+            <legend class="sr-only">"Show flows"</legend>
+            <ReadoutStrip>
+                <FlowReadout
+                    state=None
+                    filter=filter
+                    chosen=chosen
+                    count=Signal::derive(move || model.progress.get().map_or(0, |p| {
+                        READOUTS.iter().map(|s| count_in(Some(p), s)).sum()
+                    }))
+                />
+                {READOUTS
+                    .into_iter()
+                    .map(|state| view! {
+                        <Show when=move || has_flows(model.progress.get(), state)>
+                            <FlowReadout
+                                state=Some(state)
+                                filter=filter
+                                chosen=chosen
+                                count=Signal::derive(move || count_in(model.progress.get(), state))
+                            />
+                        </Show>
+                    })
+                    .collect_view()}
+            </ReadoutStrip>
+        </fieldset>
+    }
+}
+
+/// One readout: a radio in a label, so the whole cell is the target.
+#[component]
+fn FlowReadout(
+    /// The flow state it selects; `None` for all flows.
+    state: Option<&'static str>,
+    filter: RwSignal<Option<&'static str>>,
+    chosen: Memo<Option<&'static str>>,
+    count: Signal<u64>,
+) -> impl IntoView {
+    let testid = state.map_or("count-all", count_testid);
+    let label = match state {
+        Some(state) => {
+            let pill = flow_state_pill(state);
+            view! { <StatusPill mark=pill.mark label=pill.label /> }.into_any()
+        }
+        None => view! { "All flows" }.into_any(),
+    };
+    view! {
+        <label class="tile">
+            <input
+                type="radio"
+                name="flow-filter"
+                prop:checked=move || chosen.get() == state
+                on:change=move |_| filter.set(state)
+            />
+            <span class="tile-l">{label}</span>
+            <span class="tile-n" data-testid=testid>{move || count.get()}</span>
+        </label>
+    }
+}
+
+/// The failed and interrupted flows, grouped by their message: the message is the line, and the
+/// flows that failed with it sit under it. While the run is open the group says so once.
+#[component]
+fn Failures(
+    model: LiveModel,
+    project: StoredValue<String>,
+    settled: Signal<bool>,
+) -> impl IntoView {
+    let groups = move || model.failures.with(|rows| message_groups(rows));
+    view! {
+        <section class="card" aria-labelledby="fail-h">
+            <div class="card-h">
+                <h2 id="fail-h">"Failures"</h2>
+                <Show when=move || !settled.get()>
+                    <span class="pv-statement"><ProvenanceBadge provenance=Signal::stored(Provenance::Provisional) /></span>
+                </Show>
+                <span class="note">
+                    {move || {
+                        let n = groups().len();
+                        format!("Grouped by message · {n} {}", if n == 1 { "group" } else { "groups" })
+                    }}
+                </span>
+            </div>
             <Show
                 when=move || !model.failures.with(Vec::is_empty)
-                fallback=|| view! { <p class="text-muted" data-testid="no-failures">"No failures."</p> }
+                fallback=move || view! {
+                    <p class="note" data-testid="no-failures">
+                        {move || if settled.get() { "No failures." } else { "None so far." }}
+                    </p>
+                }
             >
-                <ul class="space-y-2" data-testid="failures">
-                    <For
-                        each=move || model.failures.get()
-                        key=model::failure_key
-                        children=move |f| {
-                            view! {
-                                <li class="flex flex-wrap items-center gap-2" data-testid="failure">
-                                    <A href=f.href.clone() attr:class="font-medium text-primary hover:underline">{f.name.clone()}</A>
-                                    <StatusPill mark=f.state.mark label=f.state.label />
-                                    <ProvenanceBadge provenance=f.provenance />
-                                    {f.message.clone().map(|m| view! { <span class="text-sm text-muted">{m}</span> })}
-                                </li>
-                            }
-                        }
-                    />
-                </ul>
+                <For
+                    each=groups
+                    key=|(message, rows)| (message.clone(), rows.iter().map(failure_key).collect::<Vec<_>>())
+                    children=move |(message, rows)| view! {
+                        <MessageGroup message=message rows=rows model=model project=project settled=settled />
+                    }
+                />
             </Show>
-        </Card>
+        </section>
     }
 }
 
 #[component]
-fn Jobs(model: LiveModel, project: StoredValue<String>) -> impl IntoView {
-    let keyed = move || {
+fn MessageGroup(
+    message: String,
+    rows: Vec<FailureRow>,
+    model: LiveModel,
+    project: StoredValue<String>,
+    settled: Signal<bool>,
+) -> impl IntoView {
+    let count = rows.len();
+    let line = if message.is_empty() {
+        "No message reported".to_owned()
+    } else {
+        message
+    };
+    view! {
+        <div class="row mt-4 items-baseline justify-between border-b border-line pb-2">
+            <p class="m-0 min-w-0 break-words font-mono text-[13px]">{line}</p>
+            <span class="chip">{format!("{count} {}", if count == 1 { "flow" } else { "flows" })}</span>
+        </div>
+        <TableBox label="Flows that failed with this message">
+            <table class="tbl tbl-cards">
+                <caption class="sr-only">"Flows that failed with this message"</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">"Flow"</th>
+                        <th scope="col">"Result"</th>
+                        <th scope="col">"Device"</th>
+                        <th scope="col" class="num">"Duration"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .map(|row| view! { <FailureLine row=row model=model project=project settled=settled /> })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
+    }
+}
+
+#[component]
+fn FailureLine(
+    row: FailureRow,
+    model: LiveModel,
+    project: StoredValue<String>,
+    settled: Signal<bool>,
+) -> impl IntoView {
+    let flow_id = row.flow_id;
+    let device = move || {
+        model
+            .flows
+            .cell(flow_id)
+            .and_then(|f| f.with(|f| f.device_session_id))
+            .and_then(|d| model.devices.cell(d))
+            .map_or_else(|| "—".to_owned(), |d| d.with(|d| d.serial.clone()))
+    };
+    let duration = move || {
+        model
+            .flows
+            .cell(flow_id)
+            .and_then(|f| f.with(|f| f.duration_ms))
+            .map_or_else(|| "—".to_owned(), format_duration)
+    };
+    let provenance = row.provenance;
+    let mark = move || row_mark(provenance, settled.get());
+    view! {
+        <tr data-testid="failure">
+            <td data-label="Flow">
+                <A href=flow_href(&project.get_value(), flow_id) attr:class="cell-title">{row.name.clone()}</A>
+            </td>
+            <td data-label="Result">
+                <StatusPill mark=row.state.mark label=row.state.label />
+                {move || mark().map(|p| view! {
+                    <span data-testid="flow-provenance"><ProvenanceBadge provenance=Signal::stored(p) /></span>
+                })}
+            </td>
+            <td data-label="Device">{device}</td>
+            <td data-label="Duration" class="num">{duration}</td>
+        </tr>
+    }
+}
+
+/// The flows of one attempt: each job with its devices, the passed flows collapsed, and the
+/// timeline at the end.
+#[component]
+fn Flows(
+    model: LiveModel,
+    project: StoredValue<String>,
+    settled: Signal<bool>,
+    chosen: Memo<Option<&'static str>>,
+    plans: RwSignal<Option<Vec<PlanView>>>,
+    timeline: Signal<TimelineData>,
+    now: RwSignal<i64>,
+) -> impl IntoView {
+    let jobs = move || {
         let epoch = model.epoch.get();
         model
             .tree
             .with(|t| t.jobs.iter().map(|j| (epoch, j.id)).collect::<Vec<_>>())
     };
+    // A timeline of two devices or more is worth seeing at once; one device's is a click away.
+    let two_devices = move || timeline.with(|t| t.lanes().len() >= 2);
     view! {
-        <section aria-label="Jobs and devices" class="space-y-3">
-            <h3 class="text-sm font-semibold text-muted">"Jobs and devices"</h3>
+        <section class="card" aria-labelledby="flows-h">
+            <div class="card-h">
+                <h2 id="flows-h">"Flows"</h2>
+                <span class="note">"Grouped by job and device"</span>
+                <p class="pv-statement" data-testid="flows-provenance">
+                    {move || if settled.get() {
+                        view! { <ProvenanceBadge provenance=Signal::stored(Provenance::Final) /> " unless marked" }.into_any()
+                    } else {
+                        view! { <ProvenanceBadge provenance=Signal::stored(Provenance::Provisional) /> " until the final report" }.into_any()
+                    }}
+                </p>
+            </div>
             <For
-                each=keyed
+                each=jobs
                 key=|k| *k
-                children=move |(_, id)| view! { <JobCard model=model project=project id=id /> }
+                children=move |(_, id)| view! {
+                    <JobGroup model=model project=project id=id plans=plans chosen=chosen settled=settled />
+                }
             />
-            <Show when=move || !model.tree.with(|t| t.orphan_flows.is_empty())>
-                <Card title="Flows without a suite">
-                    <ul>
-                        <For
-                            each=move || {
-                                let epoch = model.epoch.get();
-                                model.tree.with(|t| t.orphan_flows.iter().map(|f| (epoch, *f)).collect::<Vec<_>>())
-                            }
-                            key=|k| *k
-                            children=move |(_, id)| view! { <FlowRow model=model project=project id=id /> }
-                        />
-                    </ul>
-                </Card>
-            </Show>
+            <details class="mt-6" open=two_devices>
+                <summary class="cursor-pointer text-sm text-link underline">"Show timeline"</summary>
+                <div class="mt-3">
+                    <SwimlaneTimeline data=timeline now_ms=now utc_offset_minutes=utc_offset_minutes() />
+                </div>
+            </details>
         </section>
     }
 }
 
+/// The flows of one job (its suites' flows, then any flow whose suite is unknown), in run order.
+fn job_flow_ids(model: &LiveModel, job: Uuid) -> Vec<Uuid> {
+    model.tree.with(|t| {
+        let mut ids: Vec<Uuid> = t
+            .jobs
+            .iter()
+            .filter(|j| j.id == job)
+            .flat_map(|j| j.suites.iter().flat_map(|s| s.flows.iter().copied()))
+            .collect();
+        ids.extend(t.orphan_flows.iter().copied().filter(|f| {
+            model
+                .flows
+                .cell(*f)
+                .is_some_and(|c| c.with(|f| f.job_id == job))
+        }));
+        ids
+    })
+}
+
+/// A job's progress: the flows it has seen, with the plan total when every suite has one.
+fn job_progress(model: &LiveModel, job: Uuid) -> Progress {
+    let flows: Vec<FlowView> = job_flow_ids(model, job)
+        .into_iter()
+        .filter_map(|f| model.flows.cell(f))
+        .map(|c| c.get())
+        .collect();
+    let suites: Vec<Uuid> = model.tree.with(|t| {
+        t.jobs
+            .iter()
+            .filter(|j| j.id == job)
+            .flat_map(|j| j.suites.iter().map(|s| s.id))
+            .collect()
+    });
+    let planned: Option<Vec<i32>> = suites
+        .iter()
+        .map(|s| {
+            model
+                .suites
+                .cell(*s)
+                .and_then(|c| c.with(|s| s.planned_count))
+        })
+        .collect();
+    let total = planned.map(|p| p.iter().map(|n| i64::from(*n)).sum::<i64>());
+    Progress::from_flows(&flows, total)
+}
+
 #[component]
-fn JobCard(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl IntoView {
+fn JobGroup(
+    model: LiveModel,
+    project: StoredValue<String>,
+    id: Uuid,
+    plans: RwSignal<Option<Vec<PlanView>>>,
+    chosen: Memo<Option<&'static str>>,
+    settled: Signal<bool>,
+) -> impl IntoView {
     let Some(cell) = model.jobs.cell(id) else {
         return ().into_any();
     };
     let job: RwSignal<_> = cell.into();
-    let node = Memo::new(move |_| {
+    let runs = move || {
         model
             .tree
-            .with(|t| t.jobs.iter().find(|j| j.id == id).cloned())
-            .unwrap_or_else(|| model::JobNode {
-                id,
-                runs: Vec::new(),
-                suites: Vec::new(),
-            })
+            .with(|t| t.jobs.iter().find(|j| j.id == id).map(|j| j.runs.clone()))
+            .unwrap_or_default()
+    };
+    // The devices the job's flows ran on, by serial, so a device's group keeps its place.
+    let devices = Memo::new(move |_| {
+        let mut keyed = BTreeSet::new();
+        for flow in job_flow_ids(&model, id) {
+            let device = model
+                .flows
+                .cell(flow)
+                .and_then(|c| c.with(|f| f.device_session_id));
+            let serial = device
+                .and_then(|d| model.devices.cell(d))
+                .map(|c| c.with(|d| d.serial.clone()))
+                .unwrap_or_default();
+            keyed.insert((serial, device));
+        }
+        keyed
+            .into_iter()
+            .map(|(_, device)| device)
+            .collect::<Vec<_>>()
     });
-    let keyed = move |ids: Vec<Uuid>| {
+    let keyed = move || {
         let epoch = model.epoch.get();
-        ids.into_iter().map(|i| (epoch, i)).collect::<Vec<_>>()
+        devices
+            .get()
+            .into_iter()
+            .map(|d| (epoch, d))
+            .collect::<Vec<_>>()
     };
     view! {
-        <section class="space-y-3 rounded-lg border border-border bg-surface p-4" data-testid="job">
-            <header class="flex flex-wrap items-center gap-2">
-                <h4 class="font-semibold">{move || job.with(|j| j.name.clone().unwrap_or_else(|| j.job_key.clone()))}</h4>
+        <div class="mt-6 border-t border-line pt-3">
+            <div class="row">
+                <b class="font-medium">{move || job.with(|j| j.name.clone().unwrap_or_else(|| j.job_key.clone()))}</b>
                 {move || {
                     let j = job.get();
                     let pill = job_pill(&j.lifecycle, j.outcome.as_deref());
+                    let outcome = j.outcome.is_some().then(|| source_provenance(j.outcome_source.as_deref()));
                     view! {
                         <StatusPill mark=pill.mark label=pill.label />
-                        {j.outcome.is_some().then(|| view! {
-                            <ProvenanceBadge provenance=source_provenance(j.outcome_source.as_deref()) />
-                        })}
+                        {outcome
+                            .filter(|p| *p != Provenance::Final)
+                            .map(|p| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })}
                     }
                 }}
-            </header>
+                <span class="note" data-testid="suite-progress" data-progress=move || if job_progress(&model, id).is_uncertain() { "uncertain" } else { "known" }>
+                    {move || job_line(&job_progress(&model, id), settled.get())}
+                </span>
+                <For
+                    each=runs
+                    key=|r| *r
+                    children=move |run| view! { <RunLiveness model=model id=run /> }
+                />
+            </div>
             <For
-                each=move || keyed(node.with(|n| n.runs.clone()))
+                each=keyed
                 key=|k| *k
-                children=move |(_, run)| view! { <RunRow model=model id=run /> }
+                children=move |(_, device)| view! {
+                    <DeviceGroup model=model project=project job=id device=device plans=plans chosen=chosen settled=settled />
+                }
             />
-            <For
-                each=move || keyed(node.with(|n| n.suites.iter().map(|s| s.id).collect()))
-                key=|k| *k
-                children=move |(_, suite)| view! { <SuiteBlock model=model project=project id=suite /> }
-            />
-        </section>
+        </div>
     }
     .into_any()
 }
 
+/// The job's progress sentence. Once it has settled with no plan, only the flows seen are said.
+fn job_line(progress: &Progress, settled: bool) -> String {
+    if settled && progress.is_uncertain() {
+        format!("{} flows finished", progress.finished())
+    } else {
+        progress.text()
+    }
+}
+
 #[component]
-fn RunRow(model: LiveModel, id: Uuid) -> impl IntoView {
+fn RunLiveness(model: LiveModel, id: Uuid) -> impl IntoView {
     let Some(cell) = model.runs.cell(id) else {
         return ().into_any();
     };
     let run: RwSignal<_> = cell.into();
     view! {
-        <div class="space-y-1" data-testid="run" data-liveness=move || format!("{:?}", run.get().liveness)>
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="font-medium">{move || run.with(|r| r.runner_name.clone().unwrap_or_else(|| "agent".to_owned()))}</span>
-                <span data-testid="run-liveness">
-                    {move || {
-                        let pill = liveness_pill(run.get().liveness);
-                        view! { <StatusPill mark=pill.mark label=pill.label /> }
-                    }}
-                </span>
-            </div>
-            <ul class="flex flex-wrap gap-2 text-xs text-muted" aria-label="Devices">
-                <For
-                    each=move || {
-                        let epoch = model.epoch.get();
-                        model
-                            .devices
-                            .keys
-                            .get()
-                            .into_iter()
-                            .filter(|(e, _)| *e == epoch)
-                            .filter(|(_, d)| {
-                                model.devices.cell(*d).is_some_and(|c| c.read_untracked().agent_run_id == id)
-                            })
-                            .collect::<Vec<_>>()
-                    }
-                    key=|k| *k
-                    children=move |(_, device)| {
-                        let cell = model.devices.cell(device);
-                        cell.map(|cell| {
-                            let device: RwSignal<_> = cell.into();
-                            view! {
-                                <li data-testid="device">
-                                    <Badge tone=fleet_ui::tone::Tone::Neutral>
-                                        {move || device.with(|d| format!("{} · {}", d.serial, d.state))}
-                                    </Badge>
-                                </li>
-                            }
-                        })
-                    }
-                />
-            </ul>
-        </div>
+        <span data-testid="run-liveness">
+            {move || {
+                let pill = liveness_pill(run.get().liveness);
+                view! { <StatusPill mark=pill.mark label=pill.label /> }
+            }}
+        </span>
     }
     .into_any()
 }
 
+/// One device of a job: its flows in run order, with the plan's shard for it, the failing and
+/// interrupted rows, and the passed ones collapsed under a disclosure.
 #[component]
-fn SuiteBlock(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl IntoView {
-    let Some(cell) = model.suites.cell(id) else {
-        return ().into_any();
+fn DeviceGroup(
+    model: LiveModel,
+    project: StoredValue<String>,
+    job: Uuid,
+    device: Option<Uuid>,
+    plans: RwSignal<Option<Vec<PlanView>>>,
+    chosen: Memo<Option<&'static str>>,
+    settled: Signal<bool>,
+) -> impl IntoView {
+    let device_flows = Memo::new(move |_| {
+        job_flow_ids(&model, job)
+            .into_iter()
+            .filter(|f| {
+                model
+                    .flows
+                    .cell(*f)
+                    .is_some_and(|c| c.with(|f| f.device_session_id == device))
+            })
+            .collect::<Vec<Uuid>>()
+    });
+    // Numbered by run order on the device, before any filter: a filtered row keeps its number.
+    let split = Memo::new(move |_| {
+        let chosen = chosen.get();
+        let mut shown: Vec<Numbered> = Vec::new();
+        let mut passed: Vec<Numbered> = Vec::new();
+        for (i, flow) in device_flows.get().into_iter().enumerate() {
+            let state = model
+                .flows
+                .cell(flow)
+                .map_or("unknown", |c| c.with(|f| bucket(&f.state)));
+            match chosen {
+                None if state == "passed" => passed.push((i + 1, flow)),
+                None => shown.push((i + 1, flow)),
+                Some(wanted) if wanted == state => shown.push((i + 1, flow)),
+                Some(_) => {}
+            }
+        }
+        (shown, passed)
+    });
+    let label = move || {
+        device
+            .and_then(|d| model.devices.cell(d))
+            .map(|c| c.with(|d| (d.serial.clone(), d.state.clone())))
     };
-    let suite: RwSignal<_> = cell.into();
-    let flow_ids = Memo::new(move |_| {
-        model.tree.with(|t| {
-            t.jobs
-                .iter()
-                .flat_map(|j| &j.suites)
-                .find(|s| s.id == id)
-                .map(|s| s.flows.clone())
-                .unwrap_or_default()
-        })
-    });
-    let progress = Signal::derive(move || {
-        let flows: Vec<_> = flow_ids
+    // The plan's shard that ran this device's flows, planned against its actual time.
+    let shard = move || -> Option<ShardRow> {
+        let run = device_flows
             .get()
-            .iter()
-            .filter_map(|f| model.flows.cell(*f))
-            .map(|c| c.get())
-            .collect();
-        Progress::from_flows(&flows, suite.get().planned_count.map(i64::from))
-    });
+            .first()
+            .and_then(|f| model.flows.cell(*f))
+            .map(|c| c.with(|f| f.agent_run_id))?;
+        plans.with(|plans| {
+            plans.as_deref()?.iter().find_map(|plan| {
+                let i = plan
+                    .shards
+                    .iter()
+                    .position(|s| s.agent_runs.contains(&run))?;
+                PlanComparison::new(plan).shards.get(i).cloned()
+            })
+        })
+    };
     view! {
-        <div class="space-y-1 border-l-2 border-border pl-3" data-testid="suite">
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="font-medium">"Suite"</span>
-                {move || {
-                    let s = suite.get();
-                    let pill = suite_pill(&s.lifecycle, s.outcome.as_deref());
-                    view! {
-                        <StatusPill mark=pill.mark label=pill.label />
-                        {s.outcome.is_some().then(|| view! {
-                            <ProvenanceBadge provenance=source_provenance(s.outcome_source.as_deref()) />
-                        })}
+        <div class="mt-4">
+            <p class="row note m-0">
+                {move || match (label(), device) {
+                    (Some((serial, state)), Some(device)) => view! {
+                        <A href=device_href(&project.get_value(), device) attr:class="cell-title">{serial}</A>
+                        <span>{state}</span>
                     }
+                    .into_any(),
+                    _ => view! { <b class="font-medium text-fg">"No device"</b> }.into_any(),
                 }}
-                <span class="text-muted" data-testid="suite-progress" data-progress=move || if progress.get().is_uncertain() { "uncertain" } else { "known" }>
-                    {move || progress.get().text()}
-                </span>
-            </div>
-            <ul class="space-y-1">
-                <For
-                    each=move || {
-                        let epoch = model.epoch.get();
-                        flow_ids.get().into_iter().map(|f| (epoch, f)).collect::<Vec<_>>()
-                    }
-                    key=|k| *k
-                    children=move |(_, flow)| view! { <FlowRow model=model project=project id=flow /> }
-                />
-            </ul>
+                <span>{move || format!("{} {}", device_flows.with(Vec::len), if device_flows.with(Vec::len) == 1 { "flow" } else { "flows" })}</span>
+            </p>
+            {move || shard().map(|row| view! {
+                <p class="mt-2 font-mono text-[12.5px] text-muted" data-testid="shard-line">
+                    {format!(
+                        "Shard {} · planned {} · actual {} · {}",
+                        row.shard_id,
+                        show(row.planned_ms),
+                        show(row.actual_ms),
+                        row.difference_ms().map_or_else(|| "—".to_owned(), signed),
+                    )}
+                </p>
+            })}
+            <table class="tbl tbl-cards mt-2">
+                <caption class="sr-only">"Flows on this device, in run order"</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="num">"#"</th>
+                        <th scope="col">"Flow"</th>
+                        <th scope="col">"Result"</th>
+                        <th scope="col" class="num">"Duration"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <For
+                        each=move || split.get().0
+                        key=|r| *r
+                        children=move |(n, flow)| view! {
+                            <FlowRow model=model project=project id=flow number=n settled=settled />
+                        }
+                    />
+                </tbody>
+            </table>
+            <Show when=move || !split.with(|s| s.1.is_empty())>
+                <details class="mt-2">
+                    <summary class="cursor-pointer text-sm text-muted">
+                        {move || format!("Show {} passed flows", split.with(|s| s.1.len()))}
+                    </summary>
+                    <table class="tbl tbl-cards mt-2">
+                        <caption class="sr-only">"Passed flows on this device"</caption>
+                        <tbody>
+                            <For
+                                each=move || split.get().1
+                                key=|r| *r
+                                children=move |(n, flow)| view! {
+                                    <FlowRow model=model project=project id=flow number=n settled=settled />
+                                }
+                            />
+                        </tbody>
+                    </table>
+                </details>
+            </Show>
         </div>
     }
-    .into_any()
 }
 
+/// One flow's row. Its provenance shows only where it differs from the group's, which the
+/// Flows heading states once.
 #[component]
-fn FlowRow(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl IntoView {
+fn FlowRow(
+    model: LiveModel,
+    project: StoredValue<String>,
+    id: Uuid,
+    number: usize,
+    settled: Signal<bool>,
+) -> impl IntoView {
     let Some(cell) = model.flows.cell(id) else {
         return ().into_any();
     };
@@ -628,66 +962,70 @@ fn FlowRow(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl Int
             .cell(flow.read().agent_run_id)
             .and_then(|c| c.get().liveness)
     };
-    let provenance = Signal::derive(move || {
+    let mark = move || {
         let f = flow.get();
-        flow_provenance(&f.finality, &f.state, liveness())
-    });
-    let device = move || {
-        flow.read()
-            .device_session_id
-            .and_then(|d| model.devices.cell(d))
-            .map(|c| c.get().serial)
+        row_mark(
+            flow_provenance(&f.finality, &f.state, liveness()),
+            settled.get(),
+        )
     };
     view! {
-        <li class="flex flex-wrap items-center gap-2 text-sm" data-testid="flow-row" data-state=move || flow.get().state>
-            <A
-                href=move || flow_href(&project.get_value(), id)
-                attr:class="font-medium text-primary hover:underline"
-            >
-                {move || flow.get().name}
-            </A>
-            {move || {
-                let pill = flow_state_pill(&flow.read().state);
-                view! { <StatusPill mark=pill.mark label=pill.label /> }
-            }}
-            <span data-testid="flow-provenance"><ProvenanceBadge provenance=provenance /></span>
-            {move || device().map(|d| view! { <span class="text-xs text-muted">{d}</span> })}
-            {move || flow.get().duration_ms.map(|ms| view! {
-                <span class="text-xs text-muted">{format_duration(ms)}</span>
-            })}
-            {move || flow.get().failure_message.map(|m| view! { <span class="text-xs text-muted">{m}</span> })}
-        </li>
+        <tr data-testid="flow-row" data-state=move || flow.get().state>
+            <td data-label="#" class="num">{number}</td>
+            <td data-label="Flow">
+                <A href=move || flow_href(&project.get_value(), id) attr:class="cell-title">
+                    {move || flow.get().name}
+                </A>
+            </td>
+            <td data-label="Result">
+                {move || {
+                    let pill = flow_state_pill(&flow.read().state);
+                    view! { <StatusPill mark=pill.mark label=pill.label /> }
+                }}
+                {move || mark().map(|p| view! {
+                    <span data-testid="flow-provenance"><ProvenanceBadge provenance=Signal::stored(p) /></span>
+                })}
+            </td>
+            <td data-label="Duration" class="num">
+                {move || flow.get().duration_ms.map_or_else(|| "—".to_owned(), format_duration)}
+            </td>
+        </tr>
     }
     .into_any()
 }
 
+/// The newest few things that happened. Shown only while the run is open: a settled run's
+/// history is its flows.
 #[component]
-fn ActivityCard(model: LiveModel, project: StoredValue<String>) -> impl IntoView {
+fn Activity(model: LiveModel, project: StoredValue<String>) -> impl IntoView {
     let offset = utc_offset_minutes();
     view! {
-        <Card title="Live activity">
+        <section class="card" aria-labelledby="ac-h">
+            <div class="card-h"><h2 id="ac-h">"Activity"</h2></div>
             <Show
                 when=move || model.activity.with(|a| a.entries().next().is_some())
-                fallback=|| view! { <p class="text-muted">"Waiting for the next event."</p> }
+                fallback=|| view! { <p class="note">"Waiting for the next event."</p> }
             >
-                <ol class="space-y-1 text-sm" data-testid="activity" aria-live="polite">
+                <ol class="m-0 list-none p-0" data-testid="activity">
                     <For
-                        each=move || model.activity.with(|a| a.entries().cloned().collect::<Vec<_>>())
+                        each=move || model.activity.with(|a| a.entries().take(ACTIVITY_SHOWN).cloned().collect::<Vec<_>>())
                         key=|e| e.id
                         children=move |e| {
                             view! {
-                                <li class="flex flex-wrap items-center gap-2" data-testid="activity-entry">
-                                    <span class="tabular-nums text-xs text-muted">{format_timestamp(e.at_ms, offset)}</span>
-                                    <Badge tone=e.tone>{e.text.clone()}</Badge>
-                                    {e.flow_id.map(|f| view! {
-                                        <A href=flow_href(&project.get_value(), f) attr:class="text-xs text-primary hover:underline">"Open"</A>
-                                    })}
+                                <li class="grid grid-cols-[70px_minmax(0,1fr)] gap-2.5 border-b border-line py-2 text-[13px]" data-testid="activity-entry">
+                                    <span class="note font-mono">{format_timestamp(e.at_ms, offset)}</span>
+                                    <span>
+                                        {e.text.clone()}
+                                        {e.flow_id.map(|f| view! {
+                                            " " <A href=flow_href(&project.get_value(), f) attr:class="text-link underline">"Open"</A>
+                                        })}
+                                    </span>
                                 </li>
                             }
                         }
                     />
                 </ol>
             </Show>
-        </Card>
+        </section>
     }
 }

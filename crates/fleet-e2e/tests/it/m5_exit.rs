@@ -126,21 +126,20 @@ fn path_of(url: &str) -> String {
     url.path().to_owned()
 }
 
-/// The flow rows of a pipeline page: `(name, state, provenance label)`, sorted by name.
-async fn flow_rows(page: &Page<'_>) -> Vec<(String, String, String)> {
+/// The flow rows of a pipeline page: `(name, state)`, sorted by name. A settled row carries no
+/// provenance of its own: the Flows heading states it for the group.
+async fn flow_rows(page: &Page<'_>) -> Vec<(String, String)> {
     let rows = page
         .eval(
             &format!(
                 "return Array.from(document.querySelectorAll('{}')).map(r => [\
-                 r.querySelector('a').textContent.trim(), r.dataset.state, \
-                 (r.querySelector('{} [role=img]') || document.body).getAttribute('aria-label')]);",
+                 r.querySelector('a').textContent.trim(), r.dataset.state]);",
                 q("flow-row"),
-                q("flow-provenance")
             ),
             vec![],
         )
         .await;
-    let mut rows: Vec<(String, String, String)> = serde_json::from_value(rows).unwrap();
+    let mut rows: Vec<(String, String)> = serde_json::from_value(rows).unwrap();
     rows.sort();
     rows
 }
@@ -173,23 +172,14 @@ async fn ac07_final_outcomes_equal_the_junit_report() {
     page.wait(
         "every testcase of the report as a verified flow",
         &format!(
-            "{} === {} && Array.from(document.querySelectorAll('{} {} [role=img]')).every(\
-             e => e.getAttribute('aria-label') === 'Provenance: verified')",
+            "{} === {} && document.querySelector('{} [role=img]')?.getAttribute('aria-label') === 'Provenance: verified'",
             count_of(&q("flow-row")),
             expected.len(),
-            q("flow-row"),
-            q("flow-provenance"),
+            q("flows-provenance"),
         ),
     )
     .await;
-    let shown: Vec<(String, String)> = flow_rows(&page)
-        .await
-        .into_iter()
-        .map(|(name, state, provenance)| {
-            assert_eq!(provenance, "Provenance: verified", "{name}");
-            (name, state)
-        })
-        .collect();
+    let shown = flow_rows(&page).await;
     assert_eq!(
         shown, expected,
         "the dashboard's flows are the report's testcases, outcome for outcome"
