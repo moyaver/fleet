@@ -1579,6 +1579,24 @@ mod tests {
         assert_eq!(artifact_outcomes(&s), [FlowOutcome::Failed]);
     }
 
+    /// A flow that fails names its shard's device once, until the observer takes it (PLAN §6.5:
+    /// the activity is read on failure). A device that never failed is not named.
+    #[test]
+    fn a_failed_flow_names_its_device_until_it_is_taken() {
+        let mut s = session();
+        log_line(
+            &mut s,
+            "maestro.cli.command.TestCommand",
+            "[shard 1] Selected device emulator-5584 using port 54235 with execution plan ExecutionPlan(flowsToRun=[/a/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))",
+        );
+        assert!(s.take_failed_devices().is_empty(), "nothing failed yet");
+        file(&mut s, "pass/commands.json", Some(FAILED));
+        let failed = s.take_failed_devices();
+        assert_eq!(failed.len(), 1, "{failed:?}");
+        assert_eq!(failed[0].0, "emulator-5584");
+        assert!(s.take_failed_devices().is_empty(), "taken once");
+    }
+
     #[test]
     fn only_the_devices_maestro_selected_are_driven_and_adb_states_come_from_its_list() {
         let mut s = session();
