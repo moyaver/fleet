@@ -66,6 +66,39 @@ impl EvidenceFeed {
     }
 }
 
+/// The flow's device logcat excerpt, as a link once the evidence has loaded, or a plain statement
+/// when none was uploaded. Read from the feed, so a renewed link updates it in place.
+#[component]
+pub fn LogcatLink(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+) -> impl IntoView {
+    move || {
+        // `None` while the evidence loads or cannot be opened: the evidence pane says which.
+        let href = feed.evidence.with(|e| match e {
+            Evidence::Files(files) => Some(files.logcat.as_ref().map(|l| match l {
+                LogSource::Show(text) => text.url.clone(),
+                LogSource::TooLarge(link) => link.href.clone(),
+            })),
+            Evidence::Nothing(_) => Some(None),
+            _ => None,
+        });
+        match href {
+            None => ().into_any(),
+            Some(None) => {
+                view! { <span class="text-muted">"No logcat excerpt was uploaded."</span> }
+                    .into_any()
+            }
+            Some(Some(href)) => view! {
+                <a class="underline" href=href rel="noopener noreferrer" data-testid="crash-logcat">
+                    "Device logcat excerpt"
+                </a>
+            }
+            .into_any(),
+        }
+    }
+}
+
 /// One tab of a set: the signal holds the chosen one.
 fn tab<T>(current: RwSignal<T>, value: T, label: &'static str) -> impl IntoView
 where

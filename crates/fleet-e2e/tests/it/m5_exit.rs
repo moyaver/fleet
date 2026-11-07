@@ -29,6 +29,9 @@ use crate::{
 const FIXTURE: &str = "suite";
 /// The flow that fails in [`FIXTURE`].
 const FAILING: &str = "delta-fails";
+/// The fixture whose app crashes during its one flow (`crash`): Maestro's assertion fails and the
+/// agent records the crash (issue #152).
+const CRASH: &str = "crash";
 /// The failing flow's assertion, as Maestro logs it.
 const FAILING_STEP: &str = "Assert that \"Fleet never shows this\" is visible";
 
@@ -58,13 +61,14 @@ async fn evidence_stack_with_link_ttl(link_ttl_seconds: u64) -> (Stack, u16) {
     (stack, port)
 }
 
-/// Runs the real agent to the end (Maestro exits 1: one flow fails); when this returns the agent
-/// process is gone, its uploads are done, and the server has stored the run's end.
-async fn run_agent_to_the_end(stack: &Stack) {
+/// Runs the real agent to the end on `fixture` (Maestro exits 1: a flow fails); when this returns
+/// the agent process is gone, its uploads are done, and the server has stored the run's end.
+async fn run_agent_to_the_end(stack: &Stack, fixture: &str) {
     let (ws, key) = (stack.ws_url(), stack.key.clone());
+    let fixture = fixture.to_owned();
     let out = tokio::task::spawn_blocking(move || {
         support::run_agent(
-            FIXTURE,
+            &fixture,
             &[
                 ("FLEET_SERVER", &ws),
                 ("FLEET_TOKEN", &key),
@@ -106,15 +110,15 @@ fn junit_outcomes() -> Vec<(String, String)> {
     cases
 }
 
-/// The id of the failing flow on the server (REST, not the browser).
-async fn failing_flow(stack: &Stack) -> String {
+/// The id of the flow named `name` on the server (REST, not the browser).
+async fn flow_id(stack: &Stack, name: &str) -> String {
     let snapshot = stack.latest_snapshot().await;
     snapshot["flows"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|f| f["name"] == FAILING)
-        .unwrap_or_else(|| panic!("no flow {FAILING} in {snapshot}"))["id"]
+        .find(|f| f["name"] == name)
+        .unwrap_or_else(|| panic!("no flow {name} in {snapshot}"))["id"]
         .as_str()
         .unwrap()
         .to_owned()
@@ -151,7 +155,7 @@ async fn flow_rows(page: &Page<'_>) -> Vec<(String, String)> {
 #[tokio::test]
 async fn ac07_final_outcomes_equal_the_junit_report() {
     let (stack, port) = evidence_stack().await;
-    run_agent_to_the_end(&stack).await;
+    run_agent_to_the_end(&stack, FIXTURE).await;
     let attempt = first_attempt(&stack).await;
 
     let browser = Browser::launch().await;
@@ -393,8 +397,8 @@ async fn check_command_timings(page: &Page<'_>) {
 #[tokio::test]
 async fn ac08_a_failed_flow_links_its_screenshot_and_log_lines() {
     let (stack, port) = evidence_stack().await;
-    run_agent_to_the_end(&stack).await;
-    let flow = failing_flow(&stack).await;
+    run_agent_to_the_end(&stack, FIXTURE).await;
+    let flow = flow_id(&stack, FAILING).await;
     let browser = Browser::launch().await;
     let page = Page {
         client: &browser.client,
@@ -422,6 +426,95 @@ async fn ac08_a_failed_flow_links_its_screenshot_and_log_lines() {
     browser.quit().await;
 }
 
+/// Issue #152: an app that crashes during a flow is shown above Maestro's failure, with the device
+/// logcat excerpt one click away. The failure stays Maestro's: the message below it is its
+/// assertion, and the run's outcome is the one Maestro reported.
+#[tokio::test]
+async fn an_app_crash_is_shown_above_maestros_failure_with_its_logcat() {
+    let (stack, port) = evidence_stack().await;
+    run_agent_to_the_end(&stack, CRASH).await;
+    let flow = flow_id(&stack, CRASH).await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait("the flow's name", &has_text(&q("flow-title"), CRASH))
+        .await;
+    page.wait(
+        "the crash and its logcat excerpt",
+        &format!(
+            "{} === 1 && {} === 1",
+            count_of(&q("crash-message")),
+            count_of(&q("crash-logcat"))
+        ),
+    )
+    .await;
+
+    let message = page.texts(&q("crash-message")).await;
+    assert!(
+        message[0]
+            .starts_with("App crashed: android.app.RemoteServiceException$CrashedByAdbException"),
+        "{message:?}"
+    );
+    assert!(
+        message[0].ends_with("in com.android.settings"),
+        "{message:?}"
+    );
+    let before = page
+        .eval(
+            &format!(
+                "const c = document.querySelector('{}'), f = document.querySelector('{}');\
+                 return Boolean(c.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING);",
+                q("crash-message"),
+                q("failure-message")
+            ),
+            vec![],
+        )
+        .await;
+    assert_eq!(
+        before,
+        json!(true),
+        "the crash is shown above Maestro's failure"
+    );
+    let failure = page.texts(&q("failure-message")).await;
+    assert!(
+        failure[0].starts_with("Assertion is false:"),
+        "the failure is still Maestro's assertion: {failure:?}"
+    );
+
+    assert_eq!(
+        page.texts(&q("crash-logcat")).await,
+        ["Device logcat excerpt"]
+    );
+    let href = page
+        .eval(
+            &format!(
+                "return document.querySelector('{}').href;",
+                q("crash-logcat")
+            ),
+            vec![],
+        )
+        .await;
+    let href = href.as_str().unwrap().to_owned();
+    assert!(
+        href.starts_with(&format!("http://localhost:{port}/u/")),
+        "the logcat comes from the usercontent origin: {href}"
+    );
+    let (status, head, _) =
+        get_as(stack.addr(), &format!("localhost:{port}"), &path_of(&href)).await;
+    assert_eq!(status, 200, "{head}");
+
+    assert!(page.never_reloaded().await);
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
 /// Presses the page's button with this label.
 async fn click_button(page: &Page<'_>, label: &str) {
     page.eval(
@@ -444,8 +537,8 @@ async fn click_button(page: &Page<'_>, label: &str) {
 #[tokio::test]
 async fn evidence_viewers_keep_their_state_when_the_links_are_renewed() {
     let (stack, port) = evidence_stack_with_link_ttl(61).await;
-    run_agent_to_the_end(&stack).await;
-    let flow = failing_flow(&stack).await;
+    run_agent_to_the_end(&stack, FIXTURE).await;
+    let flow = flow_id(&stack, FAILING).await;
     let browser = Browser::launch().await;
     let page = Page {
         client: &browser.client,
@@ -596,8 +689,8 @@ const HOSTILE_REPORT: &str = "<!doctype html><html><head><title>report</title></
 #[tokio::test]
 async fn i7_an_uploaded_html_report_never_runs_on_the_app_origin() {
     let (stack, port) = evidence_stack().await;
-    run_agent_to_the_end(&stack).await;
-    let flow = failing_flow(&stack).await;
+    run_agent_to_the_end(&stack, FIXTURE).await;
+    let flow = flow_id(&stack, FAILING).await;
     upload_html_report(&stack, &flow, HOSTILE_REPORT).await;
 
     let browser = Browser::launch().await;
@@ -822,7 +915,7 @@ async fn diagnose_from_history(port: u16, what: &str) {
 #[tokio::test]
 async fn ac09_history_and_evidence_outlive_the_runner_and_a_server_restart() {
     let (mut stack, port) = evidence_stack().await;
-    run_agent_to_the_end(&stack).await;
+    run_agent_to_the_end(&stack, FIXTURE).await;
     // The agent process has been waited for: no `fleet-agent` of this run is alive to answer.
     let stats = stack.latest_snapshot().await["agent_runs"][0]["state"].clone();
     assert_eq!(

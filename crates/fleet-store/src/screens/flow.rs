@@ -4,7 +4,8 @@
 use fleet_protocol::{
     live::FlowView,
     rest::{
-        ArtifactRefView, ClaimView, FailureView, FlowDetailView, PreviousExecutionView, StepView,
+        ArtifactRefView, ClaimView, CrashView, FailureView, FlowDetailView, PreviousExecutionView,
+        StepView,
     },
 };
 use uuid::Uuid;
@@ -30,7 +31,8 @@ impl Store {
             .await?;
         let Some(head) = sqlx::query!(
             "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,
-                    device_session_id, flow_name, flow_path, started_at, ended_at
+                    device_session_id, flow_name, flow_path, started_at, ended_at,
+                    crash_package, crash_exception
                FROM flow_executions WHERE id = $1 AND project_id = $2",
             flow_id,
             project_id
@@ -111,6 +113,10 @@ impl Store {
         .await?;
         tx.commit().await?;
         let failure = failure_of(&flow, &steps);
+        let crash = match (head.crash_package, head.crash_exception) {
+            (Some(package), Some(exception)) => Some(CrashView { package, exception }),
+            _ => None,
+        };
         Ok(Some(FlowDetailView {
             started_at: head.started_at,
             ended_at: head.ended_at,
@@ -123,6 +129,7 @@ impl Store {
             claims,
             steps: nest(steps),
             failure,
+            crash,
             previous,
             artifacts,
         }))

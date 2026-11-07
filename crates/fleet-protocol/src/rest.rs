@@ -585,6 +585,17 @@ pub struct FailureView {
     pub last_successful_step_index: Option<i32>,
 }
 
+/// The app crash Maestro recorded during a flow (`app.crashed`, issue #152). Evidence only: the
+/// flow's verdict stays Maestro's (I3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct CrashView {
+    /// The app's package, for example `com.example.app`.
+    pub package: String,
+    /// The exception's first line: its class, then its message.
+    pub exception: String,
+}
+
 /// An earlier execution of the same flow (same file, or same name when no file is known).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -712,6 +723,9 @@ pub struct FlowDetailView {
     pub steps: Vec<StepView>,
     /// Why it failed; `None` for a flow that hasn't failed.
     pub failure: Option<FailureView>,
+    /// The app crash recorded during it, if any; evidence beside the failure, not a verdict.
+    #[serde(default)]
+    pub crash: Option<CrashView>,
     /// Up to 10 earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousExecutionView>,
     /// Related artifacts that are available; [`ArtifactListView`] has their links.

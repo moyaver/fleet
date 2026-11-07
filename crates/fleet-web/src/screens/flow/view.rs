@@ -10,7 +10,7 @@
     reason = "Leptos's #[component] macro generates the props structs"
 )]
 
-use fleet_protocol::rest::FlowDetailView;
+use fleet_protocol::rest::{CrashView, FlowDetailView};
 use fleet_ui::{
     components::display::{Card, ProvenanceBadge, StatusPill, TableBox},
     mark::Mark,
@@ -26,7 +26,9 @@ use crate::{
         common::{Ctx, Fact},
         device::model::DeviceSessionRow,
         flow::{
-            evidence_view::{EvidenceFeed, EvidencePane, FilesCard, LogsPane, ReportLink},
+            evidence_view::{
+                EvidenceFeed, EvidencePane, FilesCard, LogcatLink, LogsPane, ReportLink,
+            },
             model::{
                 CiSection, ClaimsSection, CurrentStep, Failure, FlowHeader, FlowPage, HistoryLine,
                 StepRef, StepsSection,
@@ -89,6 +91,7 @@ pub fn FlowPageView(
                     |f| {
                         let page = FlowPage::build(&f, &ctx.get_untracked());
                         view! {
+                            <CrashLine crash=page.crash evidence />
                             <FailureBand failure=page.failure />
                             <HistoryLineView history=page.history />
                         }
@@ -205,6 +208,32 @@ fn HeaderView(
             }}
         </header>
     }
+}
+
+/// The app crash Maestro's run recorded during the flow, flat above the failure band. Evidence, not
+/// the verdict: the failure and its message stay Maestro's, below it.
+#[component]
+fn CrashLine(
+    /// The crash, when one was recorded.
+    crash: Option<CrashView>,
+    /// What the route fetched, for the logcat excerpt.
+    evidence: EvidenceFeed,
+) -> impl IntoView {
+    crash.map(|c| {
+        view! {
+            <section class="text-sm" aria-label="App crash" data-testid="crash">
+                <p class="break-words" data-testid="crash-message">
+                    <span class="font-semibold text-fail">"App crashed: "</span>
+                    <span class="font-mono">{c.exception}</span>
+                    <span class="text-muted">" in "</span>
+                    <span class="font-mono">{c.package}</span>
+                </p>
+                <p class="mt-1">
+                    <LogcatLink feed=evidence />
+                </p>
+            </section>
+        }
+    })
 }
 
 /// The failure, flat: the message in mono, where it failed and a copy button. Nothing is boxed; the

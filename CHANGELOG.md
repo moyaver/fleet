@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard: a flow whose app crashed shows "App crashed: <exception> in <package>" above Maestro's failure, with a link to the device logcat excerpt (or a note that none was uploaded); the flow's result and failure message stay Maestro's (#152).
+
 ## [0.1.0-alpha.3] - 2026-11-07
 
 ### Changed

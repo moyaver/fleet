@@ -190,3 +190,58 @@ async fn a_server_that_refuses_uploads_never_changes_the_run() {
         "the journal still arrived"
     );
 }
+
+/// The app crashed during a failing flow (issue #152): the crash is shown on the flow, and the
+/// flow's verdict and failure message stay Maestro's assertion, not the crash.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_app_crash_is_shown_on_its_flow_and_the_verdict_stays_maestros() {
+    let stack = Stack::start(|_| {}).await;
+    let ws = stack.ws_url();
+    let key = stack.key.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        crate::support::run_agent(
+            "crash",
+            &[
+                ("FLEET_SERVER", &ws),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_UPLOAD_TIMEOUT", "20"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+
+    let snap = stack.await_run_ended("job").await;
+    let flow = snap["flows"][0]["id"].as_str().unwrap().to_owned();
+    let detail = stack
+        .get(&format!("/api/v1/projects/app/flows/{flow}"))
+        .await;
+    assert_eq!(
+        detail["crash"]["package"], "com.android.settings",
+        "{detail}"
+    );
+    assert!(
+        detail["crash"]["exception"].as_str().unwrap().starts_with(
+            "android.app.RemoteServiceException$CrashedByAdbException: shell-induced crash"
+        ),
+        "{detail}"
+    );
+    assert_eq!(detail["flow"]["state"], "failed", "{detail}");
+    assert_eq!(
+        detail["failure"]["message"], "Assertion is false: \"Fleet never shows this\" is visible",
+        "{detail}"
+    );
+
+    let listed = stack
+        .get(&format!("/api/v1/projects/app/flows/{flow}/artifacts"))
+        .await;
+    assert!(
+        listed["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["class"] == "device_logcat"),
+        "{listed}"
+    );
+}

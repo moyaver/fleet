@@ -7,13 +7,14 @@
 use fleet_protocol::{
     PROTOCOL_VERSION,
     event::{
-        ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted,
-        JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
-        RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
-        SuiteStarted,
+        AppCrashed, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
+        FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed,
+        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
+        StepStatus, SuiteStarted,
     },
     frame::{AgentInfo, CiContext, ProtocolRange, ResumeState},
     journal::{ClockSample, Provenance, SourceKind, StepRef, Subject},
+    rest::CrashView,
 };
 use sqlx::PgPool;
 
@@ -1511,4 +1512,72 @@ async fn absolute_and_relative_report_paths_share_history_identity(pool: PgPool)
             .collect::<Vec<_>>(),
         ["examples/pass.yaml", "examples/pass.yaml"]
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_app_crash_is_shown_on_its_flow_and_changes_no_verdict(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("crash", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let mut events = suite_run(&mut a, ids, &[("crash", false)]);
+    let flow = events
+        .iter()
+        .find_map(|e| e.subject.flow_execution_id)
+        .unwrap();
+    // The crash arrives before run.ended, so it goes just ahead of it in the same sequence.
+    events.pop();
+    a.seq -= 1;
+    events.push(
+        a.event(
+            ids.flow(flow),
+            SourceKind::ArtifactFile,
+            &EventBody::AppCrashed(AppCrashed {
+                package: "com.android.settings".into(),
+                exception:
+                    "android.app.RemoteServiceException$CrashedByAdbException: shell-induced crash"
+                        .into(),
+            }),
+        ),
+    );
+    events.push(a.event(
+        Subject::default(),
+        SourceKind::AgentObserved,
+        &EventBody::RunEnded(RunEnded {
+            interrupted: false,
+            output_bytes_dropped: 0,
+        }),
+    ));
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert!(applied.rejected.is_empty(), "the crash is accepted");
+
+    let detail = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        detail.crash,
+        Some(CrashView {
+            package: "com.android.settings".into(),
+            exception:
+                "android.app.RemoteServiceException$CrashedByAdbException: shell-induced crash"
+                    .into(),
+        })
+    );
+    // Evidence only (I3): the flow is still Maestro's failure, with Maestro's message.
+    assert_eq!(detail.flow.state, "failed");
+    assert_eq!(
+        detail.failure.and_then(|f| f.message).as_deref(),
+        Some("Assertion is false")
+    );
+    assert_eq!(flows(&store, a.id).await[0].1, "failed");
 }
