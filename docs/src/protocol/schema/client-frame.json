@@ -173,9 +173,27 @@
           "default": null,
           "description": "adb's state for the device at sampling time, from the device list adb pushed. `Absent`\nmeans the list did not contain it."
         },
+        "api_level": {
+          "default": null,
+          "description": "The device's API level (`ro.build.version.sdk`), once read. `None` until then.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "at": {
           "$ref": "#/$defs/ClockSample",
           "description": "When the probe was started."
+        },
+        "avd_name": {
+          "default": null,
+          "description": "The emulator's AVD name, from its command line (`-avd`). `None` for a physical device.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "boot_completed": {
           "default": null,
@@ -189,6 +207,33 @@
           "description": "The device session the sample belongs to (its `shard.assigned` event names it).",
           "format": "uuid",
           "type": "string"
+        },
+        "emu_cpu_pct": {
+          "default": null,
+          "description": "The emulator process's CPU use since the previous sample, percent of one core. `None` for\na physical device, when no emulator process maps to the serial, or when it was unreadable.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "emu_rss_bytes": {
+          "default": null,
+          "description": "The emulator process's resident memory, bytes. `None` as for `emu_cpu_pct`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "foreground_activity": {
+          "default": null,
+          "description": "The component of the resumed activity. Set only on the sample taken after a flow failed on\nthis device (PLAN §6.5: current activity only on failure); `None` otherwise.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "guest_cpu_pct": {
           "default": null,
