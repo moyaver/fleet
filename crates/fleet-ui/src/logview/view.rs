@@ -91,6 +91,9 @@ pub fn LogViewer(
     /// Viewport height in pixels.
     #[prop(default = 480)]
     viewport_px: u32,
+    /// The region's accessible name, when there is more than one log on a page.
+    #[prop(into, default = "Log".to_owned())]
+    label: String,
 ) -> impl IntoView {
     let log = StoredValue::new(log);
     let scroll_top = RwSignal::new(0_u64);
@@ -125,7 +128,7 @@ pub fn LogViewer(
     };
 
     view! {
-        <section class="rounded border border-border bg-surface" aria-label="Log">
+        <section class="rounded border border-border bg-surface" aria-label=label>
             <div class="flex items-center gap-2 border-b border-border p-2">
                 <input
                     type="search"
@@ -157,6 +160,9 @@ pub fn LogViewer(
             <div
                 class="overflow-auto bg-surface font-mono text-sm text-fg"
                 role="log"
+                // A log grows while a run is open: its lines are never announced (the status region
+                // announces run-level events only).
+                aria-live="off"
                 tabindex="0"
                 node_ref=scroller
                 style:height=format!("{viewport_px}px")

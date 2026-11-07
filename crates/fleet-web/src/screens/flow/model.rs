@@ -2,8 +2,11 @@
 //! The flow page's view-model: what `GET …/flows/{execution_id}` says, laid out for debugging.
 //!
 //! Every claim about the outcome is listed with its source (invariant I4), the winner marked and
-//! disagreements highlighted. Steps are flat, because the journal doesn't carry nesting or
-//! retries yet (issue #68). Evidence (screenshots, logs, reports) is [`super::evidence`].
+//! disagreements highlighted. Steps are numbered as the flow file numbers its commands, with
+//! Maestro's own setup commands folded into one Setup row. Evidence (screenshots, logs, reports)
+//! is [`super::evidence`].
+
+use std::collections::HashMap;
 
 use fleet_protocol::{
     event::StepStatus,
@@ -12,13 +15,16 @@ use fleet_protocol::{
 };
 use fleet_ui::{
     charts::format::format_duration,
+    components::live::LiveState,
+    mark::Mark,
     provenance::Provenance,
-    steps::tree::{StepExec, StepTree},
+    steps::tree::{StepExec, StepTree, format_duration as step_duration},
 };
 
 use crate::{
     clock::unix_ms,
-    paths::{flow_href, pipeline_href, worker_href},
+    live::socket::Connection,
+    paths::{history_flow_href, pipeline_href, worker_href},
     screens::{
         common::{Ctx, Fact, finality_note, parse_source, source_label},
         device::model::DeviceSessionRow,
@@ -85,13 +91,16 @@ pub enum ClaimsSection {
     Claims(Vec<ClaimRow>),
 }
 
-/// A step, by position and name.
+/// A step, by its number in the flow file and its name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StepRef {
-    /// Its position among the steps as observed.
-    pub index: i32,
+    /// The number the step is shown with (`6`, or `2.1` inside a block); `None` for Maestro's
+    /// setup commands, which the flow file does not number.
+    pub number: Option<String>,
     /// Its description.
     pub label: String,
+    /// How long it ran, when it ended.
+    pub duration: Option<String>,
 }
 
 /// Why the flow failed.
@@ -99,10 +108,12 @@ pub struct StepRef {
 pub struct FailureDetails {
     /// The failure message, redacted; `None` when none was reported.
     pub message: Option<String>,
-    /// The first failed step.
+    /// The first failed step; `None` when the failure named none the steps know.
     pub failed_step: Option<StepRef>,
     /// The last step that completed before it.
     pub last_successful_step: Option<StepRef>,
+    /// How many steps the flow file has, as far as they were observed (the `M` in "Step 6 of 6").
+    pub total_steps: usize,
 }
 
 /// Whether the flow failed, and the details when it did.
@@ -117,12 +128,38 @@ pub enum Failure {
 /// The step tree and what to say about it.
 #[derive(Debug, Clone)]
 pub struct StepsSection {
-    /// The steps.
+    /// The steps, the setup commands folded into one row first.
     pub tree: StepTree,
     /// How many, and whether the total is known.
     pub summary: String,
     /// A caveat about how the steps are listed, when there are steps.
     pub note: Option<&'static str>,
+    /// How the steps are known: observed once the flow has ended, provisional while it runs.
+    pub provenance: Provenance,
+}
+
+/// The step a running flow is on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentStep {
+    /// Its number, as the step list shows it.
+    pub number: Option<String>,
+    /// Its description.
+    pub label: String,
+    /// How long it has run so far.
+    pub elapsed: String,
+}
+
+/// The History line under the header: this flow's recent executions, and where its history is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryLine {
+    /// The state of each of the most recent executions, oldest first, this one last.
+    pub cells: Vec<Mark>,
+    /// The strip, for a screen reader: how many of the cells passed, failed and are still open.
+    pub strip_label: String,
+    /// What the strip says, in words.
+    pub summary: String,
+    /// The History page, filtered to this flow with its stats open.
+    pub href: String,
 }
 
 /// The CI run, job and runner.
@@ -132,23 +169,6 @@ pub struct CiSection {
     pub facts: Vec<Fact>,
     /// Pages for the pipeline and the worker.
     pub links: Vec<Link>,
-}
-
-/// An earlier execution of the same flow.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PreviousRow {
-    /// Its state.
-    pub state: Pill,
-    /// What the state rests on.
-    pub provenance: Provenance,
-    /// When it started.
-    pub started: String,
-    /// How long it took.
-    pub duration: Option<String>,
-    /// Its page.
-    pub href: String,
-    /// Its pipeline.
-    pub pipeline_href: String,
 }
 
 /// Screen D, laid out.
@@ -166,8 +186,12 @@ pub struct FlowPage {
     pub failure: Failure,
     /// The steps.
     pub steps: StepsSection,
-    /// Earlier executions of the same flow, newest first.
-    pub previous: Vec<PreviousRow>,
+    /// The step a running flow is on; `None` once it has ended or before its first step.
+    pub current: Option<CurrentStep>,
+    /// This flow's recent executions.
+    pub history: HistoryLine,
+    /// Whether the outcome is settled: the flow has ended and its final report has arrived.
+    pub settled: bool,
 }
 
 fn step_status(status: &str) -> StepStatus {
@@ -187,13 +211,66 @@ fn step_label(s: &StepView) -> String {
         .unwrap_or_else(|| format!("Step {}", s.index))
 }
 
-fn step_ref(steps: &[&StepView], index: i32) -> StepRef {
-    StepRef {
-        index,
-        label: steps
-            .iter()
-            .find(|s| s.index == index)
-            .map_or_else(|| format!("Step {index}"), |s| step_label(s)),
+/// Maestro's own commands that run before the flow file's first command. They are not numbered:
+/// all of them show as one Setup row.
+const SETUP_COMMANDS: [&str; 2] = ["Define variables", "Apply configuration"];
+
+const SETUP_ROW: &str = "Setup · variables and configuration";
+
+/// How many executions the History strip shows.
+const HISTORY_CELLS: usize = 8;
+
+fn is_setup(step: &StepView) -> bool {
+    step.parent_index.is_none()
+        && step
+            .label
+            .as_deref()
+            .is_some_and(|l| SETUP_COMMANDS.contains(&l))
+}
+
+/// How the steps are numbered: as the flow file numbers its commands, from 1, without the setup
+/// commands. A step inside a block is its block's number and its place in the block (`2.1`).
+struct Numbering {
+    /// The number of each numbered step, by index.
+    numbers: HashMap<i32, String>,
+    /// The indexes of the setup commands, in order.
+    setup: Vec<i32>,
+    /// How many top-level steps there are.
+    top_level: usize,
+}
+
+impl Numbering {
+    /// `steps` in the order Maestro ran them (a block before the steps it ran).
+    fn of(steps: &[&StepView]) -> Self {
+        let mut numbering = Self {
+            numbers: HashMap::new(),
+            setup: Vec::new(),
+            top_level: 0,
+        };
+        let mut placed: HashMap<i32, usize> = HashMap::new();
+        for step in steps {
+            if is_setup(step) {
+                numbering.setup.push(step.index);
+                continue;
+            }
+            let block = step
+                .parent_index
+                .and_then(|p| numbering.numbers.get(&p).cloned().map(|number| (p, number)));
+            let number = if let Some((p, block_number)) = block {
+                let place = placed.entry(p).or_insert(0);
+                *place += 1;
+                format!("{block_number}.{place}")
+            } else {
+                numbering.top_level += 1;
+                numbering.top_level.to_string()
+            };
+            numbering.numbers.insert(step.index, number);
+        }
+        numbering
+    }
+
+    fn number(&self, index: i32) -> Option<String> {
+        self.numbers.get(&index).cloned()
     }
 }
 
@@ -239,10 +316,33 @@ fn plural(n: usize, one: &str, many: &str) -> String {
     }
 }
 
+/// Whether the flow's outcome is final: it has ended and its final report confirmed it.
+#[must_use]
+pub fn is_settled(view: &FlowDetailView) -> bool {
+    !matches!(view.flow.state.as_str(), "running" | "pending") && view.flow.finality == "verified"
+}
+
+/// What the top bar's live indicator says on the flow page: Settled once the outcome is final,
+/// otherwise the socket's own state.
+#[must_use]
+pub fn live_state(connection: Connection, settled: bool) -> LiveState {
+    if settled {
+        return LiveState::Settled;
+    }
+    match connection {
+        Connection::Connecting => LiveState::Connecting,
+        Connection::Live => LiveState::Live,
+        Connection::Reconnecting => LiveState::Reconnecting,
+    }
+}
+
 impl FlowPage {
     /// Lays out `view`.
     #[must_use]
     pub fn build(view: &FlowDetailView, ctx: &Ctx) -> Self {
+        let flat = StepView::flatten(&view.steps);
+        let numbering = Numbering::of(&flat);
+        let settled = is_settled(view);
         Self {
             header: header(view, ctx),
             ci: ci(view, ctx),
@@ -251,20 +351,11 @@ impl FlowPage {
                 .as_ref()
                 .map(|d| DeviceSessionRow::build(d, ctx)),
             claims: claims(&view.claims, ctx),
-            failure: failure(view),
-            steps: steps(view),
-            previous: view
-                .previous
-                .iter()
-                .map(|p| PreviousRow {
-                    state: flow_state_pill(&p.state),
-                    provenance: flow_provenance(&p.finality, &p.state, None),
-                    started: ctx.time(unix_ms(p.started_at)),
-                    duration: p.duration_ms.map(format_duration),
-                    href: flow_href(&ctx.project, p.flow_id),
-                    pipeline_href: pipeline_href(&ctx.project, p.pipeline_attempt_id),
-                })
-                .collect(),
+            failure: failure(view, &flat, &numbering),
+            steps: steps(view, &flat, &numbering, settled),
+            current: current(view, &flat, &numbering, ctx),
+            history: history(view, ctx),
+            settled,
         }
     }
 }
@@ -375,7 +466,21 @@ fn claims(claims: &[ClaimView], ctx: &Ctx) -> ClaimsSection {
     )
 }
 
-fn failure(view: &FlowDetailView) -> Failure {
+/// The step with this index, as the flow file numbers it. `None` when no step has the index.
+fn step_ref(flat: &[&StepView], numbering: &Numbering, index: i32) -> Option<StepRef> {
+    let step = flat.iter().find(|s| s.index == index)?;
+    Some(StepRef {
+        number: numbering.number(index),
+        label: step_label(step),
+        // The step list's own format, so a step reads the same wherever it is named.
+        duration: step
+            .duration_ms
+            .and_then(|d| u64::try_from(d).ok())
+            .map(step_duration),
+    })
+}
+
+fn failure(view: &FlowDetailView, flat: &[&StepView], numbering: &Numbering) -> Failure {
     if view.flow.state != "failed" && view.failure.is_none() {
         return Failure::NotFailed;
     }
@@ -386,31 +491,67 @@ fn failure(view: &FlowDetailView) -> Failure {
             .or_else(|| view.flow.failure_message.clone()),
         failed_step: f
             .and_then(|f| f.failed_step_index)
-            .map(|i| step_ref(&StepView::flatten(&view.steps), i)),
+            .and_then(|i| step_ref(flat, numbering, i)),
         last_successful_step: f
             .and_then(|f| f.last_successful_step_index)
-            .map(|i| step_ref(&StepView::flatten(&view.steps), i)),
+            .and_then(|i| step_ref(flat, numbering, i)),
+        total_steps: numbering.top_level,
     })
 }
 
-fn steps(view: &FlowDetailView) -> StepsSection {
-    // Pre-order, so a block precedes the steps it ran, as the tree needs.
-    let flat = StepView::flatten(&view.steps);
-    let execs: Vec<StepExec> = flat
+/// The setup commands as one exec, first in the list: the worst of their statuses, and their
+/// durations summed when all of them are known.
+fn setup_exec(setup: &[&StepView]) -> Option<StepExec> {
+    let first = setup.first()?;
+    let statuses: Vec<StepStatus> = setup.iter().map(|s| step_status(&s.status)).collect();
+    let status = [
+        StepStatus::Failed,
+        StepStatus::Running,
+        StepStatus::Warned,
+        StepStatus::Unknown,
+        StepStatus::Skipped,
+    ]
+    .into_iter()
+    .find(|s| statuses.contains(s))
+    .unwrap_or(StepStatus::Completed);
+    let durations: Option<Vec<u64>> = setup
         .iter()
-        .map(|s| StepExec {
-            id: s.index.to_string(),
-            parent: s.parent_index.map(|p| p.to_string()),
-            label: step_label(s),
-            status: step_status(&s.status),
-            source: parse_source(&s.source),
-            duration_ms: s.duration_ms.and_then(|d| u64::try_from(d).ok()),
-            // Unknown attempts count as the first, which is what a step outside a retry is.
-            attempt: s.attempt.and_then(|a| u32::try_from(a).ok()).unwrap_or(1),
-        })
+        .map(|s| s.duration_ms.and_then(|d| u64::try_from(d).ok()))
         .collect();
+    Some(StepExec {
+        // The first setup command's index: the Setup row jumps to where the log's setup begins.
+        id: first.index.to_string(),
+        parent: None,
+        label: SETUP_ROW.to_owned(),
+        number: None,
+        status,
+        source: parse_source(&first.source),
+        duration_ms: durations.map(|d| d.iter().sum()),
+        attempt: 1,
+    })
+}
+
+fn steps(
+    view: &FlowDetailView,
+    flat: &[&StepView],
+    numbering: &Numbering,
+    settled: bool,
+) -> StepsSection {
+    let setup: Vec<&StepView> = flat.iter().copied().filter(|s| is_setup(s)).collect();
+    let mut execs: Vec<StepExec> = setup_exec(&setup).into_iter().collect();
+    execs.extend(flat.iter().filter(|s| !is_setup(s)).map(|s| StepExec {
+        id: s.index.to_string(),
+        parent: s.parent_index.map(|p| p.to_string()),
+        label: step_label(s),
+        number: numbering.number(s.index),
+        status: step_status(&s.status),
+        source: parse_source(&s.source),
+        duration_ms: s.duration_ms.and_then(|d| u64::try_from(d).ok()),
+        // Unknown attempts count as the first, which is what a step outside a retry is.
+        attempt: s.attempt.and_then(|a| u32::try_from(a).ok()).unwrap_or(1),
+    }));
     let tree = StepTree::build(&execs);
-    let n = flat.len();
+    let n = flat.len() - setup.len();
     let open = matches!(view.flow.state.as_str(), "running" | "pending");
     let summary = match (n, open) {
         (0, true) => "No steps reported yet".to_owned(),
@@ -427,13 +568,76 @@ fn steps(view: &FlowDetailView) -> StepsSection {
         note: (n > 0).then_some(
             "Listed in the order Maestro ran them. A block (runFlow, retry, repeat) holds the steps it ran; a retried step shows its attempt.",
         ),
+        provenance: if settled {
+            Provenance::Observed
+        } else {
+            Provenance::Provisional
+        },
+    }
+}
+
+/// The last step that is still running, while the flow is open.
+fn current(
+    view: &FlowDetailView,
+    flat: &[&StepView],
+    numbering: &Numbering,
+    ctx: &Ctx,
+) -> Option<CurrentStep> {
+    if view.flow.state != "running" {
+        return None;
+    }
+    let step = flat
+        .iter()
+        .rev()
+        .find(|s| !is_setup(s) && step_status(&s.status) == StepStatus::Running)?;
+    let elapsed = step
+        .started_at
+        .map(|t| ctx.now_ms.saturating_sub(unix_ms(t)))?;
+    Some(CurrentStep {
+        number: numbering.number(step.index),
+        label: step_label(step),
+        elapsed: format_duration(elapsed),
+    })
+}
+
+/// The History line: the most recent executions of this flow, this one last.
+fn history(view: &FlowDetailView, ctx: &Ctx) -> HistoryLine {
+    let mut all: Vec<Mark> = view
+        .previous
+        .iter()
+        .rev()
+        .map(|p| flow_state_pill(&p.state).mark)
+        .collect();
+    all.push(flow_state_pill(&view.flow.state).mark);
+    let start = all.len().saturating_sub(HISTORY_CELLS);
+    let cells: Vec<Mark> = all.into_iter().skip(start).collect();
+    let count = |mark: Mark| cells.iter().filter(|m| **m == mark).count();
+    let (passed, failed) = (count(Mark::Passed), count(Mark::Failed));
+    let summary = if view.previous.is_empty() {
+        "First execution of this flow".to_owned()
+    } else {
+        format!(
+            "Failed in {failed} of the last {}",
+            plural(cells.len(), "execution", "executions")
+        )
+    };
+    HistoryLine {
+        strip_label: format!(
+            "Last {}: {passed} passed, {failed} failed, {} other",
+            plural(cells.len(), "execution", "executions"),
+            cells.len() - passed - failed
+        ),
+        summary,
+        href: history_flow_href(
+            &ctx.project,
+            view.flow.path.as_deref().unwrap_or(&view.flow.name),
+        ),
+        cells,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use fleet_ui::mark::Mark;
-
     use super::*;
 
     const FAILED: &str = r#"{
@@ -636,17 +840,97 @@ mod tests {
         assert_eq!(
             f.failed_step,
             Some(StepRef {
-                index: 2,
-                label: "Assert visible \"Done\"".to_owned()
+                number: Some("3".to_owned()),
+                label: "Assert visible \"Done\"".to_owned(),
+                duration: Some("7.0 s".to_owned()),
             })
         );
         assert_eq!(
             f.last_successful_step,
             Some(StepRef {
-                index: 1,
-                label: "Tap on \"Pay\"".to_owned()
+                number: Some("2".to_owned()),
+                label: "Tap on \"Pay\"".to_owned(),
+                duration: Some("3.0 s".to_owned()),
             })
         );
+        assert_eq!(f.total_steps, 3);
+    }
+
+    /// A step as the server reports it, with the fields a step without nesting leaves out.
+    fn step(index: i32, label: &str, status: &str, duration_ms: i64) -> StepView {
+        serde_json::from_value(serde_json::json!({
+            "index": index, "label": label, "status": status, "source": "debug_log",
+            "duration_ms": duration_ms,
+        }))
+        .unwrap()
+    }
+
+    /// Issue: "step 7" for the eighth row. The flow file has six commands; Maestro ran two setup
+    /// commands before them, so the failing `assertVisible` is the eighth row, index 7. It is the
+    /// sixth command the user wrote, and that is what the page must say.
+    #[test]
+    fn the_failed_step_is_numbered_as_in_the_flow_file_not_by_its_index() {
+        let mut v = view();
+        v.steps = vec![
+            step(0, "Define variables", "completed", 4),
+            step(1, "Apply configuration", "completed", 1),
+            step(2, "Launch app", "completed", 2000),
+            step(3, "Tap on \"Pay\"", "completed", 3000),
+            step(4, "Tap on \"Sport\"", "completed", 1700),
+            step(5, "Tap on \"Browse\"", "completed", 1400),
+            step(6, "Extended wait until \"Hot deals\"", "completed", 0),
+            step(7, "Assert that \"Done\" is visible", "failed", 17_200),
+        ];
+        v.failure = serde_json::from_value(serde_json::json!({
+            "message": "Element not found: Done",
+            "failed_step_index": 7,
+            "last_successful_step_index": 6,
+        }))
+        .unwrap();
+        let page = FlowPage::build(&v, &ctx());
+        let Failure::Failed(f) = page.failure else {
+            panic!("the flow failed");
+        };
+        let failed = f.failed_step.expect("the failed step is known");
+        assert_eq!(
+            failed.number.as_deref(),
+            Some("6"),
+            "the sixth command of the flow file"
+        );
+        assert_eq!(f.total_steps, 6);
+        assert_eq!(failed.duration.as_deref(), Some("17.2 s"));
+
+        // The setup commands are one row, unnumbered, and the user's six follow as 1 to 6.
+        let state = fleet_ui::steps::tree::TreeState::open_to_attention(&page.steps.tree);
+        let rows = state.rows(&page.steps.tree);
+        let shown: Vec<(String, String)> = rows
+            .iter()
+            .map(|r| (r.number.clone().unwrap_or_default(), r.label.clone()))
+            .collect();
+        assert_eq!(
+            shown.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(),
+            ["", "1", "2", "3", "4", "5", "6"]
+        );
+        assert_eq!(shown[0].1, "Setup · variables and configuration");
+        assert_eq!(shown[6].1, "Assert that \"Done\" is visible");
+    }
+
+    #[test]
+    fn a_failure_at_the_setup_commands_says_setup_not_a_number() {
+        let mut v = view();
+        v.steps = vec![
+            step(0, "Define variables", "failed", 4),
+            step(1, "Apply configuration", "skipped", 0),
+        ];
+        v.failure = serde_json::from_value(serde_json::json!({
+            "message": "bad variable", "failed_step_index": 0,
+        }))
+        .unwrap();
+        let Failure::Failed(f) = FlowPage::build(&v, &ctx()).failure else {
+            panic!("the flow failed");
+        };
+        assert_eq!(f.failed_step.map(|s| s.number), Some(None));
+        assert_eq!(f.total_steps, 0);
     }
 
     #[test]
@@ -821,16 +1105,70 @@ mod tests {
     }
 
     #[test]
-    fn earlier_executions_link_to_their_own_pages_with_their_provenance() {
-        let prev = page().previous;
-        assert_eq!(prev.len(), 1);
-        assert_eq!(prev[0].state.label, "Passed");
-        assert_eq!(prev[0].provenance, Provenance::Final);
-        assert_eq!(prev[0].started, "2025-12-31 10:10:00");
-        assert_eq!(prev[0].duration.as_deref(), Some("9 s"));
+    fn the_history_line_strips_this_flows_recent_executions_and_opens_its_history() {
+        let h = page().history;
+        assert_eq!(h.cells, [Mark::Passed, Mark::Failed]);
+        assert_eq!(h.summary, "Failed in 1 of the last 2 executions");
         assert_eq!(
-            prev[0].href,
-            "/flows/00000000-0000-0000-0000-0000000000f0?project=shop"
+            h.strip_label,
+            "Last 2 executions: 1 passed, 1 failed, 0 other"
+        );
+        assert_eq!(
+            h.href,
+            "/history?project=shop&flow=flows%2Fcheckout.yaml&stats=flows%2Fcheckout.yaml"
+        );
+    }
+
+    #[test]
+    fn a_flow_with_no_earlier_execution_says_it_is_the_first() {
+        let mut v = view();
+        v.previous.clear();
+        let h = FlowPage::build(&v, &ctx()).history;
+        assert_eq!(h.cells, [Mark::Failed]);
+        assert_eq!(h.summary, "First execution of this flow");
+    }
+
+    #[test]
+    fn a_running_flow_names_the_step_it_is_on() {
+        let mut v = view();
+        v.flow.state = "running".to_owned();
+        v.failure = None;
+        v.steps[2] = serde_json::from_value(serde_json::json!({
+            "index": 2, "label": "Assert visible \"Done\"", "status": "running",
+            "source": "debug_log", "started_at": "2026-01-01T10:10:05Z",
+        }))
+        .unwrap();
+        let current = FlowPage::build(&v, &ctx())
+            .current
+            .expect("a step is running");
+        assert_eq!(current.number.as_deref(), Some("3"));
+        assert_eq!(current.label, "Assert visible \"Done\"");
+        assert_ne!(current.elapsed, "");
+        assert_eq!(
+            page().current,
+            None,
+            "a flow that has ended has no current step"
+        );
+    }
+
+    #[test]
+    fn the_live_indicator_is_settled_only_once_the_outcome_is_final() {
+        assert!(page().settled);
+        assert_eq!(page().steps.provenance, Provenance::Observed);
+        let mut v = view();
+        v.flow.finality = "provisional".to_owned();
+        let open = FlowPage::build(&v, &ctx());
+        assert!(!open.settled);
+        assert_eq!(open.steps.provenance, Provenance::Provisional);
+        assert_eq!(live_state(Connection::Live, true), LiveState::Settled);
+        assert_eq!(live_state(Connection::Live, false), LiveState::Live);
+        assert_eq!(
+            live_state(Connection::Reconnecting, false),
+            LiveState::Reconnecting
+        );
+        assert_eq!(
+            live_state(Connection::Connecting, false),
+            LiveState::Connecting
         );
     }
 

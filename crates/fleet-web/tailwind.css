@@ -1136,3 +1136,83 @@ label.tile:hover {
     padding-top: 44px;
   }
 }
+
+/* Flow page (screen D): steps, evidence and logs side by side; the failure, the running step and
+   the steps' rows. On a phone the evidence and the logs come before the steps. */
+.flow-work {
+  display: grid;
+  grid-template-columns: minmax(0, 290px) minmax(0, 0.85fr) minmax(0, 1.35fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.step-row {
+  --step-color: var(--fg);
+  border-bottom: 1px solid var(--line);
+}
+
+.step-row[data-status="Failed"] {
+  background: var(--fail-tint);
+}
+
+.step-row[data-status="Running"] {
+  background: var(--run-tint);
+}
+
+.step-row[aria-selected="true"] {
+  --step-color: var(--fg);
+  box-shadow: inset 2px 0 0 var(--step-color);
+  font-weight: 600;
+}
+
+.step-row[data-status="Failed"][aria-selected="true"] {
+  --step-color: var(--fail);
+}
+
+.step-row[data-status="Passed"][aria-selected="true"] {
+  --step-color: var(--pass);
+}
+
+.run-band {
+  background: var(--run-tint);
+  padding: 16px 24px;
+  margin: 0 -24px;
+}
+
+@media (max-width: 1200px) {
+  .flow-work {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .flow-work > .flow-logs {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .flow-work {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .flow-work > .flow-logs {
+    grid-column: auto;
+  }
+
+  .flow-work > .flow-ev {
+    order: 1;
+  }
+
+  .flow-work > .flow-logs {
+    order: 2;
+  }
+
+  .flow-work > .flow-steps {
+    order: 3;
+  }
+
+  .run-band {
+    margin: 0 -16px;
+    padding: 14px 16px;
+  }
+}
