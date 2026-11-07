@@ -29,6 +29,10 @@ use crate::adb;
 pub(crate) const PROBE: &str =
     r#"echo "boot=$(getprop sys.boot_completed)"; head -n 1 /proc/stat; cat /proc/meminfo"#;
 
+/// The probe while the host is throttled (PLAN §6.5): the boot line of [`PROBE`] alone, so the
+/// guest's CPU and memory are not read. Its reply is the first line the probe prints.
+pub(crate) const PROBE_BOOT: &str = r#"echo "boot=$(getprop sys.boot_completed)""#;
+
 /// Reads the device's API level, once per device session (PLAN §6.5). Captured output:
 /// `fixtures/adb/android-37.1/api-level.raw`.
 pub(crate) const API_LEVEL: &str = "getprop ro.build.version.sdk";
@@ -227,8 +231,15 @@ impl Probes {
     }
 
     /// Starts a probe for each target that is due: none in flight for its serial, and the last
-    /// one started at least [`INTERVAL`] ago. Never waits for a probe.
-    pub(crate) fn start_due(&mut self, now: Instant, at: &ClockSample, targets: &[Target]) {
+    /// one started at least [`INTERVAL`] ago. `guest` false is the throttled probe: the guest's
+    /// CPU and memory are not read. Never waits for a probe.
+    pub(crate) fn start_due(
+        &mut self,
+        now: Instant,
+        at: &ClockSample,
+        targets: &[Target],
+        guest: bool,
+    ) {
         for target in targets {
             let watch = self.watch.entry(target.serial.clone()).or_default();
             let due = !watch.in_flight
@@ -252,7 +263,7 @@ impl Probes {
             tokio::spawn(async move {
                 let result = tokio::time::timeout(
                     timeout,
-                    read_probe(&addr, &target.serial, want_api_level),
+                    read_probe(&addr, &target.serial, want_api_level, guest),
                 )
                 .await;
                 let read = match result {
@@ -397,12 +408,14 @@ fn log_failure(warned: &mut bool, serial: &str, error: &io::Error) {
     }
 }
 
-/// One probe task's reads: the API level first when it is still unknown, then the probe. A
-/// failed API read is not an error of the probe (fail-open): the level simply stays unknown.
+/// One probe task's reads: the API level first when it is still unknown, then the probe (the full
+/// one when `guest`, else [`PROBE_BOOT`]). A failed API read is not an error of the probe
+/// (fail-open): the level simply stays unknown.
 async fn read_probe(
     addr: &str,
     serial: &str,
     want_api_level: bool,
+    guest: bool,
 ) -> (io::Result<Probe>, Option<u32>) {
     let api_level = if want_api_level {
         adb::shell(addr, serial, API_LEVEL)
@@ -412,7 +425,8 @@ async fn read_probe(
     } else {
         None
     };
-    let probe = match adb::shell(addr, serial, PROBE).await {
+    let command = if guest { PROBE } else { PROBE_BOOT };
+    let probe = match adb::shell(addr, serial, command).await {
         Ok(bytes) => parse(&String::from_utf8_lossy(&bytes))
             .ok_or_else(|| io::Error::other("the probe's reply had no boot line")),
         Err(e) => Err(e),
@@ -549,6 +563,7 @@ mod tests {
             Instant::now(),
             &at(0),
             &[target("emulator-5584", Some(AdbState::Device))],
+            true,
         );
         let s = collect(&mut probes, 1).await.remove(0);
         assert_eq!(
@@ -571,9 +586,9 @@ mod tests {
         let mut probes = Probes::new(addr);
         let targets = [target("emulator-5584", Some(AdbState::Device))];
         let start = Instant::now();
-        probes.start_due(start, &at(0), &targets);
+        probes.start_due(start, &at(0), &targets, true);
         let first = collect(&mut probes, 1).await.remove(0);
-        probes.start_due(start + INTERVAL, &at(30_000), &targets);
+        probes.start_due(start + INTERVAL, &at(30_000), &targets, true);
         let second = collect(&mut probes, 1).await.remove(0);
         assert_eq!((first.api_level, second.api_level), (Some(37), Some(37)));
         // One API read and two probes: the level is not asked for again once it is known.
@@ -601,6 +616,40 @@ mod tests {
         assert_eq!(s.adb_state, Some(AdbState::Device));
     }
 
+    /// While throttled, the probe is the boot-only command: after a full probe has set a CPU
+    /// baseline, the throttled one reads no guest CPU or memory, and still reads boot and the API
+    /// level. The fake fails any command it does not list, so a full probe would read nothing.
+    #[tokio::test]
+    async fn a_throttled_probe_reads_boot_and_no_guest_figures() {
+        let boot_only: &'static [u8] = b"OKAYboot=1\n";
+        let (addr, _) = fake::devices(
+            "emulator-5584",
+            vec![
+                (PROBE, &FIRST[4..]),
+                (PROBE_BOOT, boot_only),
+                (API_LEVEL, &API[4..]),
+            ],
+        )
+        .await;
+        let mut probes = Probes::new(addr);
+        let targets = [target("emulator-5584", Some(AdbState::Device))];
+        let start = Instant::now();
+        probes.start_due(start, &at(0), &targets, true);
+        let full = collect(&mut probes, 1).await.remove(0);
+        assert!(full.guest_mem_available_bytes.is_some());
+        probes.start_due(start + INTERVAL, &at(30_000), &targets, false);
+        let throttled = collect(&mut probes, 1).await.remove(0);
+        assert_eq!(
+            (
+                throttled.boot_completed,
+                throttled.guest_cpu_pct,
+                throttled.guest_mem_available_bytes,
+                throttled.api_level,
+            ),
+            (Some(true), None, None, Some(37)),
+        );
+    }
+
     #[tokio::test]
     async fn a_failed_activity_read_reports_nothing() {
         // The fake answers no `dumpsys` command, so adb's refusal comes back.
@@ -617,12 +666,12 @@ mod tests {
         let mut probes = Probes::new(addr);
         let targets = [target("emulator-5584", Some(AdbState::Device))];
         let start = Instant::now();
-        probes.start_due(start, &at(0), &targets);
+        probes.start_due(start, &at(0), &targets, true);
         // Ten seconds later the device is not due: the probe starting then is never spawned.
-        probes.start_due(start + Duration::from_secs(10), &at(10_000), &targets);
+        probes.start_due(start + Duration::from_secs(10), &at(10_000), &targets, true);
         assert_eq!(collect(&mut probes, 1).await[0].at.mono_ms, 0);
         // Thirty seconds after the first probe, the next one is due.
-        probes.start_due(start + INTERVAL, &at(30_000), &targets);
+        probes.start_due(start + INTERVAL, &at(30_000), &targets, true);
         assert_eq!(collect(&mut probes, 1).await[0].at.mono_ms, 30_000);
         // The API read, then one probe, then the next probe: three connections.
         assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 3);
@@ -634,9 +683,9 @@ mod tests {
         let mut probes = Probes::new(addr);
         let targets = [target("emulator-5584", None)];
         let start = Instant::now();
-        probes.start_due(start, &at(0), &targets);
+        probes.start_due(start, &at(0), &targets, true);
         // Due by the interval, but the first probe has not finished: nothing starts.
-        probes.start_due(start + INTERVAL, &at(30_000), &targets);
+        probes.start_due(start + INTERVAL, &at(30_000), &targets, true);
         assert_eq!(collect(&mut probes, 1).await[0].at.mono_ms, 0);
         // Give a wrongly started probe time to connect; none may.
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -653,6 +702,7 @@ mod tests {
             Instant::now(),
             &at(0),
             &[target("emulator-5584", Some(AdbState::Device))],
+            true,
         );
         let s = tokio::time::timeout(Duration::from_secs(5), collect(&mut probes, 1))
             .await
@@ -680,7 +730,12 @@ mod tests {
         let addr = listener.local_addr().unwrap().to_string();
         drop(listener);
         let mut probes = Probes::new(addr);
-        probes.start_due(Instant::now(), &at(0), &[target("emulator-5584", None)]);
+        probes.start_due(
+            Instant::now(),
+            &at(0),
+            &[target("emulator-5584", None)],
+            true,
+        );
         let s = collect(&mut probes, 1).await.remove(0);
         assert_eq!(
             (

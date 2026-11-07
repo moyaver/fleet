@@ -197,6 +197,100 @@ fn tv(t: nix::sys::time::TimeVal) -> Duration {
     Duration::from_secs(secs) + Duration::from_micros(micros)
 }
 
+/// The observer's sampling tick, and the interval of host and process metrics while the host is
+/// calm (PLAN §6.5).
+pub(crate) const SAMPLE: Duration = Duration::from_secs(5);
+
+/// The interval of host and process metrics while the host is under pressure (PLAN §6.5).
+pub(crate) const THROTTLED_INTERVAL: Duration = Duration::from_secs(15);
+
+const PSI_CPU_CRITICAL: f32 = 40.0;
+const PSI_MEMORY_CRITICAL: f32 = 20.0;
+const HOST_CPU_CRITICAL: f32 = 95.0;
+/// Consecutive non-critical samples before a throttled agent samples normally again.
+const CALM_SAMPLES: u32 = 3;
+
+/// The auto-throttle of PLAN §6.5: while the host is under pressure, host and process metrics are
+/// taken every [`THROTTLED_INTERVAL`] instead of every [`SAMPLE`], and the devices' guest CPU and
+/// memory reads are skipped.
+///
+/// The host is critical when host PSI CPU `some avg10` is at least 40.0, or PSI memory `some
+/// avg10` is at least 20.0, or host CPU usage is at least 95 %. macOS has no PSI, so there host CPU
+/// alone decides. These thresholds are defaults, not configuration. The agent enters the throttled
+/// state at once and leaves it only after three consecutive non-critical samples, so it does not
+/// flap.
+#[derive(Debug, Default)]
+pub(crate) struct Throttle {
+    critical: bool,
+    /// Non-critical samples in a row while throttled.
+    calm: u32,
+    /// When the last sample was taken.
+    last: Option<Instant>,
+}
+
+/// The host readings the throttle decides on: the ones a [`Sample`] carries. `None` is unknown and
+/// never critical.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub(crate) struct Pressure {
+    host_cpu: Option<f32>,
+    psi_cpu: Option<f32>,
+    psi_memory: Option<f32>,
+}
+
+impl From<&Sample> for Pressure {
+    fn from(sample: &Sample) -> Self {
+        Self {
+            host_cpu: sample.host_cpu_pct,
+            psi_cpu: sample.host_psi_cpu_pct,
+            psi_memory: sample.host_psi_memory_pct,
+        }
+    }
+}
+
+/// Whether any threshold of [`Throttle`] is reached.
+fn is_critical(pressure: Pressure) -> bool {
+    pressure.psi_cpu.is_some_and(|v| v >= PSI_CPU_CRITICAL)
+        || pressure
+            .psi_memory
+            .is_some_and(|v| v >= PSI_MEMORY_CRITICAL)
+        || pressure.host_cpu.is_some_and(|v| v >= HOST_CPU_CRITICAL)
+}
+
+impl Throttle {
+    /// Whether the agent is throttled right now.
+    pub(crate) fn throttled(&self) -> bool {
+        self.critical
+    }
+
+    /// Whether a sample is due at `now`: none has been taken, or the current interval has passed
+    /// since the last one. Half a [`SAMPLE`] of slack absorbs the tick's scheduling jitter, so a
+    /// 15 s interval is not missed by a few milliseconds.
+    pub(crate) fn due(&self, now: Instant) -> bool {
+        let interval = if self.critical {
+            THROTTLED_INTERVAL
+        } else {
+            SAMPLE
+        };
+        self.last
+            .is_none_or(|t| now.saturating_duration_since(t) + SAMPLE / 2 >= interval)
+    }
+
+    /// Records a sample taken at `now` and its host readings.
+    pub(crate) fn observe(&mut self, now: Instant, pressure: Pressure) {
+        self.last = Some(now);
+        if is_critical(pressure) {
+            self.critical = true;
+            self.calm = 0;
+        } else if self.critical {
+            self.calm = self.calm.saturating_add(1);
+            if self.calm >= CALM_SAMPLES {
+                self.critical = false;
+                self.calm = 0;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use time::OffsetDateTime;
@@ -317,5 +411,138 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         let next = s.sample(at);
         assert!(next.agent_cpu_pct.is_some() && next.agent_rss_bytes.is_some());
+    }
+
+    const CALM: Pressure = Pressure {
+        host_cpu: Some(10.0),
+        psi_cpu: Some(0.0),
+        psi_memory: Some(0.0),
+    };
+
+    #[test]
+    fn each_threshold_is_critical_at_its_value_and_not_below() {
+        let with = |p: Pressure| is_critical(p);
+        assert!(!with(CALM));
+        assert!(with(Pressure {
+            psi_cpu: Some(40.0),
+            ..CALM
+        }));
+        assert!(!with(Pressure {
+            psi_cpu: Some(39.9),
+            ..CALM
+        }));
+        assert!(with(Pressure {
+            psi_memory: Some(20.0),
+            ..CALM
+        }));
+        assert!(!with(Pressure {
+            psi_memory: Some(19.9),
+            ..CALM
+        }));
+        assert!(with(Pressure {
+            host_cpu: Some(95.0),
+            ..CALM
+        }));
+        assert!(!with(Pressure {
+            host_cpu: Some(94.9),
+            ..CALM
+        }));
+    }
+
+    /// macOS has no PSI: the figures are unknown there, and host CPU alone decides. Unknown never
+    /// counts as critical.
+    #[test]
+    fn without_psi_host_cpu_alone_decides() {
+        let no_psi = |cpu| Pressure {
+            host_cpu: cpu,
+            psi_cpu: None,
+            psi_memory: None,
+        };
+        assert!(is_critical(no_psi(Some(96.0))));
+        assert!(!is_critical(no_psi(Some(60.0))));
+        assert!(!is_critical(no_psi(None)));
+        assert!(!is_critical(Pressure::default()));
+    }
+
+    #[test]
+    fn throttling_enters_at_once_and_leaves_after_three_calm_samples() {
+        let t0 = Instant::now();
+        let mut throttle = Throttle::default();
+        let hot = Pressure {
+            psi_memory: Some(25.0),
+            ..CALM
+        };
+        throttle.observe(t0, hot);
+        assert!(throttle.throttled(), "one critical sample is enough");
+        let mut at = t0;
+        for _ in 0..2 {
+            at += SAMPLE;
+            throttle.observe(at, CALM);
+        }
+        assert!(throttle.throttled(), "two calm samples do not leave");
+        at += SAMPLE;
+        throttle.observe(at, hot);
+        for _ in 0..2 {
+            at += SAMPLE;
+            throttle.observe(at, CALM);
+        }
+        assert!(
+            throttle.throttled(),
+            "a critical sample restarts the count of calm ones"
+        );
+        at += SAMPLE;
+        throttle.observe(at, CALM);
+        assert!(!throttle.throttled(), "three calm samples in a row leave");
+    }
+
+    /// An unreadable reading is unknown, not critical: it never throttles the agent, and while
+    /// throttled it counts as a calm sample, so the agent keeps sampling and can leave the state.
+    #[test]
+    fn unreadable_readings_never_throttle_and_count_as_calm() {
+        let t0 = Instant::now();
+        let mut throttle = Throttle::default();
+        throttle.observe(t0, Pressure::default());
+        assert!(!throttle.throttled());
+        assert!(
+            throttle.due(t0 + SAMPLE),
+            "an unreadable host keeps sampling"
+        );
+        let hot = Pressure {
+            host_cpu: Some(99.0),
+            ..Pressure::default()
+        };
+        throttle.observe(t0 + SAMPLE, hot);
+        assert!(throttle.throttled());
+        let mut at = t0 + SAMPLE;
+        for _ in 0..CALM_SAMPLES {
+            at += THROTTLED_INTERVAL;
+            throttle.observe(at, Pressure::default());
+        }
+        assert!(!throttle.throttled());
+    }
+
+    #[test]
+    fn samples_are_due_every_five_seconds_when_calm_and_every_fifteen_when_throttled() {
+        let t0 = Instant::now();
+        let mut throttle = Throttle::default();
+        assert!(throttle.due(t0), "the first sample is due at once");
+        throttle.observe(t0, CALM);
+        assert!(!throttle.due(t0 + Duration::from_secs(2)));
+        assert!(throttle.due(t0 + SAMPLE));
+        assert!(
+            throttle.due(t0 + Duration::from_millis(4990)),
+            "tick jitter does not skip a sample"
+        );
+        let hot_at = t0 + SAMPLE;
+        throttle.observe(
+            hot_at,
+            Pressure {
+                host_cpu: Some(97.0),
+                ..CALM
+            },
+        );
+        assert!(!throttle.due(hot_at + SAMPLE), "throttled: not after 5 s");
+        assert!(!throttle.due(hot_at + Duration::from_secs(12)));
+        assert!(throttle.due(hot_at + Duration::from_millis(14_990)));
     }
 }
