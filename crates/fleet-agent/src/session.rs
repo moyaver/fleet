@@ -182,6 +182,9 @@ pub(crate) struct Session {
     out: Vec<EventEnvelope>,
     /// Files worth uploading that the observer hasn't taken yet.
     uploads: Vec<Candidate>,
+    /// Devices a flow failed on since the observer last took them: their serial and device session
+    /// (PLAN §6.5: the current activity is read on failure).
+    failed_devices: Vec<(String, Uuid)>,
 }
 
 /// A file the observer may upload (PLAN §6.6): what it is and which flow it is evidence for.
@@ -270,6 +273,7 @@ impl Session {
             flows: Vec::new(),
             seq: 0,
             sequence_aborted: false,
+            failed_devices: Vec::new(),
             closed: false,
             signalled: false,
             maestro: None,
@@ -1184,6 +1188,9 @@ impl Session {
             path: f.path.clone(),
         });
         let subject = self.flow_subject_at(idx);
+        if outcome == FlowOutcome::Failed {
+            self.note_failed_device(idx);
+        }
         self.emit(
             at,
             subject,
@@ -1196,6 +1203,28 @@ impl Session {
                 flow,
             }),
         );
+    }
+
+    /// Remembers the device of flow `idx`'s shard as failed, once per serial until taken.
+    fn note_failed_device(&mut self, idx: usize) {
+        let Some(flow) = self.flows.get(idx) else {
+            return;
+        };
+        let Some(shard) = self.shards.iter().find(|s| s.number == flow.shard) else {
+            return;
+        };
+        let Some(serial) = &shard.serial else {
+            return;
+        };
+        let entry = (serial.clone(), shard.device_session_id);
+        if !self.failed_devices.contains(&entry) {
+            self.failed_devices.push(entry);
+        }
+    }
+
+    /// The devices a flow failed on since the last call, each once, and forgets them.
+    pub(crate) fn take_failed_devices(&mut self) -> Vec<(String, Uuid)> {
+        std::mem::take(&mut self.failed_devices)
     }
 
     /// The device each shard Maestro selected, once per serial (the first shard that selected

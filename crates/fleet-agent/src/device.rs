@@ -29,6 +29,14 @@ use crate::adb;
 pub(crate) const PROBE: &str =
     r#"echo "boot=$(getprop sys.boot_completed)"; head -n 1 /proc/stat; cat /proc/meminfo"#;
 
+/// Reads the device's API level, once per device session (PLAN §6.5). Captured output:
+/// `fixtures/adb/android-37.1/api-level.raw`.
+pub(crate) const API_LEVEL: &str = "getprop ro.build.version.sdk";
+
+/// Lists the activities, to find the resumed one after a failure. Captured output:
+/// `fixtures/adb/android-37.1/dumpsys-activity-activities.raw`.
+pub(crate) const ACTIVITY: &str = "dumpsys activity activities";
+
 /// Time between two probes of one device. The guest figures are sampled at 30 s or more (PLAN §6.5).
 pub(crate) const INTERVAL: Duration = Duration::from_secs(30);
 
@@ -77,6 +85,26 @@ pub(crate) fn parse(text: &str) -> Option<Probe> {
         cpu,
         mem_available_bytes,
     })
+}
+
+/// Reads [`API_LEVEL`]'s output: the level as a number, `None` when it is not one.
+pub(crate) fn parse_api_level(text: &str) -> Option<u32> {
+    text.trim().parse().ok()
+}
+
+/// The component (`package/.Activity`) of the resumed activity in [`ACTIVITY`]'s output. adb
+/// prints it as `ResumedActivity: ActivityRecord{<hash> u<user> <component> t<task>}`, and the
+/// component is the token with a slash. `None` when no such line is there.
+pub(crate) fn resumed_activity(text: &str) -> Option<String> {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| l.starts_with("ResumedActivity:") || l.starts_with("mResumedActivity:"))?;
+    let record = line.split_once("ActivityRecord{")?.1.split('}').next()?;
+    record
+        .split_whitespace()
+        .find(|token| token.contains('/'))
+        .map(str::to_owned)
 }
 
 /// The `cpu` line's counters: user nice system idle iowait irq softirq steal (guest time is
@@ -140,14 +168,28 @@ struct Watch {
     in_flight: bool,
     last_started: Option<Instant>,
     cpu: GuestCpu,
+    /// The API level, once a probe has read it.
+    api_level: Option<u32>,
 }
 
-/// A finished probe, from its task to the observer's next tick.
+/// What a finished task read.
+#[derive(Debug)]
+enum Read {
+    /// A probe, and the API level if this one also read it.
+    Probe {
+        probe: io::Result<Probe>,
+        api_level: Option<u32>,
+    },
+    /// The resumed activity's component, if the listing named one.
+    Activity(io::Result<Option<String>>),
+}
+
+/// A finished task, from its task to the observer's next tick.
 #[derive(Debug)]
 struct Done {
     target: Target,
     at: ClockSample,
-    result: io::Result<Probe>,
+    read: Read,
 }
 
 /// The device probes of one run. Probes run in tasks; the observer collects their samples with
@@ -198,6 +240,7 @@ impl Probes {
             }
             watch.in_flight = true;
             watch.last_started = Some(now);
+            let want_api_level = watch.api_level.is_none();
             let (addr, timeout, finished, woken, target, at) = (
                 self.addr.clone(),
                 self.timeout,
@@ -207,71 +250,182 @@ impl Probes {
                 *at,
             );
             tokio::spawn(async move {
-                let result =
-                    match tokio::time::timeout(timeout, adb::shell(&addr, &target.serial, PROBE))
-                        .await
-                    {
-                        Ok(Ok(bytes)) => parse(&String::from_utf8_lossy(&bytes))
-                            .ok_or_else(|| io::Error::other("the probe's reply had no boot line")),
-                        Ok(Err(e)) => Err(e),
-                        Err(_) => Err(io::Error::new(io::ErrorKind::TimedOut, "probe timed out")),
-                    };
-                if let Ok(mut finished) = finished.lock() {
-                    finished.push(Done { target, at, result });
-                }
-                woken.notify_one();
+                let result = tokio::time::timeout(
+                    timeout,
+                    read_probe(&addr, &target.serial, want_api_level),
+                )
+                .await;
+                let read = match result {
+                    Ok((probe, api_level)) => Read::Probe { probe, api_level },
+                    Err(_) => Read::Probe {
+                        probe: Err(io::Error::new(io::ErrorKind::TimedOut, "probe timed out")),
+                        api_level: None,
+                    },
+                };
+                push(&finished, &woken, Done { target, at, read });
             });
         }
     }
 
-    /// The samples of the probes that finished since the last call, in finishing order.
+    /// Starts a read of the resumed activity for each target, now. Used after a flow failed on a
+    /// device (PLAN §6.5: current activity only on failure). Not deduplicated here: the observer
+    /// asks once per device per tick.
+    pub(crate) fn request_activity(&mut self, at: &ClockSample, targets: &[Target]) {
+        for target in targets {
+            let (addr, timeout, finished, woken, target, at) = (
+                self.addr.clone(),
+                self.timeout,
+                Arc::clone(&self.finished),
+                Arc::clone(&self.woken),
+                target.clone(),
+                *at,
+            );
+            tokio::spawn(async move {
+                let result = match tokio::time::timeout(
+                    timeout,
+                    adb::shell(&addr, &target.serial, ACTIVITY),
+                )
+                .await
+                {
+                    Ok(Ok(bytes)) => Ok(resumed_activity(&String::from_utf8_lossy(&bytes))),
+                    Ok(Err(e)) => Err(e),
+                    Err(_) => Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "activity read timed out",
+                    )),
+                };
+                push(
+                    &finished,
+                    &woken,
+                    Done {
+                        target,
+                        at,
+                        read: Read::Activity(result),
+                    },
+                );
+            });
+        }
+    }
+
+    /// The samples of the tasks that finished since the last call, in finishing order.
     pub(crate) fn take(&mut self) -> Vec<DeviceSample> {
         let done = match self.finished.lock() {
             Ok(mut finished) => std::mem::take(&mut *finished),
             Err(_) => return Vec::new(),
         };
-        done.into_iter().map(|d| self.finish(d)).collect()
+        done.into_iter().filter_map(|d| self.finish(d)).collect()
     }
 
-    /// Returns once a probe has finished (or at once if one finished since the last wait).
+    /// Returns once a task has finished (or at once if one finished since the last wait).
     #[cfg(test)]
     async fn finished_one(&self) {
         self.woken.notified().await;
     }
 
-    fn finish(&mut self, done: Done) -> DeviceSample {
+    /// The sample a finished task makes, or `None` when it has nothing to report (a failed or
+    /// empty activity read: unknown, so nothing is sent).
+    fn finish(&mut self, done: Done) -> Option<DeviceSample> {
         let serial = done.target.serial.clone();
         let watch = self.watch.entry(serial.clone()).or_default();
-        watch.in_flight = false;
-        let (boot_completed, guest_cpu_pct, guest_mem_available_bytes) = match done.result {
-            Ok(probe) => (
-                Some(probe.boot_completed),
-                probe.cpu.and_then(|now| watch.cpu.percent(now)),
-                probe.mem_available_bytes,
-            ),
-            Err(e) => {
-                if self.warned {
-                    tracing::debug!(%serial, error = %e, "device probe failed");
-                } else {
-                    self.warned = true;
-                    tracing::warn!(
-                        %serial,
-                        error = %e,
-                        "device probe failed; device readings are unknown until one succeeds"
-                    );
+        match done.read {
+            Read::Probe { probe, api_level } => {
+                watch.in_flight = false;
+                if let Some(level) = api_level {
+                    watch.api_level = Some(level);
                 }
-                (None, None, None)
+                let (boot_completed, guest_cpu_pct, guest_mem_available_bytes) = match probe {
+                    Ok(probe) => (
+                        Some(probe.boot_completed),
+                        probe.cpu.and_then(|now| watch.cpu.percent(now)),
+                        probe.mem_available_bytes,
+                    ),
+                    Err(e) => {
+                        log_failure(&mut self.warned, &serial, &e);
+                        (None, None, None)
+                    }
+                };
+                Some(DeviceSample {
+                    at: done.at,
+                    device_session_id: done.target.device_session_id,
+                    adb_state: done.target.adb_state,
+                    boot_completed,
+                    guest_cpu_pct,
+                    guest_mem_available_bytes,
+                    emu_cpu_pct: None,
+                    emu_rss_bytes: None,
+                    avd_name: None,
+                    api_level: watch.api_level,
+                    foreground_activity: None,
+                })
             }
-        };
-        DeviceSample {
-            at: done.at,
-            device_session_id: done.target.device_session_id,
-            adb_state: done.target.adb_state,
-            boot_completed,
-            guest_cpu_pct,
-            guest_mem_available_bytes,
+            Read::Activity(result) => match result {
+                Ok(Some(component)) => Some(DeviceSample {
+                    at: done.at,
+                    device_session_id: done.target.device_session_id,
+                    adb_state: done.target.adb_state,
+                    boot_completed: None,
+                    guest_cpu_pct: None,
+                    guest_mem_available_bytes: None,
+                    emu_cpu_pct: None,
+                    emu_rss_bytes: None,
+                    avd_name: None,
+                    api_level: watch.api_level,
+                    foreground_activity: Some(component),
+                }),
+                Ok(None) => None,
+                Err(e) => {
+                    log_failure(&mut self.warned, &serial, &e);
+                    None
+                }
+            },
         }
     }
+}
+
+/// Logs the first failure of the run at warn level, and later ones at debug level. The reading
+/// stays unknown either way.
+fn log_failure(warned: &mut bool, serial: &str, error: &io::Error) {
+    if *warned {
+        tracing::debug!(%serial, error = %error, "device read failed");
+    } else {
+        *warned = true;
+        tracing::warn!(
+            %serial,
+            error = %error,
+            "device read failed; device readings are unknown until one succeeds"
+        );
+    }
+}
+
+/// One probe task's reads: the API level first when it is still unknown, then the probe. A
+/// failed API read is not an error of the probe (fail-open): the level simply stays unknown.
+async fn read_probe(
+    addr: &str,
+    serial: &str,
+    want_api_level: bool,
+) -> (io::Result<Probe>, Option<u32>) {
+    let api_level = if want_api_level {
+        adb::shell(addr, serial, API_LEVEL)
+            .await
+            .ok()
+            .and_then(|bytes| parse_api_level(&String::from_utf8_lossy(&bytes)))
+    } else {
+        None
+    };
+    let probe = match adb::shell(addr, serial, PROBE).await {
+        Ok(bytes) => parse(&String::from_utf8_lossy(&bytes))
+            .ok_or_else(|| io::Error::other("the probe's reply had no boot line")),
+        Err(e) => Err(e),
+    };
+    (probe, api_level)
+}
+
+/// Hands a finished task to the observer and wakes anyone waiting for one.
+fn push(finished: &Mutex<Vec<Done>>, woken: &Notify, done: Done) {
+    if let Ok(mut finished) = finished.lock() {
+        finished.push(done);
+    }
+    woken.notify_one();
 }
 
 #[cfg(test)]
@@ -296,6 +450,14 @@ mod tests {
     const FIRST: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/probe.raw");
     const LATER: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/probe-2.raw");
     const UNSET: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/probe-unset-prop.raw");
+    const API: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/api-level.raw");
+    const DUMPSYS: &[u8] =
+        include_bytes!("../../../fixtures/adb/android-37.1/dumpsys-activity-activities.raw");
+
+    /// The replies of a device that answers both the probe and the API level read.
+    fn answers_probe_and_level() -> Vec<(&'static str, &'static [u8])> {
+        vec![(PROBE, &FIRST[4..]), (API_LEVEL, &API[4..])]
+    }
 
     fn text(captured: &[u8]) -> String {
         String::from_utf8_lossy(&captured[8..]).into_owned()
@@ -322,6 +484,17 @@ mod tests {
         assert!(probe.boot_completed);
         assert_eq!(probe.mem_available_bytes, Some(2_268_736 * 1024));
         assert!(probe.cpu.is_some());
+    }
+
+    #[test]
+    fn the_api_level_and_the_resumed_activity_parse_from_their_captures() {
+        assert_eq!(parse_api_level(&text(API)), Some(37));
+        assert_eq!(parse_api_level("oops\n"), None);
+        assert_eq!(
+            resumed_activity(&text(DUMPSYS)).as_deref(),
+            Some("com.android.fakesystemapp/.launcher.EmptyHomeActivity")
+        );
+        assert_eq!(resumed_activity(""), None, "no listing, no activity");
     }
 
     #[test]
@@ -370,7 +543,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_device_that_answers_gives_its_readings_and_adbs_state() {
-        let (addr, _) = fake::device("emulator-5584", PROBE, &FIRST[4..]).await;
+        let (addr, _) = fake::devices("emulator-5584", answers_probe_and_level()).await;
         let mut probes = Probes::new(addr);
         probes.start_due(
             Instant::now(),
@@ -385,11 +558,62 @@ mod tests {
         );
         assert_eq!(s.guest_mem_available_bytes, Some(2_268_736 * 1024));
         assert_eq!(s.device_session_id, Uuid::from_u128(7));
+        assert_eq!(s.api_level, Some(37));
+        assert_eq!(
+            (s.avd_name, s.emu_cpu_pct, s.foreground_activity),
+            (None, None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_api_level_is_read_once_and_then_carried_on_every_sample() {
+        let (addr, connections) = fake::devices("emulator-5584", answers_probe_and_level()).await;
+        let mut probes = Probes::new(addr);
+        let targets = [target("emulator-5584", Some(AdbState::Device))];
+        let start = Instant::now();
+        probes.start_due(start, &at(0), &targets);
+        let first = collect(&mut probes, 1).await.remove(0);
+        probes.start_due(start + INTERVAL, &at(30_000), &targets);
+        let second = collect(&mut probes, 1).await.remove(0);
+        assert_eq!((first.api_level, second.api_level), (Some(37), Some(37)));
+        // One API read and two probes: the level is not asked for again once it is known.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn the_resumed_activity_is_reported_on_its_own_sample() {
+        let (addr, _) = fake::device("emulator-5584", ACTIVITY, &DUMPSYS[4..]).await;
+        let mut probes = Probes::new(addr);
+        probes.request_activity(&at(0), &[target("emulator-5584", Some(AdbState::Device))]);
+        let s = collect(&mut probes, 1).await.remove(0);
+        assert_eq!(
+            (
+                s.foreground_activity.as_deref(),
+                s.boot_completed,
+                s.guest_cpu_pct
+            ),
+            (
+                Some("com.android.fakesystemapp/.launcher.EmptyHomeActivity"),
+                None,
+                None
+            ),
+        );
+        assert_eq!(s.adb_state, Some(AdbState::Device));
+    }
+
+    #[tokio::test]
+    async fn a_failed_activity_read_reports_nothing() {
+        // The fake answers no `dumpsys` command, so adb's refusal comes back.
+        let (addr, _) = fake::devices("emulator-5584", Vec::new()).await;
+        let mut probes = Probes::new(addr);
+        probes.request_activity(&at(0), &[target("emulator-5584", None)]);
+        probes.finished_one().await;
+        assert!(probes.take().is_empty(), "unknown is not reported");
     }
 
     #[tokio::test]
     async fn one_probe_per_device_per_interval_and_never_two_at_once() {
-        let (addr, connections) = fake::device("emulator-5584", PROBE, &FIRST[4..]).await;
+        let (addr, connections) = fake::devices("emulator-5584", answers_probe_and_level()).await;
         let mut probes = Probes::new(addr);
         let targets = [target("emulator-5584", Some(AdbState::Device))];
         let start = Instant::now();
@@ -400,12 +624,13 @@ mod tests {
         // Thirty seconds after the first probe, the next one is due.
         probes.start_due(start + INTERVAL, &at(30_000), &targets);
         assert_eq!(collect(&mut probes, 1).await[0].at.mono_ms, 30_000);
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        // The API read, then one probe, then the next probe: three connections.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
     async fn no_second_probe_starts_while_one_is_in_flight() {
-        let (addr, connections) = fake::device("emulator-5584", PROBE, &FIRST[4..]).await;
+        let (addr, connections) = fake::devices("emulator-5584", answers_probe_and_level()).await;
         let mut probes = Probes::new(addr);
         let targets = [target("emulator-5584", None)];
         let start = Instant::now();
@@ -416,7 +641,8 @@ mod tests {
         // Give a wrongly started probe time to connect; none may.
         tokio::time::sleep(Duration::from_millis(200)).await;
         assert!(probes.take().is_empty(), "no second probe was started");
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 1);
+        // The API read and the first probe only.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

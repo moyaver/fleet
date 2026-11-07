@@ -38,7 +38,9 @@ It checks that `maestro` is on `PATH` (and which version), that the adb server i
 
 The agent reads the device list from the adb server (`host:track-devices`) and never starts, restarts or kills the adb server: a different `adb` client version could restart it and break Maestro. If nothing listens on port 5037 (or `ANDROID_ADB_SERVER_PORT`), the agent waits.
 
-Every 30 seconds the agent also probes each device that Maestro selected, with read-only adb shell commands (boot status, and CPU and available memory from `/proc`). A probe has a 5-second timeout. A probe that fails or hangs leaves its readings unknown and never affects Maestro. Devices that Maestro did not select are not probed.
+Every 30 seconds the agent also probes each device that Maestro selected, with read-only adb shell commands (boot status, and CPU and available memory from `/proc`). The first probe of a device also reads its API level (`ro.build.version.sdk`). A probe has a 5-second timeout. A probe that fails or hangs leaves its readings unknown and never affects Maestro. Devices that Maestro did not select are not probed.
+
+For an emulator, the agent finds its `qemu-system-*` process and matches it to the serial by its console port (`-port 5554` is `emulator-5554`). Every 30 seconds it reports that process's CPU (percent of one core) and resident memory, and the AVD name from its `-avd` argument. The process table is scanned when the agent starts and whenever adb's device list changes; in between, only the matched processes are read. A physical device has no emulator process, so its emulator readings are unavailable. When a flow fails on a device, the agent reads the device's resumed activity once (`dumpsys activity activities`) and sends its component as one extra device sample on the next sampling tick.
 
 ## Cost
 

@@ -33,6 +33,7 @@ use uuid::Uuid;
 
 use crate::{
     device::{Probes, Target},
+    emulator::Emulators,
     ipc::{Control, Frame, Stream},
     journal::Writer,
     metrics::Sampler,
@@ -150,6 +151,8 @@ struct Live {
     devices: mpsc::Receiver<Vec<(String, fleet_protocol::event::AdbState)>>,
     /// Device probes for the devices Maestro drives (PLAN §6.5); used only when telemetry is sent.
     probes: Probes,
+    /// The emulator processes behind those devices (PLAN §6.5); rescanned when adb's list changes.
+    emulators: Emulators,
     /// Device samples waiting for the next telemetry frame.
     pending_devices: Vec<DeviceSample>,
     /// Uploads artifacts (PLAN §6.6); `None` offline or with `FLEET_UPLOAD_ARTIFACTS=off`.
@@ -253,6 +256,7 @@ async fn observe() -> io::Result<Option<String>> {
             } => {
                 if let (Some(l), Some(list)) = (live.as_mut(), list) {
                     l.session.observe(clock(), Observation::Devices(list));
+                    l.emulators.rescan();
                     flush(l);
                 }
             }
@@ -260,12 +264,27 @@ async fn observe() -> io::Result<Option<String>> {
                 if let Some(l) = live.as_mut() {
                     let s = l.sampler.sample(clock());
                     l.tseq += 1;
-                    l.pending_devices.extend(l.probes.take());
+                    l.emulators.refresh();
+                    let driven = l.session.driven_devices();
+                    let finished = l.probes.take();
+                    l.pending_devices.extend(
+                        finished.into_iter().map(|d| with_emulator(d, &driven, &l.emulators)),
+                    );
                     if l.telemetry.is_some() {
                         let at = clock();
-                        let targets: Vec<Target> = l
+                        let targets: Vec<Target> = driven
+                            .iter()
+                            .map(|(serial, device_session_id)| Target {
+                                adb_state: l.session.adb_state(serial),
+                                serial: serial.clone(),
+                                device_session_id: *device_session_id,
+                            })
+                            .collect();
+                        l.probes.start_due(Instant::now(), &at, &targets);
+                        // A flow that failed on a device since the last tick: read its activity now.
+                        let failed: Vec<Target> = l
                             .session
-                            .driven_devices()
+                            .take_failed_devices()
                             .into_iter()
                             .map(|(serial, device_session_id)| Target {
                                 adb_state: l.session.adb_state(&serial),
@@ -273,7 +292,7 @@ async fn observe() -> io::Result<Option<String>> {
                                 device_session_id,
                             })
                             .collect();
-                        l.probes.start_due(Instant::now(), &at, &targets);
+                        l.probes.request_activity(&at, &failed);
                     }
                     let devices = std::mem::take(&mut l.pending_devices);
                     if let Some(t) = &l.telemetry {
@@ -380,6 +399,8 @@ fn start(
     };
     let (devices_tx, devices) = mpsc::channel(16);
     tokio::spawn(crate::adb::track(crate::adb::server_addr(), devices_tx));
+    let mut emulators = Emulators::new();
+    emulators.rescan();
     let debug = debug_dir.map(PathBuf::from);
     Live {
         uploader: uploader.flatten(),
@@ -407,8 +428,28 @@ fn start(
         dropped_bytes: 0,
         devices,
         probes: Probes::new(crate::adb::server_addr()),
+        emulators,
         pending_devices: Vec::new(),
     }
+}
+
+/// Adds the emulator process's readings to a device sample: CPU, resident memory and the AVD name,
+/// when a process maps to the sample's serial (PLAN §6.5). A physical device keeps them unknown.
+fn with_emulator(
+    mut sample: DeviceSample,
+    driven: &[(String, Uuid)],
+    emulators: &Emulators,
+) -> DeviceSample {
+    let serial = driven
+        .iter()
+        .find(|(_, id)| *id == sample.device_session_id)
+        .map(|(serial, _)| serial);
+    if let Some(reading) = serial.and_then(|s| emulators.reading(s)) {
+        sample.emu_cpu_pct = reading.cpu_pct;
+        sample.emu_rss_bytes = reading.rss_bytes;
+        sample.avd_name = reading.avd;
+    }
+    sample
 }
 
 /// Artifact uploads are on unless `FLEET_UPLOAD_ARTIFACTS` says `0`, `false`, `no` or `off`.

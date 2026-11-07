@@ -11,6 +11,8 @@ device parser and fake-adb tests (`crates/fleet-agent/src/adb.rs`, `crates/fleet
 | `probe-2.raw` | the same, a few seconds later | a second probe, to compute guest CPU between two samples |
 | `probe-unset-prop.raw` | `host:transport:emulator-5584`, then `shell:<PROBE with an unset property>` | `boot=` (empty: the property is unset) |
 | `missing-device.raw` | `host:transport:emulator-5999` | `FAIL0020device 'emulator-5999' not found` (adb's refusal) |
+| `api-level.raw` | `host:transport:emulator-5590`, then `shell:getprop ro.build.version.sdk` | `37` and a newline |
+| `dumpsys-activity-activities.raw` | `host:transport:emulator-5590`, then `shell:dumpsys activity activities` | the activity listing; its `ResumedActivity:` line names the resumed component |
 
 `<PROBE>` is the shell command the agent runs (`crates/fleet-agent/src/device.rs`):
 
@@ -25,6 +27,7 @@ line endings: the output has LF only. The first eight bytes of `probe.raw` are t
 
 ## Provenance
 
+- **Captured (`api-level.raw`, `dumpsys-activity-activities.raw`):** 2026-11-07, from the same kind of emulator (serial `emulator-5590`, a read-only boot of an existing AVD) with the same socket client. The owner's emulators were not sent any command.
 - **Captured:** 2026-11-07, on macOS 26 (Darwin 25.6.0, Apple Silicon), against the host's adb server
   (platform-tools 37.0.0).
 - **Device:** a throwaway AVD on the `system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a`
