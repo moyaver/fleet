@@ -32,6 +32,17 @@ pub fn flow_href(project: &str, execution: Uuid) -> String {
     format!("/flows/{execution}?project={}", escape(project))
 }
 
+/// The History page filtered to one flow, with its stats panel open (the flow's file, or its
+/// name when no file is known).
+#[must_use]
+pub fn history_flow_href(project: &str, flow: &str) -> String {
+    format!(
+        "/history?project={}&flow={f}&stats={f}",
+        escape(project),
+        f = escape(flow)
+    )
+}
+
 /// The history page of a project (screen E): `/history?project=<slug>`.
 #[must_use]
 pub fn history_href(project: &str) -> String {

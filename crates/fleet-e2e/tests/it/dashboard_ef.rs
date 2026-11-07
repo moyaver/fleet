@@ -99,6 +99,26 @@ async fn attempt_of(stack: &Stack, run_id: &str) -> String {
         .to_owned()
 }
 
+/// The history table says Verified once, in its caption, and its settled rows carry no label.
+async fn assert_caption_states_verified_once(page: &Page<'_>) {
+    let caption = page
+        .eval(
+            &format!(
+                "return Array.from(document.querySelectorAll('{} caption [role=img]')).map(e => e.getAttribute('aria-label'));",
+                q("history-table")
+            ),
+            vec![],
+        )
+        .await;
+    assert_eq!(caption, json!(["Provenance: verified"]), "stated once");
+    assert_eq!(
+        page.count(&format!("{} [role=img]", q("history-row")))
+            .await,
+        0,
+        "a settled row is not marked"
+    );
+}
+
 #[tokio::test]
 async fn history_marks_a_flow_that_passed_then_failed_on_one_commit_as_flaky_with_its_evidence() {
     let stack = stack_without_host_telemetry().await;
@@ -132,27 +152,14 @@ async fn history_marks_a_flow_that_passed_then_failed_on_one_commit_as_flaky_wit
         .unwrap();
     page.mark_loaded().await;
 
-    // Four executions: two flows in two runs, newest first, each with its provenance (I4).
+    // Four executions: two flows in two runs, newest first. The final report settled every one,
+    // so the table says Verified once, in its caption, and the rows carry no label (I4).
     page.wait(
         "four history rows",
         &format!("{} === 4", count_of(&q("history-row"))),
     )
     .await;
-    let provenance = page
-        .eval(
-            &format!(
-                "return Array.from(document.querySelectorAll('{} [role=img]')).map(e => e.getAttribute('aria-label'));",
-                q("history-row")
-            ),
-            vec![],
-        )
-        .await;
-    let provenance: Vec<String> = serde_json::from_value(provenance).unwrap();
-    assert_eq!(provenance.len(), 4, "a provenance badge on every row");
-    assert!(
-        provenance.iter().all(|p| p == "Provenance: verified"),
-        "the final report settled every one: {provenance:?}"
-    );
+    assert_caption_states_verified_once(&page).await;
 
     // The flaky flow is named with the two runs that show it, as links to their pages.
     let card = format!("{}[data-flow=\"flows/flow-0-0.yaml\"]", q("flaky-flow"));
@@ -190,8 +197,10 @@ async fn history_marks_a_flow_that_passed_then_failed_on_one_commit_as_flaky_wit
     };
     assert_eq!(page.count(&marked("flows/flow-0-0.yaml")).await, 2);
     assert_eq!(page.count(&marked("flows/flow-0-1.yaml")).await, 0);
-    // The failed execution carries its failure fingerprint (ADR-0009).
-    let fingerprints = page.texts(&q("failure-fingerprint")).await;
+    // The failed execution carries its failure fingerprint (ADR-0009), behind a disclosure.
+    let fingerprints = page
+        .texts(&format!("{} code", q("failure-fingerprint")))
+        .await;
     assert_eq!(fingerprints.len(), 1);
     assert!(fingerprints[0].starts_with("v1:"), "{fingerprints:?}");
     assert_eq!(page.count(&q("condition")).await, 4);
@@ -244,9 +253,12 @@ async fn open_and_check_stats(browser: &Browser, page: &Page<'_>) {
         Some("1"),
         "and failed once (the outcome filter doesn't change the flow's stats)"
     );
+    // Two settled executions are listed in words; a chart is drawn from three.
+    assert_eq!(page.count(&q("duration-chart")).await, 0);
+    let summary = page.texts(&q("duration-summary")).await.concat();
     assert!(
-        page.count(&format!("{} svg", q("duration-chart"))).await >= 1,
-        "the duration chart is drawn"
+        summary.starts_with("Duration of settled executions: 2 executions: "),
+        "{summary}"
     );
     assert_eq!(page.count(&q("failure-group")).await, 1);
     let query = browser
@@ -324,13 +336,12 @@ async fn history_filters_live_in_the_url_and_survive_a_reload_and_a_flows_stats_
         .await;
     assert_eq!(controls, json!(["failed", "flow-0-0"]));
     assert_eq!(
-        page.texts(&format!(
+        page.count(&format!(
             "{} {}",
             q("history-row"),
             q("failure-fingerprint")
         ))
-        .await
-        .len(),
+        .await,
         1
     );
     page.mark_loaded().await;
@@ -447,15 +458,21 @@ async fn compare_explains_a_new_failure_by_the_changed_condition_and_lists_flows
         ["The conditions differ, so this is not a like-for-like comparison."],
         "a duration is never read as a regression across different conditions"
     );
-    // Each side shows its outcome with its provenance (I4).
-    for side in ["A", "B"] {
-        assert_eq!(
-            page.count(&format!("{row} td[data-side=\"{side}\"] [role=img]"))
-                .await,
-            1,
-            "{side}"
-        );
-    }
+    // Both runs were settled by their final reports: the section says Verified once in its
+    // heading and the sides carry no label of their own (I4).
+    // The heading sits beside the disclosure, in the same section block.
+    assert_eq!(
+        page.count(&format!(
+            ".sec-block:has({newly}) .sec-h [aria-label=\"Provenance: verified\"]"
+        ))
+        .await,
+        1
+    );
+    assert_eq!(
+        page.count(&format!("{row} td[data-side] [role=img]")).await,
+        0,
+        "a settled side is not marked"
+    );
 
     check_only_in_b_and_summary(&page, &section).await;
 

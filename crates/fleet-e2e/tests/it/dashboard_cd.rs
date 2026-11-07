@@ -61,7 +61,7 @@ async fn worker_of(stack: &Stack, snapshot: &Value) -> String {
 }
 
 #[tokio::test]
-async fn the_worker_page_labels_metrics_with_units_and_shows_missing_thermal_as_unavailable() {
+async fn the_worker_page_labels_metrics_with_units_and_leaves_out_the_sensor_it_never_reports() {
     let stack = stack(|_| {}).await;
     let snapshot = finished_run(&stack, "worker-page").await;
     let worker = worker_of(&stack, &snapshot).await;
@@ -99,6 +99,12 @@ async fn the_worker_page_labels_metrics_with_units_and_shows_missing_thermal_as_
         );
     }
     let value = |metric: &str| format!("{} {}", tile(metric), q("health-value"));
+    // The health readout fills from the same fetch as the charts' windows: wait for it.
+    page.wait(
+        "the host CPU tile's value",
+        &format!("{} === 1", count_of(&value("host_cpu_pct"))),
+    )
+    .await;
     assert_eq!(
         page.texts(&value("host_cpu_pct")).await,
         ["25%"],
@@ -123,25 +129,10 @@ async fn the_worker_page_labels_metrics_with_units_and_shows_missing_thermal_as_
     )
     .await;
 
-    // AC5: no thermal sensor is reported, so the page says unavailable, with the reason, and
-    // draws no series and shows no number for it.
-    let reason = "unavailable (the agent does not report this metric yet)";
-    assert_eq!(
-        page.texts(&format!("{} [data-unavailable]", chart("host_thermal_c")))
-            .await,
-        [reason]
-    );
-    assert_eq!(
-        page.count(&format!("{} svg", chart("host_thermal_c")))
-            .await,
-        0
-    );
-    assert_eq!(
-        page.count(&format!("{} canvas", chart("host_thermal_c")))
-            .await,
-        0
-    );
-    assert_eq!(page.texts(&value("host_thermal_c")).await, [reason]);
+    // AC5: the agent never reports a thermal sensor, so the runner page has no cell and no chart
+    // for it: a permanent absence is left out, not shown as a gap.
+    assert_eq!(page.count(&tile("host_thermal_c")).await, 0);
+    assert_eq!(page.count(&chart("host_thermal_c")).await, 0);
 
     assert!(page.never_reloaded().await);
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
@@ -289,7 +280,7 @@ async fn clicking_a_flow_on_the_pipeline_page_opens_its_investigation_page() {
 }
 
 #[tokio::test]
-async fn a_device_page_lists_its_flows_with_links_and_shows_missing_sensors_as_unavailable() {
+async fn a_device_page_lists_its_flows_with_links_and_leaves_out_the_sensor_it_never_reports() {
     let stack = stack(|_| {}).await;
     let snapshot = finished_run(&stack, "device-page").await;
     let device = snapshot["devices"][0]["id"].as_str().unwrap().to_owned();
@@ -324,22 +315,15 @@ async fn a_device_page_lists_its_flows_with_links_and_shows_missing_sensors_as_u
         &format!("{} === {on_device}", count_of(&q("device-flow"))),
     )
     .await;
-    // AC5: a device with no thermal sensor reading says so and shows no number.
-    page.wait(
-        "the device temperature chart",
-        &count_of(&format!(
-            "{}[data-metric=\"device_thermal_c\"]",
-            q("metric-chart")
-        )),
-    )
-    .await;
+    // AC5: no device reports a temperature (the agent has no thermal collector), so the device
+    // page has no chart or tile for it, the same as the runner page.
     assert_eq!(
-        page.texts(&format!(
-            "{}[data-metric=\"device_thermal_c\"] [data-unavailable]",
+        page.count(&format!(
+            "{}[data-metric=\"device_thermal_c\"]",
             q("metric-chart")
         ))
         .await,
-        ["unavailable (the agent does not report this metric yet)"]
+        0
     );
     // Every flow row links to its investigation page, client-side.
     page.eval(

@@ -14,7 +14,7 @@
 use std::time::Duration;
 
 use fleet_protocol::rest::{TimelineView, WorkerRunPage};
-use fleet_ui::components::display::EmptyState;
+use fleet_ui::components::{display::EmptyState, live::LiveState};
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{
     NavigateOptions,
@@ -24,10 +24,12 @@ use uuid::Uuid;
 
 use crate::{
     api,
+    app::{LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
+    format::time_of_day,
     live::{
         model::LiveModel,
-        socket::{Event, Subscription, connect},
+        socket::{Connection, Event, Subscription, connect},
     },
     paths::flow_href,
     remote::{Remote, remote},
@@ -36,7 +38,7 @@ use crate::{
         flow::{
             evidence::{Evidence, Load, LogSource, TextFile, refresh_in_ms},
             evidence_view::EvidenceFeed,
-            model::evidence_steps,
+            model::{evidence_steps, is_settled, live_state},
             view::FlowPageView,
         },
         metrics::{RangePreset, RangeSelection, query_string_at},
@@ -118,6 +120,91 @@ fn load_timelines(project: String, attempts: Vec<Uuid>, into: RwSignal<Vec<Timel
     });
 }
 
+/// Follows `project`'s live socket while the page is open. Any frame bumps `tick`, which asks the
+/// page for fresh data (the requests are throttled), and the top bar's indicator shows how the feed
+/// stands. Pause holds the frames as they arrive; resuming bumps `tick` once if any came.
+fn follow_project(project: String, tick: RwSignal<u64>, now: RwSignal<i64>) {
+    let paused = RwSignal::new(false);
+    let held = RwSignal::new(0_usize);
+    let last_update = RwSignal::new(now_ms());
+    let socket = connect(
+        Subscription {
+            project,
+            attempt: None,
+        },
+        move |event| {
+            if let Event::Frames(frames) = event {
+                last_update.set(now_ms());
+                if paused.get_untracked() {
+                    held.update(|n| *n += frames.len());
+                } else {
+                    tick.update(|n| *n += 1);
+                }
+            }
+        },
+    );
+    let bar = LiveBar {
+        state: RwSignal::new(LiveState::Connecting),
+        detail: RwSignal::new(String::new()),
+        action: RwSignal::new(None),
+        on_action: Callback::new(move |()| {
+            if paused.get_untracked() {
+                paused.set(false);
+                if held.get_untracked() > 0 {
+                    held.set(0);
+                    tick.update(|n| *n += 1);
+                }
+            } else {
+                paused.set(true);
+            }
+        }),
+    };
+    Effect::new(move |_| {
+        let at = now.get();
+        let offset = utc_offset_minutes();
+        let (state, detail, action) = match (socket.connection.get(), paused.get(), held.get()) {
+            (Connection::Connecting, _, _) => (LiveState::Connecting, String::new(), None),
+            (Connection::Reconnecting, _, _) => (
+                LiveState::Reconnecting,
+                format!(
+                    "showing data from {}",
+                    time_of_day(last_update.get(), offset)
+                ),
+                None,
+            ),
+            (Connection::Live, true, 0) => (
+                LiveState::Paused,
+                String::new(),
+                Some("Resume updates".to_owned()),
+            ),
+            (Connection::Live, true, n) => (
+                LiveState::Paused,
+                String::new(),
+                Some(format!("Show {n} updates")),
+            ),
+            (Connection::Live, false, _) => (
+                LiveState::Live,
+                format!("updated {} s ago", ((at - last_update.get()) / 1000).max(0)),
+                Some("Pause".to_owned()),
+            ),
+        };
+        bar.state.set(state);
+        bar.detail.set(detail);
+        bar.action.set(action);
+    });
+    let slot = expect_context::<LiveSlot>().0;
+    slot.set(Some(bar));
+    // Clears the slot only if it still holds this page's bar.
+    let mine = bar.state;
+    on_cleanup(move || {
+        slot.update(|current| {
+            if current.is_some_and(|b| b.state == mine) {
+                *current = None;
+            }
+        });
+    });
+}
+
 /// Opens a flow's page without reloading.
 fn open_flow(project: String) -> Callback<String> {
     let navigate = use_navigate();
@@ -176,6 +263,20 @@ fn WorkerBody(project: String, id: Uuid) -> impl IntoView {
             }
         });
     }
+    // Any change on the project asks for the runner's data again, and its charts.
+    let now = ticking_now();
+    let tick = RwSignal::new(0_u64);
+    {
+        let (worker, metrics) = (worker.clone(), metrics.clone());
+        Effect::new(move |_| {
+            // The first run is the fetch `remote` already started.
+            if tick.get() > 0 {
+                worker.request();
+                metrics.request();
+            }
+        });
+    }
+    follow_project(project.clone(), tick, now);
     let more_runs: RwSignal<Vec<WorkerRunPage>> = RwSignal::new(Vec::new());
     let on_more_runs = {
         let project = project.clone();
@@ -202,7 +303,7 @@ fn WorkerBody(project: String, id: Uuid) -> impl IntoView {
             range=range
             timelines=timelines
             project=project.clone()
-            now_ms=ticking_now()
+            now_ms=now
             utc_offset_minutes=utc_offset_minutes()
             on_open_flow=open_flow(project)
         />
@@ -236,26 +337,27 @@ fn DeviceBody(project: String, id: Uuid) -> impl IntoView {
             async move { api::device_metrics(&project, id, &query).await }
         })
     };
-    let timelines = RwSignal::new(Vec::new());
+    let now = ticking_now();
+    let tick = RwSignal::new(0_u64);
     {
-        let (project, data) = (project.clone(), device.data);
+        let (device, metrics) = (device.clone(), metrics.clone());
         Effect::new(move |_| {
-            if let Some(d) = data.get() {
-                let scope = TimelineScope::of_sessions(std::slice::from_ref(&d.session));
-                load_timelines(project.clone(), scope.attempts, timelines);
+            // The first run is the fetch `remote` already started.
+            if tick.get() > 0 {
+                device.request();
+                metrics.request();
             }
         });
     }
+    follow_project(project.clone(), tick, now);
     view! {
         <DevicePage
             device=Fetched::from(&device)
             metrics=Fetched::from(&metrics)
             range=range
-            timelines=timelines
-            project=project.clone()
-            now_ms=ticking_now()
+            project=project
+            now_ms=now
             utc_offset_minutes=utc_offset_minutes()
-            on_open_flow=open_flow(project)
         />
     }
 }
@@ -380,6 +482,13 @@ fn evidence_feed(
         },
         _ => None,
     }));
+    let logcat = text_file(Memo::new(move |_| match evidence.get() {
+        Evidence::Files(f) => match f.logcat {
+            Some(LogSource::Show(file)) => Some(file),
+            _ => None,
+        },
+        _ => None,
+    }));
     let commands = text_file(Memo::new(move |_| match evidence.get() {
         Evidence::Files(f) => f.commands,
         _ => None,
@@ -387,6 +496,7 @@ fn evidence_feed(
     EvidenceFeed {
         evidence,
         log,
+        logcat,
         commands,
         selected_step: RwSignal::new(None),
     }
@@ -415,7 +525,9 @@ fn text_file(file: Memo<Option<TextFile>>) -> RwSignal<Load<String>> {
     text
 }
 
-/// Keeps a socket on the attempt open while the flow page is, and refetches on every change.
+/// Keeps a socket on the attempt open while the flow page is, refetches on every change, and lends
+/// the top bar's live indicator: Settled once the outcome is final, otherwise the socket's state
+/// and the time since its last frame.
 #[component]
 fn FlowFollower(
     project: String,
@@ -423,13 +535,17 @@ fn FlowFollower(
     flow: StoredValue<Remote<fleet_protocol::rest::FlowDetailView>, LocalStorage>,
 ) -> impl IntoView {
     let model = LiveModel::new(attempt);
-    let _live = connect(
+    let last_frame = RwSignal::new(now_ms());
+    let live = connect(
         Subscription {
             project: project.clone(),
             attempt: Some(attempt),
         },
         move |event| match event {
-            Event::Frames(frames) => model.apply(&project, frames),
+            Event::Frames(frames) => {
+                last_frame.set(now_ms());
+                model.apply(&project, frames);
+            }
             Event::Lost => model.connection_lost(),
         },
     );
@@ -437,6 +553,40 @@ fn FlowFollower(
         if model.version.get() > 0 {
             flow.with_value(Remote::request);
         }
+    });
+    let data = flow.with_value(|f| f.data);
+    let now = RwSignal::new(now_ms());
+    if let Ok(handle) = set_interval_with_handle(move || now.set(now_ms()), Duration::from_secs(1))
+    {
+        on_cleanup(move || handle.clear());
+    }
+    let bar = LiveBar {
+        state: RwSignal::new(LiveState::Connecting),
+        detail: RwSignal::new(String::new()),
+        action: RwSignal::new(None),
+        on_action: Callback::new(|()| {}),
+    };
+    Effect::new(move |_| {
+        let settled = data.with(|d| d.as_ref().is_some_and(is_settled));
+        let state = live_state(live.connection.get(), settled);
+        bar.state.set(state);
+        bar.detail.set(if state == LiveState::Live {
+            let ago = (now.get() - last_frame.get()) / 1000;
+            format!("updated {} s ago", ago.max(0))
+        } else {
+            String::new()
+        });
+    });
+    let slot = expect_context::<LiveSlot>().0;
+    slot.set(Some(bar));
+    // Clears the slot only if it still holds this page's bar (see the pipeline page).
+    let mine = bar.state;
+    on_cleanup(move || {
+        slot.update(|current| {
+            if current.is_some_and(|b| b.state == mine) {
+                *current = None;
+            }
+        });
     });
 }
 

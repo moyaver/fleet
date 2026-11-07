@@ -193,6 +193,8 @@ pub struct HistoryRow {
     pub flaky: Option<FlakyBadge>,
     /// The page address that opens this flow's stats panel.
     pub stats_query: String,
+    /// Whether this flow's stats panel is the open one.
+    pub stats_open: bool,
 }
 
 /// Screen E's table and the flaky flows on it.
@@ -206,6 +208,8 @@ pub struct HistoryTable {
     pub next_cursor: Option<String>,
     /// What window the rows are from.
     pub window: String,
+    /// Whether every row is verified: then the table says so once and rows stay silent.
+    pub verified: bool,
 }
 
 impl HistoryTable {
@@ -214,7 +218,7 @@ impl HistoryTable {
     pub fn build(first: &HistoryPage, more: &[HistoryPage], ctx: &Ctx, current: &str) -> Self {
         let pages: Vec<&HistoryPage> = std::iter::once(first).chain(more).collect();
         let verdicts = |flow: &str| pages.iter().flat_map(|p| &p.flows).find(|v| v.flow == flow);
-        let rows = pages
+        let rows: Vec<HistoryRow> = pages
             .iter()
             .flat_map(|p| &p.items)
             .map(|e| row(e, verdicts(&e.flow), ctx, current))
@@ -225,7 +229,9 @@ impl HistoryTable {
                 flaky.push(flaky_flow(v, ctx));
             }
         }
+        let verified = rows.iter().all(|r| r.provenance == Provenance::Final);
         Self {
+            verified,
             rows,
             flaky,
             next_cursor: pages.last().and_then(|p| p.next_cursor.clone()),
@@ -266,6 +272,7 @@ fn row(
             .map(|c| c.chars().take(8).collect()),
         flaky: verdict.and_then(|v| badge(v.flakiness)),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
+        stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
     }
 }
 
@@ -377,9 +384,12 @@ pub struct StatsPanel {
     pub flow: String,
     /// The window the figures are from.
     pub window: String,
-    /// The headline figures.
+    /// The headline figures: the counts and the pass rate, then the other figures that are known
+    /// and not zero.
     pub tiles: Vec<Tile>,
-    /// Duration of settled executions over time; `None` when there is none to draw.
+    /// Each settled execution's duration, in the server's order, as text.
+    pub durations: Vec<String>,
+    /// Duration of settled executions over time; `None` below [`CHART_MIN_POINTS`].
     pub chart: Option<Series>,
     /// The latest kinds of failure.
     pub failures: Vec<FailureGroup>,
@@ -399,20 +409,43 @@ impl StatsPanel {
             // Whole percent, rounded half up: the figure is for orientation, the counts are exact.
             format!("{}%", (c.passed * 100 + settled / 2) / settled)
         });
-        let ms = |v: Option<i64>| v.map(format_duration);
-        let tiles = vec![
+        // The pass rate is always asked for: with nothing settled it is unavailable, not zero.
+        // The other figures are shown only when they say something (a zero or a missing value
+        // is left out, never printed as a number).
+        let mut tiles = vec![
             tile("Passed", Some(c.passed.to_string()), "passed"),
             tile("Failed", Some(c.failed.to_string()), "failed"),
-            tile("Not settled", Some(c.other.to_string()), "other"),
             tile("Pass rate", pass_rate, "pass-rate"),
-            tile("Median duration (passes)", ms(view.duration.p50_ms), "p50"),
-            tile("p90 duration (passes)", ms(view.duration.p90_ms), "p90"),
-            tile(
+        ];
+        if c.other > 0 {
+            tiles.push(tile("Not settled", Some(c.other.to_string()), "other"));
+        }
+        if let Some(p50) = view.duration.p50_ms {
+            tiles.push(tile(
+                "Median duration (passes)",
+                Some(format_duration(p50)),
+                "p50",
+            ));
+        }
+        if let Some(p90) = view.duration.p90_ms {
+            tiles.push(tile(
+                "p90 duration (passes)",
+                Some(format_duration(p90)),
+                "p90",
+            ));
+        }
+        if view.flaky_commits > 0 {
+            tiles.push(tile(
                 "Flaky commits",
                 Some(view.flaky_commits.to_string()),
                 "flaky-commits",
-            ),
-        ];
+            ));
+        }
+        let durations: Vec<String> = view
+            .durations
+            .iter()
+            .map(|d| format_duration(d.duration_ms))
+            .collect();
         let points: Vec<Point> = view
             .durations
             .iter()
@@ -421,7 +454,7 @@ impl StatsPanel {
                 reading: Reading::Value(duration_value(d.duration_ms)),
             })
             .collect();
-        let chart = (!points.is_empty()).then(|| {
+        let chart = (points.len() >= CHART_MIN_POINTS).then(|| {
             Series::new(
                 Metric {
                     name: "Duration".to_owned(),
@@ -438,6 +471,7 @@ impl StatsPanel {
                 ctx.time(unix_ms(view.to))
             ),
             tiles,
+            durations,
             chart,
             failures: view
                 .recent_failures
@@ -469,6 +503,10 @@ impl StatsPanel {
         }
     }
 }
+
+/// Fewer settled durations than this are listed in text, not drawn: a line of three points or
+/// fewer says little more than its numbers.
+pub const CHART_MIN_POINTS: usize = 3;
 
 /// The note on runs a lost device excluded, `None` when there are none.
 fn excluded_note(excluded: i64) -> Option<String> {
@@ -648,6 +686,27 @@ mod tests {
         assert_eq!(q.stats.as_deref(), Some("flows/login.yaml"));
         assert_eq!(q.outcome.as_deref(), Some("failed"));
         assert!(table.rows[0].stats_query.contains("project=shop"));
+        assert!(!table.rows[0].stats_open, "no panel is open");
+        let open = HistoryTable::build(
+            &page(None),
+            &[],
+            &ctx(),
+            "project=shop&stats=flows%2Flogin.yaml",
+        );
+        assert_eq!(
+            open.rows.iter().map(|r| r.stats_open).collect::<Vec<_>>(),
+            [true, true, false],
+            "the rows of the open flow say so, and only them"
+        );
+    }
+
+    #[test]
+    fn the_table_states_verified_once_only_when_every_row_is() {
+        let table = HistoryTable::build(&page(None), &[], &ctx(), "");
+        assert!(!table.verified, "the inferred row is not verified");
+        let mut all = page(None);
+        all.items.truncate(2);
+        assert!(HistoryTable::build(&all, &[], &ctx(), "").verified);
     }
 
     #[test]
@@ -674,7 +733,8 @@ mod tests {
                          "p50_ms": p50, "p90_ms": p50},
             "durations": if p50.is_some() { serde_json::json!([
                 {"flow_id": A, "at": "2026-01-01T10:00:00Z", "duration_ms": 3000, "state": "passed"},
-                {"flow_id": B, "at": "2026-01-01T10:30:00Z", "duration_ms": 1500, "state": "failed"}
+                {"flow_id": B, "at": "2026-01-01T10:30:00Z", "duration_ms": 1500, "state": "failed"},
+                {"flow_id": C, "at": "2026-01-01T10:45:00Z", "duration_ms": 4500, "state": "passed"}
             ]) } else { serde_json::json!([]) },
             "recent_failures": [
                 {"fingerprint": "v1:0123456789abcdef", "step_kind": "Tap on \"Pay\"",
@@ -702,16 +762,17 @@ mod tests {
             [
                 ("passed", Some("3")),
                 ("failed", Some("1")),
-                ("other", Some("1")),
                 ("pass-rate", Some("75%")),
+                ("other", Some("1")),
                 ("p50", Some("3 s")),
                 ("p90", Some("3 s")),
-                ("flaky-commits", Some("0")),
-            ]
+            ],
+            "a zero flaky-commit count is left out"
         );
-        let chart = panel.chart.expect("two points to draw");
+        assert_eq!(panel.durations, ["3 s", "1.5 s", "4.5 s"]);
+        let chart = panel.chart.expect("three points to draw");
         assert_eq!(chart.metric.unit, Unit::Millis);
-        assert_eq!(chart.points().len(), 2);
+        assert_eq!(chart.points().len(), 3);
         assert_eq!(chart.points()[0].reading, Reading::Value(3000.0));
         let [group] = panel.failures.as_slice() else {
             panic!("one failure group");
@@ -721,6 +782,15 @@ mod tests {
         assert_eq!(group.last_seen, "2026-01-01 10:30:00");
         assert_eq!(group.links[0].href, format!("/flows/{B}?project=shop"));
         assert_eq!(panel.flaky.expect("suspected").label, "Suspected flaky");
+    }
+
+    #[test]
+    fn fewer_than_three_durations_are_listed_not_drawn() {
+        let mut view = stats(3, 1, Some(3000));
+        view.durations.truncate(2);
+        let panel = StatsPanel::build(&view, &ctx());
+        assert_eq!(panel.chart, None);
+        assert_eq!(panel.durations, ["3 s", "1.5 s"]);
     }
 
     #[test]
@@ -742,10 +812,17 @@ mod tests {
     #[test]
     fn a_flow_with_no_settled_runs_has_no_pass_rate_and_no_durations_rather_than_zeros() {
         let panel = StatsPanel::build(&stats(0, 0, None), &ctx());
-        let t = tiles(&panel);
-        assert!(t.contains(&("pass-rate", None)), "{t:?}");
-        assert!(t.contains(&("p50", None)));
-        assert!(t.contains(&("p90", None)));
+        assert_eq!(
+            tiles(&panel),
+            [
+                ("passed", Some("0")),
+                ("failed", Some("0")),
+                ("pass-rate", None),
+                ("other", Some("1")),
+            ],
+            "the pass rate reads unavailable; the durations it has none of are left out"
+        );
+        assert_eq!(panel.durations, Vec::<String>::new());
         assert_eq!(panel.chart, None);
     }
 }
