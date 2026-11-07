@@ -553,6 +553,8 @@ pub struct StepView {
     pub attempt: Option<i32>,
     /// The steps this block ran, in the order Maestro ran them. Empty for a step that ran none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // Without this, utoipa expands StepView's schema into itself forever and the server overflows.
+    #[cfg_attr(feature = "openapi", schema(no_recursion))]
     pub children: Vec<StepView>,
 }
 
