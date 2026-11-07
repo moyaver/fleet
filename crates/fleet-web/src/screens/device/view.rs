@@ -217,7 +217,7 @@ fn FlowsSection(
                 view! {
                     <TableBox label="Flow executions on this device">
                         <table class="tbl tbl-cards">
-                            <caption class="sr">"Flow executions on this device, newest first"</caption>
+                            <caption class="sr-only">"Flow executions on this device, newest first"</caption>
                             <thead>
                                 <tr>
                                     {["Flow", "Result", "Duration", "Steps", "Failure"]
