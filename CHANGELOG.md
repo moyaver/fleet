@@ -7,6 +7,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Agent: each emulator's `qemu-system-*` process is matched to its serial by its console port, and its CPU and resident memory are sent with the device's samples (`emu_cpu_pct`, `emu_rss_bytes`, #39).
+- Agent: device samples carry the AVD name and the API level, and the resumed activity of a device on which a flow failed (#39). The server stores them in `device_samples` (migration 0019).
+- Dashboard: an *Active emulators* tile on the overview counts emulators seen in the last two minutes that adb reports online (#123).
 - Dashboard: a flow whose app crashed shows "App crashed: <exception> in <package>" above Maestro's failure, with a link to the device logcat excerpt (or a note that none was uploaded); the flow's result and failure message stay Maestro's (#152).
 - Dashboard: a flow whose device was lost during it (Maestro's `DeviceServerDiedException`) is labelled "Infrastructure, not the app" above Maestro's failure, and the label says the failure is excluded from flakiness; the flow stays failed. Its history row and `fleet-agent inspect` carry the same label (#145).
 

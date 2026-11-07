@@ -77,6 +77,7 @@ pub(super) async fn overview(
         recent: data.recent,
         worker_counts,
         workers: workers.into_iter().take(OVERVIEW_WORKERS).collect(),
+        active_emulators: data.active_emulators,
     })
     .into_response()
 }

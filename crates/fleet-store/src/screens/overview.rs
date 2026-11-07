@@ -51,6 +51,8 @@ pub struct Overview {
     pub recent: Vec<RecentAttemptView>,
     /// Workers seen in the last day, most recently seen first.
     pub workers: Vec<WorkerRow>,
+    /// Emulators seen in the last two minutes with adb reporting them online (issue #123).
+    pub active_emulators: i64,
 }
 
 impl Store {
@@ -103,6 +105,7 @@ impl Store {
         let recent_ids: Vec<Uuid> = recent_rows.iter().map(|r| r.id).collect();
         let mut jobs = jobs_of(&mut tx, &recent_ids).await?;
         let workers = workers(&mut tx, project_id, None).await?;
+        let active_emulators = active_emulators(&mut tx, project_id).await?;
         tx.commit().await?;
 
         let active_total = active_rows.first().map_or(0, |r| r.total);
@@ -132,8 +135,29 @@ impl Store {
             active_total,
             recent,
             workers,
+            active_emulators,
         })
     }
+}
+
+/// How many emulators the project's devices were seen on in the last two minutes, adb reporting
+/// them `device` (online). An emulator is a device whose serial is `emulator-<port>`. Device
+/// samples come every 30 s per device, so two minutes covers the last few.
+async fn active_emulators(
+    c: &mut sqlx::PgConnection,
+    project_id: Uuid,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"SELECT count(DISTINCT s.device_session_id) AS "active!"
+             FROM device_samples s JOIN device_sessions d ON d.id = s.device_session_id
+            WHERE s.project_id = $1
+              AND s.ts > now() - interval '2 minutes'
+              AND s.adb_state = 0 -- adb's `device` state (telemetry::adb_code)
+              AND d.serial LIKE 'emulator-%'"#,
+        project_id
+    )
+    .fetch_one(c)
+    .await
 }
 
 async fn job_counts(

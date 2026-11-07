@@ -19,7 +19,7 @@ use fleet_ui::{
     components::{
         display::{
             EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutChoice, ReadoutStrip,
-            Skeleton, StatusPill, TableBox,
+            Skeleton, StatTile, StatusPill, TableBox,
         },
         forms::use_url_query,
         live::LiveState,
@@ -382,6 +382,13 @@ fn readout_strip(r: Readouts, filter: Memo<Filter>, choose: Callback<Filter>) ->
                 on_select=pick(Filter::NoFailures)
                 test_id="tile-no-failures"
             />
+            <div data-testid="tile-emulators">
+                <StatTile
+                    label="Active emulators"
+                    value=r.emulators.to_string()
+                    provenance=Provenance::Observed
+                />
+            </div>
         </ReadoutStrip>
     }
 }

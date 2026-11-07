@@ -112,6 +112,9 @@ pub struct OverviewView {
     pub worker_counts: WorkerCounts,
     /// Those workers, most recently seen first (at most 50).
     pub workers: Vec<WorkerSummaryView>,
+    /// Emulators of the project seen in the last two minutes with adb reporting them online: the
+    /// "active emulators" readout (issue #123).
+    pub active_emulators: i64,
 }
 
 /// A worker (a runner machine) at a glance.
