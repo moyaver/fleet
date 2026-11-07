@@ -268,8 +268,11 @@ mod tests {
         );
     }
 
+    /// Only claims a source may make. The allowed (source, outcome) pairs are enumerated once and
+    /// sampled directly, so no case is rejected: a filter would hit proptest's local-reject limit
+    /// at high `PROPTEST_CASES`.
     fn any_claim() -> impl Strategy<Value = Claim> {
-        let sources = prop::sample::select(vec![
+        let sources = [
             SourceKind::Declared,
             SourceKind::AgentObserved,
             SourceKind::ProcessExit,
@@ -278,16 +281,21 @@ mod tests {
             SourceKind::ArtifactFile,
             SourceKind::JunitFinal,
             SourceKind::ServerInferred,
-        ]);
-        let outcomes = prop::sample::select(vec![
+        ];
+        let outcomes = [
             FlowOutcome::Passed,
             FlowOutcome::Failed,
             FlowOutcome::Skipped,
             FlowOutcome::Interrupted,
             FlowOutcome::Unknown,
-        ]);
-        (sources, outcomes, 0u64..20)
-            .prop_filter_map("allowed", |(s, o, n)| Claim::new(s, o, n).ok())
+        ];
+        let allowed: Vec<(SourceKind, FlowOutcome)> = sources
+            .into_iter()
+            .flat_map(|s| outcomes.into_iter().map(move |o| (s, o)))
+            .filter(|&(s, o)| may_claim(s, o))
+            .collect();
+        (prop::sample::select(allowed), 0u64..20)
+            .prop_map(|((s, o), n)| Claim::new(s, o, n).expect("pairs were filtered by may_claim"))
     }
 
     proptest! {
