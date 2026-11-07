@@ -126,7 +126,7 @@ async fn ac12_signing_in_with_the_company_identity_provider_works_in_the_browser
         .unwrap();
     page.wait(
         "the signed-in overview",
-        &has_text("h2", "No active pipelines"),
+        &has_text("h2", "No pipelines yet"),
     )
     .await;
     page.wait("the person's name", &has_text(&q("whoami"), "Ada Lovelace"))
@@ -388,7 +388,7 @@ async fn ac02_a_real_agents_failing_run_is_followed_live_from_the_overview_to_th
         .goto(&format!("http://{}/", stack.addr()))
         .await
         .unwrap();
-    page.wait("the empty overview", &has_text("h2", "No active pipelines"))
+    page.wait("the empty overview", &has_text("h2", "No pipelines yet"))
         .await;
     page.mark_loaded().await;
 
@@ -649,7 +649,7 @@ async fn ten_runs_are_listed_and_the_page_answers(browser: &Browser, page: &Page
     .await;
     page.wait(
         "the tile to count all ten",
-        &has_text(&format!("{} p", q("tile-active")), &RUNS.to_string()),
+        &has_text(&format!("{} .tile-n", q("tile-running")), &RUNS.to_string()),
     )
     .await;
     // Every row holds its own run's live counts: eight flows, one failed, seven passed.
@@ -751,7 +751,7 @@ async fn ac14_ten_simultaneous_runs_stay_correct_and_the_page_stays_responsive()
         .goto(&format!("http://{}/", stack.addr()))
         .await
         .unwrap();
-    page.wait("the empty overview", &has_text("h2", "No active pipelines"))
+    page.wait("the empty overview", &has_text("h2", "No pipelines yet"))
         .await;
     page.mark_loaded().await;
     start_stall_meter(&page).await;
