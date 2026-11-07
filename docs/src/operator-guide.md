@@ -2,7 +2,7 @@
 
 ## Deploy
 
-The reference deployment is Docker Compose: Caddy (TLS, WebSocket-friendly), the Fleet server, Postgres 18 and Garage (S3-compatible, used for artifacts from M5). Step-by-step: [`deploy/compose/README.md`](https://github.com/moyaver/fleet/blob/main/deploy/compose/README.md). The image is built from [`deploy/docker/Dockerfile`](https://github.com/moyaver/fleet/blob/main/deploy/docker/Dockerfile) (cargo-chef, distroless, runs as non-root). Each release tag publishes it to `ghcr.io/moyaver/fleet`, tagged with the version (and `latest` for stable releases); pin a version with `FLEET_IMAGE` in the compose `.env`.
+The reference deployment is Docker Compose: Caddy (TLS, WebSocket-friendly), the Fleet server, Postgres 18 and Garage (S3-compatible, used for artifacts from M5). Step-by-step: [`deploy/compose/README.md`](https://github.com/moyaver/fleet/blob/main/deploy/compose/README.md). The image is built from [`deploy/docker/Dockerfile`](https://github.com/moyaver/fleet/blob/main/deploy/docker/Dockerfile) (cargo-chef, distroless, runs as non-root). Each release tag publishes it to `ghcr.io/moyaver/fleet`, tagged with the version (and `latest` for stable releases); pin a version with `FLEET_IMAGE` in the compose `.env`. For a single free cloud VM, see [Try Fleet on a free VM](free-vm.md).
 
 ## The `fleet` binary
 
@@ -41,7 +41,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification (local disk; one server instance per spool) |
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
-| `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class |
+| `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 4 MiB failure_hierarchy, 512 KiB device_logcat, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class. `failure_hierarchy` is a step's UI hierarchy and `device_logcat` a failed flow's logcat excerpt |
 | `retention.raw_samples_days` | `7` | Raw 5 s telemetry samples; see [Retention](#retention) (0 keeps for ever, like every `retention.*_days`) |
 | `retention.rollup_1m_days`, `retention.rollup_1h_days` | `90`, `365` | One-minute and one-hour rollups |
 | `retention.journal_days`, `retention.steps_days` | `14`, `14` | The raw agent journal and step executions |
@@ -145,14 +145,14 @@ An artifact is accepted only if its declared size and SHA-256 match, it is not l
 | screenshot | PNG, JPEG, WebP |
 | junit | XML |
 | html report | an HTML file, or a zip |
-| log | UTF-8 text without NUL bytes |
+| text: `maestro_log`, `commands`, `failure_hierarchy`, `device_logcat` | UTF-8 text without NUL bytes |
 | bundle | zip, or `tar.zst` |
 
 Zip and `tar.zst` archives are also read through (never unpacked to disk) and refused if they have more than 5,000 entries, expand to more than 1 GiB in total, expand more than 100:1 (judged per file in a zip, over the whole stream for `tar.zst`, above 1 MiB), contain an absolute path, `..`, a backslash, a drive letter, control characters, a symlink, hardlink, device or fifo, contain another archive, or have bytes after their end. Sizes in archive headers are ignored: only bytes actually produced by decompression count. A refused artifact is refused with its reason and nothing is kept.
 
 ## Artifact uploads
 
-Agents upload four kinds of evidence: failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log` (HTML reports are accepted by the server and served, but the agent does not upload them yet). The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
+Agents upload failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log`, and two classes for failures: a failing step's UI hierarchy (`failure_hierarchy`) and a failed flow's device logcat excerpt (`device_logcat`). HTML reports are accepted by the server and served, but the agent does not upload them yet. The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
 
 Retention is recorded per artifact and enforced by the retention jobs (see [Retention](#retention)).
 
@@ -180,8 +180,8 @@ Fleet keeps what you need to debug last week's failure and see this year's trend
 
 | Class | Default | Applies to |
 |---|---|---|
-| `success_evidence` | 7 days | Screenshots and commands of a flow that has not failed |
-| `failure_evidence` | 90 days | The same, once the flow fails (promoted when the flow finalizes, or at upload if it had already failed), and the run's Maestro log when any of its flows failed |
+| `success_evidence` | 7 days | Screenshots, commands and UI hierarchies of a flow that has not failed |
+| `failure_evidence` | 90 days | The same, once the flow fails (promoted when the flow finalizes, or at upload if it had already failed), and the run's Maestro log and device logcat excerpt when any of its flows failed |
 | `report` | 1 year | JUnit reports and HTML reports |
 | `debug_log` | 30 days | Maestro logs of runs without a failed flow |
 | `video`, `bundle` | 14 days | Reserved |

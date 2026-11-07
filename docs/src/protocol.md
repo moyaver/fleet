@@ -23,9 +23,9 @@ The agent journals the outcome in its own event stream: `artifact.uploaded` (`cl
 ## Session
 
 1. `hello` (agent run ID, resume state, CI context) → `welcome` (`epoch`, `committed_through`, limits) or `reject` (`fatal` means stop for good; telemetry turns off, Maestro is unaffected).
-2. The agent drops everything up to `committed_through` and sends the rest as `events` batches, contiguous in `seq`.
+2. The agent drops everything up to `committed_through` and sends the rest as `events` batches, contiguous in `seq`. A `step.started` may carry optional `depth`, `parent` and `attempt` for steps nested by `runFlow` and for retries (#134); top-level steps carry none of them.
 3. Each batch is one database transaction; after the commit the server sends `ack{through}` (cumulative). Duplicates are acked again and counted. A permanently refused event gets `event_rejected` and the cursor moves past it. A batch that skips ahead gets `error{seq_gap, expected_seq}` and the socket stays open.
-4. `telemetry` is a separate stream, written at a checkpoint and acked with `telemetry_ack`.
+4. `telemetry` is a separate stream, written at a checkpoint and acked with `telemetry_ack`. Its optional `devices` list carries each device's adb state, boot completion and guest CPU and available memory; unknown readings are left out (#136).
 5. A newer connection for the same run bumps the epoch; the older one gets `error{superseded}` and close 1008.
 6. On shutdown the server sends `goaway` and closes with 1012; the agent reconnects after the given delay.
 

@@ -43,14 +43,14 @@ Without the report, Fleet still follows the run from Maestro's session log, flow
 | `FLEET_GRACE` | Seconds between the first INT/TERM and killing Maestro's process group (default 15). |
 | `FLEET_FINALIZE_TIMEOUT` | Seconds the agent may spend finishing after Maestro exits (default 60). |
 | `FLEET_FLUSH_TIMEOUT` | Seconds the observer waits for the server to ack everything (default 20); capped at 3 seconds if the server never answered the WebSocket upgrade during the run. |
-| `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
+| `FLEET_UPLOAD_ARTIFACTS` | `off` stops the agent uploading evidence (failure screenshots, `commands.json`, the UI hierarchy of a step, the logcat excerpt of a failed flow, the JUnit report, `maestro.log`). On by default when `FLEET_SERVER` is set. |
 | `FLEET_UPLOAD_TIMEOUT` | Seconds the agent waits at the end of the run for uploads to finish (default: half of `FLEET_FLUSH_TIMEOUT`). Unfinished uploads are abandoned. The journal is sent first, while uploads run; the run end is sent after the upload results, and the final flush gets what is left of `FLEET_FLUSH_TIMEOUT`. |
 | `FLEET_UPLOAD_RATE` | Upload rate cap in bytes per second, shared by all uploads (default 4 MiB/s). |
 | `FLEET_JOURNAL_MAX_BYTES` | Most bytes the local `journal.jsonl` may take (default 256 MiB, 268435456). Past the cap the file stops growing and ends in a `journal.truncated` line; the events still go to the server. Also `--journal-max-bytes` on `fleet-agent run`. See [Offline mode](#offline-mode-and-inspect). |
 
 ### What the agent uploads
 
-At most two files at a time, hashed while they stream. Uploading never changes Maestro's result or output: a refused, failed or timed-out upload is recorded in the run's journal (`artifact.rejected`) and nothing else. **Text is redacted before it leaves the runner**: `commands.json`, the JUnit report and `maestro.log` go through the same redaction as the console (`-e` values, `MAESTRO_*` values, secret-named variables, known token shapes). A text that is not valid UTF-8, contains NUL bytes or is over 16 MiB cannot be redacted reliably, so it is **not uploaded**, and the run's journal says so (`artifact_not_uploaded`). Screenshots are binary: they are never redacted, only access-controlled on the server.
+At most two files at a time, hashed while they stream. Uploading never changes Maestro's result or output: a refused, failed or timed-out upload is recorded in the run's journal (`artifact.rejected`) and nothing else. **Text is redacted before it leaves the runner**: `commands.json`, the JUnit report, `maestro.log` and the logcat excerpt go through the same redaction as the console (`-e` values, `MAESTRO_*` values, secret-named variables, known token shapes). A UI hierarchy first has the value of its `text`, `accessibilityText`, `hintText` and `error` attributes replaced by `[REDACTED]`. A text that is not valid UTF-8, contains NUL bytes or is over 16 MiB cannot be redacted reliably, so it is **not uploaded**, and the run's journal says so (`artifact_not_uploaded`). Screenshots are binary: they are never redacted, only access-controlled on the server. Maestro's own `takeScreenshot` images and `startRecording` videos are not uploaded yet ([#133](https://github.com/moyaver/fleet/issues/133)).
 
 `FLEET_REPOSITORY`, `FLEET_RUN_ID`, `FLEET_RUN_ATTEMPT`, `FLEET_SHA`, `FLEET_REF` and `FLEET_RUNNER` describe the CI run on systems other than GitHub Actions.
 
@@ -64,9 +64,9 @@ A run is followed in four screens, each a click from the one before.
 
 **B. Pipeline detail** (`/p/<project>/pipelines/<id>`). The header shows the result (*Running* until every job has ended), the commit and a link to the CI run. Below it: *Test progress*, *Failures* (each links to its flow), *Jobs and devices* (each job, its agent's liveness, its devices and suites, and every flow with its outcome and badge), the *Execution timeline* (one lane per device, with the same data as a table for keyboard and screen-reader users) and *Live activity*. A *Live* / *Reconnecting* indicator in the header says whether the page is receiving updates.
 
-**C. Runner and device detail** (`/workers/<id>`, `/devices/<id>`). Charts of host, Maestro and device metrics, each labelled with what it measures and its unit (for example *Host CPU (%)*, *Maestro CPU (% of one core)*, *Host memory used (bytes)*). A sensor the agent doesn't report, such as a thermal sensor on a machine without one, reads **unavailable (reason)**: Fleet draws no line and shows no number rather than inventing one.
+**C. Runner and device detail** (`/workers/<id>`, `/devices/<id>`). Charts of host, Maestro and device metrics, each labelled with what it measures and its unit (for example *Host CPU (%)*, *Maestro CPU (% of one core)*, *Host memory used (bytes)*). On a runner, Maestro and agent resource use is one chart per run, titled with the run's short ID, because runs on one runner share it; host readings are one series per runner, and the *Health now* card shows only host readings. On a device, *Device (adb and sensors)* shows adb state, boot completion, and guest CPU and available memory, sampled every 30 seconds. Emulator process CPU and memory are not reported yet. A sensor the agent doesn't report, such as a thermal sensor on a machine without one, reads **unavailable (reason)**: Fleet draws no line and shows no number rather than inventing one.
 
-**D. Flow investigation** (`/flows/<id>?project=<slug>`). The flow's outcome, Maestro's failure message, every *claim* about the outcome with its provenance badge (the live log's and the final report's, with the deciding one marked), and the steps in order. Evidence files (screenshots, logs) arrive with the artifact upload feature; until then the page says so.
+**D. Flow investigation** (`/flows/<id>?project=<slug>`). The flow's outcome, Maestro's failure message, every *claim* about the outcome with its provenance badge (the live log's and the final report's, with the deciding one marked), and the steps as a tree: a step run by `runFlow` sits under the block that ran it, and a retried step shows its attempt (for example *attempt 2 of 3*). Evidence is described under [Investigating a failure](#investigating-a-failure).
 
 ### Provenance badges
 
@@ -102,6 +102,8 @@ Without a plan Fleet can't know how many flows other jobs of the pipeline will s
 
 A run that stays disconnected longer than `liveness.resume_grace_ms` (15 minutes by default) is abandoned: its unfinished flows become *unknown* (inferred by the server, never passed) and its jobs *interrupted*.
 
+The server also limits how often each viewer credential may read (`429 Too Many Requests` with `Retry-After`). The dashboard waits that long and keeps the data it has on screen.
+
 ## Reading results: provenance
 
 See [Provenance badges](#provenance-badges) above. The agent adds the same information to its own output: `fleet-agent inspect` prints each flow's outcome with its source.
@@ -110,11 +112,14 @@ See [Provenance badges](#provenance-badges) above. The agent adds the same infor
 
 A failed flow's page (open it from the pipeline page, from the pipeline's list of failures, or from a flow's earlier executions) is built to answer "why did this fail?" without the CI logs, and without the runner: once the run has ended, everything below is read from Fleet's own database and blob store, and nothing contacts the machine that ran Maestro.
 
-- **Failure** names Maestro's message, the step that failed and the last step that succeeded. **Steps** lists every step with its result, duration and provenance.
+- **Failure** names Maestro's message, the step that failed and the last step that succeeded. **Steps** lists every step with its result, duration and provenance, nested under the block that ran it.
 - **Evidence** is what the agent uploaded for the flow:
   - **Failure screenshot**: the screenshot Maestro took at the failing step, with zoom (`+`, `-`, `0`) and a strip when there are several.
   - **Maestro log**: Maestro's session log for the whole run (redacted on the runner), opened at the failing step of *this* flow. Pick another step in the step tree and the log moves to where that step started; **Jump to the failing step** brings it back. The log has search (Enter and Shift+Enter step through the matches). The log is shown as Maestro wrote it (`MFLT1|time|thread|level|logger|message`); a log with no step markers for this flow is still shown, just without jumps. A log over 8 MiB is offered as a download instead.
   - **Command timings**: one row per command from `commands.json`, in order, with its result and duration; commands nested inside `runFlow` are indented.
+  - **UI hierarchy**: the view hierarchy Maestro wrote for a step, listed under that step, with the failing step first. On-screen text is replaced by `[REDACTED]`; the tree, classes, bounds and resource IDs are kept.
+  - **Device logcat excerpt**: the device log from 10 seconds before the failing step started to 2 seconds after it ended, redacted, at most 512 KiB. When it is cut, the newest lines are kept and the file says how many older lines were left out.
+  - **App crash**: if the app died during the flow, Fleet records an `app.crashed` event for that flow with the package and the exception. The page does not show it yet, and the flow's result stays Maestro's own failure message.
   - **Maestro HTML report**, when one was uploaded, opens in a new tab. **Files** lists the other uploads (`commands.json`, the JUnit report, the log) to save.
 - **Where the files come from.** Screenshots, logs and reports are served from the **usercontent domain** (`usercontent.url`, see the [operator guide](operator-guide.md#usercontent-domain)), never from the dashboard's own address, because a report is a file from a CI job: opened there it gets no cookie, no access to the dashboard and no scripts (`Content-Security-Policy: sandbox`). The dashboard asks for a short-lived signed link for each file; the page renews them before they lapse (5 minutes by default), and a link copied out of the page stops working after that. If you leave a page open for a long time and a download answers "this link has expired", reload the page.
 - **When there is no evidence** the page says why instead of showing an empty box:

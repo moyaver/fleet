@@ -225,7 +225,7 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 | WebSocket | `tokio-tungstenite` 0.30 over `hyper-util` 0.1 proxy `Tunnel` (CONNECT) + `tokio-rustls` |
 | TLS trust | `rustls-platform-verifier` 0.7, `webpki-roots` 1 fallback, `FLEET_CA_FILE` custom bundle |
 | Uploads | `reqwest` 0.13 (rustls, stream), `sha2` 0.11, `infer` 0.22 |
-| Backoff | `backon` 1.6 |
+| Backoff | Hand-rolled full jitter (`getrandom`, 250 ms base, doubling, 30 s cap). `backon` was planned and is not used; see §6.6 |
 | Spool | Own append-only segment file (length + `crc32fast` frames) |
 | Parsing | `quick-xml` 0.42 (serialize), `regex` 1, `strip-ansi-escapes` 0.2, `semver` 1 |
 | CLI/config | `clap` 4.6 (derive, env), `toml` 1, `secrecy` 0.10 |
@@ -338,13 +338,14 @@ Every parser is version-profiled (`≥2.7` bundle layout; `<2.7` best-effort). U
 - **Host:** CPU, logical cores, memory total/available, swap, load, uptime, PSI. **cgroup** quota, throttling, memory max/current, OOM events (labelled `scope`). Thermal state plus its source.
 - **Processes:** Maestro JVM and each emulator `qemu-system-*`, mapped to a serial via the console port in its cmdline. Targeted per-PID refresh only; a full scan only at start and on device change.
 - **Devices:** serial, AVD name, API level, boot completed, adb state, assigned shard. Guest memory and CPU are optional, at ≥ 30 s intervals, labelled `guest`. Current activity only on failure.
+- **Status (M6):** adb state, boot completed, and guest CPU and available memory are sampled every 30 s (#136). Not yet: AVD name, API level, current activity on failure, the auto-throttle, and emulator process CPU and memory (the `emu_*` series).
 - **Agent self:** supervisor plus observer (I10). CPU is the sum of both processes' CPU-time deltas since the last sample (the observer from `getrusage`, the supervisor from a targeted refresh of the PID it passes at spawn); RSS is their current resident memory, summed.
 - Every sample carries a unit, a timestamp, a `scope`, and `available: bool` with a reason.
 - **Auto-throttle:** if host PSI or CPU is critical, sample every 15–30 s and skip guest metrics.
 
 ### 6.6 Transport and buffering
 - Implements ADR-0005: hello/welcome, journal and telemetry streams, cumulative acks, server-authoritative resume.
-- Ping every 15 s; dead after 45 s. Reconnect with full-jitter backoff (backon), capped at 30 s.
+- The agent pings every 10 s and drops a connection that is silent for 30 s. The server closes an agent socket that is silent for 45 s (`ingest.idle_timeout_ms`). Reconnects use full-jitter backoff capped at 30 s, hand-rolled in `transport.rs` rather than with `backon` as planned (§5.2).
 - HTTPS batch-POST fallback (`/api/v1/agent/batch`) after N failed WS upgrades.
 - **Outbox:** the journal spools to disk (64 MiB default) and is the source of truth; a small in-memory send window (1024 events / 2 MiB) is read back from it, so memory does not grow with the backlog (I10). When the spool or the window is full the agent stops storing event bodies and sequences one `journal.gap` per dropped run (I5); `journal.gap` and `run.ended` have a reserve and always fit. Telemetry: telemetry is a 2 MiB ring that coalesces 5 s samples into 1 min and then drops.
 - **Uploads:** allowlisted artifact classes; at most 2 concurrent uploads, rate-capped; sha256 while streaming; `upload_request` → grant → PUT → `upload_complete`.
@@ -523,7 +524,7 @@ Upload is relayed through the server by default; presigned direct upload is opti
 | `cla.yml` | PR, comments | CLA Assistant Lite (pinned SHA) |
 | `release.yml` | Tag `v*` | cargo-dist: agent for linux-musl x86_64/aarch64 and macOS arm64, server for linux x86_64/aarch64; SHA-256 checksums and GitHub artifact attestations (verified with `gh attestation verify`; no minisign); THIRD_PARTY_LICENSES |
 | `image.yml` | Tag `v*` | Multi-arch `ghcr.io/<owner>/fleet` (native arm64 runner), SBOM, attestation |
-| `nightly-emulator.yml` | Nightly + manual | Linux x64 + KVM, `reactivecircus/android-emulator-runner`, Maestro pinned, `maestro download-samples` flows; run wrapped by the agent against a Compose stack in the job; assert the reconciled results; upload fixtures as artifacts |
+| `nightly-emulator.yml` | Nightly (02:21 UTC) + manual | Self-hosted Apple Silicon Mac (`fleet-mac` runner), not Linux KVM: GitHub-hosted runners have no GPU, and every Android 37 image crashed there under SwiftShader, while the fixtures were captured on this Mac with the same image and GPU mode. Starts Docker Desktop if needed; creates a throwaway AVD on port 5580 (API 37.1, `google_apis_playstore_ps16k`, arm64-v8a); Maestro pinned; runs the Compose stack and the flows in `examples/flows/phase0/` through the agent; asserts the reconciled results; uploads its artifacts; removes the emulator and the stack in an always-run step |
 | `audit.yml` | Weekly | cargo-deny advisories, `cargo outdated` report |
 
 Pin every third-party action by commit SHA. Use `permissions:` least-privilege per workflow.
@@ -633,7 +634,7 @@ Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the 
 | Server integration | Ingest, idempotency, fencing, restart recovery, auth boundaries | sqlx::test, testcontainers, axum-test |
 | Load/resilience | Reconnect storms, duplicates, reordering, clock skew, full buffers, giant logs | fleet-loadgen |
 | UI | Component logic (wasm-bindgen-test); E2E flows and accessibility smoke | thirtyfour + chromedriver, vendored axe-core (tests only) |
-| Real world | Nightly emulator job; Maestro version matrix (current, N−1) | GitHub Actions + KVM |
+| Real world | Nightly emulator job; Maestro version matrix (current, N−1) | Self-hosted Apple Silicon Mac (`fleet-mac`), see §11.2 |
 | Security | Header and CSP assertions, XSS corpus in flow names and logs, archive bombs, authZ matrix | custom tests |
 
 **Compatibility rule:** a new Maestro minor version needs fixtures before support is claimed. Unknown versions run in "degraded" mode.
