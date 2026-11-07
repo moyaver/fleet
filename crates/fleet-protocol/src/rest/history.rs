@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{live::AttemptView, rest::FlowCounts};
+use crate::{
+    live::AttemptView,
+    rest::{FlowCounts, InfrastructureView},
+};
 
 /// How flaky a flow is, by the rules of ADR-0009 (`fleet_core::flaky::Flakiness`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,6 +108,10 @@ pub struct HistoryEntryView {
     pub failure_fingerprint: Option<String>,
     /// The condition fingerprint, lowercase hex; set on a final pass or failure.
     pub condition_fingerprint: Option<String>,
+    /// Set when the failure is the device's (the device was lost, issue #145). The row still
+    /// reads as failed, and the flow's flakiness leaves it out.
+    #[serde(default)]
+    pub infrastructure: Option<InfrastructureView>,
 }
 
 /// A page of the history, newest first, with the flakiness of the flows on it.

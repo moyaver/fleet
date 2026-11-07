@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Dashboard: a flow whose app crashed shows "App crashed: <exception> in <package>" above Maestro's failure, with a link to the device logcat excerpt (or a note that none was uploaded); the flow's result and failure message stay Maestro's (#152).
+- Dashboard: a flow whose device was lost during it (Maestro's `DeviceServerDiedException`) is labelled "Infrastructure, not the app" above Maestro's failure, and the label says the failure is excluded from flakiness; the flow stays failed. Its history row and `fleet-agent inspect` carry the same label (#145).
 
 ## [0.1.0-alpha.3] - 2026-11-07
 

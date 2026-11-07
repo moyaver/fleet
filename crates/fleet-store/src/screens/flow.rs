@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen D: one flow execution with its claims, steps and failure.
 
+use fleet_core::flaky::{DEVICE_LOST, Exclusion, exclusion_of};
 use fleet_protocol::{
+    event::FlowOutcome,
     live::FlowView,
     rest::{
-        ArtifactRefView, ClaimView, CrashView, FailureView, FlowDetailView, PreviousExecutionView,
-        StepView,
+        ArtifactRefView, ClaimView, CrashView, FailureView, FlowDetailView, InfrastructureView,
+        PreviousExecutionView, StepView,
     },
 };
 use uuid::Uuid;
@@ -117,6 +119,7 @@ impl Store {
             (Some(package), Some(exception)) => Some(CrashView { package, exception }),
             _ => None,
         };
+        let infrastructure = infrastructure_of(&flow.state, flow.failure_message.as_deref());
         Ok(Some(FlowDetailView {
             started_at: head.started_at,
             ended_at: head.ended_at,
@@ -130,6 +133,7 @@ impl Store {
             steps: nest(steps),
             failure,
             crash,
+            infrastructure,
             previous,
             artifacts,
         }))
@@ -231,6 +235,22 @@ fn nest(flat: Vec<StepView>) -> Vec<StepView> {
     }
     roots.reverse();
     roots
+}
+
+/// The device loss that makes a failed flow's failure the device's (issue #145), judged by the rule
+/// flaky analysis uses. The flow stays failed: this only labels it. Screens D and E share it.
+pub(super) fn infrastructure_of(
+    state: &str,
+    failure_message: Option<&str>,
+) -> Option<InfrastructureView> {
+    if state != "failed" {
+        return None;
+    }
+    (exclusion_of(FlowOutcome::Failed, failure_message) == Some(Exclusion::Infrastructure)).then(
+        || InfrastructureView {
+            evidence: DEVICE_LOST.to_owned(),
+        },
+    )
 }
 
 /// Why a flow failed and where: the first failed step and the last good one before it.

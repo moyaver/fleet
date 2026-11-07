@@ -248,6 +248,7 @@ fn FailureBand(
     };
     let total = details.total_steps;
     let message = details.message.clone();
+    let infrastructure = details.infrastructure.clone();
     let shown = message
         .clone()
         .unwrap_or_else(|| "No failure message was reported".to_owned());
@@ -260,6 +261,17 @@ fn FailureBand(
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="min-w-0 flex-1">
                     <h3 id="fail-h" class="text-sm font-semibold text-fail">"Failure"</h3>
+                    {infrastructure
+                        .map(|i| {
+                            view! {
+                                <p class="mt-2 text-sm" data-testid="infrastructure">
+                                    <span class="font-semibold">"Infrastructure, not the app: "</span>
+                                    "the device was lost during this flow ("
+                                    <span class="font-mono">{i.evidence}</span>
+                                    "). Excluded from flakiness."
+                                </p>
+                            }
+                        })}
                     <p class="mt-2 whitespace-pre-wrap break-words font-mono text-[15px]" data-testid="failure-message">
                         {shown}
                     </p>
