@@ -36,7 +36,7 @@ use crate::{
     emulator::Emulators,
     ipc::{Control, Frame, Stream},
     journal::Writer,
-    metrics::Sampler,
+    metrics::{Pressure, SAMPLE, Sampler, Throttle},
     outbox::{Budget, Outbox},
     session::{Observation, Session},
     transport::{self, Shared},
@@ -53,7 +53,6 @@ pub(crate) const SUPERVISOR_PID_ENV: &str = "FLEET_SUPERVISOR_PID";
 pub(crate) const LOG_ENV: &str = "FLEET_OBSERVER_LOG";
 
 const POLL: Duration = Duration::from_millis(250);
-const SAMPLE: Duration = Duration::from_secs(5);
 const MAX_LINE: usize = 64 * 1024;
 
 /// Runs the observer until the run is finalized or the supervisor goes away.
@@ -142,6 +141,8 @@ struct Live {
     pgid: Option<u32>,
     stdout: Lines,
     sampler: Sampler,
+    /// When host and process metrics are taken, and whether the host is under pressure (PLAN §6.5).
+    throttle: Throttle,
     shared: Arc<Shared>,
     journal: Option<Writer>,
     telemetry: Option<mpsc::Sender<Telemetry>>,
@@ -262,9 +263,18 @@ async fn observe() -> io::Result<Option<String>> {
             }
             _ = sample.tick() => {
                 if let Some(l) = live.as_mut() {
-                    let s = l.sampler.sample(clock());
-                    l.tseq += 1;
-                    l.emulators.refresh();
+                    // Host and process metrics are taken when due: every 5 s, or every 15 s while the
+                    // host is under pressure (PLAN §6.5). Device probes keep their own interval.
+                    let now = Instant::now();
+                    let host = if l.throttle.due(now) {
+                        let s = l.sampler.sample(clock());
+                        l.throttle.observe(now, Pressure::from(&s));
+                        l.tseq += 1;
+                        l.emulators.refresh();
+                        Some(s)
+                    } else {
+                        None
+                    };
                     let driven = l.session.driven_devices();
                     let finished = l.probes.take();
                     l.pending_devices.extend(
@@ -280,7 +290,7 @@ async fn observe() -> io::Result<Option<String>> {
                                 device_session_id: *device_session_id,
                             })
                             .collect();
-                        l.probes.start_due(Instant::now(), &at, &targets);
+                        l.probes.start_due(now, &at, &targets, !l.throttle.throttled());
                         // A flow that failed on a device since the last tick: read its activity now.
                         let failed: Vec<Target> = l
                             .session
@@ -294,9 +304,12 @@ async fn observe() -> io::Result<Option<String>> {
                             .collect();
                         l.probes.request_activity(&at, &failed);
                     }
-                    let devices = std::mem::take(&mut l.pending_devices);
-                    if let Some(t) = &l.telemetry {
-                        let _ = t.try_send(Telemetry { tseq_from: l.tseq, tseq_to: l.tseq, dropped_since_last: 0, samples: vec![s], devices });
+                    // Device samples wait for the next host sample's frame.
+                    if let Some(s) = host {
+                        let devices = std::mem::take(&mut l.pending_devices);
+                        if let Some(t) = &l.telemetry {
+                            let _ = t.try_send(Telemetry { tseq_from: l.tseq, tseq_to: l.tseq, dropped_since_last: 0, samples: vec![s], devices });
+                        }
                     }
                 }
             }
@@ -420,6 +433,7 @@ fn start(
                 .ok()
                 .and_then(|v| v.parse().ok()),
         ),
+        throttle: Throttle::default(),
         shared,
         journal,
         telemetry,
@@ -755,6 +769,18 @@ async fn finalize(
     // Let Maestro's last writes land, then take a final look.
     tokio::time::sleep(POLL).await;
     watch(&mut l, true, &clock);
+    // Device samples still waiting for a host frame (the host is throttled) go out now, in a frame
+    // without host samples; `tseq_to` repeats the last host sample, so the server's ack is unchanged.
+    let devices = std::mem::take(&mut l.pending_devices);
+    if let (false, Some(t)) = (devices.is_empty(), &l.telemetry) {
+        let _ = t.try_send(Telemetry {
+            tseq_from: l.tseq,
+            tseq_to: l.tseq,
+            dropped_since_last: 0,
+            samples: Vec::new(),
+            devices,
+        });
+    }
     // I3: a report left by an earlier run in the same workspace is not this run's evidence.
     let report = match l.report.as_deref().map(|p| (p, read_report(p, l.started))) {
         Some((_, ReportRead::Fresh(bytes))) => Some(bytes),

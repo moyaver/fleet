@@ -38,7 +38,7 @@ It checks that `maestro` is on `PATH` (and which version), that the adb server i
 
 The agent reads the device list from the adb server (`host:track-devices`) and never starts, restarts or kills the adb server: a different `adb` client version could restart it and break Maestro. If nothing listens on port 5037 (or `ANDROID_ADB_SERVER_PORT`), the agent waits.
 
-Every 30 seconds the agent also probes each device that Maestro selected, with read-only adb shell commands (boot status, and CPU and available memory from `/proc`). The first probe of a device also reads its API level (`ro.build.version.sdk`). A probe has a 5-second timeout. A probe that fails or hangs leaves its readings unknown and never affects Maestro. Devices that Maestro did not select are not probed.
+Every 30 seconds the agent also probes each device that Maestro selected, with read-only adb shell commands (boot status, and CPU and available memory from `/proc`). The first probe of a device also reads its API level (`ro.build.version.sdk`). A probe has a 5-second timeout. A probe that fails or hangs leaves its readings unknown and never affects Maestro. Devices that Maestro did not select are not probed. While the host is under pressure (see [Cost](#cost)), the probe reads boot status only, and the guest CPU and memory stay unknown.
 
 For an emulator, the agent finds its `qemu-system-*` process and matches it to the serial by its console port (`-port 5554` is `emulator-5554`). Every 30 seconds it reports that process's CPU (percent of one core) and resident memory, and the AVD name from its `-avd` argument. The process table is scanned when the agent starts and whenever adb's device list changes; in between, only the matched processes are read. A physical device has no emulator process, so its emulator readings are unavailable. When a flow fails on a device, the agent reads the device's resumed activity once (`dumpsys activity activities`) and sends its component as one extra device sample on the next sampling tick.
 
@@ -53,6 +53,8 @@ Measured with `cargo xtask bench-overhead --runs 3 --linger 50` on an Apple M1 P
 - duration: the run with the agent took 0.32 s longer (range 0.27 to 0.34 s), 0.6% of 50 s. The cause was not isolated.
 
 Shorter runs spend more of their time on the fixed start-up and exit cost: the default 10 s runs used 0.42% and 0.43% of one core in two runs on the same machine. Its own CPU and memory are also reported with every metrics sample.
+
+**Throttling.** Host and process metrics are sampled every 5 seconds. When the host is under pressure, the agent samples every 15 seconds instead and skips the devices' guest CPU and memory reads, to take less from a busy runner. The host counts as under pressure when Linux's pressure stall information (`/proc/pressure`) shows CPU `some avg10` at 40 or more, or memory `some avg10` at 20 or more, or when host CPU usage is 95 % or more; macOS has no pressure information, so there host CPU alone decides. These thresholds are defaults and are not configurable. The agent leaves the throttled state after three consecutive samples that are not under pressure, so it does not flap. While throttled, a device's guest CPU and memory are unknown, not zero.
 
 ## Signals and CI cancellation
 
