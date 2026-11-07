@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ts AS \"at!\", agent_run_id AS \"run_id!\",\n                            maestro_cpu_pct::float8 AS maestro_cpu_pct,\n                            maestro_rss_bytes::float8 AS maestro_rss_bytes,\n                            agent_cpu_pct::float8 AS agent_cpu_pct,\n                            agent_rss_bytes::float8 AS agent_rss_bytes\n                       FROM host_samples\n                      WHERE project_id = $1 AND worker_id = $2 AND ts >= $3 AND ts < $4\n                      ORDER BY ts, agent_run_id LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "host_samples",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "host_samples",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "maestro_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "maestro_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "agent_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "agent_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ea8b1163146bbf09ab5e6ac0733ff2c7a26cf88346df0423ebe51bf118c50ec2"
+}

@@ -105,10 +105,23 @@ async fn the_worker_page_labels_metrics_with_units_and_shows_missing_thermal_as_
         "the agent reported 25 % host CPU"
     );
     assert_eq!(page.texts(&value("host_mem_used_bytes")).await, ["4 GiB"]);
+    // The health card is host-only: a process reading belongs to one run, so the worker has no
+    // Maestro tile. Maestro's CPU is one chart per run, and the chart's accessible summary ends
+    // with its latest reading in the same unit.
+    assert_eq!(page.count(&tile("maestro_cpu_pct")).await, 0);
     assert_eq!(
-        page.texts(&value("maestro_cpu_pct")).await,
-        ["80% of one core"]
+        page.count(&chart("maestro_cpu_pct")).await,
+        1,
+        "one run, one chart"
     );
+    page.wait(
+        "the Maestro chart's latest reading",
+        &format!(
+            "Array.from(document.querySelectorAll('{} svg')).some(e => (e.getAttribute('aria-label') || '').includes('latest 80% of one core'))",
+            chart("maestro_cpu_pct")
+        ),
+    )
+    .await;
 
     // AC5: no thermal sensor is reported, so the page says unavailable, with the reason, and
     // draws no series and shows no number for it.

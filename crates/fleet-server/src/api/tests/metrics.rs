@@ -446,3 +446,129 @@ async fn an_unknown_device_has_no_metrics() {
     assert_eq!(res.status_code(), 404);
     assert_eq!(res.json::<Value>(), json!({"error": "no such device"}));
 }
+
+/// `(at_ms, value)` of every point of a series.
+fn points(s: &Value) -> Vec<(i64, Option<f64>)> {
+    s["points"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| (p["at_ms"].as_i64().unwrap(), p["value"].as_f64()))
+        .collect()
+}
+
+/// The series of `metric` about one agent run.
+fn run_series<'a>(view: &'a Value, metric: &str, run: uuid::Uuid) -> &'a Value {
+    view["series"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["metric"] == metric && s["run_id"] == json!(run.to_string()))
+        .unwrap_or_else(|| panic!("no {metric} series for run {run} in {view}"))
+}
+
+/// Two agent runs on one worker (one runner) report at the same instants. Each run's Maestro
+/// figures stay its own, one series per run, from raw samples and from the minute and hour
+/// rollups; the host's figures stay one series per worker.
+#[tokio::test]
+async fn concurrent_runs_on_one_worker_each_keep_their_own_maestro_series() {
+    let rig = rig().await;
+    let now = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap();
+    // Twenty hours ago, on a whole minute: closed minute and hour buckets for the rollups.
+    let m0 = (now - Duration::hours(20)).replace_second(0).unwrap();
+    let minute_of = |maestro_cpu: f32, maestro_rss: u64| -> Vec<Sample> {
+        (0..12)
+            .map(|i| {
+                let mut s = sample(m0 + Duration::seconds(5 * i), 10.0);
+                s.maestro_cpu_pct = Some(maestro_cpu);
+                s.maestro_rss_bytes = Some(maestro_rss);
+                s
+            })
+            .collect()
+    };
+    let mut a = Agent::new("930", "build", "runner-a");
+    let mut b = Agent::new("931", "build", "runner-a");
+    rig.publish(&mut a, vec![telemetry(1, minute_of(100.0, 200 << 20))])
+        .await;
+    rig.publish(&mut b, vec![telemetry(1, minute_of(300.0, 400 << 20))])
+        .await;
+    rig.store.roll_up(now).await.unwrap();
+    let overview = rig.json("/api/v1/projects/app/overview").await;
+    let worker = overview["workers"][0]["id"].as_str().unwrap().to_owned();
+    let path = |from: OffsetDateTime, to: OffsetDateTime, metrics: &str| {
+        format!(
+            "/api/v1/projects/app/workers/{worker}/metrics?from={}&to={}&metrics={metrics}",
+            from.format(&Rfc3339).unwrap(),
+            to.format(&Rfc3339).unwrap()
+        )
+    };
+
+    let raw = rig
+        .json(&path(
+            m0 - Duration::minutes(1),
+            m0 + Duration::minutes(2),
+            "maestro_cpu_pct,host_cpu_pct",
+        ))
+        .await;
+    assert_eq!(raw["resolution"], "raw");
+    assert_eq!(
+        points(run_series(&raw, "maestro_cpu_pct", a.id)).len(),
+        12,
+        "run A's own readings"
+    );
+    assert!(
+        points(run_series(&raw, "maestro_cpu_pct", a.id))
+            .iter()
+            .all(|(_, v)| *v == Some(100.0)),
+        "{raw}"
+    );
+    assert!(
+        points(run_series(&raw, "maestro_cpu_pct", b.id))
+            .iter()
+            .all(|(_, v)| *v == Some(300.0)),
+        "{raw}"
+    );
+    let host_series = raw["series"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["metric"] == "host_cpu_pct")
+        .count();
+    assert_eq!(host_series, 1, "host figures stay one series per worker");
+
+    let minutes = rig
+        .json(&path(
+            now - Duration::days(3),
+            now,
+            "maestro_cpu_pct,maestro_rss_bytes",
+        ))
+        .await;
+    assert_eq!(minutes["resolution"], "1m");
+    assert_eq!(
+        points(run_series(&minutes, "maestro_cpu_pct", a.id)),
+        [(ms(m0), Some(100.0))]
+    );
+    assert_eq!(
+        points(run_series(&minutes, "maestro_cpu_pct", b.id)),
+        [(ms(m0), Some(300.0))],
+        "not averaged with run A"
+    );
+    assert_eq!(
+        points(run_series(&minutes, "maestro_rss_bytes", b.id)),
+        [(ms(m0), Some(f64::from(400 << 20)))]
+    );
+
+    let hours = rig
+        .json(&path(now - Duration::days(40), now, "maestro_cpu_pct"))
+        .await;
+    assert_eq!(hours["resolution"], "1h");
+    let hour = m0.replace_minute(0).unwrap();
+    assert_eq!(
+        points(run_series(&hours, "maestro_cpu_pct", a.id)),
+        [(ms(hour), Some(100.0))]
+    );
+    assert_eq!(
+        points(run_series(&hours, "maestro_cpu_pct", b.id)),
+        [(ms(hour), Some(300.0))]
+    );
+}

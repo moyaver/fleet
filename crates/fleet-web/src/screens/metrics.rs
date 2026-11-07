@@ -7,6 +7,7 @@
 //! as a number, a zero or an interpolation (acceptance criteria 4 and 5).
 
 use crate::clock::unix_ms;
+use crate::format::short_commit;
 use fleet_protocol::rest::{
     MetricAggregate, MetricPoint, MetricResolution, MetricScope, MetricUnit, MetricsView,
     SeriesView,
@@ -119,6 +120,11 @@ fn reading(p: &MetricPoint) -> Reading {
 
 fn chart(s: &SeriesView) -> MetricChart {
     let unit = unit_of(s.unit, s.scope);
+    // A process series is one of several runs' on the worker: the run tells the lines apart.
+    let label = match s.run_id {
+        Some(run) => format!("{} · run {}", s.label, short_commit(&run.to_string())),
+        None => s.label.clone(),
+    };
     let points: Vec<Point> = s
         .points
         .iter()
@@ -133,7 +139,7 @@ fn chart(s: &SeriesView) -> MetricChart {
     let body = if s.available && has_value {
         ChartBody::Series(Series::new(
             Metric {
-                name: s.label.clone(),
+                name: label.clone(),
                 unit,
             },
             points,
@@ -149,7 +155,7 @@ fn chart(s: &SeriesView) -> MetricChart {
     };
     MetricChart {
         id: s.metric.clone(),
-        title: s.label.clone(),
+        title: label,
         unit_symbol: unit_symbol(unit),
         aggregate_note: match s.aggregate {
             Some(MetricAggregate::Avg) => Some("Average per bucket"),
@@ -480,6 +486,41 @@ mod tests {
             host,
             ["host_thermal_c", "host_cpu_pct", "host_mem_used_bytes"]
         );
+    }
+
+    /// Two agent runs on one worker: Maestro's CPU is one series per run, each its own line.
+    const TWO_RUNS: &str = r#"{
+      "subject": {"kind": "worker", "id": "00000000-0000-0000-0000-0000000000a1"},
+      "from": "2026-01-01T10:00:00Z", "to": "2026-01-01T11:00:00Z",
+      "resolution": "raw", "truncated": false,
+      "series": [
+        {"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+         "scope": "maestro", "run_id": "3f2a9c1d-0000-4000-8000-000000000001", "available": true,
+         "points": [{"at_ms": 1767261600000, "value": 100.0, "available": true}]},
+        {"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+         "scope": "maestro", "run_id": "9b7e0d4c-0000-4000-8000-000000000002", "available": true,
+         "points": [{"at_ms": 1767261600000, "value": 300.0, "available": true}]}
+      ]
+    }"#;
+
+    #[test]
+    fn each_run_on_a_worker_is_its_own_maestro_line_labelled_by_its_run() {
+        let p = panel(TWO_RUNS);
+        assert_eq!(p.sections.len(), 1);
+        let charts = &p.sections[0].charts;
+        let titles: Vec<&str> = charts.iter().map(|c| c.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            ["Maestro CPU · run 3f2a9c1", "Maestro CPU · run 9b7e0d4"]
+        );
+        let readings: Vec<Reading> = charts
+            .iter()
+            .map(|c| match &c.body {
+                ChartBody::Series(s) => s.points()[0].reading.clone(),
+                ChartBody::Unavailable { text } => panic!("run has readings: {text}"),
+            })
+            .collect();
+        assert_eq!(readings, [Reading::Value(100.0), Reading::Value(300.0)]);
     }
 
     /// A 7-day response: one-minute aggregates, cut short, host CPU averaged, Maestro memory

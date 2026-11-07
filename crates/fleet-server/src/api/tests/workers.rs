@@ -234,8 +234,7 @@ async fn runner_health_shows_the_latest_readings_and_when_they_were_taken() {
     let rig = rig().await;
     let t0 = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap() - Duration::minutes(2);
     let mut agent = Agent::new("530", "build", "runner-a");
-    let mut samples = vec![sample(t0, 10.0), sample(t0 + Duration::seconds(5), 20.0)];
-    samples[1].agent_cpu_pct = None;
+    let samples = vec![sample(t0, 10.0), sample(t0 + Duration::seconds(5), 20.0)];
     rig.publish(&mut agent, vec![telemetry(1, samples)]).await;
 
     let overview = rig.json("/api/v1/projects/app/overview").await;
@@ -259,10 +258,18 @@ async fn runner_health_shows_the_latest_readings_and_when_they_were_taken() {
     assert_eq!(cpu["unit"], "percent");
     assert_eq!(cpu["value"], 20.0);
     assert_eq!(cpu["available"], true);
-    let agent_cpu = reading("agent_cpu_pct");
-    assert_eq!(agent_cpu["value"], json!(null), "unreported is not zero");
-    assert_eq!(agent_cpu["available"], false);
-    assert_eq!(agent_cpu["reason"], "the agent reported no value");
+    let load = reading("host_load_1m");
+    assert_eq!(load["value"], json!(null), "unreported is not zero");
+    assert_eq!(load["available"], false);
+    assert_eq!(load["reason"], "the agent reported no value");
+    assert!(
+        latest["readings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["scope"] == "host"),
+        "process readings belong to a run, not to the worker: {latest}"
+    );
     let thermal = reading("host_thermal_c");
     assert_eq!(thermal["available"], false);
     assert_eq!(
