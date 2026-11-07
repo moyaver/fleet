@@ -26,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Agent: reconnects to a refusing server back off again. The jitter read the clock's low nanoseconds, which are always zero on macOS, so every delay was zero and the agent retried about every 1.5 ms (3,108 attempts in 5 s); jitter now comes from OS randomness, and the server's goaway reconnect jitter, which had the same bug, too (#90).
 - Agent: a failed write to `journal.jsonl` (disk full, I/O error) stops the journal like the cap does: one `journal.truncated` line names the error, the run's warning names the first missing seq, and `fleet-agent inspect` reports it. Before, the error was dropped silently (#112).
 - Dashboard: a flow's evidence keeps its state when its signed links renew (about every four minutes): the screenshot zoom and selection, and the log search, stay put instead of resetting, and the evidence card no longer rebuilds on every live update of the flow. A tooltip hides on Escape from anywhere while it is shown, not only from inside its trigger (#41).
 - Server: a run whose socket another instance holds shows `online` or `stale` from its persisted contact, as on the instance holding it, instead of always `stale` (#114).

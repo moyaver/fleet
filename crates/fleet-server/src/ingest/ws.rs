@@ -302,8 +302,25 @@ fn invalid(message: &str) -> ServerFrame {
 
 /// A delay in `0..max` ms, so agents don't reconnect in lockstep.
 fn jitter(max: u64) -> u64 {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| u64::from(d.subsec_nanos()));
-    if max == 0 { 0 } else { nanos % max }
+    // OS randomness: clock bits are not (on macOS the nanoseconds are always a multiple of 1000).
+    if max == 0 {
+        0
+    } else {
+        getrandom::u64().unwrap_or(0) % max
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::jitter;
+
+    #[test]
+    fn jitter_varies() {
+        let draws: std::collections::HashSet<u64> = (0..64).map(|_| jitter(2_000)).collect();
+        assert!(
+            draws.len() > 8,
+            "jitter takes {} values: {draws:?}",
+            draws.len()
+        );
+    }
 }

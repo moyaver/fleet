@@ -387,15 +387,15 @@ fn share(shared: &Shared, token: Option<&String>) {
     }
 }
 
-/// Exponential backoff with full jitter.
+/// Exponential backoff with full jitter: uniform in `0..ceiling`. The draw is OS randomness; clock
+/// bits are not (on macOS the nanoseconds are always a multiple of 1000, so the delay was zero).
 fn backoff(attempt: u32) -> Duration {
     let ceiling = BACKOFF_BASE
         .saturating_mul(1u32 << attempt.min(8))
         .min(BACKOFF_CAP);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.subsec_nanos());
-    ceiling.mul_f64(f64::from(nanos % 1000) / 1000.0)
+    let ceiling_ns = u64::try_from(ceiling.as_nanos()).unwrap_or(u64::MAX);
+    // No randomness from the OS means no delay: the reconnect loop must not panic over it.
+    Duration::from_nanos(getrandom::u64().unwrap_or(0) % ceiling_ns)
 }
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -809,5 +809,41 @@ mod tests {
         for a in 0..40 {
             assert!(backoff(a) <= BACKOFF_CAP);
         }
+    }
+
+    #[test]
+    fn backoff_is_jittered() {
+        let draws: std::collections::HashSet<Duration> = (0..64).map(|_| backoff(6)).collect();
+        assert!(draws.len() > 1, "backoff never varies: {draws:?}");
+    }
+
+    #[tokio::test]
+    async fn refused_reconnects_are_backed_off() {
+        // Accepts every connection and drops it at once: each one is a failed attempt.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let attempts = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let counter = Arc::clone(&attempts);
+        let refuse = tokio::spawn(async move {
+            while listener.accept().await.is_ok() {
+                counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        });
+        let cfg = Config::from_env(
+            format!("ws://{addr}"),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |_| None,
+        );
+        let (_tx, rx) = mpsc::channel(1);
+        let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
+            wall: time::OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }));
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        agent.abort();
+        refuse.abort();
+        let n = attempts.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(n <= 50, "{n} reconnect attempts in 5 s: no backoff");
     }
 }
