@@ -258,6 +258,9 @@
     font-size: 14px;
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
+    /* Flow names, run ids and URLs break where they must rather than push the page sideways;
+       text still breaks at spaces first. */
+    overflow-wrap: anywhere;
   }
 
   :focus-visible {
@@ -397,6 +400,8 @@
 }
 
 .wrap {
+  width: 100%;
+  min-width: 0;
   max-width: 1360px;
   margin: 0 auto;
   padding: 28px 32px 64px;
@@ -697,6 +702,7 @@
 
 /* Tables: flush, hairline rows; scroll only inside their own box; stacked rows under 720 px. */
 .tbox {
+  position: relative;
   overflow-x: auto;
 }
 
@@ -941,6 +947,12 @@ label.tile:hover {
 
   .top-in > .proj {
     display: none;
+  }
+
+  /* The navigation's wrapper must shrink too, or its links set the width of the bar. */
+  .top-in > nav {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .nav {

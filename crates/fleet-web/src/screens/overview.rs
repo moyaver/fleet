@@ -312,7 +312,7 @@ fn overview_body(
     let pipelines = StoredValue::new(m.pipelines);
     view! {
         {readout_strip(m.readouts, filter, choose)}
-        <div class="grid gap-x-10 gap-y-9 min-[721px]:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
+        <div class="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-9 min-[721px]:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
             <div class="stack">
                 {attention_section(m.attention)}
                 {move || {
