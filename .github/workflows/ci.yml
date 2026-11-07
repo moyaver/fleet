@@ -67,3 +67,22 @@ jobs:
         if: runner.environment == 'github-hosted'
       - run: cargo test --locked -p fleet-agent -p fleet-maestro -p fleet-core -p fleet-protocol
       - run: cargo build --locked --release -p fleet-agent
+
+  action-smoke:
+    # Installs the released agent through the composite action in install-only mode (no command, so
+    # no Maestro, server or token). Proves the release archive matches sha256.sum, its build
+    # attestation verifies, and the binary runs. Not covered: the run and job summary.
+    name: fleet-agent action (install and verify)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read   # gh attestation verify, with the job's GITHUB_TOKEN
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./examples/github-actions/fleet-agent
+        with:
+          version: v0.1.0-alpha.3
+      - run: fleet-agent version
