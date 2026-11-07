@@ -18,6 +18,7 @@ use fleet_ui::{
         forms::FilterBar,
     },
     provenance::Provenance,
+    tone::Tone,
 };
 use leptos::prelude::*;
 
@@ -269,6 +270,13 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
                     {r
                         .flaky
                         .map(|b| view! { <span data-testid="flaky-badge"><Badge tone=b.tone>{b.label}</Badge></span> })}
+                    {r
+                        .infrastructure
+                        .then(|| view! {
+                            <span data-testid="infrastructure-badge" title="The device was lost during this run: the failure is the device's, and it is excluded from flakiness">
+                                <Badge tone=Tone::Neutral>"infrastructure (device lost)"</Badge>
+                            </span>
+                        })}
                 </span>
             </td>
             <td data-label="Branch">

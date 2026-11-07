@@ -232,6 +232,11 @@ async fn an_app_crash_is_shown_on_its_flow_and_the_verdict_stays_maestros() {
         detail["failure"]["message"], "Assertion is false: \"Fleet never shows this\" is visible",
         "{detail}"
     );
+    assert_eq!(
+        detail["infrastructure"],
+        Value::Null,
+        "an assertion is the app's, not the device's: {detail}"
+    );
 
     let listed = stack
         .get(&format!("/api/v1/projects/app/flows/{flow}/artifacts"))
@@ -244,4 +249,87 @@ async fn an_app_crash_is_shown_on_its_flow_and_the_verdict_stays_maestros() {
             .any(|a| a["class"] == "device_logcat"),
         "{listed}"
     );
+}
+
+/// The device was lost during a failing flow (issue #145): the flow is labelled as the device's,
+/// with the exception that named it, and its status stays failed.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lost_device_is_labelled_as_infrastructure_and_the_status_stays_failed() {
+    let stack = Stack::start(|_| {}).await;
+    let ws = stack.ws_url();
+    let key = stack.key.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        crate::support::run_agent(
+            "device-killed",
+            &[
+                ("FLEET_SERVER", &ws),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_UPLOAD_TIMEOUT", "20"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+
+    let snap = stack.await_run_ended("job").await;
+    let flow = snap["flows"][0]["id"].as_str().unwrap().to_owned();
+    let detail = stack
+        .get(&format!("/api/v1/projects/app/flows/{flow}"))
+        .await;
+    assert_eq!(detail["flow"]["state"], "failed", "{detail}");
+    assert_eq!(
+        detail["infrastructure"]["evidence"], "maestro.android.DeviceServerDiedException",
+        "{detail}"
+    );
+    assert!(
+        detail["failure"]["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("maestro.android.DeviceServerDiedException: Device server died"),
+        "the failure is Maestro's: {detail}"
+    );
+
+    // Screen E carries the same label on the row.
+    let history = stack.get("/api/v1/projects/app/history").await;
+    let row = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["flow_id"] == flow.as_str())
+        .unwrap_or_else(|| panic!("no history row for the flow: {history}"));
+    assert_eq!(row["state"], "failed", "{row}");
+    assert_eq!(
+        row["infrastructure"]["evidence"], "maestro.android.DeviceServerDiedException",
+        "{row}"
+    );
+}
+
+/// Issue #145: an assertion failure is the app's, so its flow carries no infrastructure label.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_assertion_failure_carries_no_infrastructure_label() {
+    let stack = Stack::start(|_| {}).await;
+    let ws = stack.ws_url();
+    let key = stack.key.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        crate::support::run_agent(
+            "fail",
+            &[
+                ("FLEET_SERVER", &ws),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_UPLOAD_TIMEOUT", "20"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+
+    let snap = stack.await_run_ended("job").await;
+    let flow = snap["flows"][0]["id"].as_str().unwrap().to_owned();
+    let detail = stack
+        .get(&format!("/api/v1/projects/app/flows/{flow}"))
+        .await;
+    assert_eq!(detail["flow"]["state"], "failed", "{detail}");
+    assert_eq!(detail["infrastructure"], Value::Null, "{detail}");
 }

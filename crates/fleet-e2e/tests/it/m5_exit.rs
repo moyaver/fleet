@@ -515,6 +515,76 @@ async fn an_app_crash_is_shown_above_maestros_failure_with_its_logcat() {
     browser.quit().await;
 }
 
+/// Issue #145: a flow whose device was lost is labelled as the device's, above Maestro's failure,
+/// and its history row carries the same label. The status stays failed.
+#[tokio::test]
+async fn a_lost_device_is_labelled_on_the_flow_page_and_in_history() {
+    let (stack, port) = evidence_stack().await;
+    run_agent_to_the_end(&stack, "device-killed").await;
+    let flow = flow_id(&stack, "slow").await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait("the flow's name", &has_text(&q("flow-title"), "slow"))
+        .await;
+    page.wait(
+        "the infrastructure label",
+        &format!("{} === 1", count_of(&q("infrastructure"))),
+    )
+    .await;
+
+    let label = page.texts(&q("infrastructure")).await;
+    assert!(
+        label[0].starts_with("Infrastructure, not the app: the device was lost during this flow")
+            && label[0].ends_with("Excluded from flakiness."),
+        "{label:?}"
+    );
+    let failure = page.texts(&q("failure-message")).await;
+    assert!(
+        failure[0].starts_with("maestro.android.DeviceServerDiedException"),
+        "the failure stays Maestro's: {failure:?}"
+    );
+    let above = page
+        .eval(
+            &format!(
+                "const l = document.querySelector('{}'), f = document.querySelector('{}');\
+                 return Boolean(l.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING);",
+                q("infrastructure"),
+                q("failure-message")
+            ),
+            vec![],
+        )
+        .await;
+    assert_eq!(above, json!(true), "the label is shown above the failure");
+
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/history?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the history row's label",
+        &format!("{} === 1", count_of(&q("infrastructure-badge"))),
+    )
+    .await;
+    assert_eq!(
+        page.texts(&q("infrastructure-badge")).await,
+        ["infrastructure (device lost)"]
+    );
+
+    assert!(page.never_reloaded().await);
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
 /// Presses the page's button with this label.
 async fn click_button(page: &Page<'_>, label: &str) {
     page.eval(

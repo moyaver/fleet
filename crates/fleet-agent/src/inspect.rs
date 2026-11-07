@@ -18,7 +18,11 @@ use std::{
 };
 
 use anyhow::Context;
-use fleet_core::{claims::FlowState, redact::Redactor};
+use fleet_core::{
+    claims::FlowState,
+    flaky::{DEVICE_LOST, Exclusion, exclusion_of},
+    redact::Redactor,
+};
 use fleet_maestro::{ReportState, log};
 use fleet_protocol::journal::{ClockSample, EventEnvelope};
 use serde::Serialize;
@@ -52,6 +56,10 @@ pub struct FlowResult {
     pub steps: u32,
     /// Failure message (redacted).
     pub failure: Option<String>,
+    /// Set when the device was lost during a failed flow, so the failure is the device's (issue
+    /// #145): the lost-device exception it names. The outcome stays `failed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub infrastructure: Option<String>,
 }
 
 /// What `inspect` found.
@@ -131,22 +139,39 @@ pub(crate) fn flow_results(session: &Session) -> Vec<FlowResult> {
     session
         .summary()
         .into_iter()
-        .map(|(f, r)| FlowResult {
-            shard: f.shard,
-            name: f.name,
-            path: f.path,
-            outcome: match r.state {
-                FlowState::Pending => "pending".into(),
-                FlowState::Running => "running".into(),
-                FlowState::Ended(o) => snake(&format!("{o:?}")),
-            },
-            finality: snake(&format!("{:?}", r.finality)),
-            source: r.source.map(|s| snake(&format!("{s:?}"))),
-            conflict: r.conflict,
-            steps: f.steps,
-            failure: f.failure,
+        .map(|(f, r)| {
+            // The same rule flaky analysis uses (ADR-0009): a failure that names a lost device.
+            let lost = match r.state {
+                FlowState::Ended(o) => exclusion_of(o, f.failure.as_deref()),
+                FlowState::Pending | FlowState::Running => None,
+            } == Some(Exclusion::Infrastructure);
+            FlowResult {
+                shard: f.shard,
+                name: f.name,
+                path: f.path,
+                outcome: match r.state {
+                    FlowState::Pending => "pending".into(),
+                    FlowState::Running => "running".into(),
+                    FlowState::Ended(o) => snake(&format!("{o:?}")),
+                },
+                finality: snake(&format!("{:?}", r.finality)),
+                source: r.source.map(|s| snake(&format!("{s:?}"))),
+                conflict: r.conflict,
+                steps: f.steps,
+                failure: f.failure,
+                infrastructure: lost.then(|| DEVICE_LOST.to_owned()),
+            }
         })
         .collect()
+}
+
+/// The reason a failed flow's row gives: the lost device first, then Maestro's message.
+fn reason_of(f: &FlowResult) -> String {
+    let message = f.failure.as_deref().unwrap_or_default();
+    match f.infrastructure {
+        Some(_) => format!("infrastructure (device lost): {message}"),
+        None => message.to_owned(),
+    }
 }
 
 /// Most flows the job summary lists; the rest are counted, not listed.
@@ -190,7 +215,7 @@ pub(crate) fn job_summary(flows: &[FlowResult], dashboard: Option<&str>) -> Stri
                 table_cell(&f.name, 80),
                 f.outcome,
                 provenance,
-                table_cell(f.failure.as_deref().unwrap_or_default(), 200),
+                table_cell(&reason_of(f), 200),
             );
         }
         if open.len() > SUMMARY_ROWS {
@@ -257,13 +282,7 @@ pub fn table(i: &Inspection) -> String {
         "SHARD", "FLOW", "OUTCOME", "FINALITY", "SOURCE"
     );
     for f in &i.flows {
-        let failure: String = f
-            .failure
-            .as_deref()
-            .unwrap_or("")
-            .chars()
-            .take(60)
-            .collect();
+        let failure: String = reason_of(f).chars().take(60).collect();
         let conflict = if f.conflict { " (conflict)" } else { "" };
         let _ = writeln!(
             out,

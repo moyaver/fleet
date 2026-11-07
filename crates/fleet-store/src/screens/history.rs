@@ -20,7 +20,7 @@ use fleet_protocol::{
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
-use super::workers::RunCursor;
+use super::{flow::infrastructure_of, workers::RunCursor};
 use crate::{Result, Store};
 
 /// The history rows classified per flow: at most this many, the latest.
@@ -63,6 +63,49 @@ pub struct HistoryQuery<'a> {
     pub limit: i64,
 }
 
+/// One history row as the query reads it: an entry before its infrastructure label, which is
+/// judged from the state and the failure message (issue #145).
+struct HistoryRow {
+    flow_id: Uuid,
+    flow: String,
+    name: String,
+    attempt_id: Uuid,
+    repository: Option<String>,
+    commit_sha: Option<String>,
+    git_ref: Option<String>,
+    state: String,
+    outcome_source: Option<String>,
+    finality: String,
+    at: OffsetDateTime,
+    duration_ms: Option<i64>,
+    failure_message: Option<String>,
+    failure_fingerprint: Option<String>,
+    condition_fingerprint: Option<String>,
+}
+
+impl HistoryRow {
+    fn into_entry(self) -> HistoryEntryView {
+        HistoryEntryView {
+            infrastructure: infrastructure_of(&self.state, self.failure_message.as_deref()),
+            flow_id: self.flow_id,
+            flow: self.flow,
+            name: self.name,
+            attempt_id: self.attempt_id,
+            repository: self.repository,
+            commit_sha: self.commit_sha,
+            git_ref: self.git_ref,
+            state: self.state,
+            outcome_source: self.outcome_source,
+            finality: self.finality,
+            at: self.at,
+            duration_ms: self.duration_ms,
+            failure_message: self.failure_message,
+            failure_fingerprint: self.failure_fingerprint,
+            condition_fingerprint: self.condition_fingerprint,
+        }
+    }
+}
+
 /// A page of the history, and what flaky v1 needs to judge its flows.
 #[derive(Debug, Clone)]
 pub struct HistoryData {
@@ -82,8 +125,8 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         let after = query.after.map(|c| c.0.parts());
-        let mut items: Vec<HistoryEntryView> = sqlx::query_as!(
-            HistoryEntryView,
+        let rows = sqlx::query_as!(
+            HistoryRow,
             "SELECT f.id AS flow_id, coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.flow_name AS name,
                     f.pipeline_attempt_id AS attempt_id, pr.repository, pr.commit_sha, pr.git_ref,
                     f.state, f.outcome_source::text AS outcome_source,
@@ -122,6 +165,8 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
+        let mut items: Vec<HistoryEntryView> =
+            rows.into_iter().map(HistoryRow::into_entry).collect();
         let more = usize::try_from(query.limit).is_ok_and(|l| items.len() > l);
         if more {
             items.truncate(usize::try_from(query.limit).unwrap_or(0));

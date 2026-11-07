@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use fleet_protocol::{
     event::StepStatus,
     live::AgentRunView,
-    rest::{ClaimView, CrashView, FlowDetailView, StepView},
+    rest::{ClaimView, CrashView, FlowDetailView, InfrastructureView, StepView},
 };
 use fleet_ui::{
     charts::format::format_duration,
@@ -114,6 +114,8 @@ pub struct FailureDetails {
     pub last_successful_step: Option<StepRef>,
     /// How many steps the flow file has, as far as they were observed (the `M` in "Step 6 of 6").
     pub total_steps: usize,
+    /// Set when the device was lost during the flow, so the failure is the device's (issue #145).
+    pub infrastructure: Option<InfrastructureView>,
 }
 
 /// Whether the flow failed, and the details when it did.
@@ -499,6 +501,7 @@ fn failure(view: &FlowDetailView, flat: &[&StepView], numbering: &Numbering) -> 
             .and_then(|f| f.last_successful_step_index)
             .and_then(|i| step_ref(flat, numbering, i)),
         total_steps: numbering.top_level,
+        infrastructure: view.infrastructure.clone(),
     })
 }
 
@@ -957,6 +960,30 @@ mod tests {
         let mut v = view();
         v.crash = None;
         assert_eq!(FlowPage::build(&v, &ctx()).crash, None);
+    }
+
+    #[test]
+    fn a_lost_device_is_carried_with_the_failure_and_the_failure_stays_failed() {
+        let mut v = view();
+        v.infrastructure = Some(InfrastructureView {
+            evidence: "maestro.android.DeviceServerDiedException".to_owned(),
+        });
+        let Failure::Failed(f) = FlowPage::build(&v, &ctx()).failure else {
+            panic!("the flow failed");
+        };
+        assert_eq!(
+            f.infrastructure.map(|i| i.evidence).as_deref(),
+            Some("maestro.android.DeviceServerDiedException")
+        );
+        assert_eq!(
+            f.message.as_deref(),
+            Some("Element not found: Done"),
+            "the verdict stays Maestro's failure"
+        );
+        let Failure::Failed(plain) = page().failure else {
+            panic!("the flow failed");
+        };
+        assert_eq!(plain.infrastructure, None, "an assertion is the app's");
     }
 
     #[test]

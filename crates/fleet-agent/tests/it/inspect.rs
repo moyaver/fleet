@@ -63,6 +63,35 @@ fn a_journal_that_stopped_on_a_write_error_says_so() {
     );
 }
 
+/// Issue #145: a flow that failed because its device was lost is labelled as the device's, in the
+/// table and in the JSON, and its outcome stays `failed`. An assertion failure carries no label.
+#[test]
+fn a_lost_device_is_labelled_as_infrastructure_and_an_assertion_is_not() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");
+    let (lost, _) = fleet_agent::inspect::inspect(&root.join("device-killed")).unwrap();
+    let [flow] = lost.flows.as_slice() else {
+        panic!("one flow");
+    };
+    assert_eq!(flow.outcome, "failed");
+    assert_eq!(
+        flow.infrastructure.as_deref(),
+        Some("maestro.android.DeviceServerDiedException")
+    );
+    assert!(
+        fleet_agent::inspect::table(&lost).contains("infrastructure (device lost): maestro"),
+        "the table labels the failure"
+    );
+    let json = serde_json::to_value(&lost).unwrap();
+    assert_eq!(
+        json["flows"][0]["infrastructure"],
+        "maestro.android.DeviceServerDiedException"
+    );
+
+    let (fail, _) = fleet_agent::inspect::inspect(&root.join("fail")).unwrap();
+    assert!(fail.flows.iter().all(|f| f.infrastructure.is_none()));
+    assert!(!fleet_agent::inspect::table(&fail).contains("device lost"));
+}
+
 #[test]
 fn every_fixture_reconciles() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");

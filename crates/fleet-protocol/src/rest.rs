@@ -596,6 +596,16 @@ pub struct CrashView {
     pub exception: String,
 }
 
+/// Why a failed flow is the device's, not the app's (issue #145): the device was lost during it.
+/// Evidence only: the flow stays failed, and flaky analysis leaves the failure out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct InfrastructureView {
+    /// The lost-device exception the failure names, for example
+    /// `maestro.android.DeviceServerDiedException`.
+    pub evidence: String,
+}
+
 /// An earlier execution of the same flow (same file, or same name when no file is known).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -726,6 +736,9 @@ pub struct FlowDetailView {
     /// The app crash recorded during it, if any; evidence beside the failure, not a verdict.
     #[serde(default)]
     pub crash: Option<CrashView>,
+    /// Set when the failure is the device's (the device was lost); the flow still reads as failed.
+    #[serde(default)]
+    pub infrastructure: Option<InfrastructureView>,
     /// Up to 10 earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousExecutionView>,
     /// Related artifacts that are available; [`ArtifactListView`] has their links.

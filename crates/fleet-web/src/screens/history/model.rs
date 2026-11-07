@@ -191,6 +191,8 @@ pub struct HistoryRow {
     pub condition: Option<String>,
     /// The flaky marker, when the flow is judged flaky.
     pub flaky: Option<FlakyBadge>,
+    /// Set when the device was lost during the run, so the failure is the device's (issue #145).
+    pub infrastructure: bool,
     /// The page address that opens this flow's stats panel.
     pub stats_query: String,
     /// Whether this flow's stats panel is the open one.
@@ -271,6 +273,7 @@ fn row(
             .as_deref()
             .map(|c| c.chars().take(8).collect()),
         flaky: verdict.and_then(|v| badge(v.flakiness)),
+        infrastructure: e.infrastructure.is_some(),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
         stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
     }
@@ -637,6 +640,7 @@ mod tests {
             })
         );
         assert_eq!(failed.condition.as_deref(), Some("474c43fe"));
+        assert!(!failed.infrastructure, "an assertion is the app's");
         assert_eq!(passed.failure, None);
         assert_eq!(passed.duration, None, "no duration is not a zero duration");
         assert_eq!(passed.condition, None);
@@ -645,6 +649,38 @@ mod tests {
         assert_eq!(inferred.provenance, Provenance::Inferred);
         assert_eq!(inferred.branch, None);
         assert_eq!(table.window, "2025-12-02 11:00:00 to 2026-01-01 11:00:00");
+    }
+
+    #[test]
+    fn a_lost_device_row_is_labelled_infrastructure_and_stays_failed() {
+        let page: HistoryPage = serde_json::from_value(serde_json::json!({
+            "from": "2025-12-02T11:00:00Z",
+            "to": "2026-01-01T11:00:00Z",
+            "items": [
+                {"flow_id": A, "flow": "flows/slow.yaml", "name": "slow",
+                 "attempt_id": C, "repository": "o/r", "commit_sha": null,
+                 "git_ref": null, "state": "failed",
+                 "outcome_source": "junit_final", "finality": "verified",
+                 "at": "2026-01-01T10:30:00Z", "duration_ms": 37790,
+                 "failure_message": "maestro.android.DeviceServerDiedException: Device server died",
+                 "failure_fingerprint": "v1:0123456789abcdef",
+                 "condition_fingerprint": null,
+                 "infrastructure": {"evidence": "maestro.android.DeviceServerDiedException"}}
+            ],
+            "next_cursor": null,
+            "flows": []
+        }))
+        .unwrap();
+        let table = HistoryTable::build(&page, &[], &ctx(), "project=shop");
+        let [row] = table.rows.as_slice() else {
+            panic!("one row");
+        };
+        assert!(row.infrastructure);
+        assert_eq!(
+            (row.state.label, row.state.mark),
+            ("Failed", Mark::Failed),
+            "the label does not change the status"
+        );
     }
 
     #[test]

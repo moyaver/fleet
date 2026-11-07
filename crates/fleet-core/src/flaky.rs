@@ -34,7 +34,7 @@ pub enum Exclusion {
 
 /// The exception Maestro raises when the device's driver server dies mid-flow (fixture
 /// `device-killed`): the failure is the device's, not the flow's.
-const DEVICE_LOST: &str = "maestro.android.DeviceServerDiedException";
+pub const DEVICE_LOST: &str = "maestro.android.DeviceServerDiedException";
 
 /// The exclusion a stored run carries, judged from its outcome and failure message (ADR-0009).
 ///
