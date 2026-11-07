@@ -166,8 +166,6 @@ pub struct LiveInputs {
     pub held: usize,
     /// Whether every job has closed: no further updates will come.
     pub settled: bool,
-    /// When the attempt was first seen settled, if it has been.
-    pub settled_at: Option<i64>,
     /// The time now.
     pub now: i64,
     /// When the last frame arrived.
@@ -198,10 +196,9 @@ pub fn live_view(i: LiveInputs) -> LiveView {
             "showing data from {}",
             time_of_day(i.last_update, i.utc_offset_minutes)
         ),
-        LiveState::Settled => i
-            .settled_at
-            .map_or_else(String::new, |t| time_of_day(t, i.utc_offset_minutes)),
-        LiveState::Connecting | LiveState::Paused => String::new(),
+        // No finish time is on the attempt or job data, so the word alone is shown: a time the
+        // page merely saw would be a made-up number.
+        LiveState::Settled | LiveState::Connecting | LiveState::Paused => String::new(),
     };
     let action = match state {
         LiveState::Live => Some("Pause".to_owned()),
@@ -483,7 +480,6 @@ mod live_tests {
             paused: false,
             held: 0,
             settled: false,
-            settled_at: None,
             now: T0 + 3_000,
             last_update: T0,
             utc_offset_minutes: 0,
@@ -537,18 +533,22 @@ mod live_tests {
     }
 
     #[test]
-    fn a_settled_run_says_when_it_settled_and_has_no_pause() {
+    fn a_settled_run_says_settled_with_no_made_up_time_and_no_pause() {
         let v = live_view(LiveInputs {
             settled: true,
             paused: true,
             held: 4,
-            settled_at: Some(T0 + 60_000),
             connection: Connection::Reconnecting,
             ..inputs()
         });
-        assert_eq!(v.state, LiveState::Settled);
-        assert_eq!(v.detail, "22:14:20");
-        assert_eq!(v.action, None);
+        assert_eq!(
+            v,
+            LiveView {
+                state: LiveState::Settled,
+                detail: String::new(),
+                action: None,
+            }
+        );
     }
 
     #[test]

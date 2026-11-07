@@ -153,7 +153,6 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
         on_cleanup(move || handle.clear());
     }
     // The top bar's live indicator follows this page while it is shown.
-    let settled_at = RwSignal::new(None::<i64>);
     let bar = LiveBar {
         state: RwSignal::new(LiveState::Connecting),
         detail: RwSignal::new(String::new()),
@@ -177,19 +176,11 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     Effect::new(move |_| {
         let at = now.get();
         let settled = model.header.with(|h| h.as_ref().is_some_and(|h| h.settled));
-        // The first time the attempt is seen settled is when it settled, as far as this page knows.
-        let settled_at = settled_at.get_untracked().or_else(|| {
-            settled.then(|| {
-                settled_at.set(Some(at));
-                at
-            })
-        });
         let view = live_view(LiveInputs {
             connection: live.connection.get(),
             paused: paused.get(),
             held: held.with(Vec::len),
             settled,
-            settled_at,
             now: at,
             last_update: last_update.get(),
             utc_offset_minutes: utc_offset_minutes(),
