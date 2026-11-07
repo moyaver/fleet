@@ -1,0 +1,36 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "nested",
+      "path": "<REPO>/examples/flows/phase0/nested.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 32,
+      "failure": null
+    }
+  ],
+  "events": 77,
+  "event_types": {
+    "artifact.registered": 2,
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 32,
+    "step.started": 32,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}
