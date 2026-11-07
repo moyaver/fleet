@@ -1,0 +1,1 @@
+13909     1 /Users/mohamadjaber/Library/Android/sdk/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless -avd Pixel_10a_atd -port 5590 -no-window -no-snapshot -no-audio -read-only -no-boot-anim -no-metrics -memory 2048 -cores 2

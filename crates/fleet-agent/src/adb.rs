@@ -151,6 +151,15 @@ pub(crate) mod fake {
         command: &'static str,
         reply: &'static [u8],
     ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        devices(serial, vec![(command, reply)]).await
+    }
+
+    /// As [`device`], for several commands: each connection's `shell:` command selects its reply.
+    /// A command not listed gets `FAIL`, as adb answers an unknown request.
+    pub(crate) async fn devices(
+        serial: &'static str,
+        replies: Vec<(&'static str, &'static [u8])>,
+    ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap().to_string();
         let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -165,8 +174,10 @@ pub(crate) mod fake {
                 assert_eq!(body, format!("host:transport:{serial}"));
                 s.write_all(b"OKAY").await.unwrap();
                 let body = read_request(&mut s).await;
-                assert_eq!(body, format!("shell:{command}"));
-                s.write_all(reply).await.unwrap();
+                match replies.iter().find(|(c, _)| body == format!("shell:{c}")) {
+                    Some((_, reply)) => s.write_all(reply).await.unwrap(),
+                    None => s.write_all(b"FAIL000funknown command").await.unwrap(),
+                }
             }
         });
         (addr, count)

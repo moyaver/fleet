@@ -8,6 +8,7 @@ mod ci;
 pub mod cli;
 mod commands;
 mod device;
+mod emulator;
 pub mod inspect;
 mod ipc;
 pub mod journal;

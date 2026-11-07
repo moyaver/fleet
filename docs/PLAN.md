@@ -339,7 +339,7 @@ Every parser is version-profiled (`≥2.7` bundle layout; `<2.7` best-effort). U
 - **Host:** CPU, logical cores, memory total/available, swap, load, uptime, PSI. **cgroup** quota, throttling, memory max/current, OOM events (labelled `scope`). Thermal state plus its source.
 - **Processes:** Maestro JVM and each emulator `qemu-system-*`, mapped to a serial via the console port in its cmdline. Targeted per-PID refresh only; a full scan only at start and on device change.
 - **Devices:** serial, AVD name, API level, boot completed, adb state, assigned shard. Guest memory and CPU are optional, at ≥ 30 s intervals, labelled `guest`. Current activity only on failure.
-- **Status (M6):** adb state, boot completed, and guest CPU and available memory are sampled every 30 s (#136). Not yet: AVD name, API level, current activity on failure, the auto-throttle, and emulator process CPU and memory (the `emu_*` series).
+- **Status (M6):** adb state, boot completed, and guest CPU and available memory are sampled every 30 s (#136). Emulator process CPU and memory (the `emu_*` series), the AVD name, the API level and the current activity on failure are sampled too (#39). Not yet: the auto-throttle. PLAN does not define what "critical" means for it, so it waits for thresholds.
 - **Agent self:** supervisor plus observer (I10). CPU is the sum of both processes' CPU-time deltas since the last sample (the observer from `getrusage`, the supervisor from a targeted refresh of the PID it passes at spawn); RSS is their current resident memory, summed.
 - Every sample carries a unit, a timestamp, a `scope`, and `available: bool` with a reason.
 - **Auto-throttle:** if host PSI or CPU is critical, sample every 15–30 s and skip guest metrics.
