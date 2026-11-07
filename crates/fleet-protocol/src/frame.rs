@@ -169,6 +169,23 @@ pub struct DeviceSample {
     /// The guest's `MemAvailable`, bytes. `None` when the probe did not answer.
     #[serde(default)]
     pub guest_mem_available_bytes: Option<u64>,
+    /// The emulator process's CPU use since the previous sample, percent of one core. `None` for
+    /// a physical device, when no emulator process maps to the serial, or when it was unreadable.
+    #[serde(default)]
+    pub emu_cpu_pct: Option<f32>,
+    /// The emulator process's resident memory, bytes. `None` as for `emu_cpu_pct`.
+    #[serde(default)]
+    pub emu_rss_bytes: Option<u64>,
+    /// The emulator's AVD name, from its command line (`-avd`). `None` for a physical device.
+    #[serde(default)]
+    pub avd_name: Option<String>,
+    /// The device's API level (`ro.build.version.sdk`), once read. `None` until then.
+    #[serde(default)]
+    pub api_level: Option<u32>,
+    /// The component of the resumed activity. Set only on the sample taken after a flow failed on
+    /// this device (PLAN §6.5: current activity only on failure); `None` otherwise.
+    #[serde(default)]
+    pub foreground_activity: Option<String>,
 }
 
 /// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
