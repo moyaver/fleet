@@ -11,7 +11,7 @@ use fleet_protocol::rest::TimelineView;
 use fleet_ui::{
     charts::{series::Series, view::TimeSeriesChart},
     components::{
-        display::{Card, EmptyState, ProvenanceBadge, Skeleton},
+        display::{EmptyState, ProvenanceBadge, Skeleton},
         forms::DateTimeRange,
     },
     provenance::Provenance,
@@ -26,7 +26,7 @@ use crate::{
     remote::Remote,
     screens::{
         common::Fact,
-        metrics::{ChartBody, MetricChart, MetricsPanel, RangePreset, RangeSelection},
+        metrics::{ChartBody, Latest, MetricChart, MetricsPanel, RangePreset, RangeSelection},
         timeline::{TimelineScope, timeline_data},
     },
     status::Pill,
@@ -137,7 +137,8 @@ pub fn Outcome(
     }
 }
 
-/// The range picker: presets, and a custom range with native date and time inputs.
+/// The range picker: presets as radio buttons, and a custom range with native date and time
+/// inputs. The radios are the page's range; a change requests the metrics again.
 #[component]
 pub fn RangePicker(
     /// The selection; the page requests metrics whenever it changes.
@@ -146,21 +147,23 @@ pub fn RangePicker(
     let parse = |s: Option<String>| s.and_then(|s| OffsetDateTime::parse(&s, &Rfc3339).ok());
     view! {
         <div class="flex flex-wrap items-end gap-4">
-            <fieldset class="flex flex-wrap items-center gap-2">
+            <fieldset class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <legend class="mb-1 text-sm font-medium">"Range"</legend>
                 {RangePreset::ALL
                     .into_iter()
                     .map(|p| {
-                        let selected = move || range.get() == RangeSelection::Preset(p);
+                        let checked = move || range.get() == RangeSelection::Preset(p);
                         view! {
-                            <button
-                                type="button"
-                                class="rounded border border-border bg-surface px-2 py-1 text-sm aria-pressed:bg-primary aria-pressed:text-primary-fg"
-                                aria-pressed=move || selected().to_string()
-                                on:click=move |_| range.set(RangeSelection::Preset(p))
-                            >
+                            <label class="inline-flex min-h-8 items-center gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    name="metrics-range"
+                                    value=p.label()
+                                    prop:checked=checked
+                                    on:change=move |_| range.set(RangeSelection::Preset(p))
+                                />
                                 {p.label()}
-                            </button>
+                            </label>
                         }
                     })
                     .collect_view()}
@@ -177,7 +180,8 @@ pub fn RangePicker(
     }
 }
 
-/// One chart: title and unit, an aggregate note, then the drawing, or "unavailable (reason)".
+/// One chart: its title and unit, the newest reading in its header, then the drawing, or the
+/// word Missing with the reason when the range has no value at all.
 #[component]
 fn MetricChartView(
     /// The chart.
@@ -193,8 +197,9 @@ fn MetricChartView(
         id,
         title,
         unit_symbol,
-        aggregate_note,
         body,
+        latest,
+        ..
     } = chart;
     let body = match body {
         ChartBody::Series(series) => {
@@ -209,26 +214,45 @@ fn MetricChartView(
             }
             .into_any()
         }
-        ChartBody::Unavailable { text } => view! {
-            <p class="rounded border border-dashed border-border p-4 italic text-muted" data-unavailable>
-                {text}
+        ChartBody::Unavailable { reason } => view! {
+            <p class="flex flex-wrap items-center gap-2 py-6 text-sm text-muted" data-unavailable>
+                <ProvenanceBadge provenance=Signal::stored(Provenance::Missing) />
+                <span>{reason.unwrap_or_else(|| "no reason given".to_owned())}</span>
             </p>
         }
         .into_any(),
     };
+    let now = match latest {
+        Some(Latest::Value(v)) => view! {
+            <span class="tabular-nums">{v}<span class="note">" now"</span></span>
+        }
+        .into_any(),
+        Some(Latest::Missing(reason)) => view! {
+            <span class="flex flex-wrap items-center gap-2">
+                <ProvenanceBadge provenance=Signal::stored(Provenance::Missing) />
+                {reason.map(|r| view! { <span class="note">{r}</span> })}
+            </span>
+        }
+        .into_any(),
+        None => ().into_any(),
+    };
     view! {
-        <figure class="space-y-1" data-testid="metric-chart" data-metric=id>
-            <figcaption class="flex flex-wrap items-baseline gap-2 text-sm">
-                <span class="font-medium">{title}</span>
-                <span class="text-muted">{format!("({unit_symbol})")}</span>
-                {aggregate_note.map(|n| view! { <span class="text-muted">{n}</span> })}
+        <figure class="space-y-2" data-testid="metric-chart" data-metric=id>
+            <figcaption class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+                <span class="font-medium">
+                    {title}
+                    " "
+                    <span class="font-normal text-muted">{format!("({unit_symbol})")}</span>
+                </span>
+                {now}
             </figcaption>
             {body}
         </figure>
     }
 }
 
-/// Screen C's correlated charts: grouped by scope, one range, one cursor.
+/// Screen C's correlated charts, grouped by scope under a small heading each: one range, one
+/// cursor. The section that holds them states its resolution once, in the page.
 #[component]
 pub fn MetricsCharts(
     /// The laid-out metrics.
@@ -241,12 +265,11 @@ pub fn MetricsCharts(
     let MetricsPanel {
         sections,
         domain_ms,
-        resolution_note,
         truncated_note,
+        ..
     } = panel;
     view! {
-        <div class="space-y-4">
-            <p class="text-sm text-muted">{resolution_note}</p>
+        <div class="space-y-6">
             {truncated_note.map(|t| view! { <Notice tone=Tone::Warning text=t /> })}
             {if sections.is_empty() {
                 view! { <EmptyState title="No metrics" description="The server returned no series for this range." /> }
@@ -256,8 +279,9 @@ pub fn MetricsCharts(
                     .into_iter()
                     .map(|section| {
                         view! {
-                            <Card title=section.heading>
-                                <div class="grid gap-4 lg:grid-cols-2">
+                            <div class="space-y-3">
+                                <h3 class="text-sm font-medium text-muted">{section.heading}</h3>
+                                <div class="grid gap-6 md:grid-cols-2">
                                     {section
                                         .charts
                                         .into_iter()
@@ -273,7 +297,7 @@ pub fn MetricsCharts(
                                         })
                                         .collect_view()}
                                 </div>
-                            </Card>
+                            </div>
                         }
                     })
                     .collect_view()

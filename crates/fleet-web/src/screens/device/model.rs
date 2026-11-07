@@ -11,10 +11,15 @@ use uuid::Uuid;
 
 use crate::{
     clock::unix_ms,
-    paths::{device_href, flow_href, worker_href},
-    screens::common::{Ctx, Fact},
+    paths::{device_href, flow_href, pipeline_href, worker_href},
+    screens::common::Ctx,
     status::{Pill, flow_provenance, flow_state_pill},
 };
+
+/// The metrics the device page charts, in the order its design shows them. Temperature is not
+/// among them: the agent's device sampler has no thermal collector (adb state, boot flag, guest
+/// CPU and memory only), so no device reports it and the page omits it, as the runner does.
+pub const CHARTED: [&str; 3] = ["emu_cpu_pct", "guest_cpu_pct", "guest_mem_available_bytes"];
 
 /// A device session's state as a word and a colour role.
 #[must_use]
@@ -64,14 +69,38 @@ pub struct DeviceHeader {
     pub subtitle: String,
     /// Boot and connection status.
     pub state: Pill,
-    /// What it is.
-    pub facts: Vec<Fact>,
-    /// The worker's page, when the worker is known.
+    /// `Android emulator · sdk_gphone64_arm64 · Android 14 (API 34) · arm64-v8a`; a missing part
+    /// reads "Not reported".
+    pub meta: String,
+    /// The runner's name, or `Runner` when it is not known.
+    pub runner_name: String,
+    /// The runner's page, when the runner is known.
     pub worker_href: Option<String>,
 }
 
+/// `Android emulator · sdk_gphone64_arm64 · Android 14 (API 34) · arm64-v8a`.
+fn meta_text(profile: Option<&DeviceProfileView>) -> String {
+    let Some(p) = profile else {
+        return "Profile not reported".to_owned();
+    };
+    [
+        kind_text(p),
+        p.model
+            .clone()
+            .unwrap_or_else(|| "Model not reported".to_owned()),
+        os_text(p).map_or_else(
+            || "OS not reported".to_owned(),
+            |os| format!("{} {os}", platform_name(&p.platform)),
+        ),
+        p.abi
+            .clone()
+            .unwrap_or_else(|| "ABI not reported".to_owned()),
+    ]
+    .join(" · ")
+}
+
 impl DeviceHeader {
-    /// The header of `view`, with times in the viewer's zone.
+    /// The header of `view`.
     #[must_use]
     pub fn build(view: &DeviceDetailView, ctx: &Ctx) -> Self {
         let s = &view.session;
@@ -84,22 +113,8 @@ impl DeviceHeader {
             title,
             subtitle: s.device.serial.clone(),
             state: device_state_pill(&s.device.state),
-            facts: vec![
-                Fact::maybe("Kind", profile.map(kind_text)),
-                Fact::maybe("Model", profile.and_then(|p| p.model.clone())),
-                Fact::maybe("OS version", profile.and_then(os_text)),
-                Fact::maybe("CPU ABI", profile.and_then(|p| p.abi.clone())),
-                Fact::maybe(
-                    "Current shard",
-                    view.flows
-                        .first()
-                        .and_then(|f| f.shard_number)
-                        .map(|n| n.to_string()),
-                ),
-                Fact::known("Job", s.job_key.clone()),
-                Fact::known("First seen", ctx.time(unix_ms(s.first_seen_at))),
-                Fact::known("Last seen by the agent", ctx.ago(unix_ms(s.last_seen_at))),
-            ],
+            meta: meta_text(profile),
+            runner_name: s.runner_name.clone().unwrap_or_else(|| "Runner".to_owned()),
             worker_href: s.worker_id.map(|w| worker_href(&ctx.project, w)),
         }
     }
@@ -121,8 +136,8 @@ pub struct CurrentFlow {
 pub struct ExecutionDetails {
     /// The running flow, if one is.
     pub current_flow: Option<CurrentFlow>,
-    /// Facts about it the server may not have.
-    pub facts: Vec<Fact>,
+    /// The job the device serves, and its pipeline page.
+    pub job: (String, String),
 }
 
 impl ExecutionDetails {
@@ -143,8 +158,10 @@ impl ExecutionDetails {
             });
         Self {
             current_flow,
-            // The device view carries no step names: the flow page has them.
-            facts: vec![Fact::maybe("Current step", None)],
+            job: (
+                view.session.job_key.clone(),
+                pipeline_href(&ctx.project, view.session.pipeline_attempt_id),
+            ),
         }
     }
 }
@@ -327,20 +344,11 @@ mod tests {
         assert_eq!(h.title, "Pixel_7_API_34");
         assert_eq!(h.subtitle, "emulator-5554");
         assert_eq!((h.state.label, h.state.mark), ("Busy", Mark::Running));
-        let facts: Vec<_> = h.facts.iter().map(|f| (f.label, f.shown())).collect();
         assert_eq!(
-            facts,
-            [
-                ("Kind", "Android emulator"),
-                ("Model", "sdk_gphone64_arm64"),
-                ("OS version", "14 (API 34)"),
-                ("CPU ABI", "arm64-v8a"),
-                ("Current shard", "1"),
-                ("Job", "e2e-shard-1"),
-                ("First seen", "2026-01-01 10:00:00"),
-                ("Last seen by the agent", "2 s ago"),
-            ]
+            h.meta,
+            "Android emulator · sdk_gphone64_arm64 · Android 14 (API 34) · arm64-v8a"
         );
+        assert_eq!(h.runner_name, "mac-mini-3");
         assert_eq!(
             h.worker_href.as_deref(),
             Some("/workers/00000000-0000-0000-0000-0000000000a1?project=shop")
@@ -353,17 +361,18 @@ mod tests {
         v.session.profile = None;
         let h = DeviceHeader::build(&v, &ctx());
         assert_eq!(h.title, "emulator-5554");
-        let fact = |label| {
-            h.facts
-                .iter()
-                .find(|f| f.label == label)
-                .unwrap()
-                .value
-                .clone()
-        };
-        assert_eq!(fact("Kind"), None);
-        assert_eq!(fact("Model"), None);
-        assert_eq!(fact("OS version"), None);
+        assert_eq!(h.meta, "Profile not reported");
+    }
+
+    #[test]
+    fn a_missing_part_of_the_profile_reads_not_reported_in_its_place() {
+        let mut v = view();
+        v.session.profile.as_mut().unwrap().abi = None;
+        v.session.profile.as_mut().unwrap().model = None;
+        assert_eq!(
+            DeviceHeader::build(&v, &ctx()).meta,
+            "Android emulator · Model not reported · Android 14 (API 34) · ABI not reported"
+        );
     }
 
     #[test]
@@ -396,14 +405,12 @@ mod tests {
             "/flows/00000000-0000-0000-0000-0000000000f3?project=shop"
         );
         assert_eq!(current.steps_seen, "7 steps seen so far");
-        // The device view carries no step names or progress clock.
         assert_eq!(
-            e.facts
-                .iter()
-                .find(|f| f.label == "Current step")
-                .unwrap()
-                .value,
-            None
+            e.job,
+            (
+                "e2e-shard-1".to_owned(),
+                "/p/shop/pipelines/00000000-0000-0000-0000-0000000000c1".to_owned()
+            )
         );
     }
 

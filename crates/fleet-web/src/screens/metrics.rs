@@ -7,14 +7,17 @@
 //! as a number, a zero or an interpolation (acceptance criteria 4 and 5).
 
 use crate::clock::unix_ms;
-use crate::format::short_commit;
+use crate::format::{short_commit, time_of_day};
 use fleet_protocol::rest::{
     MetricAggregate, MetricPoint, MetricResolution, MetricScope, MetricUnit, MetricsView,
     SeriesView,
 };
-use fleet_ui::charts::{
-    format::Unit,
-    series::{Metric, Point, Reading, Series},
+use fleet_ui::{
+    charts::{
+        format::Unit,
+        series::{Metric, Point, Reading, Series},
+    },
+    provenance::Provenance,
 };
 
 /// What one chart shows.
@@ -24,9 +27,18 @@ pub enum ChartBody {
     Series(Series),
     /// No value in the whole range: say so, with the reason, instead of drawing anything.
     Unavailable {
-        /// `unavailable (reason)`.
-        text: String,
+        /// Why there is no value, when the server says.
+        reason: Option<String>,
     },
+}
+
+/// The newest reading of a chart, shown in its header.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Latest {
+    /// The newest reading's value in the chart's unit, such as `38%`.
+    Value(String),
+    /// The newest point has no value; why, when the server says.
+    Missing(Option<String>),
 }
 
 /// One metric's chart.
@@ -42,6 +54,8 @@ pub struct MetricChart {
     pub aggregate_note: Option<&'static str>,
     /// What is drawn.
     pub body: ChartBody,
+    /// The newest point, for the chart's header; `None` when the range has no points at all.
+    pub latest: Option<Latest>,
 }
 
 /// The charts about one kind of subject. Host, process and guest figures are never mixed.
@@ -63,8 +77,10 @@ pub struct MetricsPanel {
     /// The requested range (unix ms), the x-axis of every chart, so they line up and share a
     /// cursor with the timeline.
     pub domain_ms: (i64, i64),
-    /// Where the points come from: raw samples or aggregates.
+    /// Where the points come from, in words: `Raw samples`, `1-minute averages` or `1-hour averages`.
     pub resolution_note: &'static str,
+    /// How the values are known: observed when raw, derived from aggregates otherwise.
+    pub provenance: Provenance,
     /// Set when more samples matched than one response carries, so the charts stop short.
     pub truncated_note: Option<&'static str>,
 }
@@ -118,6 +134,13 @@ fn reading(p: &MetricPoint) -> Reading {
     }
 }
 
+fn latest_of(points: &[Point], unit: Unit) -> Option<Latest> {
+    points.last().map(|p| match &p.reading {
+        Reading::Value(v) => Latest::Value(unit.format(*v)),
+        Reading::Unavailable { reason } => Latest::Missing(reason.clone()),
+    })
+}
+
 fn chart(s: &SeriesView) -> MetricChart {
     let unit = unit_of(s.unit, s.scope);
     // A process series is one of several runs' on the worker: the run tells the lines apart.
@@ -136,6 +159,7 @@ fn chart(s: &SeriesView) -> MetricChart {
     let has_value = points
         .iter()
         .any(|p| matches!(p.reading, Reading::Value(_)));
+    let latest = latest_of(&points, unit);
     let body = if s.available && has_value {
         ChartBody::Series(Series::new(
             Metric {
@@ -149,9 +173,7 @@ fn chart(s: &SeriesView) -> MetricChart {
             .reason
             .clone()
             .or_else(|| s.points.iter().find_map(|p| p.reason.clone()));
-        ChartBody::Unavailable {
-            text: Reading::Unavailable { reason }.label(unit),
-        }
+        ChartBody::Unavailable { reason }
     };
     MetricChart {
         id: s.metric.clone(),
@@ -163,10 +185,42 @@ fn chart(s: &SeriesView) -> MetricChart {
             None => None,
         },
         body,
+        latest,
     }
 }
 
 impl MetricsPanel {
+    /// Keeps only the charts named by `ids`, in their order; a section left without charts goes.
+    /// A page shows the metrics its design names, so the others are not drawn at all.
+    #[must_use]
+    pub fn only(mut self, ids: &[&str]) -> Self {
+        for section in &mut self.sections {
+            section.charts.retain(|c| ids.contains(&c.id.as_str()));
+        }
+        self.sections.retain(|s| !s.charts.is_empty());
+        self
+    }
+
+    /// The newest reading of the first chart named `id` that has one, such as `maestro_cpu_pct`.
+    #[must_use]
+    pub fn newest(&self, id: &str) -> Option<&Latest> {
+        self.sections
+            .iter()
+            .flat_map(|s| &s.charts)
+            .filter(|c| c.id == id)
+            .find_map(|c| c.latest.as_ref())
+    }
+
+    /// The window as the page names it, such as `06:31 to 07:31` in the viewer's zone.
+    #[must_use]
+    pub fn window_label(&self, utc_offset_minutes: i32) -> String {
+        format!(
+            "{} to {}",
+            time_of_day(self.domain_ms.0, utc_offset_minutes),
+            time_of_day(self.domain_ms.1, utc_offset_minutes)
+        )
+    }
+
     /// Lays out a metrics response.
     #[must_use]
     pub fn build(view: &MetricsView) -> Self {
@@ -191,8 +245,12 @@ impl MetricsPanel {
             domain_ms: (unix_ms(view.from), unix_ms(view.to)),
             resolution_note: match view.resolution {
                 MetricResolution::Raw => "Raw samples",
-                MetricResolution::OneMinute => "One-minute aggregates",
-                MetricResolution::OneHour => "One-hour aggregates",
+                MetricResolution::OneMinute => "1-minute averages",
+                MetricResolution::OneHour => "1-hour averages",
+            },
+            provenance: match view.resolution {
+                MetricResolution::Raw => Provenance::Observed,
+                MetricResolution::OneMinute | MetricResolution::OneHour => Provenance::Derived,
             },
             truncated_note: view.truncated.then_some(
                 "More samples matched than one response carries: the charts end before the end of the range.",
@@ -424,12 +482,12 @@ mod tests {
         let thermal = chart(&p, "host_thermal_c");
         assert_eq!(thermal.title, "Host temperature");
         assert_eq!(thermal.unit_symbol, "°C");
-        let ChartBody::Unavailable { text } = &thermal.body else {
+        let ChartBody::Unavailable { reason } = &thermal.body else {
             panic!("an unreported sensor draws no series");
         };
         assert_eq!(
-            text,
-            "unavailable (the agent does not report this metric yet)"
+            reason.as_deref(),
+            Some("the agent does not report this metric yet")
         );
     }
 
@@ -517,7 +575,7 @@ mod tests {
             .iter()
             .map(|c| match &c.body {
                 ChartBody::Series(s) => s.points()[0].reading.clone(),
-                ChartBody::Unavailable { text } => panic!("run has readings: {text}"),
+                ChartBody::Unavailable { reason } => panic!("run has readings: {reason:?}"),
             })
             .collect();
         assert_eq!(readings, [Reading::Value(100.0), Reading::Value(300.0)]);
@@ -545,7 +603,8 @@ mod tests {
     #[test]
     fn aggregated_figures_say_what_they_are_and_a_cut_response_says_it_stops_short() {
         let p = panel(WEEK_METRICS);
-        assert_eq!(p.resolution_note, "One-minute aggregates");
+        assert_eq!(p.resolution_note, "1-minute averages");
+        assert_eq!(p.provenance, Provenance::Derived);
         assert_eq!(
             chart(&p, "host_cpu_pct").aggregate_note,
             Some("Average per bucket")
@@ -561,12 +620,12 @@ mod tests {
             )
         );
         // An empty series with no value is explicit, with the server's reason.
-        let ChartBody::Unavailable { text } = &chart(&p, "agent_cpu_pct").body else {
+        let ChartBody::Unavailable { reason } = &chart(&p, "agent_cpu_pct").body else {
             panic!("no points, nothing to draw");
         };
         assert_eq!(
-            text,
-            "unavailable (not kept in aggregates; use a range of 24 hours or less)"
+            reason.as_deref(),
+            Some("not kept in aggregates; use a range of 24 hours or less")
         );
     }
 
@@ -574,6 +633,7 @@ mod tests {
     fn raw_samples_have_no_aggregate_note_and_no_truncation_warning() {
         let p = panel(WORKER_METRICS);
         assert_eq!(p.resolution_note, "Raw samples");
+        assert_eq!(p.provenance, Provenance::Observed);
         assert_eq!(p.truncated_note, None);
         assert_eq!(chart(&p, "host_cpu_pct").aggregate_note, None);
     }
