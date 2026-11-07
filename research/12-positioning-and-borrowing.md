@@ -86,7 +86,7 @@ Validation test [I]: run Fleet on one real app's Maestro suite in CI for two wee
   - A hosted service adds tenant isolation, billing, blob storage cost, uptime, and SOC 2 questionnaires.
   - Flaky detection from JUnit history already exists in Datadog Test Optimization, Buildkite Test Engine and Trunk [I; not checked against their current docs].
 - Schema check. `migrations/0001_tenancy.sql` defines `projects` (line 19), `users` (line 30) and `role_bindings` (line 43). The `role_bindings` comment reads "A user's role on one project (NULL = every project)" (line 42). There is no organisation or tenant table above `projects` [V; `grep -i 'organi|tenant' migrations/` returns nothing]. A multi-customer SaaS would need a tenant layer that does not exist yet [I].
-- Note for the owner: `docs/PLAN.md:54` still describes the PolyForm licence. ADR-0012 supersedes ADR-0010 and sets AGPL. The PLAN text is stale [V]. Not changed here.
+- PLAN §2 still describes the PolyForm licence, under a "Superseded" banner; ADR-0012 keeps it as history [V, `docs/PLAN.md:48`, `docs/decisions/0012-agpl-license.md`]. Two live leftovers, in §2.6 and the M0 checklist, were fixed separately.
 
 Recommendation [I]: stay self-hosted. Run one hosted demo instance for evaluation only. Build a SaaS only if demo users ask to be hosted.
 
@@ -182,7 +182,6 @@ One cost to note in the planner [V, `main.rs:546-570`]: `fetch_history` makes on
 - The percentages (80% of need covered by JUnit tooling, 10 to 30% of wall time from durations, the 95% confidence example) are estimates, not measurements.
 - Research 11 §4 says "Quarantine: No (ADR-0009)". ADR-0009 does not use the word; it excludes "test management" (line 18), and `docs/ROADMAP.md:163` maps quarantine to that exclusion. The citation is indirect but supported.
 - Competitor tools named in §4 (Datadog Test Optimization, Buildkite Test Engine, Trunk) were not checked against their current docs.
-- `docs/PLAN.md:54` still describes the superseded PolyForm licence. Noted in §4, not changed.
 
 ---
 
@@ -193,7 +192,7 @@ One cost to note in the planner [V, `main.rs:546-570`]: `fetch_history` makes on
 - `docs/decisions/0009-scope-focused-build.md` (line 15)
 - `docs/decisions/0012-agpl-license.md` (lines 9-13)
 - `docs/spec-v1.0.md` (lines 51, 95, 1182-1192)
-- `docs/PLAN.md` (lines 54, 128-130, 270-276)
+- `docs/PLAN.md` (lines 48, 128-130, 270-276)
 - `crates/fleet-planner/src/main.rs` (lines 4-12, 135-136, 182-184, 238-245, 252-254, 307, 434-449, 472-473, 491-496, 519, 526-531, 546-570)
 - `crates/fleet-core/src/plan.rs` (lines 6-17, the `executionOrder` unit and equal-count baseline)
 - `crates/fleet-store/src/ingest/apply.rs` (lines 180-185)
