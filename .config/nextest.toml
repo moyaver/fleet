@@ -1,6 +1,13 @@
-# A hung test fails instead of running until the CI job times out.
+# A hang fails instead of running until the CI job times out.
 [profile.default]
 slow-timeout = { period = "30s", terminate-after = 4 }
+
+# The fleet-e2e scenarios drive headless Chrome, Postgres and several simulated agents at once.
+# Alone they take 4-18 s, but on a 10-core machine shared with emulators and builds the 120 s
+# default failed 7 of 39 (measured in #46), so they get the CI budget (60 s x 5) locally too.
+[[profile.default.overrides]]
+filter = "package(fleet-e2e)"
+slow-timeout = { period = "60s", terminate-after = 5, grace-period = "10s" }
 
 [profile.ci]
 fail-fast = false
