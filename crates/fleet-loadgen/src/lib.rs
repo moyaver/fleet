@@ -81,6 +81,9 @@ pub struct Options {
     pub arch: String,
     /// The index of the first agent: agent `first_agent + n` follows [`fails`] as that agent.
     pub first_agent: usize,
+    /// The shape of real suites: long flow names, a long failure message and many steps per flow.
+    /// Off, flows are short and have two steps each.
+    pub wide: bool,
     /// Stop at points of the script until released.
     pub hold: Option<Hold>,
 }
@@ -104,6 +107,7 @@ impl Default for Options {
             git_ref: None,
             arch: "x86_64".into(),
             first_agent: 0,
+            wide: false,
             hold: None,
         }
     }
@@ -223,6 +227,37 @@ pub fn fails(agent: usize, device: u32, flow: u32) -> bool {
     (agent + device as usize * 3 + flow as usize * 5).is_multiple_of(11)
 }
 
+/// Steps per flow in a [`Options::wide`] suite.
+const WIDE_STEPS: u32 = 24;
+
+fn flow_name(device: u32, flow: u32, wide: bool) -> String {
+    if wide {
+        format!(
+            "flow-{device}-{flow}-checkout-with-saved-card-promo-code-and-gift-wrap-then-receipt-email"
+        )
+    } else {
+        format!("flow-{device}-{flow}")
+    }
+}
+
+fn step_description(step: u32, wide: bool) -> String {
+    if wide {
+        format!(
+            "Tap on \"step {step}\" and wait until the order summary shows the total with tax and shipping"
+        )
+    } else {
+        format!("Tap on \"step {step}\"")
+    }
+}
+
+fn failure_message(wide: bool) -> &'static str {
+    if wide {
+        "Assertion is false: \"Order total\" was expected to read \"$84.10\" but read \"$0.00\" after the promo code was applied; the checkout screen stayed on https://shop.example.test/checkout/review?session=7f3c9d1e2ab4455f8e0c1d9a6b2e7f40&promo=SPRING-FREE-SHIPPING-2026 and the tax request timed out after 30000 ms"
+    } else {
+        "Assertion is false"
+    }
+}
+
 fn clock(t0: Instant) -> ClockSample {
     ClockSample {
         wall: OffsetDateTime::now_utc(),
@@ -318,9 +353,12 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                 shard_number: d + 1,
                 device_serial: serial.clone(),
                 planned: (0..opts.flows)
-                    .map(|f| FlowRef {
-                        name: format!("flow-{d}-{f}"),
-                        path: Some(format!("flows/flow-{d}-{f}.yaml")),
+                    .map(|f| {
+                        let name = flow_name(d, f, opts.wide);
+                        FlowRef {
+                            path: Some(format!("flows/{name}.yaml")),
+                            name,
+                        }
                     })
                     .collect(),
             }),
@@ -331,13 +369,14 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     let mut failed = 0;
     let mut flow_ids = Vec::new();
     let mut flow_ends = Vec::new();
+    let steps = if opts.wide { WIDE_STEPS } else { 2 };
     for f in 0..opts.flows {
         for (d, shard) in (0u32..).zip(&shards) {
             let flow = Subject {
                 flow_execution_id: Some(Uuid::now_v7()),
                 ..shard.clone()
             };
-            let name = format!("flow-{d}-{f}");
+            let name = flow_name(d, f, opts.wide);
             push(
                 flow.clone(),
                 SourceKind::DebugLog,
@@ -350,7 +389,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     ordinal: f,
                 }),
             );
-            for s in 0..2 {
+            for s in 0..steps {
                 let step = Subject {
                     step: Some(StepRef { index: s }),
                     ..flow.clone()
@@ -359,7 +398,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     step.clone(),
                     SourceKind::DebugLog,
                     &EventBody::StepStarted(StepStarted {
-                        description: format!("Tap on \"step {s}\""),
+                        description: step_description(s, opts.wide),
                         depth: None,
                         parent: None,
                         attempt: None,
@@ -433,7 +472,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     time_ms: Some(1000),
                     timestamp_local: None,
                     status: Some(if fail { "ERROR" } else { "SUCCESS" }.into()),
-                    failure: fail.then(|| "Assertion is false".into()),
+                    failure: fail.then(|| failure_message(opts.wide).to_owned()),
                 },
                 outcome: if fail {
                     FlowOutcome::Failed

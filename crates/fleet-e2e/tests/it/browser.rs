@@ -159,6 +159,20 @@ impl Browser {
             .unwrap();
     }
 
+    /// Lays the page out at `width` CSS px (and 900 px high), as a window or a phone of that width
+    /// would. Desktop emulation: the width is the layout viewport and nothing else changes.
+    pub(crate) async fn set_viewport_width(&self, width: u32) {
+        self.client
+            .issue_cmd(Cdp {
+                method: "Emulation.setDeviceMetricsOverride",
+                params: json!({
+                    "width": width, "height": 900, "deviceScaleFactor": 1, "mobile": false
+                }),
+            })
+            .await
+            .unwrap();
+    }
+
     /// Ends the session (chromedriver follows on drop).
     pub(crate) async fn quit(self) {
         self.client.close().await.unwrap();

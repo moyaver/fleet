@@ -41,7 +41,7 @@ fn flow_named<'a>(snapshot: &'a Value, name: &str) -> &'a Value {
 }
 
 /// The worker the run's agent reported on.
-async fn worker_of(stack: &Stack, snapshot: &Value) -> String {
+pub(crate) async fn worker_of(stack: &Stack, snapshot: &Value) -> String {
     // The worker row is written with the first telemetry flush; the snapshot may predate it.
     let attempt = snapshot["attempt"]["id"].as_str().unwrap();
     let deadline = tokio::time::Instant::now() + crate::dashboard_ab::PATIENCE;

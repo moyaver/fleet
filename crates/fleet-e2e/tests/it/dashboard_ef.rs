@@ -86,7 +86,7 @@ async fn choose(page: &Page<'_>, selector: &str, value: &str) {
 }
 
 /// The attempt of CI run `run_id` as the server lists it.
-async fn attempt_of(stack: &Stack, run_id: &str) -> String {
+pub(crate) async fn attempt_of(stack: &Stack, run_id: &str) -> String {
     let attempts = stack.get("/api/v1/projects/app/attempts").await;
     attempts
         .as_array()
