@@ -163,6 +163,11 @@ struct DeviceColumns {
     boot_completed: Vec<Option<bool>>,
     guest_cpu: Vec<Option<f32>>,
     guest_mem: Vec<Option<i64>>,
+    emu_cpu: Vec<Option<f32>>,
+    emu_rss: Vec<Option<i64>>,
+    avd: Vec<Option<String>>,
+    api_level: Vec<Option<i16>>,
+    activity: Vec<Option<String>>,
 }
 
 impl DeviceColumns {
@@ -175,6 +180,12 @@ impl DeviceColumns {
         self.boot_completed.push(d.boot_completed);
         self.guest_cpu.push(d.guest_cpu_pct);
         self.guest_mem.push(opt_i64(d.guest_mem_available_bytes));
+        self.emu_cpu.push(d.emu_cpu_pct);
+        self.emu_rss.push(opt_i64(d.emu_rss_bytes));
+        self.avd.push(d.avd_name.clone());
+        self.api_level
+            .push(d.api_level.and_then(|l| i16::try_from(l).ok()));
+        self.activity.push(d.foreground_activity.clone());
     }
 
     async fn insert(&self, tx: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
@@ -184,9 +195,12 @@ impl DeviceColumns {
         sqlx::query!(
             "INSERT INTO device_samples (ts, device_session_id, agent_run_id, project_id,
                                          adb_state, boot_completed, guest_cpu_pct,
-                                         guest_mem_available_bytes)
+                                         guest_mem_available_bytes, emu_cpu_pct, emu_rss_bytes,
+                                         avd_name, api_level, foreground_activity)
              SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],
-                                  $5::smallint[], $6::boolean[], $7::real[], $8::bigint[])
+                                  $5::smallint[], $6::boolean[], $7::real[], $8::bigint[],
+                                  $9::real[], $10::bigint[], $11::text[], $12::smallint[],
+                                  $13::text[])
              ON CONFLICT DO NOTHING",
             &self.ts,
             &self.session,
@@ -195,7 +209,12 @@ impl DeviceColumns {
             &self.adb_state as &[Option<i16>],
             &self.boot_completed as &[Option<bool>],
             &self.guest_cpu as &[Option<f32>],
-            &self.guest_mem as &[Option<i64>]
+            &self.guest_mem as &[Option<i64>],
+            &self.emu_cpu as &[Option<f32>],
+            &self.emu_rss as &[Option<i64>],
+            &self.avd as &[Option<String>],
+            &self.api_level as &[Option<i16>],
+            &self.activity as &[Option<String>]
         )
         .execute(&mut *tx)
         .await?;
@@ -284,6 +303,11 @@ mod tests {
             boot_completed: None,
             guest_cpu_pct: None,
             guest_mem_available_bytes: None,
+            emu_cpu_pct: None,
+            emu_rss_bytes: None,
+            avd_name: None,
+            api_level: None,
+            foreground_activity: None,
         }
     }
 
@@ -308,6 +332,10 @@ mod tests {
         answered.boot_completed = Some(true);
         answered.guest_cpu_pct = Some(12.5);
         answered.guest_mem_available_bytes = Some(2 << 30);
+        answered.emu_cpu_pct = Some(80.0);
+        answered.emu_rss_bytes = Some(3 << 30);
+        answered.avd_name = Some("Pixel_10a_atd".into());
+        answered.api_level = Some(37);
         let mut unreachable = device(now - time::Duration::seconds(30), session);
         unreachable.adb_state = Some(AdbState::Offline);
         // A clock two days off is not stored: there is no partition for it.
@@ -328,7 +356,8 @@ mod tests {
         store.store_telemetry(&[batch]).await.unwrap();
 
         let rows = sqlx::query!(
-            "SELECT adb_state, boot_completed, guest_cpu_pct, guest_mem_available_bytes
+            "SELECT adb_state, boot_completed, guest_cpu_pct, guest_mem_available_bytes,
+                    emu_cpu_pct, emu_rss_bytes, avd_name, api_level, foreground_activity
                FROM device_samples WHERE device_session_id = $1 ORDER BY ts",
             session
         )
@@ -343,14 +372,29 @@ mod tests {
                     r.boot_completed,
                     r.guest_cpu_pct,
                     r.guest_mem_available_bytes,
+                    r.emu_cpu_pct,
+                    r.emu_rss_bytes,
+                    r.avd_name,
+                    r.api_level,
+                    r.foreground_activity,
                 )
             })
             .collect();
         assert_eq!(
             rows,
             [
-                (Some(0), Some(true), Some(12.5), Some(2_i64 << 30)),
-                (Some(1), None, None, None),
+                (
+                    Some(0),
+                    Some(true),
+                    Some(12.5),
+                    Some(2_i64 << 30),
+                    Some(80.0),
+                    Some(3_i64 << 30),
+                    Some("Pixel_10a_atd".to_owned()),
+                    Some(37),
+                    None,
+                ),
+                (Some(1), None, None, None, None, None, None, None, None),
             ],
             "device, offline; the unknowns are NULL, never zero"
         );

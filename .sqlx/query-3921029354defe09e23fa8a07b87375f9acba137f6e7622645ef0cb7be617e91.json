@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT adb_state, boot_completed, guest_cpu_pct, guest_mem_available_bytes,\n                    emu_cpu_pct, emu_rss_bytes, avd_name, api_level, foreground_activity\n               FROM device_samples WHERE device_session_id = $1 ORDER BY ts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "adb_state",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "adb_state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "boot_completed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "boot_completed"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "guest_cpu_pct",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "guest_cpu_pct"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "guest_mem_available_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "guest_mem_available_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "emu_cpu_pct",
+        "type_info": "Float4",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "emu_cpu_pct"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "emu_rss_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "emu_rss_bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "avd_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "avd_name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "api_level",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "api_level"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "foreground_activity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "foreground_activity"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "3921029354defe09e23fa8a07b87375f9acba137f6e7622645ef0cb7be617e91"
+}
