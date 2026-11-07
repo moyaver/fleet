@@ -10,7 +10,7 @@
   - *Telemetry:* own `tseq`, may be coalesced or dropped, acked at a 10–30 s checkpoint.
 - **Resume:** the server's `welcome.committed_through` is authoritative, not the agent's last-seen ack.
 - **Outcomes are claims** with provenance (`junit_final > artifact_file > live_console > process_exit > server_inferred`). The merge is order-independent; inferred sources can never claim `passed` (enforced by a DB constraint).
-- **Keepalive:** ping every 15–25 s (proxy idle timeouts are 60–100 s). Heartbeat expiry > 3× the interval. HTTPS batch-POST fallback.
+- **Keepalive:** ping every 15–25 s (proxy idle timeouts are 60–100 s). Heartbeat expiry > 3× the interval. HTTPS batch-POST fallback. Shipped: the agent pings every 10 s (`PING_INTERVAL` in `crates/fleet-agent/src/transport.rs`), and the server pings every `ingest.ping_interval_ms` (20 s by default).
 - Artifacts go over HTTPS uploads, never WebSocket frames.
 
 ## Consequences

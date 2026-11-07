@@ -18,5 +18,5 @@ P1 spawns an **observer** (P2, tokio) that does all telemetry. P1 feeds P2 a cop
 
 ## Consequences
 - A telemetry crash cannot alter the CI result (verified in the PoC).
-- On a GitHub cancel (SIGINT, 7.5 s, SIGTERM, 2.5 s, kill), the observer sends `session.interrupted` at the first signal. Cleanup is best-effort.
+- On a GitHub cancel (SIGINT, 7.5 s, SIGTERM, 2.5 s, kill), the observer sends `session.interrupted` at the first signal. Cleanup is best-effort. Shipped: the event is `run.signal` (with the signal number), and `run.ended` then carries `interrupted: true`.
 - Slightly more complex IPC (data pipe + control pipe).

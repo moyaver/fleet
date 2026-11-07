@@ -78,7 +78,7 @@ Sources are listed at the end; the bracketed tags point to them.
 
 ## Unsafe
 
-- **`unsafe_code` is denied everywhere.** The only file that may opt out is `crates/fleet-agent/src/sys.rs`, with `#![expect(unsafe_code, reason = "…")]` **(CI: `xtask lint`)**. Prefer safe APIs first: `CommandExt::process_group`, `signal-hook`'s `emulate_default_handler`, `nix`.
+- **`unsafe_code` is denied everywhere.** The only file that may opt out is `crates/fleet-agent/src/sys.rs`, which is reserved for the day unsafe is needed (none exists today), with `#![expect(unsafe_code, reason = "…")]` **(CI: `xtask lint`)**. Prefer safe APIs first: `CommandExt::process_group`, `signal-hook`'s `emulate_default_handler`, `nix`.
 - **If unsafe is unavoidable**: one operation per block with a `// SAFETY:` comment, `# Safety` on every `unsafe fn`, and `unsafe_op_in_unsafe_fn` denied **(CI)**.
 
 ## Lint exceptions
