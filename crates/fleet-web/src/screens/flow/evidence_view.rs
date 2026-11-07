@@ -14,7 +14,7 @@
 
 use fleet_protocol::rest::FlowDetailView;
 use fleet_ui::{
-    components::display::{Card, Skeleton, StatusPill},
+    components::display::{Card, Skeleton, StatusPill, TableBox},
     logview::{model::anchored_line, view::LogViewer},
     screenshots::view::ScreenshotViewerView,
     tone::Tone,
@@ -316,34 +316,36 @@ fn CommandsSection(feed: EvidenceFeed) -> impl IntoView {
 #[component]
 fn CommandTable(rows: Vec<CommandRow>) -> impl IntoView {
     view! {
-        <table class="w-full text-left text-sm" data-testid="command-timings">
-            <caption class="sr-only">"Every command Maestro ran for this flow, with how long it took"</caption>
-            <thead class="border-b border-border text-muted">
-                <tr>
-                    {["#", "Command", "Result", "Duration"]
-                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                </tr>
-            </thead>
-            <tbody>
-                {rows
-                    .into_iter()
-                    .map(|r| {
-                        view! {
-                            <tr class="border-b border-border" data-testid="command-row" data-status=r.status>
-                                <td class="px-2 py-1 tabular-nums">{r.sequence + 1}</td>
-                                <td class="px-2 py-1">
-                                    <span style:margin-left=format!("{}rem", r.depth)>{r.label}</span>
-                                </td>
-                                <td class="px-2 py-1"><StatusPill tone=r.tone label=r.status /></td>
-                                <td class="px-2 py-1 tabular-nums">
-                                    {r.duration.unwrap_or_else(|| "—".to_owned())}
-                                </td>
-                            </tr>
-                        }
-                    })
-                    .collect_view()}
-            </tbody>
-        </table>
+        <TableBox label="Commands">
+            <table class="w-full text-left text-sm" data-testid="command-timings">
+                <caption class="sr-only">"Every command Maestro ran for this flow, with how long it took"</caption>
+                <thead class="border-b border-border text-muted">
+                    <tr>
+                        {["#", "Command", "Result", "Duration"]
+                            .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .map(|r| {
+                            view! {
+                                <tr class="border-b border-border" data-testid="command-row" data-status=r.status>
+                                    <td class="px-2 py-1 tabular-nums">{r.sequence + 1}</td>
+                                    <td class="px-2 py-1">
+                                        <span style:margin-left=format!("{}rem", r.depth)>{r.label}</span>
+                                    </td>
+                                    <td class="px-2 py-1"><StatusPill mark=r.mark label=r.status /></td>
+                                    <td class="px-2 py-1 tabular-nums">
+                                        {r.duration.unwrap_or_else(|| "—".to_owned())}
+                                    </td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
     }
 }
 

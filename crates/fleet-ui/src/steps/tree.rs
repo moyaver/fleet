@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use fleet_protocol::event::StepStatus;
 use fleet_protocol::journal::SourceKind;
 
+use crate::mark::Mark;
 use crate::provenance::Provenance;
-use crate::tone::Tone;
 
 /// One step execution, in the order the steps started.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -303,28 +303,29 @@ impl TreeState {
     }
 }
 
-/// Accessible text for a status (never color alone).
+/// The status word, in the one Title Case vocabulary. A step that completed reads `Passed`.
 #[must_use]
 pub fn status_label(status: StepStatus) -> &'static str {
     match status {
-        StepStatus::Running => "running",
-        StepStatus::Completed => "completed",
-        StepStatus::Failed => "failed",
-        StepStatus::Warned => "warned",
-        StepStatus::Skipped => "skipped",
-        StepStatus::Unknown => "unknown",
+        StepStatus::Running => "Running",
+        StepStatus::Completed => "Passed",
+        StepStatus::Failed => "Failed",
+        StepStatus::Warned => "Warned",
+        StepStatus::Skipped => "Skipped",
+        StepStatus::Unknown => "Unknown",
     }
 }
 
-/// The colour role of a status.
+/// The icon and colour that go with the word.
 #[must_use]
-pub fn status_tone(status: StepStatus) -> Tone {
+pub fn status_mark(status: StepStatus) -> Mark {
     match status {
-        StepStatus::Running => Tone::Info,
-        StepStatus::Completed => Tone::Success,
-        StepStatus::Failed => Tone::Danger,
-        StepStatus::Warned => Tone::Warning,
-        StepStatus::Skipped | StepStatus::Unknown => Tone::Muted,
+        StepStatus::Running => Mark::Running,
+        StepStatus::Completed => Mark::Passed,
+        StepStatus::Failed => Mark::Failed,
+        StepStatus::Warned => Mark::Interrupted,
+        StepStatus::Skipped => Mark::Skipped,
+        StepStatus::Unknown => Mark::Unknown,
     }
 }
 
@@ -537,9 +538,11 @@ mod tests {
             Provenance::Inferred
         );
         assert_eq!(provenance_of(SourceKind::Unrecognized), Provenance::Missing);
-        assert_eq!(status_tone(StepStatus::Failed), Tone::Danger);
-        assert_eq!(status_tone(StepStatus::Completed), Tone::Success);
-        assert_eq!(status_tone(StepStatus::Unknown), Tone::Muted);
+        assert_eq!(status_mark(StepStatus::Failed), Mark::Failed);
+        assert_eq!(status_mark(StepStatus::Completed), Mark::Passed);
+        assert_eq!(status_mark(StepStatus::Unknown), Mark::Unknown);
+        assert_eq!(status_label(StepStatus::Completed), "Passed");
+        assert_eq!(status_label(StepStatus::Warned), "Warned");
     }
 
     #[test]

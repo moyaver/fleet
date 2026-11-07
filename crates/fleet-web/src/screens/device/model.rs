@@ -6,7 +6,7 @@
 //! is shown as "Not reported" instead of being derived from something else.
 
 use fleet_protocol::rest::{DeviceDetailView, DeviceProfileView, DeviceSessionView};
-use fleet_ui::{charts::format::format_duration, provenance::Provenance, tone::Tone};
+use fleet_ui::{charts::format::format_duration, mark::Mark, provenance::Provenance};
 use uuid::Uuid;
 
 use crate::{
@@ -20,17 +20,17 @@ use crate::{
 #[must_use]
 pub const fn device_state_pill(state: &str) -> Pill {
     // `str` can't be matched with `==` in a const fn, so match the bytes of the fixed vocabulary.
-    let (label, tone) = match state.as_bytes() {
-        b"discovered" => ("Discovered", Tone::Neutral),
-        b"booting" => ("Booting", Tone::Warning),
-        b"ready" => ("Ready", Tone::Success),
-        b"busy" => ("Busy", Tone::Info),
-        b"offline" => ("Offline", Tone::Danger),
-        b"released" => ("Released", Tone::Neutral),
-        b"lost" => ("Lost", Tone::Danger),
-        _ => ("Unrecognized state", Tone::Muted),
+    let (label, mark) = match state.as_bytes() {
+        b"discovered" => ("Discovered", Mark::NotStarted),
+        b"booting" => ("Booting", Mark::Running),
+        b"ready" => ("Ready", Mark::Passed),
+        b"busy" => ("Busy", Mark::Running),
+        b"offline" => ("Offline", Mark::Failed),
+        b"released" => ("Released", Mark::End),
+        b"lost" => ("Lost", Mark::Failed),
+        _ => ("Unrecognized state", Mark::Unknown),
     };
-    Pill { label, tone }
+    Pill { label, mark }
 }
 
 fn kind_text(p: &DeviceProfileView) -> String {
@@ -326,7 +326,7 @@ mod tests {
         let h = DeviceHeader::build(&view(), &ctx());
         assert_eq!(h.title, "Pixel_7_API_34");
         assert_eq!(h.subtitle, "emulator-5554");
-        assert_eq!((h.state.label, h.state.tone), ("Busy", Tone::Info));
+        assert_eq!((h.state.label, h.state.mark), ("Busy", Mark::Running));
         let facts: Vec<_> = h.facts.iter().map(|f| (f.label, f.shown())).collect();
         assert_eq!(
             facts,
@@ -367,23 +367,23 @@ mod tests {
     }
 
     #[test]
-    fn every_session_state_has_a_word_and_a_tone() {
+    fn every_session_state_has_a_word_and_a_mark() {
         let expect = [
-            ("discovered", "Discovered", Tone::Neutral),
-            ("booting", "Booting", Tone::Warning),
-            ("ready", "Ready", Tone::Success),
-            ("busy", "Busy", Tone::Info),
-            ("offline", "Offline", Tone::Danger),
-            ("released", "Released", Tone::Neutral),
-            ("lost", "Lost", Tone::Danger),
+            ("discovered", "Discovered", Mark::NotStarted),
+            ("booting", "Booting", Mark::Running),
+            ("ready", "Ready", Mark::Passed),
+            ("busy", "Busy", Mark::Running),
+            ("offline", "Offline", Mark::Failed),
+            ("released", "Released", Mark::End),
+            ("lost", "Lost", Mark::Failed),
         ];
-        for (state, label, tone) in expect {
+        for (state, label, mark) in expect {
             let p = device_state_pill(state);
-            assert_eq!((p.label, p.tone), (label, tone), "{state}");
+            assert_eq!((p.label, p.mark), (label, mark), "{state}");
         }
-        // A state this build doesn't know is shown as unrecognized, muted.
+        // A state this build doesn't know is shown as unrecognized, never as a result.
         let p = device_state_pill("hibernating");
-        assert_eq!((p.label, p.tone), ("Unrecognized state", Tone::Muted));
+        assert_eq!((p.label, p.mark), ("Unrecognized state", Mark::Unknown));
     }
 
     #[test]
@@ -421,8 +421,8 @@ mod tests {
         assert_eq!(names, ["checkout", "login", "onboarding"]);
         let login = &rows.rows[1];
         assert_eq!(
-            (login.state.label, login.state.tone),
-            ("Failed", Tone::Danger)
+            (login.state.label, login.state.mark),
+            ("Failed", Mark::Failed)
         );
         // A live-console failure is provisional: never presented as final.
         assert_eq!(login.provenance, Provenance::Provisional);

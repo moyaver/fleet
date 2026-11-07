@@ -28,7 +28,7 @@ pub struct BarStyle {
     pub tone: Tone,
     /// The fill.
     pub pattern: Pattern,
-    /// `passed`, `failed`, `running`, …
+    /// The status word: `Passed`, `Failed`, `Running`, …
     pub outcome: &'static str,
 }
 
@@ -36,13 +36,13 @@ pub struct BarStyle {
 #[must_use]
 pub fn bar_style(state: BarState, provenance: Provenance) -> BarStyle {
     let (outcome, tone) = match state {
-        BarState::Running => ("running", Tone::Info),
+        BarState::Running => ("Running", Tone::Info),
         BarState::Ended { outcome, .. } => match outcome {
-            FlowOutcome::Passed => ("passed", Tone::Success),
-            FlowOutcome::Failed => ("failed", Tone::Danger),
-            FlowOutcome::Skipped => ("skipped", Tone::Muted),
-            FlowOutcome::Interrupted => ("interrupted", Tone::Warning),
-            FlowOutcome::Unknown | FlowOutcome::Unrecognized => ("unknown", Tone::Neutral),
+            FlowOutcome::Passed => ("Passed", Tone::Success),
+            FlowOutcome::Failed => ("Failed", Tone::Danger),
+            FlowOutcome::Skipped => ("Skipped", Tone::Muted),
+            FlowOutcome::Interrupted => ("Interrupted", Tone::Warning),
+            FlowOutcome::Unknown | FlowOutcome::Unrecognized => ("Unknown", Tone::Neutral),
         },
     };
     let (tone, pattern) = match provenance {
@@ -85,7 +85,7 @@ mod tests {
             let s = bar_style(ended(FlowOutcome::Passed), p);
             assert_eq!((s.tone, s.pattern), (Tone::Muted, Pattern::Dashed));
             // The words still say what was last known.
-            assert_eq!(s.outcome, "passed");
+            assert_eq!(s.outcome, "Passed");
         }
     }
 
@@ -102,11 +102,12 @@ mod tests {
     #[test]
     fn outcome_words() {
         let word = |s| bar_style(s, Provenance::Final).outcome;
-        assert_eq!(word(BarState::Running), "running");
-        assert_eq!(word(ended(FlowOutcome::Passed)), "passed");
-        assert_eq!(word(ended(FlowOutcome::Interrupted)), "interrupted");
-        assert_eq!(word(ended(FlowOutcome::Skipped)), "skipped");
-        assert_eq!(word(ended(FlowOutcome::Unknown)), "unknown");
-        assert_eq!(word(ended(FlowOutcome::Unrecognized)), "unknown");
+        assert_eq!(word(BarState::Running), "Running");
+        assert_eq!(word(ended(FlowOutcome::Passed)), "Passed");
+        assert_eq!(word(ended(FlowOutcome::Failed)), "Failed");
+        assert_eq!(word(ended(FlowOutcome::Interrupted)), "Interrupted");
+        assert_eq!(word(ended(FlowOutcome::Skipped)), "Skipped");
+        assert_eq!(word(ended(FlowOutcome::Unknown)), "Unknown");
+        assert_eq!(word(ended(FlowOutcome::Unrecognized)), "Unknown");
     }
 }

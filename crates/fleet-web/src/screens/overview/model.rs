@@ -365,7 +365,7 @@ fn count(n: i64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use fleet_ui::tone::Tone;
+    use fleet_ui::mark::Mark;
     use serde_json::{Value, json};
 
     use super::*;
@@ -528,8 +528,8 @@ mod tests {
         assert_eq!(r.jobs.len(), 1);
         assert_eq!(r.jobs[0].name, "E2E");
         assert_eq!(
-            (r.jobs[0].pill.label, r.jobs[0].pill.tone),
-            ("Failed", Tone::Danger)
+            (r.jobs[0].pill.label, r.jobs[0].pill.mark),
+            ("Failed", Mark::Failed)
         );
         assert_eq!(r.jobs[0].provenance, Provenance::Final);
         assert_eq!(r.progress.text(), "2 of 2 flows finished");

@@ -22,8 +22,8 @@ use fleet_protocol::{
 use fleet_ui::{
     charts::format::{Unit, format_duration},
     logview::model::{LogModel, StepStart},
+    mark::Mark,
     screenshots::Shot,
-    tone::Tone,
 };
 use serde_json::Value;
 use uuid::Uuid;
@@ -489,8 +489,8 @@ pub struct CommandRow {
     pub label: String,
     /// How it ended, in words.
     pub status: &'static str,
-    /// Its colour role.
-    pub tone: Tone,
+    /// The icon and colour of the word.
+    pub mark: Mark,
     /// How long it took.
     pub duration: Option<String>,
 }
@@ -510,21 +510,21 @@ pub fn command_rows(text: &str) -> Result<Vec<CommandRow>, &'static str> {
 fn command_row(entry: &Value) -> Option<CommandRow> {
     let name = entry.get("command")?.as_object()?.keys().next()?;
     let meta = entry.get("metadata")?;
-    let (status, tone) = match meta.get("status").and_then(Value::as_str) {
-        Some("COMPLETED") => ("Completed", Tone::Success),
-        Some("FAILED") => ("Failed", Tone::Danger),
-        Some("SKIPPED") => ("Skipped", Tone::Muted),
-        Some("WARNED") => ("Warned", Tone::Warning),
-        Some("RUNNING") => ("Running", Tone::Info),
-        Some("PENDING") => ("Pending", Tone::Neutral),
-        _ => ("Unknown", Tone::Neutral),
+    let (status, mark) = match meta.get("status").and_then(Value::as_str) {
+        Some("COMPLETED") => ("Passed", Mark::Passed),
+        Some("FAILED") => ("Failed", Mark::Failed),
+        Some("SKIPPED") => ("Skipped", Mark::Skipped),
+        Some("WARNED") => ("Warned", Mark::Interrupted),
+        Some("RUNNING") => ("Running", Mark::Running),
+        Some("PENDING") => ("Not started", Mark::NotStarted),
+        _ => ("Unknown", Mark::Unknown),
     };
     Some(CommandRow {
         sequence: meta.get("sequenceNumber")?.as_u64()?,
         depth: meta.get("depth").and_then(Value::as_u64).unwrap_or(0),
         label: words(name),
         status,
-        tone,
+        mark,
         duration: meta
             .get("duration")
             .and_then(Value::as_i64)
@@ -1119,7 +1119,7 @@ MFLT1|1793751928543|w-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \
                     r.depth,
                     r.label.as_str(),
                     r.status,
-                    r.tone,
+                    r.mark,
                     r.duration.as_deref(),
                 )
             })
@@ -1131,25 +1131,18 @@ MFLT1|1793751928543|w-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \
                     0,
                     0,
                     "Define variables",
-                    "Completed",
-                    Tone::Success,
+                    "Passed",
+                    Mark::Passed,
                     Some("4 ms")
                 ),
-                (
-                    2,
-                    0,
-                    "Launch app",
-                    "Completed",
-                    Tone::Success,
-                    Some("248 ms")
-                ),
-                (3, 0, "Tap on element", "Skipped", Tone::Muted, None),
+                (2, 0, "Launch app", "Passed", Mark::Passed, Some("248 ms")),
+                (3, 0, "Tap on element", "Skipped", Mark::Skipped, None),
                 (
                     4,
                     1,
                     "Assert condition",
                     "Failed",
-                    Tone::Danger,
+                    Mark::Failed,
                     Some("15 s")
                 ),
             ]
@@ -1161,7 +1154,7 @@ MFLT1|1793751928543|w-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \
         let json = r#"[{"command": {"waitCommand": {}},
             "metadata": {"status": "TELEPORTED", "sequenceNumber": 0, "depth": 0, "duration": 5}}]"#;
         let row = command_rows(json).unwrap().remove(0);
-        assert_eq!((row.status, row.tone), ("Unknown", Tone::Neutral));
+        assert_eq!((row.status, row.mark), ("Unknown", Mark::Unknown));
     }
 
     #[test]

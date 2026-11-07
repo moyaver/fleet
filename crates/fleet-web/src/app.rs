@@ -15,7 +15,8 @@ use fleet_protocol::rest::SessionView;
 use fleet_ui::components::{
     controls::{Button, ButtonVariant},
     display::EmptyState,
-    layout::Layout,
+    layout::{Layout, TopBar},
+    live::{LiveIndicator, LiveState},
 };
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{
@@ -45,6 +46,24 @@ pub struct Auth {
     pub sign_in_needed: RwSignal<bool>,
 }
 
+/// The live indicator of the top bar, lent by the page that follows a live feed. `None` while the
+/// page has none (the indicator is then not shown).
+#[derive(Debug, Clone, Copy)]
+pub struct LiveBar {
+    /// Where the feed stands.
+    pub state: RwSignal<LiveState>,
+    /// What follows the state's word, such as "updated 2 s ago".
+    pub detail: RwSignal<String>,
+    /// The menu's action, such as "Pause"; `None` means no menu.
+    pub action: RwSignal<Option<String>>,
+    /// Runs the menu's action.
+    pub on_action: Callback<()>,
+}
+
+/// The slot the top bar reads its live indicator from; a page sets it while it is shown.
+#[derive(Debug, Clone, Copy)]
+pub struct LiveSlot(pub RwSignal<Option<LiveBar>>);
+
 /// The app: routes inside the shell.
 #[component]
 pub fn App() -> impl IntoView {
@@ -53,6 +72,7 @@ pub fn App() -> impl IntoView {
         sign_in_needed: RwSignal::new(false),
     };
     provide_context(auth);
+    provide_context(LiveSlot(RwSignal::new(None)));
     spawn_local(async move {
         if let Ok(session) = api::session().await {
             auth.session.set(Some(session));
@@ -77,9 +97,98 @@ pub fn App() -> impl IntoView {
     }
 }
 
-/// The title (the page's `h1`), the navigation and the person.
+/// The project a page is about, from its address: `/p/<project>/…` or `?project=`.
+fn project_of(pathname: &str, search: &str) -> Option<String> {
+    let mut segments = pathname.trim_matches('/').split('/');
+    if segments.next() == Some("p") {
+        return segments.next().filter(|p| !p.is_empty()).map(str::to_owned);
+    }
+    search
+        .trim_start_matches('?')
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("project="))
+        .filter(|p| !p.is_empty())
+        .map(str::to_owned)
+}
+
+/// The top bar (the redesign's Foundations: one rule, no panel): the brand (a link to Overview),
+/// the project the page is about, the navigation and the account. The live indicator of a page
+/// that has one sits at the right. On phones the account and the navigation scroll in their own
+/// boxes, and the account moves behind a ⋯ menu.
 #[component]
 fn Header() -> impl IntoView {
+    let location = use_location();
+    let project = move || project_of(&location.pathname.get(), &location.search.get());
+    let live = expect_context::<LiveSlot>().0;
+    view! {
+        <TopBar>
+            // The product name is the page's only h1; the link takes the reader to Overview.
+            <h1 class="m-0 inline-flex">
+                <A href="/" attr:class="brand">
+                    <span class="brand-mark" aria-hidden="true"></span>
+                    <span class="brand-word">"Fleet"</span>
+                </A>
+            </h1>
+            {move || project().map(|p| view! {
+                <span class="proj" data-testid="project-label">
+                    <span class="muted">"Project"</span>
+                    <span>{p}</span>
+                </span>
+            })}
+            <nav aria-label="Primary">
+                <ul class="nav">
+                    <li>
+                        <A href="/" exact=true>"Overview"</A>
+                    </li>
+                    <li>
+                        <A href="/history">"History"</A>
+                    </li>
+                    <li>
+                        <A href="/compare">"Compare"</A>
+                    </li>
+                </ul>
+            </nav>
+            <div class="top-right">
+                {move || live.get().map(|bar| view! {
+                    <LiveIndicator
+                        state=bar.state
+                        detail=bar.detail
+                        action=bar.action
+                        on_action=bar.on_action
+                        menu_id="live-menu"
+                    />
+                })}
+                <div class="hide-phone-top flex items-center gap-3">
+                    <Account compact=false />
+                </div>
+                <div class="only-phone">
+                    <button
+                        type="button"
+                        class="inline-flex min-h-11 items-center px-2 text-lg text-muted"
+                        popovertarget="more-menu"
+                        aria-haspopup="menu"
+                        aria-label="More"
+                    >
+                        "⋯"
+                    </button>
+                    <div id="more-menu" popover="auto" role="menu" aria-label="Account" class="min-w-48 rounded border border-line-strong bg-bg p-3">
+                        <div class="flex flex-col gap-2">
+                            <Account compact=true />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </TopBar>
+    }
+}
+
+/// Who is signed in, with Sign out; or the Sign in link once a request asked for a login. The
+/// compact copy sits in the phone's ⋯ menu and carries no test ids, so each id is on one element.
+#[component]
+fn Account(
+    /// Whether this is the copy inside the phone's menu.
+    compact: bool,
+) -> impl IntoView {
     let auth = expect_context::<Auth>();
     let location = use_location();
     let sign_in = move || {
@@ -97,73 +206,39 @@ fn Header() -> impl IntoView {
             });
         }
     };
-    view! {
-        <header class="border-b border-border bg-surface">
-            <div class="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3">
-                <h1 class="text-lg font-semibold">"Fleet"</h1>
-                <nav aria-label="Primary">
-                    <ul class="flex gap-4">
-                        <li>
-                            <A
-                                href="/"
-                                exact=true
-                                attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
-                            >
-                                "Overview"
-                            </A>
-                        </li>
-                        <li>
-                            <A
-                                href="/history"
-                                attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
-                            >
-                                "History"
-                            </A>
-                        </li>
-                        <li>
-                            <A
-                                href="/compare"
-                                attr:class="rounded px-2 py-1 text-muted hover:text-fg aria-[current=page]:font-semibold aria-[current=page]:text-fg"
-                            >
-                                "Compare"
-                            </A>
-                        </li>
-                    </ul>
-                </nav>
-                <div class="ml-auto flex items-center gap-3 text-sm">
-                    {move || match auth.session.get() {
-                        Some(session) => {
-                            let who = session
-                                .user
-                                .name
-                                .or(session.user.email)
-                                .unwrap_or_else(|| "Signed in".to_owned());
-                            view! {
-                                <span data-testid="whoami" class="text-muted">{who}</span>
-                                <Button variant=ButtonVariant::Secondary on_click=Callback::new(sign_out)>
-                                    "Sign out"
-                                </Button>
-                            }
-                                .into_any()
-                        }
-                        None if auth.sign_in_needed.get() => {
-                            view! {
-                                <a
-                                    data-testid="sign-in"
-                                    rel="external"
-                                    class="rounded border border-border px-3 py-1.5 font-medium hover:bg-tone-neutral-bg"
-                                    href=sign_in()
-                                >
-                                    "Sign in"
-                                </a>
-                            }
-                                .into_any()
-                        }
-                        None => ().into_any(),
-                    }}
-                </div>
-            </div>
-        </header>
+    let whoami = (!compact).then_some("whoami");
+    let sign_in_id = (!compact).then_some("sign-in");
+    move || {
+        match auth.session.get() {
+        Some(session) => {
+            let who = session
+                .user
+                .name
+                .or(session.user.email)
+                .unwrap_or_else(|| "Signed in".to_owned());
+            view! {
+                <span data-testid=whoami class="who">{who}</span>
+                <Button variant=ButtonVariant::Secondary on_click=Callback::new(sign_out)>
+                    "Sign out"
+                </Button>
+            }
+                .into_any()
+        }
+        None if auth.sign_in_needed.get() => {
+            view! {
+                <a
+                    data-testid=sign_in_id
+                    rel="external"
+                    class="inline-flex min-h-8 items-center rounded border border-line-strong px-3 text-sm font-medium text-fg hover:bg-band"
+                    href=sign_in()
+                >
+                    "Sign in"
+                </a>
+            }
+                .into_any()
+        }
+        None => ().into_any(),
+    }
     }
 }
 

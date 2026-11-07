@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use fleet_ui::{
     charts::format::format_duration,
-    components::display::{Card, EmptyState, ProvenanceBadge, Skeleton, StatTile, StatusPill},
+    components::display::{
+        Card, EmptyState, ProvenanceBadge, Skeleton, StatTile, StatusPill, TableBox,
+    },
 };
 use futures_util::future::try_join_all;
 use leptos::prelude::*;
@@ -140,53 +142,55 @@ const TD: &str = "px-2 py-1 align-top";
 
 fn active_table(rows: Vec<ActiveRow>, now: RwSignal<i64>) -> impl IntoView {
     view! {
-        <table data-testid="active-table" class="w-full border-collapse text-sm">
-            <caption class="sr-only">"Active pipeline runs"</caption>
-            <thead class="border-b border-border">
-                <tr>
-                    <th scope="col" class=TH>"Project"</th>
-                    <th scope="col" class=TH>"Pipeline"</th>
-                    <th scope="col" class=TH>"Status"</th>
-                    <th scope="col" class=TH>"Progress"</th>
-                    <th scope="col" class=TH>"Passed"</th>
-                    <th scope="col" class=TH>"Failed"</th>
-                    <th scope="col" class=TH>"Elapsed"</th>
-                    <th scope="col" class=TH>"CI"</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows
-                    .into_iter()
-                    .map(|r| {
-                        let uncertain = if r.progress.is_uncertain() { "uncertain" } else { "known" };
-                        let started = r.started_ms;
-                        view! {
-                            <tr class="border-b border-border" data-testid="active-row" data-attempt=r.attempt_id.to_string()>
-                                <td class=TD>{r.project.clone()}</td>
-                                <td class=TD>
-                                    <A href=r.href.clone() attr:class="font-medium text-primary hover:underline">{r.title.clone()}</A>
-                                    <div class="text-xs text-muted">{refs_line(r.git_ref.as_deref(), r.commit.as_deref(), r.attempt_number)}</div>
-                                </td>
-                                <td class=TD>
-                                    <StatusPill tone=r.status.tone label=r.status.label />
-                                </td>
-                                <td class=TD data-testid="progress-text" data-progress=uncertain>{r.progress.text()}</td>
-                                <td class=TD data-testid="passed">{r.progress.passed}</td>
-                                <td class=TD data-testid="failed">{r.progress.failed}</td>
-                                <td class=TD>{move || format_duration(now.get() - started)}</td>
-                                <td class=TD>
-                                    {r.ci_url.map(|url| view! {
-                                        <a class="text-primary hover:underline" href=url target="_blank" rel="noopener noreferrer">
-                                            "Open run"
-                                        </a>
-                                    })}
-                                </td>
-                            </tr>
-                        }
-                    })
-                    .collect_view()}
-            </tbody>
-        </table>
+        <TableBox label="Active pipelines">
+            <table data-testid="active-table" class="w-full border-collapse text-sm">
+                <caption class="sr-only">"Active pipeline runs"</caption>
+                <thead class="border-b border-border">
+                    <tr>
+                        <th scope="col" class=TH>"Project"</th>
+                        <th scope="col" class=TH>"Pipeline"</th>
+                        <th scope="col" class=TH>"Status"</th>
+                        <th scope="col" class=TH>"Progress"</th>
+                        <th scope="col" class=TH>"Passed"</th>
+                        <th scope="col" class=TH>"Failed"</th>
+                        <th scope="col" class=TH>"Elapsed"</th>
+                        <th scope="col" class=TH>"CI"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .map(|r| {
+                            let uncertain = if r.progress.is_uncertain() { "uncertain" } else { "known" };
+                            let started = r.started_ms;
+                            view! {
+                                <tr class="border-b border-border" data-testid="active-row" data-attempt=r.attempt_id.to_string()>
+                                    <td class=TD>{r.project.clone()}</td>
+                                    <td class=TD>
+                                        <A href=r.href.clone() attr:class="font-medium text-primary hover:underline">{r.title.clone()}</A>
+                                        <div class="text-xs text-muted">{refs_line(r.git_ref.as_deref(), r.commit.as_deref(), r.attempt_number)}</div>
+                                    </td>
+                                    <td class=TD>
+                                        <StatusPill mark=r.status.mark label=r.status.label />
+                                    </td>
+                                    <td class=TD data-testid="progress-text" data-progress=uncertain>{r.progress.text()}</td>
+                                    <td class=TD data-testid="passed">{r.progress.passed}</td>
+                                    <td class=TD data-testid="failed">{r.progress.failed}</td>
+                                    <td class=TD>{move || format_duration(now.get() - started)}</td>
+                                    <td class=TD>
+                                        {r.ci_url.map(|url| view! {
+                                            <a class="text-primary hover:underline" href=url target="_blank" rel="noopener noreferrer">
+                                                "Open run"
+                                            </a>
+                                        })}
+                                    </td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
     }
 }
 
@@ -200,111 +204,115 @@ fn refs_line(git_ref: Option<&str>, commit: Option<&str>, attempt: i32) -> Strin
 
 fn workers_table(rows: Vec<WorkerRow>, now: RwSignal<i64>) -> impl IntoView {
     view! {
-        <table data-testid="workers-table" class="w-full border-collapse text-sm">
-            <caption class="sr-only">"Runner health"</caption>
-            <thead class="border-b border-border">
-                <tr>
-                    <th scope="col" class=TH>"Runner"</th>
-                    <th scope="col" class=TH>"Status"</th>
-                    <th scope="col" class=TH>"Workload"</th>
-                    <th scope="col" class=TH>"Health"</th>
-                    <th scope="col" class=TH>"Data freshness"</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows
-                    .into_iter()
-                    .map(|w| {
-                        let at = w.readings_at_ms;
-                        let provenance = Signal::derive(move || freshness(at, now.get()));
-                        view! {
-                            <tr class="border-b border-border" data-testid="runner-row">
-                                <td class=TD>
-                                    <A href=w.href.clone() attr:class="font-medium text-primary hover:underline">{w.name.clone()}</A>
-                                    <div class="text-xs text-muted">{w.platform.clone()}</div>
-                                </td>
-                                <td class=TD data-testid="runner-liveness">
-                                    <StatusPill tone=w.liveness.tone label=w.liveness.label />
-                                </td>
-                                <td class=TD>{format!("{} active run{}", w.active_runs, if w.active_runs == 1 { "" } else { "s" })}</td>
-                                <td class=TD>
-                                    <ul class="space-y-0.5">
-                                        {w.readings
-                                            .into_iter()
-                                            .map(|r| {
-                                                let class = if r.available { "" } else { "italic text-muted" };
-                                                view! {
-                                                    <li data-testid="reading" data-available=r.available.to_string()>
-                                                        <span class="text-muted">{r.label}": "</span>
-                                                        <span class=class title=r.reason.unwrap_or_default()>{r.text}</span>
-                                                    </li>
-                                                }
-                                            })
-                                            .collect_view()}
-                                    </ul>
-                                </td>
-                                <td class=TD>
-                                    <ProvenanceBadge provenance=provenance />
-                                    {at.map(|at| view! {
-                                        <span class="ml-2 text-xs text-muted">
-                                            {move || format!("{} ago", format_duration((now.get() - at).max(0)))}
-                                        </span>
-                                    })}
-                                </td>
-                            </tr>
-                        }
-                    })
-                    .collect_view()}
-            </tbody>
-        </table>
+        <TableBox label="Runner health">
+            <table data-testid="workers-table" class="w-full border-collapse text-sm">
+                <caption class="sr-only">"Runner health"</caption>
+                <thead class="border-b border-border">
+                    <tr>
+                        <th scope="col" class=TH>"Runner"</th>
+                        <th scope="col" class=TH>"Status"</th>
+                        <th scope="col" class=TH>"Workload"</th>
+                        <th scope="col" class=TH>"Health"</th>
+                        <th scope="col" class=TH>"Data freshness"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .map(|w| {
+                            let at = w.readings_at_ms;
+                            let provenance = Signal::derive(move || freshness(at, now.get()));
+                            view! {
+                                <tr class="border-b border-border" data-testid="runner-row">
+                                    <td class=TD>
+                                        <A href=w.href.clone() attr:class="font-medium text-primary hover:underline">{w.name.clone()}</A>
+                                        <div class="text-xs text-muted">{w.platform.clone()}</div>
+                                    </td>
+                                    <td class=TD data-testid="runner-liveness">
+                                        <StatusPill mark=w.liveness.mark label=w.liveness.label />
+                                    </td>
+                                    <td class=TD>{format!("{} active run{}", w.active_runs, if w.active_runs == 1 { "" } else { "s" })}</td>
+                                    <td class=TD>
+                                        <ul class="space-y-0.5">
+                                            {w.readings
+                                                .into_iter()
+                                                .map(|r| {
+                                                    let class = if r.available { "" } else { "italic text-muted" };
+                                                    view! {
+                                                        <li data-testid="reading" data-available=r.available.to_string()>
+                                                            <span class="text-muted">{r.label}": "</span>
+                                                            <span class=class title=r.reason.unwrap_or_default()>{r.text}</span>
+                                                        </li>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </ul>
+                                    </td>
+                                    <td class=TD>
+                                        <ProvenanceBadge provenance=provenance />
+                                        {at.map(|at| view! {
+                                            <span class="ml-2 text-xs text-muted">
+                                                {move || format!("{} ago", format_duration((now.get() - at).max(0)))}
+                                            </span>
+                                        })}
+                                    </td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
     }
 }
 
 fn recent_table(rows: Vec<RecentRow>) -> impl IntoView {
     view! {
-        <table data-testid="recent-table" class="w-full border-collapse text-sm">
-            <caption class="sr-only">"Recently finished pipelines"</caption>
-            <thead class="border-b border-border">
-                <tr>
-                    <th scope="col" class=TH>"Project"</th>
-                    <th scope="col" class=TH>"Pipeline"</th>
-                    <th scope="col" class=TH>"Jobs"</th>
-                    <th scope="col" class=TH>"Flows"</th>
-                    <th scope="col" class=TH>"Took"</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows
-                    .into_iter()
-                    .map(|r| {
-                        view! {
-                            <tr class="border-b border-border" data-testid="recent-row" data-attempt=r.attempt_id.to_string()>
-                                <td class=TD>{r.project.clone()}</td>
-                                <td class=TD>
-                                    <A href=r.href.clone() attr:class="font-medium text-primary hover:underline">{r.title.clone()}</A>
-                                    <div class="text-xs text-muted">{refs_line(r.git_ref.as_deref(), r.commit.as_deref(), r.attempt_number)}</div>
-                                </td>
-                                <td class=TD>
-                                    <ul class="space-y-1">
-                                        {r.jobs
-                                            .into_iter()
-                                            .map(|j| view! {
-                                                <li class="flex items-center gap-2">
-                                                    <span>{j.name}</span>
-                                                    <StatusPill tone=j.pill.tone label=j.pill.label />
-                                                    <ProvenanceBadge provenance=j.provenance />
-                                                </li>
-                                            })
-                                            .collect_view()}
-                                    </ul>
-                                </td>
-                                <td class=TD>{r.progress.text()}</td>
-                                <td class=TD>{format_duration(r.finished_ms - r.started_ms)}</td>
-                            </tr>
-                        }
-                    })
-                    .collect_view()}
-            </tbody>
-        </table>
+        <TableBox label="Recently finished">
+            <table data-testid="recent-table" class="w-full border-collapse text-sm">
+                <caption class="sr-only">"Recently finished pipelines"</caption>
+                <thead class="border-b border-border">
+                    <tr>
+                        <th scope="col" class=TH>"Project"</th>
+                        <th scope="col" class=TH>"Pipeline"</th>
+                        <th scope="col" class=TH>"Jobs"</th>
+                        <th scope="col" class=TH>"Flows"</th>
+                        <th scope="col" class=TH>"Took"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .map(|r| {
+                            view! {
+                                <tr class="border-b border-border" data-testid="recent-row" data-attempt=r.attempt_id.to_string()>
+                                    <td class=TD>{r.project.clone()}</td>
+                                    <td class=TD>
+                                        <A href=r.href.clone() attr:class="font-medium text-primary hover:underline">{r.title.clone()}</A>
+                                        <div class="text-xs text-muted">{refs_line(r.git_ref.as_deref(), r.commit.as_deref(), r.attempt_number)}</div>
+                                    </td>
+                                    <td class=TD>
+                                        <ul class="space-y-1">
+                                            {r.jobs
+                                                .into_iter()
+                                                .map(|j| view! {
+                                                    <li class="flex items-center gap-2">
+                                                        <span>{j.name}</span>
+                                                        <StatusPill mark=j.pill.mark label=j.pill.label />
+                                                        <ProvenanceBadge provenance=j.provenance />
+                                                    </li>
+                                                })
+                                                .collect_view()}
+                                        </ul>
+                                    </td>
+                                    <td class=TD>{r.progress.text()}</td>
+                                    <td class=TD>{format_duration(r.finished_ms - r.started_ms)}</td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
     }
 }

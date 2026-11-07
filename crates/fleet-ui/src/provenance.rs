@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Provenance view-model (PLAN invariant I4, §10.1; spec §18): which badge a value carries and
+//! Provenance view-model (PLAN invariant I4, §10.1; spec §18): which label a value carries and
 //! when fresh data turns stale. Wording follows spec §18 and research 05 §5.3.
-
-use crate::tone::Tone;
+//!
+//! Provenance is monochrome: a pattern glyph and a word. Colour says how a result went (see
+//! [`crate::mark`]); provenance says how well it is known, so a verified pass is not green.
 
 /// How long without an update before data counts as stale, in milliseconds (research 05 §6.1).
 pub const STALE_AFTER_MS: u64 = 25_000;
@@ -26,64 +27,64 @@ pub enum Provenance {
     Stale,
 }
 
-/// What a provenance badge shows.
+/// What a provenance label shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Badge {
     /// Visible text.
     pub label: &'static str,
-    /// Accessible name, so the meaning is not carried by colour alone.
+    /// Accessible name, so the meaning is not carried by the glyph alone.
     pub aria_label: &'static str,
-    /// Colour role.
-    pub tone: Tone,
+    /// The CSS class of the monochrome pattern glyph (`pg-*` in `tailwind.css`).
+    pub glyph: &'static str,
     /// Tooltip text explaining the provenance.
     pub description: &'static str,
 }
 
 impl Provenance {
-    /// The badge for this provenance.
+    /// The label for this provenance.
     #[must_use]
     pub const fn badge(self) -> Badge {
         match self {
             Self::Observed => Badge {
                 label: "Observed",
                 aria_label: "Provenance: observed",
-                tone: Tone::Info,
+                glyph: "pg-observed",
                 description: "Seen directly by the agent on the runner, such as device state, exit code or files.",
             },
             Self::Provisional => Badge {
                 label: "Provisional",
                 aria_label: "Provenance: provisional",
-                tone: Tone::Warning,
+                glyph: "pg-provisional",
                 description: "Read from live console output while the run is open; the final report may differ.",
             },
             Self::Final => Badge {
                 label: "Verified",
                 aria_label: "Provenance: verified",
-                tone: Tone::Success,
+                glyph: "pg-verified",
                 description: "Confirmed by the final test report; this result is settled.",
             },
             Self::Derived => Badge {
                 label: "Derived",
                 aria_label: "Provenance: derived",
-                tone: Tone::Neutral,
+                glyph: "pg-derived",
                 description: "Computed from other measurements, not a raw reading.",
             },
             Self::Inferred => Badge {
                 label: "Inferred",
                 aria_label: "Provenance: inferred",
-                tone: Tone::Accent,
+                glyph: "pg-inferred",
                 description: "Fleet's explanation of what probably happened; it was not observed and is never shown as passed.",
             },
             Self::Missing => Badge {
                 label: "Missing",
                 aria_label: "Provenance: missing",
-                tone: Tone::Muted,
+                glyph: "pg-missing",
                 description: "Nothing was received for this value.",
             },
             Self::Stale => Badge {
                 label: "Stale",
                 aria_label: "Provenance: stale",
-                tone: Tone::Muted,
+                glyph: "pg-stale",
                 description: "No recent update; this is the last known value.",
             },
         }
@@ -110,19 +111,16 @@ mod tests {
         let b = Provenance::Final.badge();
         assert_eq!(b.label, "Verified");
         assert_eq!(b.aria_label, "Provenance: verified");
-        assert_eq!(b.tone, Tone::Success);
         assert_eq!(
             b.description,
             "Confirmed by the final test report; this result is settled."
         );
         assert_eq!(Provenance::Provisional.badge().label, "Provisional");
-        assert_eq!(Provenance::Provisional.badge().tone, Tone::Warning);
-        assert_eq!(Provenance::Inferred.badge().tone, Tone::Accent);
-        assert_eq!(Provenance::Stale.badge().tone, Tone::Muted);
+        assert_eq!(Provenance::Stale.badge().label, "Stale");
     }
 
     #[test]
-    fn every_provenance_has_distinct_text_and_description() {
+    fn every_provenance_has_distinct_text_glyph_and_description() {
         let all = [
             Provenance::Observed,
             Provenance::Provisional,
@@ -136,9 +134,11 @@ mod tests {
             for b in &all[i + 1..] {
                 assert_ne!(a.badge().label, b.badge().label);
                 assert_ne!(a.badge().aria_label, b.badge().aria_label);
+                assert_ne!(a.badge().glyph, b.badge().glyph);
                 assert_ne!(a.badge().description, b.badge().description);
             }
             assert!(a.badge().aria_label.starts_with("Provenance: "));
+            assert!(a.badge().glyph.starts_with("pg-"));
         }
     }
 

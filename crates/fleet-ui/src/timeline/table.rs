@@ -20,7 +20,7 @@ pub struct TableRow {
     pub end: String,
     /// How long it took, or `… so far` while it runs.
     pub duration: String,
-    /// `passed`, `failed`, `running`, …
+    /// The status word: `Passed`, `Failed`, `Running`, …
     pub outcome: String,
     /// `final`, `provisional`, …
     pub provenance: String,
@@ -63,7 +63,7 @@ pub fn table_rows(data: &TimelineData, now_ms: i64, utc_offset_minutes: i32) -> 
                 flow: bar.label.clone(),
                 start: time(bar.start_ms),
                 end: if running {
-                    "running".to_owned()
+                    "Running".to_owned()
                 } else {
                     time(bar.end_ms(now_ms))
                 },
@@ -73,7 +73,7 @@ pub fn table_rows(data: &TimelineData, now_ms: i64, utc_offset_minutes: i32) -> 
                     elapsed
                 },
                 outcome: style.outcome.to_owned(),
-                provenance: bar.provenance.badge().label.to_lowercase(),
+                provenance: bar.provenance.badge().label.to_owned(),
                 running,
             }
         })
@@ -111,14 +111,14 @@ mod tests {
                 start: "2023-11-14 22:13:20".to_owned(),
                 end: "2023-11-14 22:13:24".to_owned(),
                 duration: "4.2 s".to_owned(),
-                outcome: "failed".to_owned(),
-                provenance: "provisional".to_owned(),
+                outcome: "Failed".to_owned(),
+                provenance: "Provisional".to_owned(),
                 running: false,
             }
         );
         assert_eq!(
             rows[0].summary(),
-            "login.yaml on Device a: failed (provisional), started 2023-11-14 22:13:20, took 4.2 s"
+            "login.yaml on Device a: Failed (Provisional), started 2023-11-14 22:13:20, took 4.2 s"
         );
     }
 
@@ -128,15 +128,15 @@ mod tests {
         let r = &rows[1];
         assert_eq!(
             (r.end.as_str(), r.duration.as_str()),
-            ("running", "5 s so far")
+            ("Running", "5 s so far")
         );
         assert_eq!(
             (r.outcome.as_str(), r.provenance.as_str()),
-            ("running", "observed")
+            ("Running", "Observed")
         );
         assert_eq!(
             r.summary(),
-            "checkout.yaml on Device a: running (observed), started 2023-11-14 22:13:30, 5 s so far"
+            "checkout.yaml on Device a: Running (Observed), started 2023-11-14 22:13:30, 5 s so far"
         );
     }
 

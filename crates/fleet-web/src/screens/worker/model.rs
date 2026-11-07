@@ -296,7 +296,7 @@ pub fn device_rows(view: &WorkerView, ctx: &Ctx) -> Vec<DeviceSessionRow> {
 
 #[cfg(test)]
 mod tests {
-    use fleet_ui::tone::Tone;
+    use fleet_ui::mark::Mark;
 
     use super::*;
 
@@ -351,8 +351,8 @@ mod tests {
         let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:00Z"));
         assert_eq!(h.title, "mac-mini-3");
         assert_eq!(
-            (h.liveness.label, h.liveness.tone),
-            ("Online", Tone::Success)
+            (h.liveness.label, h.liveness.mark),
+            ("Online", Mark::Passed)
         );
         let facts: Vec<_> = h.facts.iter().map(|f| (f.label, f.shown())).collect();
         assert_eq!(
