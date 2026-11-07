@@ -231,6 +231,9 @@ pub struct Readouts {
     pub failed_flows: u64,
     /// Finished pipelines with no failed flow.
     pub no_failures: u64,
+    /// Emulators active across the projects: the server's count, not a count of pipelines, so the
+    /// readouts filter nothing by it.
+    pub emulators: u64,
 }
 
 impl Readouts {
@@ -372,7 +375,14 @@ impl OverviewModel {
         let mut attention: Vec<AttentionRow> = board.failed.iter().map(attention_row).collect();
         attention.sort_by_key(|r| std::cmp::Reverse(r.at_ms));
         Self {
-            readouts: Readouts::of(&pipelines),
+            readouts: Readouts {
+                emulators: board
+                    .projects
+                    .iter()
+                    .map(|p| count(p.overview.active_emulators))
+                    .sum(),
+                ..Readouts::of(&pipelines)
+            },
             pipelines,
             attention,
             runners,
@@ -675,6 +685,7 @@ mod tests {
                 "flows": {"pending": 0, "running": 0, "passed": 2, "failed": 0, "skipped": 0,
                           "interrupted": 0, "unknown": 0}
             }],
+            "active_emulators": 2,
             "worker_counts": {"online": 1, "stale": 1, "disconnected": 0, "completed": 0},
             "workers": [
                 worker("00000000-0000-0000-0000-0000000000c1", "online", &json!(40.0)),
@@ -759,6 +770,7 @@ mod tests {
                 failed: 2,
                 failed_flows: 2,
                 no_failures: 1,
+                emulators: 2,
             },
             "the failed open run counts as failed too; finished without failures is one"
         );
