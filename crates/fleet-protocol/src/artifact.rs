@@ -37,17 +37,21 @@ pub enum ArtifactClass {
     MaestroLog,
     /// Maestro's HTML report: one HTML file, or a zip of the report directory.
     HtmlReport,
+    /// The device logcat excerpt of a failed flow: the lines around the failing step, redacted
+    /// and capped by the agent (text; issue #75).
+    DeviceLogcat,
 }
 
 impl ArtifactClass {
     /// Every class the server accepts.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::FailureScreenshot,
         Self::FailureHierarchy,
         Self::Commands,
         Self::Junit,
         Self::MaestroLog,
         Self::HtmlReport,
+        Self::DeviceLogcat,
     ];
 
     /// The wire name, for example `failure_screenshot`.
@@ -60,6 +64,7 @@ impl ArtifactClass {
             Self::Junit => "junit",
             Self::MaestroLog => "maestro_log",
             Self::HtmlReport => "html_report",
+            Self::DeviceLogcat => "device_logcat",
         }
     }
 
@@ -77,7 +82,7 @@ impl ArtifactClass {
             Self::FailureHierarchy => &["application/json"],
             Self::Commands => &["application/json", "text/plain"],
             Self::Junit => &["application/xml", "text/xml"],
-            Self::MaestroLog => &["text/plain"],
+            Self::MaestroLog | Self::DeviceLogcat => &["text/plain"],
             Self::HtmlReport => &["text/html", "application/zip"],
         }
     }

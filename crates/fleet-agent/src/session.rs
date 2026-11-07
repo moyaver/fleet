@@ -11,14 +11,14 @@ use fleet_core::{
     reconcile::{self, FlowKey},
     redact::Redactor,
 };
-use fleet_maestro::{ReportState, bundle, junit, log, stdout};
+use fleet_maestro::{ReportState, bundle, crash, junit, log, logcat, stdout};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{
-        AgentWarning, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo, FlowEnded,
-        FlowOutcome, FlowRef, FlowReported, FlowStarted, MaestroBuild, ProcessExited, ReportParsed,
-        ReportStatus, RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode, StepEnded,
-        StepStarted, StepStatus, SuiteStarted,
+        AgentWarning, AppCrashed, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo,
+        FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted, MaestroBuild, ProcessExited,
+        ReportParsed, ReportStatus, RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode,
+        StepEnded, StepStarted, StepStatus, SuiteStarted,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -174,6 +174,8 @@ pub(crate) struct Candidate {
     pub(crate) flow: Option<Uuid>,
     /// The step that produced it, as `artifacts[]` names it (see [`Session::register_file`]).
     pub(crate) step: Option<u32>,
+    /// For a device logcat excerpt: the failing step whose window it keeps (issue #75).
+    pub(crate) failure: Option<logcat::Failure>,
 }
 
 impl std::fmt::Debug for Session {
@@ -643,6 +645,7 @@ impl Session {
                     rel: rel.to_owned(),
                     flow,
                     step: None,
+                    failure: None,
                 });
             }
             bundle::Entry::Manifest { flow_dir } => {
@@ -693,6 +696,23 @@ impl Session {
                     }
                 }
             }
+            bundle::Entry::CrashReport { flow_dir } => {
+                let (name, shard) = bundle::split_shard_suffix(&flow_dir);
+                let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
+                    return;
+                };
+                let Some(bytes) = contents else { return };
+                let Some(crash) = crash::parse_crash_report(&String::from_utf8_lossy(bytes)) else {
+                    return;
+                };
+                let body = EventBody::AppCrashed(AppCrashed {
+                    package: self.redactor.redact(&crash.package).into_owned(),
+                    exception: self.clip(&crash.exception),
+                });
+                let subject = self.flow_subject_at(idx);
+                let parser = format!("crash-report@{}", fleet_maestro::PROFILE);
+                self.emit(at, subject, SourceKind::ArtifactFile, Some(parser), &body);
+            }
             bundle::Entry::FlowDir { .. } | bundle::Entry::Other => {}
         }
     }
@@ -721,6 +741,7 @@ impl Session {
                         None,
                         parser,
                     );
+                    self.queue_logcat(at, idx, rel, &cmds);
                 } else if self.flows.get(idx).is_some_and(|f| f.manifest_seen) {
                     self.claim(
                         at,
@@ -761,6 +782,43 @@ impl Session {
                 );
             }
         }
+    }
+
+    /// Queues the device logcat excerpt of a failed flow: the window around its last failed
+    /// command, which is the step that ended the flow (issue #75). The excerpt is cut at upload,
+    /// when the log is read. A failed command without timing gets no excerpt, and says so.
+    fn queue_logcat(
+        &mut self,
+        at: ClockSample,
+        idx: usize,
+        rel: &str,
+        cmds: &[bundle::CommandRecord],
+    ) {
+        let Some(failing) = cmds.iter().rev().find(|c| c.status == "FAILED") else {
+            return;
+        };
+        let timing = failing.timestamp_ms.zip(failing.duration_ms);
+        let Some((start, duration)) = timing else {
+            self.warn(
+                at,
+                "logcat_window_unknown",
+                &format!(
+                    "{rel} has no timing for its failed command, so no device log excerpt is kept"
+                ),
+            );
+            return;
+        };
+        let start_ms = i64::try_from(start).unwrap_or(i64::MAX);
+        let end_ms = start_ms.saturating_add(i64::try_from(duration).unwrap_or(i64::MAX));
+        let flow_dir = rel.split_once('/').map_or(rel, |(dir, _)| dir);
+        let flow = self.flows.get(idx).map(|f| f.id);
+        self.uploads.push(Candidate {
+            class: ArtifactClass::DeviceLogcat,
+            rel: format!("{flow_dir}/logs/device-logcat.txt"),
+            flow,
+            step: Some(failing.sequence),
+            failure: Some(logcat::Failure { start_ms, end_ms }),
+        });
     }
 
     /// Records which step produced each of a flow's files, then attaches the files that waited for
@@ -807,6 +865,7 @@ impl Session {
                 rel: rel.to_owned(),
                 flow: self.flows.get(idx).map(|f| f.id),
                 step,
+                failure: None,
             });
         }
         self.emit(
@@ -1583,12 +1642,14 @@ mod tests {
                     rel: "pass/screenshots/step-004-odd.png".into(),
                     flow: Some(flow),
                     step: Some(2),
+                    failure: None,
                 },
                 Candidate {
                     class: ArtifactClass::Commands,
                     rel: "pass/commands.json".into(),
                     flow: Some(flow),
                     step: None,
+                    failure: None,
                 },
             ]
         );
@@ -1622,6 +1683,7 @@ mod tests {
                         .into(),
                     flow: Some(flow),
                     step: Some(4),
+                    failure: None,
                 },
                 Candidate {
                     class: ArtifactClass::FailureHierarchy,
@@ -1630,12 +1692,24 @@ mod tests {
                             .into(),
                     flow: Some(flow),
                     step: Some(4),
+                    failure: None,
+                },
+                Candidate {
+                    class: ArtifactClass::DeviceLogcat,
+                    rel: "pass/logs/device-logcat.txt".into(),
+                    flow: Some(flow),
+                    step: Some(4),
+                    failure: Some(logcat::Failure {
+                        start_ms: 1_793_751_912_442,
+                        end_ms: 1_793_751_928_077,
+                    }),
                 },
                 Candidate {
                     class: ArtifactClass::Commands,
                     rel: "pass/commands.json".into(),
                     flow: Some(flow),
                     step: None,
+                    failure: None,
                 },
             ]
         );
@@ -1674,5 +1748,96 @@ mod tests {
                 .map(|r| r.index),
             Some(2)
         );
+    }
+
+    /// The `crash` fixture's failed assertion: `commands.json` gives its start and duration.
+    const TIMED_FAILURE: &[u8] = br#"[{"metadata":{"status":"COMPLETED","sequenceNumber":0,"depth":0,"timestamp":1000,"duration":5}},
+        {"metadata":{"status":"FAILED","sequenceNumber":1,"depth":0,"timestamp":2000,"duration":18287}}]"#;
+
+    /// A failed flow queues its device log excerpt for the window of its failing command, and the
+    /// excerpt is that command's step (issue #75). A passing flow queues none.
+    #[test]
+    fn a_failed_flow_queues_its_logcat_window_and_a_passing_one_does_not() {
+        let mut s = session();
+        let flow = s.flows[0].id;
+        file(&mut s, "pass/commands.json", Some(TIMED_FAILURE));
+        file(&mut s, "pass/manifest.json", None);
+        let logcat: Vec<Candidate> = s
+            .take_uploads()
+            .into_iter()
+            .filter(|c| c.class == ArtifactClass::DeviceLogcat)
+            .collect();
+        assert_eq!(
+            logcat,
+            [Candidate {
+                class: ArtifactClass::DeviceLogcat,
+                rel: "pass/logs/device-logcat.txt".into(),
+                flow: Some(flow),
+                step: Some(1),
+                failure: Some(logcat::Failure {
+                    start_ms: 2000,
+                    end_ms: 20287,
+                }),
+            }]
+        );
+
+        let mut passing = session();
+        file(&mut passing, "pass/commands.json", Some(GOOD));
+        file(&mut passing, "pass/manifest.json", None);
+        assert!(
+            passing
+                .take_uploads()
+                .iter()
+                .all(|c| c.class != ArtifactClass::DeviceLogcat)
+        );
+    }
+
+    /// A failed command with no timing names no window: no excerpt, and a warning says why.
+    #[test]
+    fn a_failure_without_timing_keeps_no_excerpt_and_says_so() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(FAILED));
+        assert!(
+            s.take_uploads()
+                .iter()
+                .all(|c| c.class != ArtifactClass::DeviceLogcat)
+        );
+        assert!(warnings(&mut s).contains(&"logcat_window_unknown".to_owned()));
+    }
+
+    /// The app's crash in `logs/crash-report.txt` is journalled on its flow as `app.crashed`, and
+    /// the flow's verdict stays Maestro's failed assertion.
+    #[test]
+    fn a_crash_report_is_journalled_on_its_flow_without_changing_the_verdict() {
+        let mut s = session();
+        let report = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/crash/run/debug/crash/logs/crash-report.txt"
+        );
+        file(&mut s, "pass/commands.json", Some(TIMED_FAILURE));
+        file(&mut s, "pass/manifest.json", None);
+        file(&mut s, "pass/logs/crash-report.txt", Some(report));
+        let events = s.drain();
+        let crashed: Vec<&EventEnvelope> =
+            events.iter().filter(|e| e.kind == "app.crashed").collect();
+        assert_eq!(crashed.len(), 1);
+        assert_eq!(crashed[0].data["package"], "com.android.settings");
+        assert_eq!(
+            crashed[0].data["exception"],
+            "android.app.RemoteServiceException$CrashedByAdbException: shell-induced crash"
+        );
+        assert_eq!(crashed[0].subject.flow_execution_id, Some(s.flows[0].id));
+        assert_eq!(
+            s.summary()[0].1.state,
+            fleet_core::claims::FlowState::Ended(FlowOutcome::Failed)
+        );
+    }
+
+    /// A flow with no crash report journals no crash.
+    #[test]
+    fn a_flow_without_a_crash_journals_none() {
+        let mut s = session();
+        file(&mut s, "pass/commands.json", Some(GOOD));
+        file(&mut s, "pass/manifest.json", None);
+        assert!(s.drain().iter().all(|e| e.kind != "app.crashed"));
     }
 }

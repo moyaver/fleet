@@ -614,7 +614,8 @@ pub struct ArtifactView {
     /// no step produced it, and for uploads that predate step links.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step: Option<u32>,
-    /// The class: `failure_screenshot`, `failure_hierarchy`, `commands`, `junit`, `maestro_log` or `html_report`.
+    /// The class: `failure_screenshot`, `failure_hierarchy`, `commands`, `junit`, `maestro_log`,
+    /// `html_report` or `device_logcat`.
     pub class: String,
     /// File name.
     pub name: String,

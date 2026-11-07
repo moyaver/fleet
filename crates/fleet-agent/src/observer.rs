@@ -444,6 +444,18 @@ fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
                 };
                 (ct, Source::File(file))
             }
+            // The window of the device log around the failed step (issue #75).
+            ArtifactClass::DeviceLogcat => {
+                let Some(failure) = c.failure else { continue };
+                (
+                    "text/plain",
+                    Source::Logcat(upload::Logcat {
+                        path: file,
+                        failure,
+                        redactor: Arc::new(l.session.redactor().clone()),
+                    }),
+                )
+            }
             // The flow's commands carry resolved `inputText`: redacted like a log.
             _ => (
                 "application/json",

@@ -43,6 +43,11 @@ pub enum Entry {
         /// The flow folder.
         flow_dir: String,
     },
+    /// `logs/crash-report.txt`: the app died during the flow (issue #75).
+    CrashReport {
+        /// The flow folder.
+        flow_dir: String,
+    },
     /// Something else.
     Other,
 }
@@ -63,6 +68,9 @@ pub fn classify(rel: &str) -> Entry {
             flow_dir: (*dir).to_owned(),
         },
         [dir, "manifest.json"] => Entry::Manifest {
+            flow_dir: (*dir).to_owned(),
+        },
+        [dir, "logs", "crash-report.txt"] => Entry::CrashReport {
             flow_dir: (*dir).to_owned(),
         },
         [dir, "screenshots", file] if has_ext(file, "png") => {
@@ -235,6 +243,17 @@ mod tests {
             }
         );
         assert_eq!(classify("maestro.log"), Entry::Other);
+        assert_eq!(
+            classify("crash/logs/crash-report.txt"),
+            Entry::CrashReport {
+                flow_dir: "crash".into()
+            }
+        );
+        assert_eq!(
+            classify("crash/logs/device-logcat.txt"),
+            Entry::Other,
+            "the logcat is read for its window, not as a bundle file"
+        );
         assert_eq!(
             classify("fail/screenshots/step-005-assertCondition-Fleet_never_shows_this.png"),
             Entry::StepScreenshot {

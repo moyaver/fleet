@@ -13,7 +13,7 @@
 //!   ([`prepare_text`]), and a text that can't be redacted reliably is not uploaded at all.
 
 use std::{
-    io,
+    io::{self, BufRead as _},
     path::PathBuf,
     sync::{
         Arc, Mutex,
@@ -23,6 +23,7 @@ use std::{
 };
 
 use fleet_core::redact::Redactor;
+use fleet_maestro::logcat;
 use fleet_protocol::artifact::{ArtifactClass, UploadGrant, UploadRequest, UploadResult};
 use sha2::{Digest, Sha256};
 use tokio::{
@@ -86,6 +87,19 @@ pub(crate) enum Source {
     /// A text file: read and redacted when its upload starts, not before, so queued uploads hold
     /// no text in memory. It is uploaded only if it can be redacted reliably ([`prepare_text`]).
     Text(PathBuf, Arc<Redactor>),
+    /// A device log, cut to the excerpt of a failed step when the upload starts (issue #75).
+    Logcat(Logcat),
+}
+
+/// A device log and the failing step whose window of it is the excerpt.
+#[derive(Debug, Clone)]
+pub(crate) struct Logcat {
+    /// The flow's `logs/device-logcat.txt`.
+    pub(crate) path: PathBuf,
+    /// The step that failed.
+    pub(crate) failure: logcat::Failure,
+    /// Redacts each kept line (I6).
+    pub(crate) redactor: Arc<Redactor>,
 }
 
 /// How an upload ended.
@@ -260,6 +274,10 @@ impl Inner {
     async fn upload(&self, item: &Item) -> Outcome {
         let source = match &item.source {
             Source::Text(path, redactor) => match read_text(path, redactor).await {
+                Ok(bytes) => Source::Bytes(bytes.into()),
+                Err(outcome) => return outcome,
+            },
+            Source::Logcat(logcat) => match excerpt(logcat).await {
                 Ok(bytes) => Source::Bytes(bytes.into()),
                 Err(outcome) => return outcome,
             },
@@ -440,6 +458,8 @@ fn body(source: &Source, limiter: Arc<Limiter>) -> reqwest::Body {
     let start = match source {
         Source::File(path) | Source::Text(path, _) => Cursor::File(path.clone(), None),
         Source::Bytes(bytes) => Cursor::Bytes(Arc::clone(bytes), 0),
+        // `upload` cuts the excerpt into bytes before any body is built.
+        Source::Logcat(_) => Cursor::Bytes(Arc::from(Vec::new()), 0),
     };
     let stream = futures_util::stream::try_unfold(start, move |mut cursor| {
         let limiter = Arc::clone(&limiter);
@@ -548,6 +568,9 @@ async fn digest(source: &Source) -> io::Result<(u64, String)> {
                 size += n as u64;
             }
         }
+        Source::Logcat(_) => {
+            return Err(io::Error::other("the excerpt is cut before it is hashed"));
+        }
     }
     Ok((size, hex(&hasher.finalize())))
 }
@@ -653,6 +676,59 @@ fn hide_command_values(value: &mut serde_json::Value) {
 
 /// The reason code for a text the agent will not upload.
 pub(crate) const NOT_REDACTABLE: &str = "not_redactable";
+/// The reason code for a device log whose clock cannot be told from the failure's (or that has
+/// no timed line): no excerpt is cut, rather than one at the wrong time.
+pub(crate) const CLOCK_UNALIGNED: &str = "clock_unaligned";
+/// The reason code for a failed step whose window holds no line of the device log.
+pub(crate) const NO_LINES_IN_WINDOW: &str = "no_lines_in_window";
+
+/// The excerpt of a device log, cut on a blocking thread (the log is read in two streamed passes,
+/// never held whole, I10). See [`cut_excerpt`].
+async fn excerpt(logcat: &Logcat) -> Result<Vec<u8>, Outcome> {
+    let logcat = logcat.clone();
+    tokio::task::spawn_blocking(move || cut_excerpt(&logcat))
+        .await
+        .unwrap_or_else(|e| Err(Outcome::Failed(format!("cutting the device log: {e}"))))
+}
+
+/// The window of the device log around the failed step, redacted and capped (issue #75).
+///
+/// The first pass finds the log's last timed line, which aligns the device's clock with UTC
+/// ([`logcat::align`]). The second keeps the window's lines, redacted, within the cap
+/// ([`logcat::Selection`]). A line of the window that is not text is never sent (I6).
+fn cut_excerpt(logcat: &Logcat) -> Result<Vec<u8>, Outcome> {
+    let io_failed = |e: io::Error| Outcome::Failed(format!("reading the device log: {e}"));
+    let open = || {
+        std::fs::File::open(&logcat.path)
+            .map(io::BufReader::new)
+            .map_err(io_failed)
+    };
+    let mut buf = Vec::new();
+    let mut reader = open()?;
+    let mut last = None;
+    while reader.read_until(b'\n', &mut buf).map_err(io_failed)? > 0 {
+        last = logcat::stamp(&buf).or(last);
+        buf.clear();
+    }
+    let clock = last
+        .and_then(|last| logcat::align(last, logcat.failure.end_ms))
+        .ok_or_else(|| Outcome::Rejected(CLOCK_UNALIGNED.into()))?;
+
+    let mut selection = logcat::Selection::new(clock, logcat.failure.window(), logcat::CAP_BYTES);
+    let mut reader = open()?;
+    while reader.read_until(b'\n', &mut buf).map_err(io_failed)? > 0 {
+        let line = buf.strip_suffix(b"\n").unwrap_or(&buf);
+        selection
+            .push(line, |text| logcat.redactor.redact(text).into_owned())
+            .map_err(|_| Outcome::Rejected(NOT_REDACTABLE.into()))?;
+        buf.clear();
+    }
+    let excerpt = selection.finish();
+    if excerpt.kept == 0 {
+        return Err(Outcome::Rejected(NO_LINES_IN_WINDOW.into()));
+    }
+    Ok(excerpt.text.into_bytes())
+}
 
 /// Redacts a text artifact for upload, or says why it can't be uploaded. A text is uploaded only
 /// if it is valid UTF-8 without NUL bytes and small enough to hold in memory: anything else
@@ -1341,5 +1417,122 @@ mod tests {
             0,
             "not even asked about"
         );
+    }
+
+    /// The crash fixture's device log, cut to the window of its failed assertion (issue #75): the
+    /// excerpt is redacted, within the cap, and keeps both the start of the window and its end.
+    #[tokio::test]
+    async fn a_failed_steps_logcat_window_is_cut_redacted_and_sent() {
+        let (server, _) = accepting().await;
+        let log = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/crash/run/debug/crash/logs/device-logcat.txt"
+        );
+        // commands.json: the assertion started at 1794008484564 ms and failed 18287 ms later.
+        let failure = logcat::Failure {
+            start_ms: 1_794_008_484_564,
+            end_ms: 1_794_008_502_851,
+        };
+        let up = Uploader::new(config(&server)).unwrap();
+        up.submit(logcat_item(
+            text_file(log),
+            failure,
+            Redactor::new(["Settings".to_owned()]),
+        ));
+        let done = run(&up).await;
+
+        assert!(
+            matches!(done[0].outcome, Outcome::Uploaded { .. }),
+            "{done:?}"
+        );
+        let seen = server.received_requests().await.unwrap();
+        let request: UploadRequest = serde_json::from_slice(&seen[0].body).unwrap();
+        assert_eq!(request.class, "device_logcat");
+        let sent = String::from_utf8(seen[1].body.clone()).unwrap();
+        assert_eq!(request.size, sent.len() as u64);
+        assert!(sent.len() <= logcat::CAP_BYTES, "{} bytes", sent.len());
+        assert!(
+            sent.contains("11-07 01:41:22.801"),
+            "10 s before the step is in the window"
+        );
+        assert!(
+            sent.contains("11-07 01:41:44.553"),
+            "the step's end is in the window"
+        );
+        assert!(
+            !sent.contains("Settings"),
+            "a planted value never leaves (I6)"
+        );
+        assert!(!sent.contains("[truncated"), "nothing was cut");
+    }
+
+    /// A window bigger than the cap keeps the newest lines and says how many older ones it cut.
+    // UNVERIFIED: the captured crash log repeated until its window exceeds the cap; the repeats
+    // carry the same device times, so they all fall in the window.
+    #[tokio::test]
+    async fn a_window_over_the_cap_keeps_its_newest_lines_and_says_what_it_cut() {
+        let (server, _) = accepting().await;
+        let fixture = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/crash/run/debug/crash/logs/device-logcat.txt"
+        );
+        let log: Vec<u8> = fixture.repeat(logcat::CAP_BYTES / fixture.len() + 2);
+        let failure = logcat::Failure {
+            start_ms: 1_794_008_484_564,
+            end_ms: 1_794_008_502_851,
+        };
+        let up = Uploader::new(config(&server)).unwrap();
+        up.submit(logcat_item(text_file(&log), failure, Redactor::new([])));
+        let done = run(&up).await;
+
+        assert!(
+            matches!(done[0].outcome, Outcome::Uploaded { .. }),
+            "{done:?}"
+        );
+        let seen = server.received_requests().await.unwrap();
+        let sent = String::from_utf8(seen[1].body.clone()).unwrap();
+        assert!(sent.len() <= logcat::CAP_BYTES, "{} bytes", sent.len());
+        assert!(sent.starts_with("[truncated: "), "{sent:.80}");
+        assert!(
+            sent.trim_end()
+                .ends_with("adbd service requested 'shell,v2,raw:logcat -v time -d'"),
+            "the newest line is kept"
+        );
+    }
+
+    /// A log whose last line is not near the failure is not aligned, so no excerpt is cut.
+    #[tokio::test]
+    async fn a_log_that_cannot_be_aligned_with_the_failure_is_not_sent() {
+        let (server, _) = accepting().await;
+        let log = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/crash/run/debug/crash/logs/device-logcat.txt"
+        );
+        // Five minutes after the log's last line: not the failure's end, so no zone can be told.
+        let failure = logcat::Failure {
+            start_ms: 1_794_008_484_564 + 300_000,
+            end_ms: 1_794_008_502_851 + 300_000,
+        };
+        let up = Uploader::new(config(&server)).unwrap();
+        up.submit(logcat_item(text_file(log), failure, Redactor::new([])));
+        let done = run(&up).await;
+
+        assert_eq!(done[0].outcome, Outcome::Rejected(CLOCK_UNALIGNED.into()));
+        assert!(
+            server.received_requests().await.unwrap().is_empty(),
+            "nothing was sent"
+        );
+    }
+
+    fn logcat_item(file: PathBuf, failure: logcat::Failure, redactor: Redactor) -> Item {
+        Item {
+            class: ArtifactClass::DeviceLogcat,
+            path: "crash/logs/device-logcat.txt".into(),
+            content_type: "text/plain",
+            flow: None,
+            step: Some(4),
+            source: Source::Logcat(Logcat {
+                path: file,
+                failure,
+                redactor: Arc::new(redactor),
+            }),
+        }
     }
 }

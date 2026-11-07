@@ -173,6 +173,7 @@ impl<'a> Ctx<'a> {
             | EventBody::ArtifactUploaded(_)
             | EventBody::ArtifactRejected(_)
             | EventBody::AgentWarning(_)
+            | EventBody::AppCrashed(_)
             | EventBody::ParserUnrecognized(_) => Ok(Effect::Applied),
         }
     }

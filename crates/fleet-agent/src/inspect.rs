@@ -436,6 +436,15 @@ impl Replay {
                     ));
                 }
             }
+            if let Ok(bytes) = fs::read(e.path().join("logs").join("crash-report.txt")) {
+                timeline.push((
+                    0,
+                    Observation::File {
+                        rel: format!("{name}/logs/crash-report.txt"),
+                        contents: Some(bytes),
+                    },
+                ));
+            }
         }
         let report = [dir.join("report.xml"), debug.join("report.xml")]
             .into_iter()
@@ -465,7 +474,8 @@ fn recorded_timeline(
 ) -> anyhow::Result<(Vec<(u64, Observation)>, u64)> {
     let mut timeline = Vec::new();
     let mut asm = log::Assembler::default();
-    let mut seen_commands = std::collections::HashSet::new();
+    // Files whose bytes the session reads: each is read once, at its first appearance.
+    let mut read_once = std::collections::HashSet::new();
     let mut last_ms = 0;
     for line in fs::read_to_string(dir.join("events.jsonl"))
         .context("reading events.jsonl")?
@@ -493,17 +503,18 @@ fn recorded_timeline(
                 let Some(rel) = path.strip_prefix(debug) else {
                     continue;
                 };
-                let contents = if rel.ends_with("commands.json") {
-                    // Read once, at its first appearance; the capture kept the final bytes.
-                    if !seen_commands.insert(rel.to_owned()) {
+                let contents =
+                    if rel.ends_with("commands.json") || rel.ends_with("logs/crash-report.txt") {
+                        // Read once, at its first appearance; the capture kept the final bytes.
+                        if !read_once.insert(rel.to_owned()) {
+                            continue;
+                        }
+                        fs::read(dir.join(path)).ok()
+                    } else if e["event"] != "created" {
                         continue;
-                    }
-                    fs::read(dir.join(path)).ok()
-                } else if e["event"] != "created" {
-                    continue;
-                } else {
-                    None
-                };
+                    } else {
+                        None
+                    };
                 timeline.push((
                     ms,
                     Observation::File {

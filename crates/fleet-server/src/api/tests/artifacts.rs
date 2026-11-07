@@ -391,6 +391,45 @@ async fn only_allowlisted_classes_types_and_sizes_get_a_grant() {
     );
 }
 
+/// The excerpt of a failed flow's device log is an allowlisted text class with its own size limit,
+/// and it lists on the flow as failure evidence (issue #75).
+#[tokio::test]
+async fn a_device_logcat_excerpt_is_text_within_its_own_limit_and_lists_on_its_flow() {
+    let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_bytes.device_logcat = 64).await;
+    let run = run_with_failed_flow(&rig, "921").await;
+    let text: &[u8] = b"11-07 01:41:44.553 I/adbd: adbd service requested\n";
+    let ask = |ctype: &str, bytes: &[u8]| {
+        request(
+            &run,
+            "device_logcat",
+            "checkout/logs/device-logcat.txt",
+            ctype,
+            bytes,
+        )
+    };
+
+    let g = rig.grant(&ask("text/html", text)).await;
+    assert_eq!(refused(g), RejectReason::ContentTypeNotAllowed);
+    let g = rig.grant(&ask("text/plain", &[b'a'; 65])).await;
+    assert_eq!(refused(g), RejectReason::TooLarge, "the class's own limit");
+
+    let result = rig.upload(&ask("text/plain", text), text).await;
+    assert!(
+        matches!(result, UploadResult::Available { .. }),
+        "{result:?}"
+    );
+    let listed = rig.artifacts_of(run.flow).await;
+    let excerpt = listed["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["class"] == "device_logcat")
+        .unwrap_or_else(|| panic!("the excerpt is listed on its flow: {listed}"));
+    assert_eq!(excerpt["name"], "device-logcat.txt");
+    assert_eq!(excerpt["state"], "available");
+    assert_eq!(excerpt["retention_class"], "failure_evidence");
+}
+
 fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
     use std::io::Write as _;
     let mut out = std::io::Cursor::new(Vec::new());

@@ -12,9 +12,11 @@
 )]
 
 pub mod bundle;
+pub mod crash;
 pub mod invocation;
 pub mod junit;
 pub mod log;
+pub mod logcat;
 pub mod stdout;
 
 use fleet_protocol::event::ExitClass;

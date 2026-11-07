@@ -265,6 +265,9 @@ pub struct ClassLimits {
     pub maestro_log: u64,
     /// `html_report`.
     pub html_report: u64,
+    /// `device_logcat`: the excerpt of a failed flow's device log. The agent cuts it to at most
+    /// 512 KiB (issue #75), so this is the ceiling it can reach.
+    pub device_logcat: u64,
 }
 
 impl Default for ClassLimits {
@@ -277,6 +280,7 @@ impl Default for ClassLimits {
             junit: 32 * MIB,
             maestro_log: 64 * MIB,
             html_report: 128 * MIB,
+            device_logcat: 512 * 1024,
         }
     }
 }
@@ -293,6 +297,7 @@ impl ClassLimits {
             C::Junit => self.junit,
             C::MaestroLog => self.maestro_log,
             C::HtmlReport => self.html_report,
+            C::DeviceLogcat => self.device_logcat,
         }
     }
 }

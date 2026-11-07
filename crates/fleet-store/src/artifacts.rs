@@ -30,7 +30,7 @@ use crate::{Result, Store, auth::Credential};
 pub fn default_retention(class: ArtifactClass) -> &'static str {
     match class {
         ArtifactClass::Junit | ArtifactClass::HtmlReport => "report",
-        ArtifactClass::MaestroLog => "debug_log",
+        ArtifactClass::MaestroLog | ArtifactClass::DeviceLogcat => "debug_log",
         ArtifactClass::FailureScreenshot
         | ArtifactClass::FailureHierarchy
         | ArtifactClass::Commands => "success_evidence",
@@ -850,5 +850,72 @@ mod tests {
         let step_of = |id: Uuid| rows.iter().find(|r| r.id == id).map(|r| r.step);
         assert_eq!(step_of(at_step), Some(Some(2)));
         assert_eq!(step_of(unlinked), Some(None));
+    }
+
+    /// After every migration, the class CHECK allows both `failure_hierarchy` (0015) and
+    /// `device_logcat` (0016): a later migration that rewrites the list without one of them makes
+    /// that class's upload fail.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn failure_hierarchy_and_device_logcat_are_both_storable(pool: PgPool) {
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
+        let publisher = publisher(&store).await;
+        let mut agent = Agent::new("1", "e2e");
+        let handle = store
+            .open_run(&publisher, &agent.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let events = suite_run(&mut agent, SuiteIds::new(), &[("login", false)]);
+        store.apply_batch(&handle, &events[..4]).await.unwrap();
+        let flow = sqlx::query_scalar!(
+            "SELECT id FROM flow_executions WHERE agent_run_id = $1",
+            handle.agent_run_id
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        let quota = Quota {
+            max_bytes: 1 << 30,
+            max_files: 100,
+        };
+        for (class, name, content_type, content) in [
+            (
+                ArtifactClass::FailureHierarchy,
+                "step-001-tapOn-Pay.json",
+                "application/json",
+                "{}",
+            ),
+            (
+                ArtifactClass::DeviceLogcat,
+                "device-logcat.txt",
+                "text/plain",
+                "I/Test: line\n",
+            ),
+        ] {
+            let sha = hex_of(content);
+            let ask = UploadAsk {
+                project_id: publisher.project_id,
+                credential: publisher.credential,
+                agent_run_id: handle.agent_run_id,
+                flow_execution_id: Some(flow),
+                class,
+                path: name,
+                name,
+                content_type,
+                size: content.len() as u64,
+                sha256: &sha,
+                step: Some(1),
+            };
+            let stored = store
+                .request_upload(&ask, Duration::from_mins(15), quota)
+                .await;
+            assert!(
+                matches!(stored, Ok(Requested::Grant { .. })),
+                "{class:?} was refused: {stored:?}"
+            );
+        }
     }
 }
