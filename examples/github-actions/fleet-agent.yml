@@ -20,9 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # … build the app, start an emulator, install Maestro …
-      # Installs the pinned agent (checksum-verified) and runs the command under it. The job summary
-      # goes to the run page. `@main` until a release includes the action: then pin its tag.
-      - uses: moyaver/fleet/examples/github-actions/fleet-agent@main
+      # Installs the agent release named by the action's `version` input (checksum-verified, build
+      # attestation checked) and runs the command under it. The job summary goes to the run page.
+      # Pinned to the release that ships this action; move the tag with each release.
+      - uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.3
         with:
           command: maestro test .maestro/
       - name: Send anything the agent couldn't deliver
