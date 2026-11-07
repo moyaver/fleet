@@ -138,6 +138,16 @@ impl<K: Hash + Eq + Copy> Limiter<K> {
         }
     }
 
+    /// Keys with a bucket right now.
+    #[cfg(test)]
+    pub(crate) fn tracked(&self) -> usize {
+        self.table
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .buckets
+            .len()
+    }
+
     /// Takes one token for `key`, or returns how long until `key` may try again.
     pub(crate) fn check(&self, key: K, now: Instant) -> Result<(), Duration> {
         let mut table = self.table.lock().unwrap_or_else(PoisonError::into_inner);
@@ -159,6 +169,16 @@ impl<K: Hash + Eq + Copy> Limiter<K> {
     }
 }
 
+/// The credential a viewer request is counted against. Both kinds are secrets, so only their
+/// SHA-256 digests are kept, never the token or the cookie value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum Viewer {
+    /// A configured viewer token, by digest.
+    Token([u8; 32]),
+    /// A browser session, by the digest of its cookie value.
+    Session([u8; 32]),
+}
+
 /// The limiters the server runs.
 #[derive(Debug)]
 pub(crate) struct Limits {
@@ -166,6 +186,8 @@ pub(crate) struct Limits {
     pub(crate) ip: Limiter<IpAddr>,
     /// Agent connections per credential.
     pub(crate) credential: Limiter<Credential>,
+    /// Viewer requests (REST reads and live socket upgrades) per viewer credential.
+    pub(crate) viewer: Limiter<Viewer>,
     /// Events per second on one agent socket (each socket holds its own bucket).
     pub(crate) event: Quota,
 }
@@ -184,6 +206,11 @@ impl Limits {
                     config.credential_requests_per_minute,
                     config.credential_burst,
                 ),
+                max,
+                now,
+            ),
+            viewer: Limiter::new(
+                Quota::per_minute(config.viewer_requests_per_minute, config.viewer_burst),
                 max,
                 now,
             ),

@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).
 - Agent: a failing step's UI hierarchy (`screen-hierarchy/step-NNN-….json`) is uploaded as a `failure_hierarchy` artifact with its on-screen text values replaced by `[REDACTED]` (the tree and its attributes are kept); screen D lists it under its step, and the failing step's comes first (#74).
 - Server: per-IP limits on the pre-auth routes (agent token exchange, browser sign-in and callback) and per-credential limits on agent connections, answered with `429 Too Many Requests` and `Retry-After`; an agent socket's events are paced, never dropped. Client IPs come from `trusted_proxies` (#35).
+- Server: viewer REST reads and live socket upgrades are limited per viewer credential (a viewer token or a browser session), answered with `429 Too Many Requests` and `Retry-After`; the dashboard waits that long and keeps its last data instead of erroring (#35).
 
 ### Changed
 

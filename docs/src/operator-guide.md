@@ -89,7 +89,7 @@ role = "admin"
 
 ## Client addresses and limits
 
-Pre-auth requests (`POST /api/v1/agent/token`, browser sign-in and its callback) are limited per client IP, and each agent credential is limited on its WebSocket upgrades and batch requests. A refused request gets `429 Too Many Requests` with `Retry-After` in seconds, and the agent waits that long and keeps spooling: a limit slows a run's upload, it never fails the run.
+Pre-auth requests (`POST /api/v1/agent/token`, browser sign-in and its callback) are limited per client IP, and each agent credential is limited on its WebSocket upgrades and batch requests. Each viewer credential (a configured viewer token, or a browser session) is limited on the REST reads and the live socket's upgrades. A refused request gets `429 Too Many Requests` with `Retry-After` in seconds. The agent waits that long and keeps spooling, so a limit slows a run's upload and never fails the run; the dashboard waits and keeps the data it has on screen.
 
 `trusted_proxies` says which peers are proxies. Behind a reverse proxy the peer is the proxy, so the client is named by `X-Forwarded-For`; Fleet reads it only when the peer is inside a listed block, and then takes the rightmost address that is not itself a proxy. With the default empty list the header is ignored, which is right when Fleet is exposed directly.
 
@@ -99,6 +99,7 @@ The Compose reference deployment fixes its network to `10.77.0.0/24` and trusts 
 |---|---|---|
 | `rate_limits.ip_requests_per_minute`, `rate_limits.ip_burst` | `120`, `60` | Pre-auth requests per client IP: sustained rate, and how many may arrive at once |
 | `rate_limits.credential_requests_per_minute`, `rate_limits.credential_burst` | `1200`, `300` | Agent connections per credential (WebSocket upgrades and batch requests) |
+| `rate_limits.viewer_requests_per_minute`, `rate_limits.viewer_burst` | `3000`, `600` | Viewer requests per credential (a viewer token, or a browser session): REST reads and live socket upgrades. A viewer token shared by a team shares this bucket. Anonymous reads (`api.anonymous_read`, development only) have no credential and are not limited |
 | `rate_limits.events_per_second`, `rate_limits.event_burst` | `1000`, `5000` | Events per second one agent socket may send on average, and at once. Beyond it the server reads that socket more slowly; no event is dropped |
 | `rate_limits.max_tracked_keys` | `100000` | Clients tracked per limiter; memory stays bounded. A new client beyond this is told to retry in one second until an idle one ages out |
 

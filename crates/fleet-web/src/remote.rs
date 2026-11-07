@@ -4,7 +4,8 @@
 //! [`remote`] fetches once at once and again whenever [`Remote::request`] is called, at most once
 //! per interval (a burst of live frames becomes one trailing fetch that sees the newest state).
 //! A slow earlier answer never overwrites a newer one, and a failed refetch keeps the last good
-//! data on screen next to its error.
+//! data on screen next to its error. A `429` is not an error: the fetch waits for the server's
+//! `Retry-After` and asks again, and the data on screen stays.
 
 use std::{
     cell::{Cell, RefCell},
@@ -16,6 +17,7 @@ use std::{
     time::Duration,
 };
 
+use gloo_timers::future::TimeoutFuture;
 use leptos::{prelude::*, task::spawn_local};
 
 use crate::{
@@ -56,6 +58,11 @@ impl<T: Send + Sync + 'static> Remote<T> {
     }
 }
 
+/// A `Retry-After` in milliseconds, for the timer that waits it out. `u32` is what the timer takes.
+fn retry_after_ms(secs: u64) -> u32 {
+    u32::try_from(secs.saturating_mul(1000)).unwrap_or(u32::MAX)
+}
+
 /// Fetches with `fetch` now, and again on [`Remote::request`], at most once per
 /// `min_interval_ms`. Stops updating when the current reactive owner is cleaned up.
 pub fn remote<T, Fut>(min_interval_ms: i64, fetch: impl Fn() -> Fut + 'static) -> Remote<T>
@@ -81,7 +88,18 @@ where
             spawn_local(async move {
                 let mine = latest.get() + 1;
                 latest.set(mine);
-                let result = fetch().await;
+                let result = loop {
+                    match fetch().await {
+                        Err(ApiError::RateLimited { retry_after_secs }) => {
+                            TimeoutFuture::new(retry_after_ms(retry_after_secs)).await;
+                            // Superseded by a newer fetch, or the page is gone: stop waiting.
+                            if latest.get() != mine || !alive.load(Ordering::Relaxed) {
+                                return;
+                            }
+                        }
+                        other => break other,
+                    }
+                };
                 // Superseded by a newer fetch, or the page is gone.
                 if latest.get() != mine || !alive.load(Ordering::Relaxed) {
                     return;
@@ -121,5 +139,16 @@ where
         data,
         error,
         request,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_after_ms;
+
+    #[test]
+    fn a_retry_after_is_waited_in_milliseconds_and_never_overflows_the_timer() {
+        assert_eq!(retry_after_ms(3), 3_000);
+        assert_eq!(retry_after_ms(u64::MAX), u32::MAX);
     }
 }
