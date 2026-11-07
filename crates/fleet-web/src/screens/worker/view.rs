@@ -268,7 +268,7 @@ fn RunsSection(
                     </p>
                     <TableBox label="Runs on this runner">
                         <table class="tbl tbl-cards">
-                            <caption class="sr">"Runs on this runner, newest first"</caption>
+                            <caption class="sr-only">"Runs on this runner, newest first"</caption>
                             <thead>
                                 <tr>
                                     {["Run", "State", "Started", "Duration"]
@@ -334,7 +334,7 @@ fn DevicesSection(
                 view! {
                     <TableBox label="Devices on this runner">
                         <table class="tbl tbl-cards">
-                            <caption class="sr">"Devices hosted by this runner"</caption>
+                            <caption class="sr-only">"Devices hosted by this runner"</caption>
                             <thead>
                                 <tr>
                                     {["Device", "State", "Profile", "Job"]

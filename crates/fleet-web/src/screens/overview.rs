@@ -468,7 +468,7 @@ fn pipelines_table(rows: Vec<PipelineRow>, now: RwSignal<i64>) -> impl IntoView 
     view! {
         <TableBox label="Pipelines">
             <table data-testid="pipelines-table" class="tbl tbl-cards">
-                <caption class="sr">"Pipelines, running first, then newest finished"</caption>
+                <caption class="sr-only">"Pipelines, running first, then newest finished"</caption>
                 <thead>
                     <tr>
                         <th scope="col">"Verdict"</th>
@@ -645,9 +645,10 @@ fn runners_section(
     rows: Vec<WorkerRow>,
     now: RwSignal<i64>,
 ) -> impl IntoView {
+    // Runners whose runs all ended are listed but not counted, so with no other count say none is online.
     let words = counts.words();
-    let counts_text = if words.is_empty() {
-        "None seen in the last day".to_owned()
+    let counts_text = if words.is_empty() && !rows.is_empty() {
+        "None online".to_owned()
     } else {
         words
     };
@@ -700,6 +701,7 @@ fn runner_item(w: WorkerRow, now: RwSignal<i64>) -> impl IntoView {
                 <div class="note mt-1">
                     "CPU "
                     <span class="num">{w.cpu.unwrap_or_else(|| "Unavailable".to_owned())}</span>
+                    " "
                     {move || {
                         let p = provenance.get();
                         let age = at.map(|at| format!(" · {} ago", format_duration((now.get() - at).max(0))));
