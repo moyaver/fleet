@@ -123,6 +123,124 @@ fn nested_steps_pair_their_ends_with_their_starts() {
     );
 }
 
+/// Maestro's log shows nesting and retry attempts (issue #38). `nested` runs a `runFlow` inside a
+/// `runFlow`, a `retry` that fails once and passes on its second attempt, and a `repeat` around a
+/// `runFlow`. Each step's depth matches the `metadata.depth` Maestro wrote in its `commands.json`.
+#[test]
+fn nested_steps_carry_their_depth_parent_and_attempt() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1/nested");
+    let (_, events) = fleet_agent::inspect::inspect(&root).unwrap();
+    let started: std::collections::BTreeMap<u32, &serde_json::Value> = events
+        .iter()
+        .filter(|e| e.kind == "step.started")
+        .filter_map(|e| Some((e.subject.step.as_ref()?.index, &e.data)))
+        .collect();
+    assert_eq!(started.len(), 32);
+
+    // (depth, parent index, attempt) as `step.started` carries them; absent means top-level.
+    let nest = |i: u32| {
+        let d = started[&i];
+        (
+            d["depth"].as_u64(),
+            d["parent"]["index"].as_u64(),
+            d["attempt"].as_u64(),
+        )
+    };
+    assert_eq!(
+        nest(3),
+        (None, None, None),
+        "the outer runFlow is top-level"
+    );
+    assert_eq!(nest(4), (Some(1), Some(3), None));
+    assert_eq!(nest(5), (Some(1), Some(3), None), "the inner runFlow");
+    assert_eq!(
+        nest(7),
+        (Some(2), Some(5), None),
+        "a step of the inner runFlow"
+    );
+    assert_eq!(nest(12), (Some(1), Some(3), None), "the retry block");
+    assert_eq!(nest(13), (Some(2), Some(12), Some(1)), "attempt 1 fails");
+    assert_eq!(nest(14), (Some(2), Some(12), Some(1)));
+    assert_eq!(nest(15), (Some(2), Some(12), Some(2)), "attempt 2 passes");
+    assert_eq!(nest(16), (Some(2), Some(12), Some(2)));
+    assert_eq!(nest(17), (Some(1), Some(3), None), "the repeat block");
+    assert_eq!(
+        nest(18),
+        (Some(2), Some(17), None),
+        "the runFlow it repeats"
+    );
+    assert_eq!(nest(26), (Some(3), Some(25), None), "its second iteration");
+
+    // The same depths as Maestro's commands.json, step by step (sequence number = index).
+    let commands: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("run/debug/nested/commands.json")).unwrap())
+            .unwrap();
+    let mut maestro = std::collections::BTreeMap::new();
+    collect_command_depths(&commands, &mut maestro);
+    assert_eq!(maestro.len(), 32);
+    for (seq, depth) in maestro {
+        let ours = started[&seq]["depth"].as_u64().unwrap_or(0);
+        assert_eq!(ours, depth, "step {seq}");
+    }
+}
+
+/// `retry-fail` retries an assertion once: `Attempt 1 failed for retry command` makes the next run
+/// attempt 2, and the final failure is `Max retries (1) reached`, which numbers nothing (#38).
+#[test]
+fn a_retry_numbers_its_attempts_from_the_failed_ones() {
+    let root =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1/retry-fail");
+    let (_, events) = fleet_agent::inspect::inspect(&root).unwrap();
+    let started: std::collections::BTreeMap<u32, &serde_json::Value> = events
+        .iter()
+        .filter(|e| e.kind == "step.started")
+        .filter_map(|e| Some((e.subject.step.as_ref()?.index, &e.data)))
+        .collect();
+    assert!(
+        started[&3].get("attempt").is_none(),
+        "the retry block itself is not an attempt"
+    );
+    assert_eq!(started[&3]["description"], "Retry 1 times");
+    for (index, attempt) in [(4, 1), (5, 2)] {
+        let step = started[&index];
+        assert_eq!(
+            step["description"],
+            "Assert that \"Fleet never shows this\" is visible"
+        );
+        assert_eq!(step["parent"]["index"], 3);
+        assert_eq!(step["attempt"], attempt, "step {index}");
+    }
+}
+
+/// `sequenceNumber -> depth` of every command in a `commands.json` tree.
+fn collect_command_depths(
+    node: &serde_json::Value,
+    out: &mut std::collections::BTreeMap<u32, u64>,
+) {
+    match node {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_command_depths(item, out);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            // A command node has both a `command` and its `metadata`.
+            if let (true, Some(seq), Some(depth)) = (
+                map.contains_key("command"),
+                map.get("metadata")
+                    .and_then(|m| m["sequenceNumber"].as_u64()),
+                map.get("metadata").and_then(|m| m["depth"].as_u64()),
+            ) {
+                out.insert(u32::try_from(seq).unwrap(), depth);
+            }
+            for value in map.values() {
+                collect_command_depths(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Every step as `index -> (description, status)`. Asserts that each step has exactly one start
 /// and one end, so none is left running and none is an unnamed `Step N` row.
 fn paired_steps(

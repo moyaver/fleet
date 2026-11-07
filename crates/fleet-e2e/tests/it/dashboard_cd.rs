@@ -224,7 +224,13 @@ async fn a_failed_flows_page_shows_the_failure_and_every_claim_with_its_provenan
         &format!("{} >= 2", count_of("[role=treeitem]")),
     )
     .await;
-    // The loadgen agents upload no evidence: the page says so instead of showing nothing.
+    // The loadgen agents upload no evidence: the page says so instead of showing nothing. The card
+    // waits for the artifact list, a separate request from the flow the steps come from.
+    page.wait(
+        "the evidence's empty state",
+        &format!("{} === 1", count_of(&q("evidence-empty"))),
+    )
+    .await;
     let empty = page.texts(&q("evidence-empty")).await;
     assert!(
         empty

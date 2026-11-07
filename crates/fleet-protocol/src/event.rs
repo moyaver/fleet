@@ -226,11 +226,25 @@ pub struct FlowStarted {
 }
 
 /// `step.started`.
+///
+/// The nesting fields are present only where Maestro's log shows them. A nested step (inside a
+/// `runFlow`, `retry` or `repeat` block) carries its depth and enclosing step; a step inside a
+/// `retry` block carries the attempt that ran it. A top-level step carries none of them, so an
+/// event from an older agent (no fields) and a flat run read the same (issue #38).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StepStarted {
     /// Maestro's description of the step, redacted.
     pub description: String,
+    /// How many blocks enclose the step: 1 inside one block. Absent for a top-level step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<u32>,
+    /// The enclosing step, in the same flow execution. Absent for a top-level step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<crate::journal::StepRef>,
+    /// The attempt of the enclosing `retry` block that ran the step, from 1. Absent outside one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
 }
 
 /// `step.ended`.
@@ -678,6 +692,9 @@ mod tests {
             }),
             EventBody::StepStarted(StepStarted {
                 description: "Tap on \"Login\"".into(),
+                depth: Some(1),
+                parent: Some(crate::journal::StepRef { index: 0 }),
+                attempt: Some(2),
             }),
             EventBody::StepEnded(StepEnded {
                 status: StepStatus::Warned,

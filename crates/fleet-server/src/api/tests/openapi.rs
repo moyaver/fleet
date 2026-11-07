@@ -67,4 +67,11 @@ async fn every_screen_route_is_documented_with_its_response_schema() {
             "{schema}.{property} is documented"
         );
     }
+
+    // The step tree nests: a block's children are StepViews, referenced rather than inlined.
+    assert_eq!(
+        schemas["StepView"]["properties"]["children"]["items"]["$ref"],
+        "#/components/schemas/StepView",
+        "StepView.children is an array of StepView refs"
+    );
 }

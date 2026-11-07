@@ -523,7 +523,34 @@ impl Agent {
             SourceKind::DebugLog,
             &EventBody::StepStarted(StepStarted {
                 description: label.into(),
+                depth: None,
+                parent: None,
+                attempt: None,
             }),
+        );
+        self.push(
+            subject,
+            SourceKind::DebugLog,
+            &EventBody::StepEnded(StepEnded { status }),
+        );
+    }
+
+    /// A step whose start carries the nesting Maestro's log gave it, and its end.
+    pub(super) fn nested_step(
+        &mut self,
+        flow: &FlowIds,
+        index: u32,
+        started: StepStarted,
+        status: StepStatus,
+    ) {
+        let subject = Subject {
+            step: Some(StepRef { index }),
+            ..flow.subject.clone()
+        };
+        self.push(
+            subject.clone(),
+            SourceKind::DebugLog,
+            &EventBody::StepStarted(started),
         );
         self.push(
             subject,

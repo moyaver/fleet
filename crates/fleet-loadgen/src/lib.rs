@@ -360,6 +360,9 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     SourceKind::DebugLog,
                     &EventBody::StepStarted(StepStarted {
                         description: format!("Tap on \"step {s}\""),
+                        depth: None,
+                        parent: None,
+                        attempt: None,
                     }),
                 );
                 push(

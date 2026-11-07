@@ -854,12 +854,56 @@
       ],
       "type": "object"
     },
-    "StepStarted": {
-      "description": "`step.started`.",
+    "StepRef": {
+      "description": "A step inside a flow execution.",
       "properties": {
+        "index": {
+          "description": "0-based position in the flow's steps as they were observed (nested steps included).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    },
+    "StepStarted": {
+      "description": "`step.started`.\n\nThe nesting fields are present only where Maestro's log shows them. A nested step (inside a\n`runFlow`, `retry` or `repeat` block) carries its depth and enclosing step; a step inside a\n`retry` block carries the attempt that ran it. A top-level step carries none of them, so an\nevent from an older agent (no fields) and a flat run read the same (issue #38).",
+      "properties": {
+        "attempt": {
+          "description": "The attempt of the enclosing `retry` block that ran the step, from 1. Absent outside one.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "depth": {
+          "description": "How many blocks enclose the step: 1 inside one block. Absent for a top-level step.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "description": {
           "description": "Maestro's description of the step, redacted.",
           "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StepRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The enclosing step, in the same flow execution. Absent for a top-level step."
         }
       },
       "required": [

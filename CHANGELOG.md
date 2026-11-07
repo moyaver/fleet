@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Examples: a composite GitHub Action, `examples/github-actions/fleet-agent`, installs a pinned, checksum-verified agent release and runs a Maestro command under it (#71).
 - Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).
 - Agent: a failing step's UI hierarchy (`screen-hierarchy/step-NNN-….json`) is uploaded as a `failure_hierarchy` artifact with its on-screen text values replaced by `[REDACTED]` (the tree and its attributes are kept); screen D lists it under its step, and the failing step's comes first (#74).
+- Agent: step events carry `depth`, `parent` and `attempt` where Maestro's log shows them (a step inside `runFlow`, `retry` or `repeat`, and the retry attempt that ran it). The flow page nests steps under their block and shows the attempt of a retried step, from `GET /api/v1/projects/{project}/flows/{execution}`, whose `steps` are now a tree with `children` (#38).
 - Server: per-IP limits on the pre-auth routes (agent token exchange, browser sign-in and callback) and per-credential limits on agent connections, answered with `429 Too Many Requests` and `Retry-After`; an agent socket's events are paced, never dropped. Client IPs come from `trusted_proxies` (#35).
 - Server: viewer REST reads and live socket upgrades are limited per viewer credential (a viewer token or a browser session), answered with `429 Too Many Requests` and `Retry-After`; the dashboard waits that long and keeps its last data instead of erroring (#35).
 
@@ -32,6 +33,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Server: a run whose socket another instance holds shows `online` or `stale` from its persisted contact, as on the instance holding it, instead of always `stale` (#114).
 - Server: a worker's Maestro and agent figures are one series per agent run, raw and in the minute and hour aggregates, so runs that share a runner no longer merge or interleave; the runner's latest reading carries only the machine's figures. The dashboard's worker page draws one line per run (#42).
 - Agent: after Maestro exits, the agent keeps draining its output while the CI log is still taking it, and gives up on an output pump after 2 s with no reads and nothing held for the log, or 10 s after the exit at most, so a backed-up log no longer loses its tail and a grandchild that keeps writing cannot hold the exit (#124).
+- Server: the OpenAPI document describes a flow's nested step tree without recursing, so `GET /api/v1/openapi.json` no longer overflows the stack; `StepView.children` is an array of `StepView` references.
 
 ## [0.1.0-alpha.1] - 2026-11-06
 

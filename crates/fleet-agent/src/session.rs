@@ -68,8 +68,8 @@ pub(crate) struct Flow {
     pub(crate) started: bool,
     pub(crate) claims: Vec<Claim>,
     pub(crate) steps: u32,
-    /// Steps Maestro has started and not yet ended, innermost last: `(index, description)`.
-    open_steps: Vec<(u32, String)>,
+    /// Steps Maestro has started and not yet ended, innermost last.
+    open_steps: Vec<OpenStep>,
     pub(crate) failure: Option<String>,
     /// The flow's `manifest.json` appeared: Maestro finished writing the bundle.
     manifest_seen: bool,
@@ -80,6 +80,25 @@ pub(crate) struct Flow {
     produced: Produced,
     /// Step-bound files seen before `produced` was known: their step waits for it.
     pending_files: Vec<PendingFile>,
+}
+
+/// A step Maestro started and has not ended (issue #38: the nesting and retry evidence).
+#[derive(Debug, Clone)]
+struct OpenStep {
+    index: u32,
+    description: String,
+    /// Set on a `retry` block: the attempt that runs now.
+    retry: Option<Retry>,
+}
+
+/// The attempts of a `retry` block, as Maestro's `Attempt N failed for retry command` lines count
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Retry {
+    /// Attempt `n` is running.
+    Attempt(u32),
+    /// The log stopped agreeing with the count, so the attempts are unknown (I3: none is guessed).
+    Unknown,
 }
 
 /// Which step produced a flow's files, as its `commands.json` says.
@@ -513,7 +532,40 @@ impl Session {
                     self.maestro = Some(build);
                 }
             }
-            Some(log::Event::RetryAttemptFailed { .. }) | None => {}
+            Some(log::Event::RetryAttemptFailed { attempt }) => self.on_attempt_failed(attempt),
+            None => {}
+        }
+    }
+
+    /// `Attempt N failed for retry command`: the next run of the retry block's commands is attempt
+    /// N + 1. The line has no shard, so it goes to the one flow that holds a retry block open; with
+    /// several, which block failed is unknown, and their attempts become unknown too.
+    fn on_attempt_failed(&mut self, attempt: u32) {
+        let holders: Vec<usize> = self
+            .flows
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.started && f.open_steps.iter().any(|s| s.retry.is_some()))
+            .map(|(i, _)| i)
+            .collect();
+        let single = holders.len() == 1;
+        for (i, f) in self.flows.iter_mut().enumerate() {
+            if !holders.contains(&i) {
+                continue;
+            }
+            if single {
+                let innermost = f.open_steps.iter_mut().rev().find(|s| s.retry.is_some());
+                if let Some(block) = innermost {
+                    block.retry = Some(match block.retry {
+                        Some(Retry::Attempt(n)) if n == attempt => Retry::Attempt(n + 1),
+                        _ => Retry::Unknown,
+                    });
+                }
+            } else {
+                for block in f.open_steps.iter_mut().filter(|s| s.retry.is_some()) {
+                    block.retry = Some(Retry::Unknown);
+                }
+            }
         }
     }
 
@@ -537,7 +589,21 @@ impl Session {
             log::StepState::Running => {
                 let index = f.steps;
                 f.steps += 1;
-                f.open_steps.push((index, description.clone()));
+                // The steps still open enclose this one: Maestro's log nests them by their RUNNING
+                // and COMPLETED lines, and the depth matches each command's `depth` in
+                // `commands.json` (issue #38). A top-level step has no depth, parent or attempt.
+                let depth = u32::try_from(f.open_steps.len()).ok().filter(|d| *d > 0);
+                let parent = f.open_steps.last().map(|s| StepRef { index: s.index });
+                let attempt = match f.open_steps.iter().rev().find_map(|s| s.retry) {
+                    Some(Retry::Attempt(n)) => Some(n),
+                    _ => None,
+                };
+                let retry = log::is_retry_block(&description).then_some(Retry::Attempt(1));
+                f.open_steps.push(OpenStep {
+                    index,
+                    description: description.clone(),
+                    retry,
+                });
                 let mut subject = self.flow_subject_at(idx);
                 subject.step = Some(StepRef { index });
                 self.emit(
@@ -545,7 +611,12 @@ impl Session {
                     subject,
                     SourceKind::DebugLog,
                     Some(parser),
-                    &EventBody::StepStarted(StepStarted { description }),
+                    &EventBody::StepStarted(StepStarted {
+                        description,
+                        depth,
+                        parent,
+                        attempt,
+                    }),
                 );
                 return;
             }
@@ -557,8 +628,12 @@ impl Session {
         // Blocks nest (runFlow, retry, repeat), so the step that ends is the innermost open one with
         // this description; a step still open above it never got an end and is dropped with it.
         // A step that ends without a RUNNING line (SKIPPED) gets its own index.
-        let index = if let Some(pos) = f.open_steps.iter().rposition(|(_, d)| *d == description) {
-            let index = f.open_steps[pos].0;
+        let index = if let Some(pos) = f
+            .open_steps
+            .iter()
+            .rposition(|s| s.description == description)
+        {
+            let index = f.open_steps[pos].index;
             f.open_steps.truncate(pos);
             index
         } else {
@@ -584,7 +659,7 @@ impl Session {
             let holder = self.flows.iter().rposition(|f| {
                 f.shard == shard
                     && f.started
-                    && f.open_steps.iter().any(|(_, open)| open == description)
+                    && f.open_steps.iter().any(|s| s.description == description)
             });
             if holder.is_some() {
                 return holder;

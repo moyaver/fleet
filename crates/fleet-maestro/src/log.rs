@@ -239,6 +239,15 @@ pub fn split_shard(msg: &str) -> (Option<u32>, &str) {
         .unwrap_or((None, msg))
 }
 
+/// Whether a console step is a `retry` block: Maestro describes it as `Retry 2 times`.
+#[must_use]
+pub fn is_retry_block(description: &str) -> bool {
+    description
+        .strip_prefix("Retry ")
+        .and_then(|rest| rest.strip_suffix(" times"))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
 fn shard_assigned(shard: u32, msg: &str) -> Option<Event> {
     let rest = msg.strip_prefix("Selected device ")?;
     let (serial, rest) = rest.split_once(' ')?;
@@ -389,6 +398,21 @@ mod tests {
                 })
                 .collect();
             assert_eq!(versions, ["2.12.1"]);
+        }
+    }
+
+    #[test]
+    fn retry_blocks_are_named_by_their_count_only() {
+        assert!(is_retry_block("Retry 2 times"));
+        assert!(is_retry_block("Retry 1 times"));
+        for not in [
+            "Retry  times",
+            "Retry 2 times ",
+            "Retry x times",
+            "Repeat 2 times",
+            "Run subflows/retry.yaml",
+        ] {
+            assert!(!is_retry_block(not), "{not:?}");
         }
     }
 
