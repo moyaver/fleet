@@ -255,6 +255,8 @@ impl Default for Artifacts {
 pub struct ClassLimits {
     /// `failure_screenshot`.
     pub failure_screenshot: u64,
+    /// `failure_hierarchy`.
+    pub failure_hierarchy: u64,
     /// `commands`.
     pub commands: u64,
     /// `junit`.
@@ -270,6 +272,7 @@ impl Default for ClassLimits {
         const MIB: u64 = 1024 * 1024;
         Self {
             failure_screenshot: 20 * MIB,
+            failure_hierarchy: 4 * MIB,
             commands: 16 * MIB,
             junit: 32 * MIB,
             maestro_log: 64 * MIB,
@@ -285,6 +288,7 @@ impl ClassLimits {
         use fleet_protocol::artifact::ArtifactClass as C;
         match class {
             C::FailureScreenshot => self.failure_screenshot,
+            C::FailureHierarchy => self.failure_hierarchy,
             C::Commands => self.commands,
             C::Junit => self.junit,
             C::MaestroLog => self.maestro_log,

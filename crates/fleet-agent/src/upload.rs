@@ -265,16 +265,16 @@ impl Inner {
             },
             other => other.clone(),
         };
-        let source = if item.class == ArtifactClass::Commands {
-            let Source::Bytes(bytes) = &source else {
-                return Outcome::Rejected(NOT_REDACTABLE.into());
-            };
-            match redact_commands(bytes) {
-                Ok(bytes) => Source::Bytes(bytes.into()),
+        let source = match item.class {
+            ArtifactClass::Commands => match structured(&source, redact_commands) {
+                Ok(source) => source,
                 Err(reason) => return Outcome::Rejected(reason.into()),
-            }
-        } else {
-            source
+            },
+            ArtifactClass::FailureHierarchy => match structured(&source, redact_hierarchy) {
+                Ok(source) => source,
+                Err(reason) => return Outcome::Rejected(reason.into()),
+            },
+            _ => source,
         };
         let item = &Item {
             class: item.class,
@@ -566,6 +566,55 @@ async fn read_text(path: &PathBuf, redactor: &Redactor) -> Result<Vec<u8>, Outco
         None => return Err(Outcome::Rejected(NOT_REDACTABLE.into())),
     };
     prepare_text(&bytes, redactor).map_err(|code| Outcome::Rejected(code.into()))
+}
+
+/// Applies a structural redaction to a text source that has already been read and redacted.
+fn structured(
+    source: &Source,
+    redact: fn(&[u8]) -> Result<Vec<u8>, &'static str>,
+) -> Result<Source, &'static str> {
+    let Source::Bytes(bytes) = source else {
+        return Err(NOT_REDACTABLE);
+    };
+    redact(bytes).map(|bytes| Source::Bytes(bytes.into()))
+}
+
+/// Maestro's UI hierarchy with every on-screen text value hidden: the tree and its attributes
+/// (class, bounds, resource ids, states) stay, so the element that failed can still be found.
+fn redact_hierarchy(bytes: &[u8]) -> Result<Vec<u8>, &'static str> {
+    let mut tree: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| NOT_REDACTABLE)?;
+    if !tree.is_object() {
+        return Err(NOT_REDACTABLE);
+    }
+    hide_on_screen_text(&mut tree);
+    serde_json::to_vec(&tree).map_err(|_| NOT_REDACTABLE)
+}
+
+/// The keys Maestro's hierarchy keeps on-screen text under. `text` and `accessibilityText` carry
+/// values in captured 2.12.1 output; `hintText` (a field's placeholder) and `error` (its message)
+/// are the other text attributes of Maestro's node, empty in the fixtures. Any other key stays.
+fn hide_on_screen_text(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                let text_key = matches!(
+                    key.as_str(),
+                    "text" | "accessibilityText" | "hintText" | "error"
+                );
+                if text_key && value.is_string() {
+                    *value = fleet_core::redact::MARKER.into();
+                } else {
+                    hide_on_screen_text(value);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                hide_on_screen_text(value);
+            }
+        }
+        _ => {}
+    }
 }
 
 // Keep the captured command metadata useful without exporting resolved values from a flow.
@@ -1177,6 +1226,95 @@ mod tests {
         let rows: serde_json::Value = serde_json::from_str(&sent).unwrap();
         assert_eq!(rows[0]["metadata"]["status"], "COMPLETED");
         assert_eq!(rows[0]["metadata"]["sequenceNumber"], 0);
+    }
+
+    /// Counts the nodes of a hierarchy, and the string values under the on-screen text keys.
+    fn hierarchy_shape(v: &serde_json::Value, nodes: &mut usize, texts: &mut Vec<String>) {
+        match v {
+            serde_json::Value::Object(fields) => {
+                *nodes += 1;
+                for (k, v) in fields {
+                    match (k.as_str(), v) {
+                        ("text" | "accessibilityText", serde_json::Value::String(s)) => {
+                            texts.push(s.clone());
+                        }
+                        _ => hierarchy_shape(v, nodes, texts),
+                    }
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for v in values {
+                    hierarchy_shape(v, nodes, texts);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// A placeholder and a field's error message are on-screen text too. UNVERIFIED: the captured
+    /// fixtures carry these attributes only empty, so this synthetic node checks the rule itself.
+    #[test]
+    fn a_placeholder_and_an_error_message_are_hidden_too() {
+        let tree = br#"{"attributes":{"hintText":"Search","error":"Required","clickable":"true"}}"#;
+        let redacted: serde_json::Value =
+            serde_json::from_slice(&redact_hierarchy(tree).unwrap()).unwrap();
+        assert_eq!(
+            redacted["attributes"]["hintText"],
+            fleet_core::redact::MARKER
+        );
+        assert_eq!(redacted["attributes"]["error"], fleet_core::redact::MARKER);
+        assert_eq!(redacted["attributes"]["clickable"], "true");
+    }
+
+    #[tokio::test]
+    async fn a_failing_steps_hierarchy_keeps_its_structure_and_hides_its_on_screen_text() {
+        let (server, _) = accepting().await;
+        let fixture = include_bytes!(
+            "../../../fixtures/maestro/2.12.1/fail/run/debug/fail/screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json"
+        );
+        // A known value that sits in a resource id: the redactor covers structure too, not only text.
+        let up = Uploader::new(config(&server)).unwrap();
+        let mut item = text_item(
+            text_file(fixture),
+            Redactor::new(["com.android.systemui".to_owned()]),
+        );
+        item.class = ArtifactClass::FailureHierarchy;
+        item.path =
+            "fail/screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json".into();
+        item.content_type = "application/json";
+        up.submit(item);
+        let done = run(&up).await;
+        assert!(
+            matches!(done[0].outcome, Outcome::Uploaded { .. }),
+            "{done:?}"
+        );
+
+        let requests = server.received_requests().await.unwrap();
+        let sent = &requests[1].body;
+        let sent_text = String::from_utf8(sent.clone()).unwrap();
+        let before: serde_json::Value = serde_json::from_slice(fixture).unwrap();
+        let after: serde_json::Value = serde_json::from_slice(sent).unwrap();
+
+        let (mut nodes_before, mut texts) = (0, Vec::new());
+        hierarchy_shape(&before, &mut nodes_before, &mut texts);
+        assert_eq!(texts.len(), 25, "this settings screen shows 25 text values");
+        for text in texts.iter().filter(|t| t.len() >= 4) {
+            assert!(!sent_text.contains(text.as_str()), "{text:?} was sent");
+        }
+        assert!(
+            !sent_text.contains("com.android.systemui"),
+            "a known value was sent"
+        );
+
+        // The same tree, node for node, with only the text values replaced by the marker.
+        let (mut nodes_after, mut texts_after) = (0, Vec::new());
+        hierarchy_shape(&after, &mut nodes_after, &mut texts_after);
+        assert_eq!(nodes_after, nodes_before);
+        assert!(texts_after.iter().all(|t| t == fleet_core::redact::MARKER));
+        assert_eq!(texts_after.len(), texts.len());
+        let frame = "/children/0/children/0/attributes/bounds";
+        assert_eq!(after.pointer(frame), before.pointer(frame));
+        assert!(after.pointer(frame).is_some(), "structure kept at {frame}");
     }
 
     #[tokio::test]

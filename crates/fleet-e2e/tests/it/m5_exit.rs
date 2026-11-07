@@ -206,6 +206,33 @@ async fn highlighted_log_lines(page: &Page<'_>) -> Vec<String> {
         .await
 }
 
+/// The failing step's UI hierarchy is listed under its step, and its link names the step's file
+/// (issue #74).
+async fn check_hierarchy(page: &Page<'_>) {
+    page.wait(
+        "the failing step's UI hierarchy",
+        &format!(
+            "Array.from(document.querySelectorAll('{}')).some(e => e.textContent.includes('Failing step'))",
+            q("evidence-hierarchy")
+        ),
+    )
+    .await;
+    let name = page
+        .eval(
+            &format!(
+                "return document.querySelector('{} a').textContent;",
+                q("evidence-hierarchy")
+            ),
+            vec![],
+        )
+        .await;
+    assert_eq!(
+        name.as_str(),
+        Some("step-004-assertCondition-Fleet_never_shows_this.json"),
+        "{name}"
+    );
+}
+
 /// The failure screenshot is an image the browser really loaded, from the usercontent origin,
 /// served sandboxed; the dashboard's own origin serves nothing of the kind.
 async fn check_screenshot(page: &Page<'_>, stack: &Stack, port: u16) {
@@ -393,6 +420,7 @@ async fn ac08_a_failed_flow_links_its_screenshot_and_log_lines() {
     check_screenshot(&page, &stack, port).await;
     check_log_jumps(&page).await;
     check_command_timings(&page).await;
+    check_hierarchy(&page).await;
 
     assert!(page.never_reloaded().await);
     assert_eq!(

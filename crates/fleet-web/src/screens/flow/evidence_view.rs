@@ -25,8 +25,8 @@ use leptos_router::hooks::use_location;
 use crate::screens::{
     flow::{
         evidence::{
-            CommandRow, Evidence, EvidenceFiles, EvidenceLink, Load, LogEvidence, LogMount,
-            LogSource, Refused, command_rows,
+            CommandRow, Evidence, EvidenceFiles, EvidenceLink, Hierarchy, Load, LogEvidence,
+            LogMount, LogSource, Refused, command_rows,
         },
         model::evidence_steps,
     },
@@ -126,6 +126,7 @@ fn FilesView(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView
                     }
                     .into_any()
                 }}
+                {move || feed.files_with(|f| f.hierarchies.clone()).filter(|h| !h.is_empty()).map(|hierarchies| view! { <Hierarchies hierarchies /> })}
                 {move || feed.files_with(|f| f.report.clone()).flatten().map(|r| view! { <ReportLink link=r /> })}
                 {match m.log {
                     LogMount::None => ().into_any(),
@@ -137,6 +138,35 @@ fn FilesView(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView
                 {move || feed.files_with(|f| f.refused.clone()).map(|refused| view! { <RefusedList refused /> })}
             }
         })
+    }
+}
+
+/// The UI hierarchies of the steps that failed, each named for its step. The failing step's comes
+/// first: it is the one the viewer came to diagnose.
+#[component]
+fn Hierarchies(hierarchies: Vec<Hierarchy>) -> impl IntoView {
+    let mut hierarchies = hierarchies;
+    hierarchies.sort_by_key(|h| !h.failed);
+    view! {
+        <section aria-labelledby="hierarchy-title" class="space-y-1">
+            <h3 id="hierarchy-title" class="text-sm font-semibold">"UI hierarchy"</h3>
+            <ul class="space-y-1 text-sm">
+                {hierarchies
+                    .into_iter()
+                    .map(|h| {
+                        let who = if h.failed { "Failing step" } else { "Step" };
+                        let step = h.step_label.unwrap_or_else(|| format!("step {}", h.step));
+                        view! {
+                            <li data-testid="evidence-hierarchy">
+                                <span class="text-muted">{format!("{who}: {step}")}</span>
+                                <a class="ml-2 underline" href=h.link.href rel="noopener noreferrer">{h.link.name}</a>
+                                <span class="ml-2 text-muted">{h.link.size}</span>
+                            </li>
+                        }
+                    })
+                    .collect_view()}
+            </ul>
+        </section>
     }
 }
 

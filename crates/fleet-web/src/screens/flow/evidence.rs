@@ -104,11 +104,26 @@ pub struct Refused {
     pub reason: String,
 }
 
+/// A step's UI hierarchy, to save, shown under the step it was taken at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hierarchy {
+    /// The step's id in the step tree (its index, as text).
+    pub step: String,
+    /// The step's description, when the flow's steps have one.
+    pub step_label: Option<String>,
+    /// Whether this is the step the failure names.
+    pub failed: bool,
+    /// The file.
+    pub link: EvidenceLink,
+}
+
 /// Everything there is to show for a flow whose evidence can be opened.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceFiles {
     /// Failure screenshots in capture order, each tied to the step it was taken at.
     pub screenshots: Vec<Shot>,
+    /// UI hierarchies of failing steps, in capture order.
+    pub hierarchies: Vec<Hierarchy>,
     /// The Maestro log, when one was uploaded.
     pub log: Option<LogSource>,
     /// `commands.json`, when one was uploaded.
@@ -210,6 +225,7 @@ impl Evidence {
         }
         let mut files = EvidenceFiles {
             screenshots: Vec::new(),
+            hierarchies: Vec::new(),
             log: None,
             commands: None,
             report: None,
@@ -249,6 +265,18 @@ impl Evidence {
                     label: a.name.clone(),
                     url: link.url.clone(),
                 }),
+                Some(ArtifactClass::FailureHierarchy) => {
+                    let step = shot_step(&a.name, a.step, failed_step, steps);
+                    files.hierarchies.push(Hierarchy {
+                        step_label: steps
+                            .iter()
+                            .find(|s| s.id == step)
+                            .and_then(|s| s.label.clone()),
+                        failed: failed_step.is_some_and(|f| f.id == step),
+                        step,
+                        link: open(),
+                    });
+                }
                 Some(ArtifactClass::HtmlReport) => files.report = Some(open()),
                 Some(ArtifactClass::MaestroLog) => {
                     files.log = Some(if a.size_bytes > MAX_LOG_BYTES {
@@ -306,6 +334,7 @@ pub fn refresh_in_ms(
 fn kind(class: Option<ArtifactClass>) -> &'static str {
     match class {
         Some(ArtifactClass::FailureScreenshot) => "Failure screenshot",
+        Some(ArtifactClass::FailureHierarchy) => "UI hierarchy",
         Some(ArtifactClass::Commands) => "commands.json",
         Some(ArtifactClass::Junit) => "JUnit report",
         Some(ArtifactClass::MaestroLog) => "Maestro log",
@@ -671,6 +700,72 @@ mod tests {
             ]
         );
         assert_eq!(f.refused, Vec::new());
+    }
+
+    /// The failing step's UI hierarchy is linked from that step, in its own list, not among the
+    /// downloads; an earlier step's hierarchy names that step instead.
+    #[test]
+    fn a_ui_hierarchy_is_linked_from_the_step_it_was_taken_at() {
+        let steps = steps();
+        let mut failed = artifact(
+            9,
+            "failure_hierarchy",
+            "step-003-assertCondition-Done.json",
+            "application/json",
+            1_200,
+            Some("https://uc.example.net/u/p/9/1/s/hierarchy.json"),
+        );
+        failed["flow_execution_id"] = serde_json::json!(FLOW);
+        let mut earlier = artifact(
+            10,
+            "failure_hierarchy",
+            "step-002-tapOn-Menu.json",
+            "application/json",
+            800,
+            Some("https://uc.example.net/u/p/10/1/s/earlier.json"),
+        );
+        earlier["flow_execution_id"] = serde_json::json!(FLOW);
+        let f = files(Evidence::build(
+            &list(&[failed, earlier], Some(UC)),
+            FLOW,
+            steps.last(),
+            &steps,
+        ));
+
+        let link = |href: &str, name: &str| EvidenceLink {
+            kind: "UI hierarchy",
+            name: name.to_owned(),
+            size: if name == "step-003-assertCondition-Done.json" {
+                "1.17 KiB".to_owned()
+            } else {
+                "800 B".to_owned()
+            },
+            href: href.to_owned(),
+        };
+        assert_eq!(
+            f.hierarchies,
+            [
+                Hierarchy {
+                    step: "2".to_owned(),
+                    step_label: Some("Assert that \"Done\" is visible".to_owned()),
+                    failed: true,
+                    link: link(
+                        "https://uc.example.net/u/p/9/1/s/hierarchy.json",
+                        "step-003-assertCondition-Done.json"
+                    ),
+                },
+                Hierarchy {
+                    step: "1".to_owned(),
+                    step_label: Some(steps[1].label.clone().unwrap_or_default()),
+                    failed: false,
+                    link: link(
+                        "https://uc.example.net/u/p/10/1/s/earlier.json",
+                        "step-002-tapOn-Menu.json"
+                    ),
+                },
+            ]
+        );
+        assert!(f.downloads.is_empty(), "{:?}", f.downloads);
     }
 
     #[test]

@@ -791,9 +791,14 @@ impl Session {
     ) {
         let mut subject = self.flow_subject_at(idx);
         subject.step = step.map(|index| StepRef { index });
-        if class == "failure_screenshot" {
+        let upload = match class {
+            "failure_screenshot" => Some(ArtifactClass::FailureScreenshot),
+            "failure_hierarchy" => Some(ArtifactClass::FailureHierarchy),
+            _ => None,
+        };
+        if let Some(class) = upload {
             self.uploads.push(Candidate {
-                class: ArtifactClass::FailureScreenshot,
+                class,
                 rel: rel.to_owned(),
                 flow: self.flows.get(idx).map(|f| f.id),
                 step,
@@ -1501,6 +1506,53 @@ mod tests {
                     rel: "pass/screenshots/step-004-odd.png".into(),
                     flow: Some(flow),
                     step: Some(2),
+                },
+                Candidate {
+                    class: ArtifactClass::Commands,
+                    rel: "pass/commands.json".into(),
+                    flow: Some(flow),
+                    step: None,
+                },
+            ]
+        );
+    }
+
+    /// On the captured `fail` flow, the failing step's screenshot and UI hierarchy are both queued
+    /// for upload with that step (index 4), before the commands that name the step.
+    #[test]
+    fn a_failing_steps_hierarchy_is_queued_for_upload_with_its_step() {
+        const FAIL: &[u8] =
+            include_bytes!("../../../fixtures/maestro/2.12.1/fail/run/debug/fail/commands.json");
+        let mut s = session();
+        let flow = s.flows[0].id;
+        file(
+            &mut s,
+            "pass/screenshots/step-005-assertCondition-Fleet_never_shows_this.png",
+            None,
+        );
+        file(
+            &mut s,
+            "pass/screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json",
+            None,
+        );
+        file(&mut s, "pass/commands.json", Some(FAIL));
+        assert_eq!(
+            s.take_uploads(),
+            [
+                Candidate {
+                    class: ArtifactClass::FailureScreenshot,
+                    rel: "pass/screenshots/step-005-assertCondition-Fleet_never_shows_this.png"
+                        .into(),
+                    flow: Some(flow),
+                    step: Some(4),
+                },
+                Candidate {
+                    class: ArtifactClass::FailureHierarchy,
+                    rel:
+                        "pass/screen-hierarchy/step-005-assertCondition-Fleet_never_shows_this.json"
+                            .into(),
+                    flow: Some(flow),
+                    step: Some(4),
                 },
                 Candidate {
                     class: ArtifactClass::Commands,
