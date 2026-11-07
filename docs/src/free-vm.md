@@ -76,7 +76,7 @@ docker compose up -d
 docker compose ps        # wait until fleet is healthy
 ```
 
-Leave out `--build`. The default image (`FLEET_IMAGE`, `ghcr.io/moyaver/fleet:0.1.0-alpha.2`) is published for linux/amd64 and linux/arm64, so the VM pulls it. Building from source on two Arm cores takes a long time; build only when you have changed the code.
+Leave out `--build`. The default image (`FLEET_IMAGE`, `ghcr.io/moyaver/fleet:0.1.0-alpha.3`) is published for linux/amd64 and linux/arm64, so the VM pulls it. Building from source on two Arm cores takes a long time; build only when you have changed the code.
 
 Check that the server answers through the proxy:
 

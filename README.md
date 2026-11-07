@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is in progress.** The latest pre-release is [`v0.1.0-alpha.2`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.2); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
+> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is in progress.** The latest pre-release is [`v0.1.0-alpha.3`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.3); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -38,10 +38,10 @@ The agent, server, and web dashboard are written in **Rust** (the dashboard is L
 
 ### Install the agent (alpha pre-release)
 
-Install `fleet-agent` from the `v0.1.0-alpha.2` release. It ships for Apple Silicon macOS and for Linux on x86_64 and aarch64 (static musl binaries):
+Install `fleet-agent` from the `v0.1.0-alpha.3` release. It ships for Apple Silicon macOS and for Linux on x86_64 and aarch64 (static musl binaries):
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.2/fleet-agent-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.3/fleet-agent-installer.sh | sh
 ```
 
 Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build attestation. To verify an archive you downloaded, with the [GitHub CLI](https://cli.github.com/):
@@ -50,7 +50,7 @@ Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build 
 gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
 ```
 
-The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.2`; the [Compose guide](deploy/compose/README.md) uses it by default. To build the agent from source instead, follow step 1.
+The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.3`; the [Compose guide](deploy/compose/README.md) uses it by default. To build the agent from source instead, follow step 1.
 
 ### 1. Observe a Maestro run locally
 
@@ -82,7 +82,7 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 2. Set `FLEET_SERVER` on your CI runner. Use GitHub Actions OIDC with an approved trust policy or a project API key (`FLEET_TOKEN`).
 3. Wrap your existing command with `fleet-agent run --`. Add `fleet-agent flush` as an always-run cleanup step if desired.
 
-The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.2` agent from its checksum-verified release and runs the Maestro command under it. The job summary (failing flows and a dashboard link) is included from `v0.1.0-alpha.2`.
+The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.3` agent from its checksum-verified release and runs the Maestro command under it. The job summary (failing flows and a dashboard link) is included from `v0.1.0-alpha.2`.
 
 > [!NOTE]
 > The server serves the dashboard at `/`: live overview, pipeline detail with a device timeline, worker and device metrics, flow investigation with screenshots, UI hierarchies, logs and a nested step tree, history and compare. Browser sign-in uses your OIDC provider; uploaded evidence is served from a separate sandboxed origin. See the [user guide](docs/src/user-guide.md) and the [operator guide](docs/src/operator-guide.md).

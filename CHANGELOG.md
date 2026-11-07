@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-11-07
+
 ### Changed
 
 - Dashboard: the redesign's foundation: graphite and paper tokens, self-hosted IBM Plex, one Title Case status vocabulary ("Not started" replaces "Pending", a completed step reads "Passed"), monochrome provenance labels, a shared top bar with a live indicator on the pipeline page, and sections without cards.
