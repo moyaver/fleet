@@ -152,3 +152,17 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 - [x] When public: branch protection on `main`, private vulnerability reporting, secret scanning ([#4](https://github.com/moyaver/fleet/issues/4))
 
 ---
+
+## Considered and not planned
+
+Proposals that were looked at and set aside. Each row names the rule it conflicts with, so the reason survives. Competitor and feature review: [research 09 §7](../research/09-competitive-review-2026-11.md#7-not-opened-and-why).
+
+| Feature | Rule it conflicts with | Why | What would bring it back |
+|---|---|---|---|
+| Quality gates (Fleet decides pass or fail) | [ADR-0009](decisions/0009-scope-focused-build.md) ("Don't build: quality gates"); invariant [I1](PLAN.md#3-invariants-non-negotiable); [spec §16 criterion 11](spec-v1.0.md#16-acceptance-criteria) (preserve the exit code and CI quality gate); I2 (fail open) | Fleet observes; Maestro's exit code is the gate. A Fleet bug or outage must never break or green a pipeline | Only as a separate, opt-in CI step that reads Fleet's data, never inside the agent. Needs a new ADR |
+| Quarantine (hide or skip flaky tests) | ADR-0009 ("test management"); [research 07](../research/07-prior-art-and-build-vs-buy.md) ("a flaky label never hides a failure"); [spec §16 criterion 15](spec-v1.0.md#16-acceptance-criteria) (failures must not look successful) | Quarantine turns a failure into something else, the opposite of Fleet's promise. Fleet labels flakiness; the status stays failed. Competitors such as BuildPulse already sell it (research 07 §3) | Not planned. It would need a change to the core promise |
+| AI root-cause assistant | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "AI-based autonomous debugging"; [PLAN M7+](PLAN.md#12-milestones) allows AI summaries only with approval; I3 and I4 (provenance) | A guessed root cause has no provenance and can be confidently wrong. The market is crowded ([research 09](../research/09-competitive-review-2026-11.md)) | Approved summaries, marked *inferred*, in M7+, after deterministic classification is solid ([research 10](../research/10-comparative-diagnosis-study.md)) |
+| Other test frameworks, or generic JUnit and CTRF import | [ADR-0011](decisions/0011-name-and-runner-scope.md) (v1 is Maestro only; a new runner is a new crate, built from captured fixtures, with its own ADR) | Fleet's edge is exact knowledge of Maestro's output. Generic JUnit import is what Allure does, and [research 10](../research/10-comparative-diagnosis-study.md) measured Allure misreading Maestro failures | A new runner crate, its captured fixtures, and its own ADR |
+| Dynamic scheduling, or test selection by code change | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "CI orchestration or job scheduling"; [ADR-0013](decisions/0013-fleet-planner.md) (static planning only) | Fleet computes assignments; CI launches the jobs. A work queue, or choosing tests, would make Fleet control execution | ADR-0013 allows a dynamic queue only if measurements show static sharding falls short. Test selection needs a spec change |
+
+The common rule: Fleet watches and explains; it never changes, hides, guesses or runs a result.
