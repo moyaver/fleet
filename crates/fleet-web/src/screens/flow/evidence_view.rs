@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Screen D's evidence card: failure screenshots, the Maestro log with a jump to the failing
-//! step, command timings, the HTML report and downloads (spec §16 criterion 8).
+//! Screen D's evidence: the failure screenshots and UI hierarchies (the evidence pane), the Maestro
+//! log, the device logcat and `commands.json` (the logs pane), the HTML report (in the header) and the
+//! downloads (the files card).
 //!
 //! Every file comes from the usercontent origin through a signed link (invariant I7): images are
 //! `<img>` elements, text is fetched by the route and shown as text nodes, and the HTML report is
 //! a plain link that opens on that origin, where it is sandboxed. Nothing from an artifact is ever
 //! rendered as HTML.
+//!
+//! The panes mount once, when the flow first arrives, and each part reads its links from the feed as
+//! they are renewed: a zoom, a log search or a selected tab survives a renewal and a live update.
 
 #![expect(
     clippy::must_use_candidate,
@@ -15,7 +19,10 @@
 use fleet_protocol::rest::FlowDetailView;
 use fleet_ui::{
     components::display::{Card, Skeleton, StatusPill, TableBox},
-    logview::{model::anchored_line, view::LogViewer},
+    logview::{
+        model::{LogModel, anchored_line},
+        view::LogViewer,
+    },
     screenshots::view::ScreenshotViewerView,
     tone::Tone,
 };
@@ -33,13 +40,15 @@ use crate::screens::{
     parts::{Fetched, Notice},
 };
 
-/// What the route fetched for the evidence card.
+/// What the route fetched for the evidence.
 #[derive(Debug, Clone, Copy)]
 pub struct EvidenceFeed {
     /// What there is to show, from the artifacts REST.
     pub evidence: Memo<Evidence>,
     /// The Maestro log's text.
     pub log: RwSignal<Load<String>>,
+    /// The device logcat's text.
+    pub logcat: RwSignal<Load<String>>,
     /// `commands.json`'s text.
     pub commands: RwSignal<Load<String>>,
     /// The step the user picked in the step tree; the log jumps to it.
@@ -49,7 +58,7 @@ pub struct EvidenceFeed {
 impl EvidenceFeed {
     /// What `f` makes of the flow's files, when its evidence is files (else `None`). Read inside a
     /// closure, it runs again when the evidence does, which includes every renewal of the links.
-    fn files_with<T>(&self, f: impl FnOnce(&EvidenceFiles) -> T) -> Option<T> {
+    pub(crate) fn files_with<T>(&self, f: impl FnOnce(&EvidenceFiles) -> T) -> Option<T> {
         self.evidence.with(|e| match e {
             Evidence::Files(files) => Some(f(files)),
             _ => None,
@@ -57,87 +66,111 @@ impl EvidenceFeed {
     }
 }
 
-/// The evidence card of screen D.
-///
-/// A signed-link renewal rebuilds the evidence, but the card mounts its parts only when what it
-/// shows changes (see [`EvidenceFiles::mounts`]). Each part reads its links from the feed as they
-/// are renewed, so a screenshot's zoom and a log's search survive a renewal.
-#[component]
-pub fn EvidenceCard(
-    /// What the route fetched.
-    feed: EvidenceFeed,
-    /// The flow, for its name and steps.
-    flow: Fetched<FlowDetailView>,
-) -> impl IntoView {
-    let is_files = Memo::new(move |_| feed.evidence.with(|e| matches!(e, Evidence::Files(_))));
+/// One tab of a set: the signal holds the chosen one.
+fn tab<T>(current: RwSignal<T>, value: T, label: &'static str) -> impl IntoView
+where
+    T: Copy + PartialEq + Send + Sync + 'static,
+{
     view! {
-        <Card title="Evidence">
-            <div class="space-y-4" data-testid="evidence">
-                {move || {
-                    if is_files.get() {
-                        view! { <FilesView feed flow /> }.into_any()
-                    } else {
-                        match feed.evidence.get() {
-                            Evidence::Loading => view! { <Skeleton lines=3 /> }.into_any(),
-                            Evidence::Unavailable(why) => {
-                                view! { <Notice tone=Tone::Warning text=format!("The evidence could not be loaded: {why}") /> }
-                                    .into_any()
-                            }
-                            Evidence::Nothing(text) => {
-                                view! { <p class="text-muted" data-testid="evidence-empty">{text}</p> }.into_any()
-                            }
-                            Evidence::Unopenable(text) => {
-                                view! { <p class="text-muted" data-testid="evidence-unopenable">{text}</p> }
-                                    .into_any()
-                            }
-                            // `is_files` is true for this one.
-                            Evidence::Files(_) => ().into_any(),
-                        }
-                    }
-                }}
-            </div>
-        </Card>
+        <button
+            type="button"
+            role="tab"
+            class="border-b-2 border-transparent pb-1 aria-selected:border-fg aria-selected:font-medium"
+            aria-selected=move || (current.get() == value).to_string()
+            on:click=move |_| current.set(value)
+        >
+            {label}
+        </button>
     }
 }
 
-/// The files of a flow. Rebuilt only when [`EvidenceFiles::mounts`] changes; the links inside are
-/// read from the feed, so a renewal updates them in place.
+/// The screenshot and the UI hierarchy of the failure, in tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EvidenceTab {
+    Screenshot,
+    Hierarchy,
+}
+
+/// The evidence pane: the failure screenshot, or the state of the evidence, and the UI hierarchies.
 #[component]
-fn FilesView(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
+pub fn EvidencePane(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+) -> impl IntoView {
+    let tab_now = RwSignal::new(EvidenceTab::Screenshot);
     let mounts = Memo::new(move |_| feed.files_with(EvidenceFiles::mounts));
-    move || {
-        mounts.get().map(|m| {
-            view! {
-                {if m.screenshots {
-                    let shots = Signal::derive(move || {
-                        feed.files_with(|f| f.screenshots.clone()).unwrap_or_default()
-                    });
-                    view! {
-                        <div data-testid="screenshots">
-                            <ScreenshotViewerView shots />
-                        </div>
-                    }
-                    .into_any()
-                } else {
-                    view! {
-                        <p class="text-sm text-muted" data-testid="screenshots-empty">
-                            "No failure screenshot was uploaded for this flow."
-                        </p>
-                    }
-                    .into_any()
+    view! {
+        <section class="card flow-ev" aria-labelledby="ev-h">
+            <div class="card-h">
+                <h2 id="ev-h">"Evidence"</h2>
+                <div role="tablist" aria-label="Evidence" class="row gap-4 text-sm">
+                    {tab(tab_now, EvidenceTab::Screenshot, "Screenshot")}
+                    {tab(tab_now, EvidenceTab::Hierarchy, "UI hierarchy")}
+                </div>
+            </div>
+            <div role="tabpanel" aria-label="Screenshot" class="card-b space-y-4" hidden=move || tab_now.get() != EvidenceTab::Screenshot>
+                {move || match feed.evidence.get() {
+                    Evidence::Files(_) => None,
+                    other => Some(evidence_state(other)),
                 }}
-                {move || feed.files_with(|f| f.hierarchies.clone()).filter(|h| !h.is_empty()).map(|hierarchies| view! { <Hierarchies hierarchies /> })}
-                {move || feed.files_with(|f| f.report.clone()).flatten().map(|r| view! { <ReportLink link=r /> })}
-                {match m.log {
-                    LogMount::None => ().into_any(),
-                    LogMount::Viewer => view! { <LogSection feed flow /> }.into_any(),
-                    LogMount::Download => view! { <TooLargeLog feed /> }.into_any(),
+                {move || {
+                    mounts
+                        .get()
+                        .map(|m| {
+                            if m.screenshots {
+                                let shots = Signal::derive(move || {
+                                    feed.files_with(|f| f.screenshots.clone()).unwrap_or_default()
+                                });
+                                view! {
+                                    <div data-testid="screenshots">
+                                        <ScreenshotViewerView shots />
+                                    </div>
+                                }
+                                .into_any()
+                            } else {
+                                view! {
+                                    <p class="text-sm text-muted" data-testid="screenshots-empty">
+                                        "No failure screenshot was uploaded for this flow."
+                                    </p>
+                                }
+                                .into_any()
+                            }
+                        })
                 }}
-                {m.commands.then(|| view! { <CommandsSection feed /> })}
-                {move || feed.files_with(|f| f.downloads.clone()).map(|links| view! { <Downloads links /> })}
-                {move || feed.files_with(|f| f.refused.clone()).map(|refused| view! { <RefusedList refused /> })}
-            }
-        })
+            </div>
+            <div role="tabpanel" aria-label="UI hierarchy" class="card-b space-y-4" hidden=move || tab_now.get() != EvidenceTab::Hierarchy>
+                {move || {
+                    feed.files_with(|f| f.hierarchies.clone())
+                        .map(|hierarchies| {
+                            if hierarchies.is_empty() {
+                                view! { <p class="text-sm text-muted">"No UI hierarchy was uploaded for this flow."</p> }
+                                    .into_any()
+                            } else {
+                                view! { <Hierarchies hierarchies /> }.into_any()
+                            }
+                        })
+                }}
+            </div>
+        </section>
+    }
+}
+
+/// What the evidence says when there are no files to show.
+fn evidence_state(e: Evidence) -> AnyView {
+    match e {
+        Evidence::Loading => view! { <Skeleton lines=3 /> }.into_any(),
+        Evidence::Unavailable(why) => {
+            view! { <Notice tone=Tone::Warning text=format!("The evidence could not be loaded: {why}") /> }
+                .into_any()
+        }
+        Evidence::Nothing(text) => {
+            view! { <p class="text-muted" data-testid="evidence-empty">{text}</p> }.into_any()
+        }
+        Evidence::Unopenable(text) => {
+            view! { <p class="text-muted" data-testid="evidence-unopenable">{text}</p> }.into_any()
+        }
+        // The caller shows the files instead.
+        Evidence::Files(_) => ().into_any(),
     }
 }
 
@@ -148,34 +181,34 @@ fn Hierarchies(hierarchies: Vec<Hierarchy>) -> impl IntoView {
     let mut hierarchies = hierarchies;
     hierarchies.sort_by_key(|h| !h.failed);
     view! {
-        <section aria-labelledby="hierarchy-title" class="space-y-1">
-            <h3 id="hierarchy-title" class="text-sm font-semibold">"UI hierarchy"</h3>
-            <ul class="space-y-1 text-sm">
-                {hierarchies
-                    .into_iter()
-                    .map(|h| {
-                        let who = if h.failed { "Failing step" } else { "Step" };
-                        let step = h.step_label.unwrap_or_else(|| format!("step {}", h.step));
-                        view! {
-                            <li data-testid="evidence-hierarchy">
-                                <span class="text-muted">{format!("{who}: {step}")}</span>
-                                <a class="ml-2 underline" href=h.link.href rel="noopener noreferrer">{h.link.name}</a>
-                                <span class="ml-2 text-muted">{h.link.size}</span>
-                            </li>
-                        }
-                    })
-                    .collect_view()}
-            </ul>
-        </section>
+        <ul class="space-y-1 text-sm">
+            {hierarchies
+                .into_iter()
+                .map(|h| {
+                    let who = if h.failed { "Failing step" } else { "Step" };
+                    let step = h.step_label.unwrap_or_else(|| format!("step {}", h.step));
+                    view! {
+                        <li data-testid="evidence-hierarchy">
+                            <span class="text-muted">{format!("{who}: {step}")}</span>
+                            <a class="ml-2 underline" href=h.link.href rel="noopener noreferrer">{h.link.name}</a>
+                            <span class="ml-2 text-muted">{h.link.size}</span>
+                        </li>
+                    }
+                })
+                .collect_view()}
+        </ul>
     }
 }
 
 /// Maestro's HTML report. It opens on the usercontent origin, in a new tab, with no way back to
 /// the dashboard's page (`noopener`): the report is sandboxed there and cannot run scripts.
 #[component]
-fn ReportLink(link: EvidenceLink) -> impl IntoView {
+pub fn ReportLink(
+    /// The report's link.
+    link: EvidenceLink,
+) -> impl IntoView {
     view! {
-        <p class="text-sm">
+        <span class="text-sm">
             <a
                 class="font-medium underline"
                 href=link.href
@@ -183,28 +216,87 @@ fn ReportLink(link: EvidenceLink) -> impl IntoView {
                 rel="noopener noreferrer"
                 data-testid="report-link"
             >
-                "Open the Maestro HTML report"
+                "Maestro report ↗"
             </a>
             <span class="ml-2 text-muted">
                 {format!("{} · opens on the usercontent origin, sandboxed", link.size)}
             </span>
-        </p>
+        </span>
     }
 }
 
-/// The Maestro log, in the viewer.
+/// The log tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogTab {
+    Maestro,
+    Logcat,
+    Timings,
+}
+
+/// The logs pane: the Maestro log with its jump to the failing step, the device logcat and the
+/// command timings, in tabs. A picked step brings the Maestro log forward.
 #[component]
-fn LogSection(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
+pub fn LogsPane(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+    /// The flow, for its steps.
+    flow: Fetched<FlowDetailView>,
+) -> impl IntoView {
+    let tab_now = RwSignal::new(LogTab::Maestro);
+    Effect::new(move |_| {
+        if feed.selected_step.with(Option::is_some) {
+            tab_now.set(LogTab::Maestro);
+        }
+    });
+    let mounts = Memo::new(move |_| feed.files_with(EvidenceFiles::mounts));
     view! {
-        <section aria-labelledby="log-title" class="space-y-2">
-            <h3 id="log-title" class="text-sm font-semibold">"Maestro log"</h3>
-            <LogBody feed flow />
+        <section class="card flow-logs" aria-labelledby="lg-h">
+            <div class="card-h">
+                <h2 id="lg-h">"Logs"</h2>
+                <div role="tablist" aria-label="Log" class="row gap-4 text-sm">
+                    {tab(tab_now, LogTab::Maestro, "Maestro log")}
+                    {tab(tab_now, LogTab::Logcat, "Logcat")}
+                    {tab(tab_now, LogTab::Timings, "Command timings")}
+                </div>
+            </div>
+            <div role="tabpanel" aria-label="Maestro log" class="card-b" hidden=move || tab_now.get() != LogTab::Maestro>
+                {move || match mounts.get().map(|m| m.log) {
+                    Some(LogMount::Viewer) => view! { <LogBody feed flow /> }.into_any(),
+                    Some(LogMount::Download) => view! { <TooLargeLog feed /> }.into_any(),
+                    Some(LogMount::None) => view! { <p class="text-sm text-muted">"No Maestro log was uploaded for this flow."</p> }.into_any(),
+                    None => view! { <p class="text-sm text-muted">{no_files_text(feed)}</p> }.into_any(),
+                }}
+            </div>
+            <div role="tabpanel" aria-label="Logcat" class="card-b" hidden=move || tab_now.get() != LogTab::Logcat>
+                {move || match mounts.get().map(|m| m.logcat) {
+                    Some(LogMount::Viewer) => view! { <LogcatBody feed /> }.into_any(),
+                    Some(LogMount::Download) => view! { <TooLargeLogcat feed /> }.into_any(),
+                    Some(LogMount::None) => view! { <p class="text-sm text-muted">"No device logcat was uploaded for this flow."</p> }.into_any(),
+                    None => view! { <p class="text-sm text-muted">{no_files_text(feed)}</p> }.into_any(),
+                }}
+            </div>
+            <div role="tabpanel" aria-label="Command timings" class="card-b" hidden=move || tab_now.get() != LogTab::Timings>
+                {move || match mounts.get().map(|m| m.commands) {
+                    Some(true) => view! { <CommandsSection feed /> }.into_any(),
+                    Some(false) => view! { <p class="text-sm text-muted">"No command timings were uploaded for this flow."</p> }.into_any(),
+                    None => view! { <p class="text-sm text-muted">{no_files_text(feed)}</p> }.into_any(),
+                }}
+            </div>
         </section>
     }
 }
 
-/// The Maestro log when it is too big to hold in the browser: a download link, read from the
-/// feed so a renewal updates it.
+/// What a log tab says while there are no files to read: loading, or nothing was uploaded.
+fn no_files_text(feed: EvidenceFeed) -> &'static str {
+    if feed.evidence.with(|e| matches!(e, Evidence::Loading)) {
+        "Loading the evidence…"
+    } else {
+        "No evidence was uploaded for this flow."
+    }
+}
+
+/// The Maestro log when it is too big to hold in the browser: a download link, read from the feed
+/// so a renewal updates it.
 #[component]
 fn TooLargeLog(feed: EvidenceFeed) -> impl IntoView {
     move || {
@@ -215,13 +307,30 @@ fn TooLargeLog(feed: EvidenceFeed) -> impl IntoView {
         .flatten()
         .map(|link| {
             view! {
-                <section aria-labelledby="log-title" class="space-y-2">
-                    <h3 id="log-title" class="text-sm font-semibold">"Maestro log"</h3>
-                    <p class="text-sm" data-testid="log-too-large">
-                        {format!("The log is {}: too large to show here. ", link.size)}
-                        <a class="underline" href=link.href>"Download it"</a>
-                    </p>
-                </section>
+                <p class="text-sm" data-testid="log-too-large">
+                    {format!("The log is {}: too large to show here. ", link.size)}
+                    <a class="underline" href=link.href>"Download it"</a>
+                </p>
+            }
+        })
+    }
+}
+
+/// The device logcat when it is too big to hold in the browser: a download link.
+#[component]
+fn TooLargeLogcat(feed: EvidenceFeed) -> impl IntoView {
+    move || {
+        feed.files_with(|f| match &f.logcat {
+            Some(LogSource::TooLarge(link)) => Some(link.clone()),
+            _ => None,
+        })
+        .flatten()
+        .map(|link| {
+            view! {
+                <p class="text-sm">
+                    {format!("The logcat is {}: too large to show here. ", link.size)}
+                    <a class="underline" href=link.href>"Download it"</a>
+                </p>
             }
         })
     }
@@ -291,25 +400,40 @@ fn LogBody(feed: EvidenceFeed, flow: Fetched<FlowDetailView>) -> impl IntoView {
     }
 }
 
+/// The device logcat, in the log viewer. It has no steps, so there is nothing to jump to.
+#[component]
+fn LogcatBody(feed: EvidenceFeed) -> impl IntoView {
+    move || {
+        match feed.logcat.get() {
+        Load::Loading => view! { <p class="text-sm text-muted">"Loading the logcat…"</p> }.into_any(),
+        Load::Failed(why) => {
+            view! { <Notice tone=Tone::Warning text=format!("The logcat could not be loaded: {why}") /> }
+                .into_any()
+        }
+        Load::Ready(text) => {
+            let model = LogModel::parse(&text);
+            view! { <LogViewer log=model label="Logcat" /> }.into_any()
+        }
+    }
+    }
+}
+
 #[component]
 fn CommandsSection(feed: EvidenceFeed) -> impl IntoView {
-    view! {
-        <section aria-labelledby="commands-title" class="space-y-2">
-            <h3 id="commands-title" class="text-sm font-semibold">"Command timings"</h3>
-            {move || match feed.commands.get() {
-                Load::Loading => {
-                    view! { <p class="text-sm text-muted">"Loading the command timings…"</p> }.into_any()
-                }
-                Load::Failed(why) => {
-                    view! { <Notice tone=Tone::Warning text=format!("The command timings could not be loaded: {why}") /> }
-                        .into_any()
-                }
-                Load::Ready(text) => match command_rows(&text) {
-                    Ok(rows) => view! { <CommandTable rows /> }.into_any(),
-                    Err(why) => view! { <Notice tone=Tone::Warning text=why /> }.into_any(),
-                }
-            }}
-        </section>
+    move || {
+        match feed.commands.get() {
+        Load::Loading => {
+            view! { <p class="text-sm text-muted">"Loading the command timings…"</p> }.into_any()
+        }
+        Load::Failed(why) => {
+            view! { <Notice tone=Tone::Warning text=format!("The command timings could not be loaded: {why}") /> }
+                .into_any()
+        }
+        Load::Ready(text) => match command_rows(&text) {
+            Ok(rows) => view! { <CommandTable rows /> }.into_any(),
+            Err(why) => view! { <Notice tone=Tone::Warning text=why /> }.into_any(),
+        },
+    }
     }
 }
 
@@ -317,9 +441,9 @@ fn CommandsSection(feed: EvidenceFeed) -> impl IntoView {
 fn CommandTable(rows: Vec<CommandRow>) -> impl IntoView {
     view! {
         <TableBox label="Commands">
-            <table class="w-full text-left text-sm" data-testid="command-timings">
+            <table class="tbl tbl-cards w-full text-left text-sm" data-testid="command-timings">
                 <caption class="sr-only">"Every command Maestro ran for this flow, with how long it took"</caption>
-                <thead class="border-b border-border text-muted">
+                <thead class="border-b border-line text-muted">
                     <tr>
                         {["#", "Command", "Result", "Duration"]
                             .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
@@ -329,14 +453,19 @@ fn CommandTable(rows: Vec<CommandRow>) -> impl IntoView {
                     {rows
                         .into_iter()
                         .map(|r| {
+                            let failed = r.status == "Failed";
                             view! {
-                                <tr class="border-b border-border" data-testid="command-row" data-status=r.status>
-                                    <td class="px-2 py-1 tabular-nums">{r.sequence + 1}</td>
-                                    <td class="px-2 py-1">
+                                <tr
+                                    class=if failed { "border-b border-line bg-band" } else { "border-b border-line" }
+                                    data-testid="command-row"
+                                    data-status=r.status
+                                >
+                                    <td class="px-2 py-1 tabular-nums" data-label="#">{r.sequence + 1}</td>
+                                    <td class="px-2 py-1" data-label="Command">
                                         <span style:margin-left=format!("{}rem", r.depth)>{r.label}</span>
                                     </td>
-                                    <td class="px-2 py-1"><StatusPill mark=r.mark label=r.status /></td>
-                                    <td class="px-2 py-1 tabular-nums">
+                                    <td class="px-2 py-1" data-label="Result"><StatusPill mark=r.mark label=r.status /></td>
+                                    <td class="px-2 py-1 tabular-nums" data-label="Duration">
                                         {r.duration.unwrap_or_else(|| "—".to_owned())}
                                     </td>
                                 </tr>
@@ -349,26 +478,45 @@ fn CommandTable(rows: Vec<CommandRow>) -> impl IntoView {
     }
 }
 
+/// The flow's files to save, and the uploads the server refused. A flow with neither has no card.
+#[component]
+pub fn FilesCard(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+) -> impl IntoView {
+    move || {
+        feed.files_with(|f| !f.downloads.is_empty() || !f.refused.is_empty())
+            .unwrap_or(false)
+            .then(|| {
+                view! {
+                    <Card title="Files">
+                        <div class="space-y-4">
+                            {move || feed.files_with(|f| f.downloads.clone()).map(|links| view! { <Downloads links /> })}
+                            {move || feed.files_with(|f| f.refused.clone()).map(|refused| view! { <RefusedList refused /> })}
+                        </div>
+                    </Card>
+                }
+            })
+    }
+}
+
 #[component]
 fn Downloads(links: Vec<EvidenceLink>) -> impl IntoView {
     (!links.is_empty()).then(|| {
         view! {
-            <section aria-labelledby="downloads-title" class="space-y-1">
-                <h3 id="downloads-title" class="text-sm font-semibold">"Files"</h3>
-                <ul class="space-y-1 text-sm">
-                    {links
-                        .into_iter()
-                        .map(|l| {
-                            view! {
-                                <li data-testid="evidence-download">
-                                    <a class="underline" href=l.href rel="noopener noreferrer">{l.name}</a>
-                                    <span class="ml-2 text-muted">{format!("{} · {}", l.kind, l.size)}</span>
-                                </li>
-                            }
-                        })
-                        .collect_view()}
-                </ul>
-            </section>
+            <ul class="grid gap-x-8 gap-y-2 text-sm [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+                {links
+                    .into_iter()
+                    .map(|l| {
+                        view! {
+                            <li data-testid="evidence-download">
+                                <a class="underline" href=l.href rel="noopener noreferrer">{l.name}</a>
+                                <div class="text-xs text-muted">{format!("{} · {}", l.kind, l.size)}</div>
+                            </li>
+                        }
+                    })
+                    .collect_view()}
+            </ul>
         }
     })
 }

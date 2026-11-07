@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: the runner and device pages follow the redesign: a header with the name, a liveness pill and the age of the newest sample, one readout strip for host and Maestro CPU and memory, charts that state their window and resolution once, runs with verdicts from their exit status, and a live bar that shows the connection and can pause updates. Temperature is no longer charted, since no agent reports it (for a device too); the API still returns it as unavailable.
 - Dashboard: the Overview is redesigned. The readouts filter one Pipelines table whose verdicts are derived from the flows, "Needs attention" lists the last day's failed flows with their message, step, device and run, and the runners show their CPU and freshness.
 - Dashboard: history and compare follow the redesign: a filter band with underlined fields, one "Verified" for a table whose rows are all final, a stats panel that shows only the figures that say something, an answer first on compare ("Failures only in B") with a Swap button, and sections that state their provenance once.
+- Dashboard: the flow page is redesigned around the failure: steps are numbered as in the flow file (Maestro's setup commands fold into one unnumbered "Setup" row), a failure band names the failed step, its command and message (with a copy button), a history strip shows the flow's last executions, the verdict says why it is verified or provisional, and steps, evidence and logs sit in three panes.
 
 ## [0.1.0-alpha.2] - 2026-11-07
 

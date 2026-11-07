@@ -126,6 +126,8 @@ pub struct EvidenceFiles {
     pub hierarchies: Vec<Hierarchy>,
     /// The Maestro log, when one was uploaded.
     pub log: Option<LogSource>,
+    /// The device logcat excerpt, when one was uploaded.
+    pub logcat: Option<LogSource>,
     /// `commands.json`, when one was uploaded.
     pub commands: Option<TextFile>,
     /// Maestro's HTML report, which opens on the usercontent origin, sandboxed.
@@ -136,7 +138,7 @@ pub struct EvidenceFiles {
     pub refused: Vec<Refused>,
 }
 
-/// How the Maestro log is shown.
+/// How a text log (the Maestro log or the device logcat) is shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogMount {
     /// No log was uploaded.
@@ -155,8 +157,19 @@ pub struct Mounts {
     pub screenshots: bool,
     /// How the log is shown.
     pub log: LogMount,
+    /// How the device logcat is shown.
+    pub logcat: LogMount,
     /// Whether there is a `commands.json` to show as timings.
     pub commands: bool,
+}
+
+/// How a text log is shown, by what the files hold.
+fn mount_of(source: Option<&LogSource>) -> LogMount {
+    match source {
+        None => LogMount::None,
+        Some(LogSource::Show(_)) => LogMount::Viewer,
+        Some(LogSource::TooLarge(_)) => LogMount::Download,
+    }
 }
 
 impl EvidenceFiles {
@@ -165,11 +178,8 @@ impl EvidenceFiles {
     pub fn mounts(&self) -> Mounts {
         Mounts {
             screenshots: !self.screenshots.is_empty(),
-            log: match &self.log {
-                None => LogMount::None,
-                Some(LogSource::Show(_)) => LogMount::Viewer,
-                Some(LogSource::TooLarge(_)) => LogMount::Download,
-            },
+            log: mount_of(self.log.as_ref()),
+            logcat: mount_of(self.logcat.as_ref()),
             commands: self.commands.is_some(),
         }
     }
@@ -227,75 +237,94 @@ impl Evidence {
             screenshots: Vec::new(),
             hierarchies: Vec::new(),
             log: None,
+            logcat: None,
             commands: None,
             report: None,
             downloads: Vec::new(),
             refused: Vec::new(),
         };
         for a in mine {
-            let class = ArtifactClass::parse(&a.class);
             if a.state != "available" {
                 files.refused.push(Refused {
                     name: a.name.clone(),
-                    kind: kind(class),
+                    kind: kind(ArtifactClass::parse(&a.class)),
                     reason: reject_reason(a.reject_reason.as_deref()),
                 });
                 continue;
             }
-            let Some(link) = &a.link else { continue };
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "an artifact is far smaller than 2^52 bytes, and the size is only displayed"
-            )]
-            let size = Unit::Bytes.format(a.size_bytes.max(0) as f64);
-            let open = || EvidenceLink {
-                kind: kind(class),
-                name: a.name.clone(),
-                size: size.clone(),
-                href: link.url.clone(),
-            };
-            let text = || TextFile {
-                id: a.id,
-                name: a.name.clone(),
-                url: link.url.clone(),
-            };
-            match class {
-                Some(ArtifactClass::FailureScreenshot) => files.screenshots.push(Shot {
-                    step: shot_step(&a.name, a.step, failed_step, steps),
-                    label: a.name.clone(),
-                    url: link.url.clone(),
-                }),
-                Some(ArtifactClass::FailureHierarchy) => {
-                    let step = shot_step(&a.name, a.step, failed_step, steps);
-                    files.hierarchies.push(Hierarchy {
-                        step_label: steps
-                            .iter()
-                            .find(|s| s.id == step)
-                            .and_then(|s| s.label.clone()),
-                        failed: failed_step.is_some_and(|f| f.id == step),
-                        step,
-                        link: open(),
-                    });
-                }
-                Some(ArtifactClass::HtmlReport) => files.report = Some(open()),
-                Some(ArtifactClass::MaestroLog) => {
-                    files.log = Some(if a.size_bytes > MAX_LOG_BYTES {
-                        LogSource::TooLarge(open())
-                    } else {
-                        LogSource::Show(text())
-                    });
-                    files.downloads.push(open());
-                }
-                Some(ArtifactClass::Commands) => {
-                    files.commands = Some(text());
-                    files.downloads.push(open());
-                }
-                Some(ArtifactClass::Junit | ArtifactClass::DeviceLogcat) | None => {
-                    files.downloads.push(open());
-                }
-            }
+            file_into(&mut files, a, failed_step, steps);
         }
         Self::Files(Box::new(files))
+    }
+}
+
+/// Files one available artifact of the flow into `files`.
+fn file_into(
+    files: &mut EvidenceFiles,
+    a: &ArtifactView,
+    failed_step: Option<&StepKey>,
+    steps: &[StepKey],
+) {
+    let class = ArtifactClass::parse(&a.class);
+    let Some(link) = &a.link else { return };
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "an artifact is far smaller than 2^52 bytes, and the size is only displayed"
+    )]
+    let size = Unit::Bytes.format(a.size_bytes.max(0) as f64);
+    let open = || EvidenceLink {
+        kind: kind(class),
+        name: a.name.clone(),
+        size: size.clone(),
+        href: link.url.clone(),
+    };
+    let text = || TextFile {
+        id: a.id,
+        name: a.name.clone(),
+        url: link.url.clone(),
+    };
+    match class {
+        Some(ArtifactClass::FailureScreenshot) => files.screenshots.push(Shot {
+            step: shot_step(&a.name, a.step, failed_step, steps),
+            label: a.name.clone(),
+            url: link.url.clone(),
+        }),
+        Some(ArtifactClass::FailureHierarchy) => {
+            let step = shot_step(&a.name, a.step, failed_step, steps);
+            files.hierarchies.push(Hierarchy {
+                step_label: steps
+                    .iter()
+                    .find(|s| s.id == step)
+                    .and_then(|s| s.label.clone()),
+                failed: failed_step.is_some_and(|f| f.id == step),
+                step,
+                link: open(),
+            });
+        }
+        Some(ArtifactClass::HtmlReport) => files.report = Some(open()),
+        Some(ArtifactClass::MaestroLog) => {
+            files.log = Some(if a.size_bytes > MAX_LOG_BYTES {
+                LogSource::TooLarge(open())
+            } else {
+                LogSource::Show(text())
+            });
+            files.downloads.push(open());
+        }
+        Some(ArtifactClass::Commands) => {
+            files.commands = Some(text());
+            files.downloads.push(open());
+        }
+        Some(ArtifactClass::DeviceLogcat) => {
+            files.logcat = Some(if a.size_bytes > MAX_LOG_BYTES {
+                LogSource::TooLarge(open())
+            } else {
+                LogSource::Show(text())
+            });
+            files.downloads.push(open());
+        }
+        Some(ArtifactClass::Junit) | None => {
+            files.downloads.push(open());
+        }
     }
 }
 

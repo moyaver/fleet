@@ -3,8 +3,8 @@
 
 use leptos::prelude::*;
 
-use crate::components::display::{ProvenanceBadge, StatusPill};
-use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_mark};
+use crate::components::display::StatusPill;
+use crate::steps::tree::{Key, Row, StepTree, TreeState, status_label, status_mark};
 
 fn key_of(name: &str) -> Option<Key> {
     Some(match name {
@@ -18,7 +18,9 @@ fn key_of(name: &str) -> Option<Key> {
     })
 }
 
-/// The step tree. `on_select` receives the id of a step the user focuses or clicks.
+/// The step tree. Each row shows its number, its status word and its duration. The group's
+/// provenance is said once by the section heading, so rows carry no badge. `on_select` receives the
+/// id of a step the user focuses or clicks.
 #[component]
 pub fn StepTreeView(
     /// The steps.
@@ -59,11 +61,14 @@ pub fn StepTreeView(
                         row.pos_in_set.to_string(),
                         row.set_size.to_string(),
                     );
+                    let number = row.number.clone().unwrap_or_default();
+                    let unnumbered = row.number.is_none();
                     let item = view! {
                         <li
-                            class="flex min-w-0 flex-wrap items-center gap-2 px-2 py-1 focus:outline-2 focus:outline-focus"
+                            class="step-row flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 px-2 py-2 focus:outline-2 focus:outline-focus"
                             role="treeitem"
                             aria-expanded=row.expanded.map(|e| e.to_string())
+                            aria-selected=if row.focused { "true" } else { "false" }
                             tabindex=if row.focused { "0" } else { "-1" }
                             data-status=status_label(row.status)
                             on:click=move |_| {
@@ -77,11 +82,17 @@ pub fn StepTreeView(
                                 notify();
                             }
                         >
-                            <span class="min-w-0 flex-1" style:padding-left=format!("{}rem", row.level.saturating_sub(1))>{row.label}</span>
+                            <span class="w-10 shrink-0 text-right font-mono text-xs tabular-nums text-muted">{number}</span>
+                            <span
+                                class="min-w-0 flex-1 break-words"
+                                class:text-muted=unnumbered
+                                style:padding-left=format!("{}rem", row.level.saturating_sub(1))
+                            >
+                                {row.label}
+                            </span>
                             <StatusPill mark=status_mark(row.status) label=status_label(row.status) />
                             {row.attempt.map(|a| view! { <span class="text-xs text-muted">{a}</span> })}
-                            {row.duration.map(|d| view! { <span class="text-xs text-muted">{d}</span> })}
-                            <ProvenanceBadge provenance=provenance_of(row.source) />
+                            {row.duration.map(|d| view! { <span class="font-mono text-xs tabular-nums text-muted">{d}</span> })}
                         </li>
                     };
                     item.attr("aria-level", level)

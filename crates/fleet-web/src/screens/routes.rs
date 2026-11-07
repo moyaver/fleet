@@ -14,7 +14,7 @@
 use std::time::Duration;
 
 use fleet_protocol::rest::{TimelineView, WorkerRunPage};
-use fleet_ui::{components::display::EmptyState, components::live::LiveState};
+use fleet_ui::components::{display::EmptyState, live::LiveState};
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{
     NavigateOptions,
@@ -38,7 +38,7 @@ use crate::{
         flow::{
             evidence::{Evidence, Load, LogSource, TextFile, refresh_in_ms},
             evidence_view::EvidenceFeed,
-            model::evidence_steps,
+            model::{evidence_steps, is_settled, live_state},
             view::FlowPageView,
         },
         metrics::{RangePreset, RangeSelection, query_string_at},
@@ -482,6 +482,13 @@ fn evidence_feed(
         },
         _ => None,
     }));
+    let logcat = text_file(Memo::new(move |_| match evidence.get() {
+        Evidence::Files(f) => match f.logcat {
+            Some(LogSource::Show(file)) => Some(file),
+            _ => None,
+        },
+        _ => None,
+    }));
     let commands = text_file(Memo::new(move |_| match evidence.get() {
         Evidence::Files(f) => f.commands,
         _ => None,
@@ -489,6 +496,7 @@ fn evidence_feed(
     EvidenceFeed {
         evidence,
         log,
+        logcat,
         commands,
         selected_step: RwSignal::new(None),
     }
@@ -517,7 +525,9 @@ fn text_file(file: Memo<Option<TextFile>>) -> RwSignal<Load<String>> {
     text
 }
 
-/// Keeps a socket on the attempt open while the flow page is, and refetches on every change.
+/// Keeps a socket on the attempt open while the flow page is, refetches on every change, and lends
+/// the top bar's live indicator: Settled once the outcome is final, otherwise the socket's state
+/// and the time since its last frame.
 #[component]
 fn FlowFollower(
     project: String,
@@ -525,13 +535,17 @@ fn FlowFollower(
     flow: StoredValue<Remote<fleet_protocol::rest::FlowDetailView>, LocalStorage>,
 ) -> impl IntoView {
     let model = LiveModel::new(attempt);
-    let _live = connect(
+    let last_frame = RwSignal::new(now_ms());
+    let live = connect(
         Subscription {
             project: project.clone(),
             attempt: Some(attempt),
         },
         move |event| match event {
-            Event::Frames(frames) => model.apply(&project, frames),
+            Event::Frames(frames) => {
+                last_frame.set(now_ms());
+                model.apply(&project, frames);
+            }
             Event::Lost => model.connection_lost(),
         },
     );
@@ -539,6 +553,40 @@ fn FlowFollower(
         if model.version.get() > 0 {
             flow.with_value(Remote::request);
         }
+    });
+    let data = flow.with_value(|f| f.data);
+    let now = RwSignal::new(now_ms());
+    if let Ok(handle) = set_interval_with_handle(move || now.set(now_ms()), Duration::from_secs(1))
+    {
+        on_cleanup(move || handle.clear());
+    }
+    let bar = LiveBar {
+        state: RwSignal::new(LiveState::Connecting),
+        detail: RwSignal::new(String::new()),
+        action: RwSignal::new(None),
+        on_action: Callback::new(|()| {}),
+    };
+    Effect::new(move |_| {
+        let settled = data.with(|d| d.as_ref().is_some_and(is_settled));
+        let state = live_state(live.connection.get(), settled);
+        bar.state.set(state);
+        bar.detail.set(if state == LiveState::Live {
+            let ago = (now.get() - last_frame.get()) / 1000;
+            format!("updated {} s ago", ago.max(0))
+        } else {
+            String::new()
+        });
+    });
+    let slot = expect_context::<LiveSlot>().0;
+    slot.set(Some(bar));
+    // Clears the slot only if it still holds this page's bar (see the pipeline page).
+    let mine = bar.state;
+    on_cleanup(move || {
+        slot.update(|current| {
+            if current.is_some_and(|b| b.state == mine) {
+                *current = None;
+            }
+        });
     });
 }
 

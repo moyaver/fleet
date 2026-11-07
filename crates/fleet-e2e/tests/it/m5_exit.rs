@@ -314,15 +314,16 @@ async fn check_log_jumps(page: &Page<'_>) {
     // Another step moves the log to that step's own lines, and "Jump to the failing step" returns.
     page.wait(
         "the steps",
-        &format!("{} >= 4", count_of("[role=treeitem]")),
+        &format!("{} >= 3", count_of("[role=treeitem]")),
     )
     .await;
-    // The step tree is a real ARIA tree: every item says its level, position and set size.
+    // The step tree is a real ARIA tree: every item says its level, position and set size. The
+    // flow's setup commands fold into one "Setup" row, so the tree is that row and the two steps.
     for attribute in ["aria-level", "aria-posinset", "aria-setsize"] {
         assert_eq!(
             page.count(&format!("[role=treeitem][{attribute}]")).await,
-            4,
-            "four steps, each with {attribute}"
+            3,
+            "three rows (setup and two steps), each with {attribute}"
         );
     }
     page.eval(

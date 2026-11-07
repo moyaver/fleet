@@ -18,6 +18,8 @@ pub struct StepExec {
     pub parent: Option<String>,
     /// Maestro's description of the step.
     pub label: String,
+    /// The number the step is shown with, such as `6` or `2.1`; `None` shows no number.
+    pub number: Option<String>,
     /// Current status.
     pub status: StepStatus,
     /// Where the status came from (invariant I4).
@@ -149,6 +151,8 @@ pub struct Row {
     pub id: String,
     /// Step description, rendered as a text node.
     pub label: String,
+    /// The number the step is shown with, if any.
+    pub number: Option<String>,
     /// `aria-level`, one-based.
     pub level: usize,
     /// `aria-posinset` among siblings, one-based.
@@ -245,6 +249,7 @@ impl TreeState {
                 Some(Row {
                     id: e.id.clone(),
                     label: e.label.clone(),
+                    number: e.number.clone(),
                     level: tree.depth(at),
                     pos_in_set: siblings.iter().position(|s| *s == at).map_or(1, |p| p + 1),
                     set_size: siblings.len(),
@@ -366,6 +371,7 @@ mod tests {
             id: id.into(),
             parent: parent.map(Into::into),
             label: format!("step {id}"),
+            number: None,
             status,
             source: SourceKind::LiveConsole,
             duration_ms: None,
