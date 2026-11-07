@@ -271,11 +271,12 @@ async fn pipeline_page_shows_the_live_flows_before_the_report(page: &Page<'_>) {
         page.texts(&q("pipeline-result")).await[0].contains("Running"),
         "the run is still in progress while its flows already show"
     );
+    // The Flows heading says once that the outcomes are provisional; no row repeats it.
     page.wait(
         "live-log flows marked provisional",
         &format!(
-            "Array.from(document.querySelectorAll('{flow} [role=img]')).every(e => e.getAttribute('aria-label') === 'Provenance: provisional')",
-            flow = q("flow-row"),
+            "document.querySelector('{} [role=img]')?.getAttribute('aria-label') === 'Provenance: provisional'",
+            q("flows-provenance"),
         ),
     )
     .await;
@@ -297,8 +298,8 @@ async fn pipeline_page_settles_and_leads_to_the_failure(page: &Page<'_>) {
     page.wait(
         "every flow verified by the report",
         &format!(
-            "Array.from(document.querySelectorAll('{flow} [role=img]')).every(e => e.getAttribute('aria-label') === 'Provenance: verified')",
-            flow = q("flow-row"),
+            "document.querySelector('{} [role=img]')?.getAttribute('aria-label') === 'Provenance: verified'",
+            q("flows-provenance"),
         ),
     )
     .await;
@@ -431,11 +432,19 @@ async fn upload_plan(stack: &Stack, manifest: &Value, repository: &str, run_id: 
     assert_eq!(status, 201, "{body}");
 }
 
-/// JS: the progress sentence, or "" while the card isn't on the page yet.
+/// JS: the progress sentence while the run is open, or "" while the line isn't on the page yet.
 fn progress_sentence() -> String {
     format!(
         "((document.querySelector('{}') || {{}}).textContent || '')",
         q("progress-text")
+    )
+}
+
+/// JS: the plan's total accounted for, once the run has settled, or "".
+fn plan_sentence() -> String {
+    format!(
+        "((document.querySelector('{}') || {{}}).textContent || '')",
+        q("plan-progress")
     )
 }
 
@@ -507,24 +516,19 @@ async fn ac06_progress_counts_toward_the_planned_total_while_the_run_goes() {
         hold.release();
     }
     run.await.unwrap();
+    // Settled, the sentence is the plan's total accounted for; the live progress line is gone.
     page.wait(
-        "all six finished",
+        "all six accounted for",
         &format!(
-            "{}.startsWith('6 of 6 flows finished')",
-            progress_sentence()
+            "{}.startsWith('6 of 6 planned flows accounted for')",
+            plan_sentence()
         ),
     )
     .await;
     assert_eq!(
-        page.eval(
-            &format!(
-                "return document.querySelector('{}').dataset.progress;",
-                q("progress-text")
-            ),
-            vec![]
-        )
-        .await,
-        json!("known")
+        page.count(&q("progress-text")).await,
+        0,
+        "settled: no live line"
     );
     assert_eq!(
         page.eval(
@@ -592,8 +596,8 @@ async fn ac06_a_real_agent_running_a_plan_shows_its_count_while_maestro_runs() {
     page.wait(
         "the final counts",
         &format!(
-            "{}.startsWith('4 of 4 flows finished') && {} === 3 && {} === 1",
-            progress_sentence(),
+            "{}.startsWith('4 of 4 planned flows accounted for') && {} === 3 && {} === 1",
+            plan_sentence(),
             number_in(&q("count-passed")),
             number_in(&q("count-failed")),
         ),

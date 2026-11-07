@@ -8,7 +8,9 @@ use fleet_protocol::{
     live::{AgentRunView, FlowView, JobView, SuiteView},
     rest::JobCounts,
 };
-use fleet_ui::{components::live::LiveState, live_store::AttemptState, provenance::Provenance};
+use fleet_ui::{
+    components::live::LiveState, live_store::AttemptState, mark::Mark, provenance::Provenance,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -16,7 +18,7 @@ use crate::{
     format::{ref_name, short_commit, time_of_day},
     live::socket::Connection,
     paths::{ci_run_url, flow_href},
-    status::{Pill, attempt_pill, flow_provenance, flow_state_pill, job_pill, source_provenance},
+    status::{Pill, attempt_pill, flow_provenance, flow_state_pill},
 };
 
 /// Jobs, with the agent runs and suites under them.
@@ -104,7 +106,7 @@ impl Tree {
 /// The page header.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Header {
-    /// The repository, else the run key.
+    /// The CI run key, which names the page.
     pub title: String,
     /// Git ref, as people say it.
     pub git_ref: Option<String>,
@@ -116,10 +118,12 @@ pub struct Header {
     pub started_ms: i64,
     /// The CI provider's page for the run, when known.
     pub ci_url: Option<String>,
-    /// The Maestro result across the jobs.
+    /// The verdict, derived from the flows: the rules are in `verdict`.
     pub result: Pill,
-    /// How settled the result is: the weakest evidence among the closed jobs.
+    /// How the verdict is known: provisional while open, derived once closed.
     pub result_provenance: Provenance,
+    /// How many flows the verdict was derived from.
+    pub flows: usize,
     /// Whether every job has closed: no further updates will come for this attempt.
     pub settled: bool,
 }
@@ -129,10 +133,11 @@ pub struct Header {
 pub fn header(state: &AttemptState) -> Header {
     let at = state.attempt();
     let jobs: Vec<&JobView> = state.jobs().collect();
-    let (result, result_provenance) = result(&jobs);
+    let flows: Vec<&FlowView> = state.flows().collect();
+    let (result, result_provenance) = verdict(&jobs, &flows, at.planned_total);
     let settled = !jobs.is_empty() && jobs.iter().all(|j| j.lifecycle == "closed");
     Header {
-        title: at.repository.clone().unwrap_or_else(|| at.run_key.clone()),
+        title: at.run_key.clone(),
         git_ref: at.git_ref.as_deref().map(|r| ref_name(r).to_owned()),
         commit: at.commit_sha.as_deref().map(short_commit),
         attempt_number: at.attempt,
@@ -140,6 +145,7 @@ pub fn header(state: &AttemptState) -> Header {
         ci_url: ci_run_url(&at.provider, at.repository.as_deref(), &at.run_key),
         result,
         result_provenance,
+        flows: flows.len(),
         settled,
     }
 }
@@ -213,61 +219,52 @@ pub fn live_view(i: LiveInputs) -> LiveView {
     }
 }
 
-/// The Maestro result across jobs: running while any is open, else the worst outcome, with the
-/// weakest evidence any closed job rests on.
-fn result(jobs: &[&JobView]) -> (Pill, Provenance) {
-    let counts = JobCounts {
-        starting: count(jobs, "starting"),
-        running: count(jobs, "running"),
-        finalizing: count(jobs, "finalizing"),
-        closed: count(jobs, "closed"),
-        pending: 0,
-    };
+/// The pipeline's verdict, derived from its flows (Foundations rule 4). While a job is open it is
+/// Running and provisional. Once every job has closed it is Failed if any flow failed; Passed only
+/// when a plan's total is known, every planned flow has been seen and each one is Verified Passed;
+/// otherwise No failures. Always derived, never a verdict the job outcome sets.
+fn verdict(jobs: &[&JobView], flows: &[&FlowView], planned: Option<i64>) -> (Pill, Provenance) {
     if jobs.is_empty() {
-        return (attempt_pill(&counts), Provenance::Missing);
+        return (attempt_pill(&JobCounts::default()), Provenance::Missing);
     }
     if jobs.iter().any(|j| j.lifecycle != "closed") {
-        return (attempt_pill(&counts), Provenance::Provisional);
+        return (
+            Pill {
+                label: "Running",
+                mark: Mark::Running,
+            },
+            Provenance::Provisional,
+        );
     }
-    let worst = jobs
-        .iter()
-        .map(|j| j.outcome.as_deref())
-        .max_by_key(|o| severity(*o))
-        .flatten();
-    let weakest = jobs
-        .iter()
-        .map(|j| source_provenance(j.outcome_source.as_deref()))
-        .min_by_key(|p| strength(*p))
-        .unwrap_or(Provenance::Missing);
-    (job_pill("closed", worst), weakest)
+    let pill = if flows.iter().any(|f| f.state == "failed") {
+        Pill {
+            label: "Failed",
+            mark: Mark::Failed,
+        }
+    } else if accounted_for(flows, planned) {
+        Pill {
+            label: "Passed",
+            mark: Mark::Passed,
+        }
+    } else {
+        Pill {
+            label: "No failures",
+            mark: Mark::End,
+        }
+    };
+    (pill, Provenance::Derived)
 }
 
-fn count(jobs: &[&JobView], lifecycle: &str) -> i64 {
-    i64::try_from(jobs.iter().filter(|j| j.lifecycle == lifecycle).count()).unwrap_or(i64::MAX)
-}
-
-/// How bad a closed job's outcome is; the worst one names the attempt.
-fn severity(outcome: Option<&str>) -> u8 {
-    match outcome {
-        Some("failed") => 5,
-        Some("interrupted") => 4,
-        Some("completed") => 1,
-        Some("cancelled") => 2,
-        _ => 3,
-    }
-}
-
-/// How much a provenance can be trusted; the weakest one describes a whole.
-fn strength(p: Provenance) -> u8 {
-    match p {
-        Provenance::Missing => 0,
-        Provenance::Stale => 1,
-        Provenance::Inferred => 2,
-        Provenance::Provisional => 3,
-        Provenance::Observed => 4,
-        Provenance::Derived => 5,
-        Provenance::Final => 6,
-    }
+/// Whether a plan's total is known and every planned flow is seen and Verified Passed.
+fn accounted_for(flows: &[&FlowView], planned: Option<i64>) -> bool {
+    planned.is_some_and(|total| {
+        total > 0
+            && i64::try_from(flows.len()).is_ok_and(|seen| seen >= total)
+            && flows.iter().all(|f| {
+                f.state == "passed"
+                    && flow_provenance(&f.finality, &f.state, None) == Provenance::Final
+            })
+    })
 }
 
 /// A flow that failed or was cut short.
@@ -317,10 +314,69 @@ pub fn failures(state: &AttemptState, project: &str) -> Vec<FailureRow> {
     rows
 }
 
+/// The message a failure is grouped under: whitespace runs collapse to one space, so a message
+/// that wraps differently still groups with its twins. Empty when no message was reported.
+#[must_use]
+pub fn normalised_message(message: Option<&str>) -> String {
+    message
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The failures grouped by normalised message, groups in message order and each group's flows
+/// in name order (the order [`failures`] gives them).
+#[must_use]
+pub fn message_groups(rows: &[FailureRow]) -> Vec<(String, Vec<FailureRow>)> {
+    let mut groups: Vec<(String, Vec<FailureRow>)> = Vec::new();
+    for row in rows {
+        let key = normalised_message(row.message.as_deref());
+        match groups.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, flows)) => flows.push(row.clone()),
+            None => groups.push((key, vec![row.clone()])),
+        }
+    }
+    groups.sort_by(|a, b| a.0.cmp(&b.0));
+    groups
+}
+
+/// The provenance a row shows, when it differs from its group's. A group is Final once the run
+/// has settled and Provisional while it is open. A flow not yet run is a dash while the run is
+/// open, never Missing (Foundations, rule 2).
+#[must_use]
+pub fn row_mark(provenance: Provenance, settled: bool) -> Option<Provenance> {
+    let group = if settled {
+        Provenance::Final
+    } else {
+        Provenance::Provisional
+    };
+    match provenance {
+        Provenance::Missing if !settled => None,
+        p if p == group => None,
+        p => Some(p),
+    }
+}
+
+/// The state a flow is filtered and counted under: one of the seven states the pipeline's
+/// readouts show. A state this build does not know is `unknown`, never passed.
+#[must_use]
+pub fn bucket(state: &str) -> &'static str {
+    match state {
+        "passed" => "passed",
+        "failed" => "failed",
+        "running" => "running",
+        "interrupted" => "interrupted",
+        "pending" => "pending",
+        "skipped" => "skipped",
+        _ => "unknown",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use fleet_protocol::live::LiveFrame;
-    use fleet_ui::{live_store::LiveStore, mark::Mark};
+    use fleet_ui::live_store::LiveStore;
 
     use super::{super::fixtures::*, *};
 
@@ -328,6 +384,17 @@ mod tests {
         let mut store = LiveStore::new();
         let _ = store.apply(frame);
         store.attempt(id(ATTEMPT)).unwrap().clone()
+    }
+
+    fn failure_row(f: &fleet_protocol::live::FlowView) -> FailureRow {
+        FailureRow {
+            flow_id: f.id,
+            name: f.name.clone(),
+            state: flow_state_pill(&f.state),
+            message: f.failure_message.clone(),
+            provenance: flow_provenance(&f.finality, &f.state, None),
+            href: flow_href("app", f.id),
+        }
     }
 
     #[test]
@@ -382,7 +449,9 @@ mod tests {
     }
 
     #[test]
-    fn the_closed_result_is_the_worst_job_outcome_with_the_weakest_evidence() {
+    fn a_closed_run_with_a_failed_flow_is_failed_and_derived_from_its_flows() {
+        let mut failed = flow(52, SUITE, "checkout", "failed", "verified");
+        failed.failure_message = Some("Assertion is false".into());
         let s = state(snapshot(
             1,
             vec![
@@ -390,32 +459,79 @@ mod tests {
                 job(11, "b", "closed", Some("failed"), Some("process_exit")),
             ],
             vec![],
-            vec![],
-            vec![],
+            vec![suite(SUITE, JOB, None)],
+            vec![flow(51, SUITE, "login", "passed", "verified"), failed],
         ));
         let h = header(&s);
         assert_eq!((h.result.label, h.result.mark), ("Failed", Mark::Failed));
+        assert_eq!(h.result_provenance, Provenance::Derived);
+        assert_eq!(h.flows, 2);
+    }
+
+    #[test]
+    fn the_job_outcome_does_not_decide_the_verdict_the_flows_do() {
+        let s = state(snapshot(
+            1,
+            vec![job(
+                JOB,
+                "a",
+                "closed",
+                Some("failed"),
+                Some("process_exit"),
+            )],
+            vec![],
+            vec![suite(SUITE, JOB, None)],
+            vec![flow(51, SUITE, "login", "passed", "verified")],
+        ));
+        let h = header(&s);
         assert_eq!(
-            h.result_provenance,
-            Provenance::Observed,
-            "the exit code alone is weaker than the report"
+            (h.result.label, h.result.mark),
+            ("No failures", Mark::End),
+            "no plan and no failed flow: the job's failure is shown separately"
         );
     }
 
     #[test]
-    fn a_header_names_the_repository_ref_and_short_commit() {
-        let s = state(snapshot(1, vec![], vec![], vec![], vec![]));
-        let h = header(&s);
-        assert_eq!(h.title, "acme/app");
-        assert_eq!(h.git_ref.as_deref(), Some("main"));
-        assert_eq!(h.commit.as_deref(), Some("0123456"));
-        assert_eq!(h.attempt_number, 2);
-        assert_eq!(h.started_ms, 1_767_225_600_000);
+    fn a_closed_run_passes_only_when_a_plan_total_is_accounted_for_by_verified_passes() {
+        let jobs = || {
+            vec![job(
+                JOB,
+                "a",
+                "closed",
+                Some("completed"),
+                Some("junit_final"),
+            )]
+        };
+        let verified = || {
+            vec![
+                flow(51, SUITE, "login", "passed", "verified"),
+                flow(52, SUITE, "wait", "passed", "verified"),
+            ]
+        };
+        let mut planned = snapshot(1, jobs(), vec![], vec![suite(SUITE, JOB, None)], verified());
+        if let LiveFrame::Snapshot { snapshot } = &mut planned {
+            snapshot.attempt.planned_total = Some(2);
+        }
+        assert_eq!(header(&state(planned)).result.label, "Passed");
+
+        let unplanned = state(snapshot(
+            1,
+            jobs(),
+            vec![],
+            vec![suite(SUITE, JOB, None)],
+            verified(),
+        ));
+        assert_eq!(header(&unplanned).result.label, "No failures");
+
+        let mut short = snapshot(1, jobs(), vec![], vec![suite(SUITE, JOB, None)], verified());
+        if let LiveFrame::Snapshot { snapshot } = &mut short {
+            snapshot.attempt.planned_total = Some(3);
+        }
         assert_eq!(
-            h.ci_url.as_deref(),
-            Some("https://github.com/acme/app/actions/runs/9001")
+            header(&state(short)).result.label,
+            "No failures",
+            "a planned flow not seen yet means not every flow is accounted for"
         );
-        assert_eq!(h.result.label, "No jobs yet");
     }
 
     #[test]
@@ -445,6 +561,66 @@ mod tests {
             "/flows/00000000-0000-0000-0000-000000000034?project=app"
         );
         assert_eq!(rows[0].provenance, Provenance::Inferred);
+    }
+
+    #[test]
+    fn failures_group_by_their_message_with_whitespace_normalised() {
+        let at = |n: u128, message: &str| {
+            let mut f = flow(n, SUITE, &format!("flow {n}"), "failed", "verified");
+            f.failure_message = Some(message.into());
+            failure_row(&f)
+        };
+        let rows = vec![
+            at(51, "Element not found:  \"Order total\""),
+            at(52, "Timed out after 15 s"),
+            at(53, "Element not found:\n\"Order total\""),
+        ];
+        let groups = message_groups(&rows);
+        let keys: Vec<&str> = groups.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(
+            keys,
+            ["Element not found: \"Order total\"", "Timed out after 15 s"]
+        );
+        assert_eq!(groups[0].1.len(), 2, "the two spellings are one group");
+    }
+
+    #[test]
+    fn a_failure_without_a_message_groups_under_the_empty_message() {
+        let f = flow(51, SUITE, "silent", "interrupted", "inferred");
+        let groups = message_groups(&[failure_row(&f)]);
+        assert_eq!(groups[0].0, "");
+    }
+
+    #[test]
+    fn a_row_marks_only_what_differs_from_its_group() {
+        assert_eq!(row_mark(Provenance::Provisional, false), None);
+        assert_eq!(row_mark(Provenance::Final, true), None, "settled is silent");
+        assert_eq!(
+            row_mark(Provenance::Inferred, true),
+            Some(Provenance::Inferred),
+            "an interrupted flow the report did not decide says so"
+        );
+        assert_eq!(
+            row_mark(Provenance::Stale, false),
+            Some(Provenance::Stale),
+            "a running flow on a quiet agent"
+        );
+    }
+
+    #[test]
+    fn a_flow_not_yet_run_is_a_dash_while_open_and_missing_once_settled() {
+        assert_eq!(row_mark(Provenance::Missing, false), None);
+        assert_eq!(
+            row_mark(Provenance::Missing, true),
+            Some(Provenance::Missing)
+        );
+    }
+
+    #[test]
+    fn every_flow_state_falls_in_one_of_seven_readout_buckets() {
+        assert_eq!(bucket("pending"), "pending");
+        assert_eq!(bucket("interrupted"), "interrupted");
+        assert_eq!(bucket("something-new"), "unknown", "never passed");
     }
 
     #[test]

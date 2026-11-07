@@ -157,6 +157,14 @@ pub(crate) fn count_of(selector: &str) -> String {
     format!("document.querySelectorAll('{selector}').length")
 }
 
+/// JS: the provenance the Flows heading states once for every flow of the group, or `undefined`.
+pub(crate) fn flows_label() -> String {
+    format!(
+        "document.querySelector('{} [role=img]')?.getAttribute('aria-label')",
+        q("flows-provenance")
+    )
+}
+
 /// JS: some element matching `selector` has exactly this text.
 pub(crate) fn has_text(selector: &str, text: &str) -> String {
     format!(
@@ -269,20 +277,21 @@ async fn pipeline_detail_shows_flows_with_provenance_and_says_when_progress_is_u
     );
 
     run.await.unwrap();
+    // The Flows heading states the group's provenance once; a settled row carries no mark of its own.
     page.wait(
         "every flow to be settled by the report",
         &format!(
-            "{n} > 0 && Array.from(document.querySelectorAll('{flow} [role=img]')).every(e => e.getAttribute('aria-label') === 'Provenance: verified')",
+            "{n} > 0 && {label} === 'Provenance: verified'",
             n = count_of(&q("flow-row")),
-            flow = q("flow-row"),
+            label = flows_label(),
         ),
     )
     .await;
-    // Every flow row carries a badge (I4), and the job's result is no longer "Running".
     assert_eq!(
         page.count(&format!("{} {}", q("flow-row"), q("flow-provenance")))
             .await,
-        page.count(&q("flow-row")).await
+        0,
+        "no row differs from the group, so none is marked"
     );
     page.wait(
         "the result to settle",
@@ -401,9 +410,9 @@ async fn after_a_server_restart_the_page_resubscribes_and_keeps_updating() {
     page.wait(
         "all ten flows settled",
         &format!(
-            "{n} === 10 && Array.from(document.querySelectorAll('{flow} [role=img]')).every(e => e.getAttribute('aria-label') === 'Provenance: verified')",
+            "{n} === 10 && {label} === 'Provenance: verified'",
             n = count_of(&q("flow-row")),
-            flow = q("flow-row"),
+            label = flows_label(),
         ),
     )
     .await;
