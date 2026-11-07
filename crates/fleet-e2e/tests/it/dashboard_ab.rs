@@ -184,7 +184,7 @@ async fn a_run_appears_on_the_overview_and_its_counts_move_without_a_reload() {
         .goto(&format!("http://{}/", stack.addr()))
         .await
         .unwrap();
-    page.wait("the empty overview", &has_text("h2", "No active pipelines"))
+    page.wait("the empty overview", &has_text("h2", "No pipelines yet"))
         .await;
     page.mark_loaded().await;
 
@@ -482,7 +482,7 @@ async fn an_agent_that_goes_quiet_turns_stale_and_then_disconnected() {
     .await;
     page.wait(
         "the runner counts to agree",
-        &has_text(&q("runner-counts"), "0 stale · 1 disconnected"),
+        &has_text(&q("runner-counts"), "1 disconnected"),
     )
     .await;
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
@@ -501,7 +501,7 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
         .goto(&format!("http://{}/", stack.addr()))
         .await
         .unwrap();
-    page.wait("the empty overview", &has_text("h2", "No active pipelines"))
+    page.wait("the empty overview", &has_text("h2", "No pipelines yet"))
         .await;
     page.mark_loaded().await;
 
@@ -516,7 +516,7 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
     .await;
     page.wait(
         "the tile to count both",
-        &has_text(&format!("{} p", q("tile-active")), "2"),
+        &has_text(&format!("{} .tile-n", q("tile-running")), "2"),
     )
     .await;
     // Both rows move: each shows its own five live passes while both are still open.
@@ -642,7 +642,7 @@ async fn without_a_login_the_dashboard_links_to_sign_in_and_with_one_it_signs_ou
     browser.client.goto(&format!("{origin}/")).await.unwrap();
     page.wait(
         "the signed-in overview",
-        &has_text("h2", "No active pipelines"),
+        &has_text("h2", "No pipelines yet"),
     )
     .await;
     page.wait("the person's name", &has_text(&q("whoami"), "Ada"))

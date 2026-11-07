@@ -146,7 +146,8 @@ pub fn StatTile(
 }
 
 /// A readout that filters: a radio in a label, so the whole cell is the target. The checked
-/// cell is underlined at its top edge.
+/// cell is underlined at its top edge. `test_id` and `note` are optional: left out, the cell is
+/// what it was before they existed.
 #[component]
 pub fn ReadoutChoice(
     /// The radio group's name.
@@ -167,9 +168,15 @@ pub fn ReadoutChoice(
     /// Called when the cell is chosen.
     #[prop(optional)]
     on_select: Option<Callback<()>>,
+    /// The cell's `data-testid`, when a test finds it.
+    #[prop(into, optional)]
+    test_id: Option<String>,
+    /// A line under the count, such as "1 flow running now". `None` leaves no line.
+    #[prop(into, optional_no_strip)]
+    note: Option<String>,
 ) -> impl IntoView {
     view! {
-        <label class="tile">
+        <label class="tile" data-testid=test_id>
             <input
                 type="radio"
                 name=name
@@ -183,6 +190,7 @@ pub fn ReadoutChoice(
             />
             <span class="tile-l">{label}</span>
             <span class="tile-n">{count}</span>
+            {note.map(|n| view! { <span class="tile-s">{n}</span> })}
         </label>
     }
 }
