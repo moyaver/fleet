@@ -7,6 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Agent: a failed flow's device logcat is uploaded as an excerpt: the lines of the failing step's window (10 s before it to 2 s after it), redacted line by line, at most 512 KiB, keeping the newest lines and saying when older ones were cut. The window is placed on UTC by the log's own last line, so a log whose clock cannot be told from the failure's is not sent (#75).
+- Agent: an app that crashes during a flow is journaled as `app.crashed` (package and exception, from Maestro's `crash-report.txt`) on that flow. The flow's verdict stays Maestro's own (#75).
+- Server: the `device_logcat` artifact class, a text file with its own size limit (`artifacts.max_bytes.device_logcat`, 512 KiB) (#75).
+- Dashboard: screen D offers a failed flow's device logcat excerpt as a download, labelled "Device logcat excerpt" (#75).
 - Agent: at run end, `GITHUB_STEP_SUMMARY` gets a short Markdown summary: outcome counts, the flows that did not pass with their provenance and reason, and a dashboard link when `FLEET_SERVER` is set. A summary that cannot be written costs one notice; Maestro's output and exit status never change (#71).
 - Examples: a composite GitHub Action, `examples/github-actions/fleet-agent`, installs a pinned, checksum-verified agent release and runs a Maestro command under it (#71).
 - Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).

@@ -70,6 +70,9 @@ impl LogTailer {
     }
 }
 
+/// Longest crash report read. Maestro's is about a kilobyte; the rest is not needed.
+const MAX_CRASH_REPORT: u64 = 64 * 1024;
+
 /// Reports flow bundle files as they appear.
 #[derive(Debug)]
 pub(crate) struct BundleScanner {
@@ -77,6 +80,8 @@ pub(crate) struct BundleScanner {
     seen: HashSet<String>,
     /// Flow folders whose `commands.json` was already reported.
     commands_read: HashSet<String>,
+    /// Flow folders whose `logs/crash-report.txt` was already reported.
+    crash_read: HashSet<String>,
 }
 
 impl BundleScanner {
@@ -85,6 +90,7 @@ impl BundleScanner {
             root,
             seen: HashSet::new(),
             commands_read: HashSet::new(),
+            crash_read: HashSet::new(),
         }
     }
 
@@ -132,6 +138,13 @@ impl BundleScanner {
                     contents: bytes,
                 });
             }
+            let crash = path.join("logs").join("crash-report.txt");
+            if (manifest || final_pass) && crash.is_file() && self.crash_read.insert(name.clone()) {
+                out.push(Observation::File {
+                    rel: format!("{name}/logs/crash-report.txt"),
+                    contents: read_head(&crash),
+                });
+            }
             if manifest {
                 self.report(&format!("{name}/manifest.json"), None, &mut out);
             }
@@ -147,6 +160,17 @@ impl BundleScanner {
             });
         }
     }
+}
+
+/// The first [`MAX_CRASH_REPORT`] bytes of `path`, or `None` when it cannot be read.
+fn read_head(path: &Path) -> Option<Vec<u8>> {
+    let mut buf = Vec::new();
+    File::open(path)
+        .ok()?
+        .take(MAX_CRASH_REPORT)
+        .read_to_end(&mut buf)
+        .ok()?;
+    Some(buf)
 }
 
 #[cfg(test)]
@@ -219,6 +243,28 @@ mod tests {
             ]
         );
         assert!(s.scan(true).is_empty(), "nothing twice");
+        std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// A crash report is read once, when its flow's manifest is there, and never twice.
+    #[test]
+    fn the_scanner_reads_a_crash_report_once_after_the_manifest() {
+        let d = tmp("crash");
+        let flow = d.join("crash");
+        std::fs::create_dir_all(flow.join("logs")).unwrap();
+        let mut s = BundleScanner::new(d.clone());
+        let crash_seen = |obs: &[Observation]| {
+            obs.iter().any(|o| {
+                matches!(o, Observation::File { rel, contents: Some(c) }
+                    if rel == "crash/logs/crash-report.txt" && c == b"boom")
+            })
+        };
+        std::fs::write(flow.join("logs/crash-report.txt"), b"boom").unwrap();
+        let before = s.scan(false);
+        assert!(!crash_seen(&before), "no manifest yet");
+        std::fs::write(flow.join("manifest.json"), b"{}").unwrap();
+        assert!(crash_seen(&s.scan(false)));
+        assert!(!crash_seen(&s.scan(true)), "nothing twice");
         std::fs::remove_dir_all(&d).ok();
     }
 }

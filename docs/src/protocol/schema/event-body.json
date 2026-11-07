@@ -48,6 +48,24 @@
       ],
       "type": "object"
     },
+    "AppCrashed": {
+      "description": "`app.crashed`: the app under test died during a flow, as Maestro's `crash-report.txt` records it\n(issue #75). It is evidence on the flow. It does not change the flow's verdict, which stays\nMaestro's own.",
+      "properties": {
+        "exception": {
+          "description": "The exception's first line: its class, then its message.",
+          "type": "string"
+        },
+        "package": {
+          "description": "The app's package, for example `com.example.app`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "exception"
+      ],
+      "type": "object"
+    },
     "ArtifactRegistered": {
       "description": "`artifact.registered`: a file worth keeping appeared.",
       "properties": {
@@ -1235,6 +1253,23 @@
         },
         "type": {
           "const": "journal.gap",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "See [`AppCrashed`].",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/AppCrashed"
+        },
+        "type": {
+          "const": "app.crashed",
           "type": "string"
         }
       },

@@ -390,6 +390,18 @@ pub struct ArtifactRejected {
     pub reason: String,
 }
 
+/// `app.crashed`: the app under test died during a flow, as Maestro's `crash-report.txt` records it
+/// (issue #75). It is evidence on the flow. It does not change the flow's verdict, which stays
+/// Maestro's own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AppCrashed {
+    /// The app's package, for example `com.example.app`.
+    pub package: String,
+    /// The exception's first line: its class, then its message.
+    pub exception: String,
+}
+
 /// `plan.assigned`: this run executes one shard of a Fleet plan (ADR-0013).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -531,6 +543,9 @@ pub enum EventBody {
     /// See [`JournalGap`].
     #[serde(rename = "journal.gap")]
     JournalGap(JournalGap),
+    /// See [`AppCrashed`].
+    #[serde(rename = "app.crashed")]
+    AppCrashed(AppCrashed),
     /// See [`ParserUnrecognized`].
     #[serde(rename = "parser.unrecognized")]
     ParserUnrecognized(ParserUnrecognized),
@@ -560,6 +575,7 @@ const VERSIONS: &[(&str, u16)] = &[
     ("plan.assigned", 1),
     ("device.state_observed", 1),
     ("agent.warning", 1),
+    ("app.crashed", 1),
     ("journal.gap", 1),
     ("parser.unrecognized", 1),
     ("maestro.detected", 1),

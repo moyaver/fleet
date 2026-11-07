@@ -32,6 +32,30 @@ pub(crate) async fn get_as(addr: SocketAddr, host: &str, path: &str) -> (u16, St
     (status, head, out[split + 4..].to_vec())
 }
 
+/// The device log around the failed step (issue #75): the excerpt is within its cap, reaches the
+/// failing step's end, holds no planted value, and opens like any other evidence.
+async fn assert_device_logcat_excerpt(stack: &Stack, excerpt: &Value) {
+    assert_eq!(excerpt["name"], "device-logcat.txt");
+    assert!(
+        excerpt["size_bytes"].as_u64().unwrap() <= 512 * 1024,
+        "{excerpt}"
+    );
+    let link = excerpt["link"]["url"].as_str().unwrap();
+    let path = url::Url::parse(link).unwrap().path().to_owned();
+    let (status, head, body) = get_as(stack.addr(), USERCONTENT, &path).await;
+    assert_eq!(status, 200, "{head}");
+    assert!(head.contains("content-disposition: attachment"), "{head}");
+    let text = String::from_utf8(body).unwrap();
+    assert!(
+        text.contains("11-04 02:25:28."),
+        "the failing step's end is in the excerpt"
+    );
+    assert!(
+        !text.contains(PLANTED),
+        "device_logcat leaked the planted secret"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_failed_runs_evidence_is_uploaded_redacted_and_opens_only_on_the_usercontent_origin() {
     let stack = Stack::start(|c| {
@@ -94,6 +118,8 @@ async fn a_failed_runs_evidence_is_uploaded_redacted_and_opens_only_on_the_userc
             "{class} should show where it was redacted"
         );
     }
+    assert_device_logcat_excerpt(&stack, find("device_logcat")).await;
+
     let link = find("failure_screenshot")["link"]["url"].as_str().unwrap();
     let path = url::Url::parse(link).unwrap().path().to_owned();
     let (status, head, body) = get_as(stack.addr(), USERCONTENT, &path).await;

@@ -290,7 +290,9 @@ impl Evidence {
                     files.commands = Some(text());
                     files.downloads.push(open());
                 }
-                Some(ArtifactClass::Junit) | None => files.downloads.push(open()),
+                Some(ArtifactClass::Junit | ArtifactClass::DeviceLogcat) | None => {
+                    files.downloads.push(open());
+                }
             }
         }
         Self::Files(Box::new(files))
@@ -339,6 +341,7 @@ fn kind(class: Option<ArtifactClass>) -> &'static str {
         Some(ArtifactClass::Junit) => "JUnit report",
         Some(ArtifactClass::MaestroLog) => "Maestro log",
         Some(ArtifactClass::HtmlReport) => "Maestro HTML report",
+        Some(ArtifactClass::DeviceLogcat) => "Device logcat excerpt",
         None => "Other file",
     }
 }
@@ -766,6 +769,38 @@ mod tests {
             ]
         );
         assert!(f.downloads.is_empty(), "{:?}", f.downloads);
+    }
+
+    /// The device logcat excerpt of a failed flow is offered as a download with its own label
+    /// (issue #75): the link opens the excerpt, and the failure's step tree is unchanged.
+    #[test]
+    fn a_device_logcat_excerpt_is_a_download_labelled_as_such() {
+        let mut excerpt = artifact(
+            6,
+            "device_logcat",
+            "device-logcat.txt",
+            "text/plain",
+            2_048,
+            Some("https://uc.example.net/u/p/6/1/s/device-logcat.txt"),
+        );
+        excerpt["flow_execution_id"] = serde_json::json!(FLOW);
+        let steps = steps();
+        let f = files(Evidence::build(
+            &list(&[excerpt], Some(UC)),
+            FLOW,
+            steps.last(),
+            &steps,
+        ));
+        assert_eq!(
+            f.downloads,
+            [EvidenceLink {
+                kind: "Device logcat excerpt",
+                name: "device-logcat.txt".to_owned(),
+                size: "2 KiB".to_owned(),
+                href: "https://uc.example.net/u/p/6/1/s/device-logcat.txt".to_owned(),
+            }]
+        );
+        assert!(f.log.is_none(), "the excerpt is not the Maestro log");
     }
 
     #[test]
