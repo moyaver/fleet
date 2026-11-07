@@ -25,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a flow's evidence keeps its state when its signed links renew (about every four minutes): the screenshot zoom and selection, and the log search, stay put instead of resetting, and the evidence card no longer rebuilds on every live update of the flow. A tooltip hides on Escape from anywhere while it is shown, not only from inside its trigger (#41).
 - Server: a run whose socket another instance holds shows `online` or `stale` from its persisted contact, as on the instance holding it, instead of always `stale` (#114).
 - Server: a worker's Maestro and agent figures are one series per agent run, raw and in the minute and hour aggregates, so runs that share a runner no longer merge or interleave; the runner's latest reading carries only the machine's figures. The dashboard's worker page draws one line per run (#42).
+- Agent: after Maestro exits, the agent keeps draining its output while the CI log is still taking it, and gives up on an output pump after 2 s with no reads and nothing held for the log, or 10 s after the exit at most, so a backed-up log no longer loses its tail and a grandchild that keeps writing cannot hold the exit (#124).
 
 ## [0.1.0-alpha.1] - 2026-11-06
 
