@@ -23,7 +23,7 @@ services:
 
   fleet:
     <<: *restart
-    image: ${FLEET_IMAGE:-ghcr.io/moyaver/fleet:0.1.0-alpha.2}
+    image: ${FLEET_IMAGE:-ghcr.io/moyaver/fleet:0.1.0-alpha.3}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
