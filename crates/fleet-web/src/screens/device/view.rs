@@ -9,7 +9,7 @@
 
 use fleet_protocol::rest::{DeviceDetailView, MetricsView, TimelineView};
 use fleet_ui::{
-    components::display::{Card, EmptyState},
+    components::display::{Card, EmptyState, TableBox},
     tone::Tone,
 };
 use leptos::prelude::*;
@@ -192,16 +192,18 @@ fn FlowsSection(
                     .into_any()
             } else {
                 view! {
-                    <table class="w-full text-left text-sm">
-                        <caption class="sr-only">"Flow executions on this device, newest first"</caption>
-                        <thead class="border-b border-border text-muted">
-                            <tr>
-                                {["Flow", "Outcome", "Duration", "Steps", "Failure"]
-                                    .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                            </tr>
-                        </thead>
-                        <tbody>{rows.into_iter().map(flow_row).collect_view()}</tbody>
-                    </table>
+                    <TableBox label="Flow executions on this device">
+                        <table class="w-full text-left text-sm">
+                            <caption class="sr-only">"Flow executions on this device, newest first"</caption>
+                            <thead class="border-b border-border text-muted">
+                                <tr>
+                                    {["Flow", "Outcome", "Duration", "Steps", "Failure"]
+                                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                                </tr>
+                            </thead>
+                            <tbody>{rows.into_iter().map(flow_row).collect_view()}</tbody>
+                        </table>
+                    </TableBox>
                 }
                     .into_any()
             }}

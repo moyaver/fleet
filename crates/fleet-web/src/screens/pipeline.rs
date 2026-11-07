@@ -23,10 +23,13 @@ mod fixtures;
 
 use std::time::Duration;
 
-use fleet_protocol::live::PlanView;
+use fleet_protocol::live::{LiveFrame, PlanView};
 use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
-    components::display::{Badge, Card, EmptyState, ProvenanceBadge, Skeleton, StatusPill},
+    components::{
+        display::{Badge, Card, EmptyState, ProvenanceBadge, Skeleton, StatusPill, TableBox},
+        live::LiveState,
+    },
     timeline::{model::TimelineData, view::SwimlaneTimeline},
 };
 use leptos::prelude::*;
@@ -34,16 +37,17 @@ use leptos_router::{components::A, hooks::use_params_map};
 use uuid::Uuid;
 
 use self::{
+    model::{LiveInputs, live_view},
     plans::{PlanComparison, show, signed},
     timeline::timeline_data,
 };
 use crate::{
     api::{self, ApiError},
-    app::ErrorNotice,
+    app::{ErrorNotice, LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
     live::{
         model::LiveModel,
-        socket::{Connection, Event, Subscription, connect},
+        socket::{Event, Subscription, connect},
     },
     paths::flow_href,
     progress::Progress,
@@ -83,6 +87,10 @@ const CARD_GAP: &str = "space-y-4";
 #[component]
 fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     let model = LiveModel::new(attempt);
+    // Pause holds the frames as they arrive, unapplied; showing them applies them in order.
+    let paused = RwSignal::new(false);
+    let held = RwSignal::new(Vec::<LiveFrame>::new());
+    let last_update = RwSignal::new(now_ms());
     let live = {
         let project = project.clone();
         connect(
@@ -91,8 +99,18 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
                 attempt: Some(attempt),
             },
             move |event| match event {
-                Event::Frames(frames) => model.apply(&project, frames),
-                Event::Lost => model.connection_lost(),
+                Event::Frames(frames) => {
+                    last_update.set(now_ms());
+                    if paused.get_untracked() {
+                        held.update(|h| h.extend(frames));
+                    } else {
+                        model.apply(&project, frames);
+                    }
+                }
+                Event::Lost => {
+                    held.set(Vec::new());
+                    model.connection_lost();
+                }
             },
         )
     };
@@ -134,6 +152,55 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     {
         on_cleanup(move || handle.clear());
     }
+    // The top bar's live indicator follows this page while it is shown.
+    let bar = LiveBar {
+        state: RwSignal::new(LiveState::Connecting),
+        detail: RwSignal::new(String::new()),
+        action: RwSignal::new(None),
+        on_action: {
+            let project = project.clone();
+            Callback::new(move |()| {
+                if paused.get_untracked() {
+                    paused.set(false);
+                    let frames = held.get_untracked();
+                    held.set(Vec::new());
+                    if !frames.is_empty() {
+                        model.apply(&project, frames);
+                    }
+                } else {
+                    paused.set(true);
+                }
+            })
+        },
+    };
+    Effect::new(move |_| {
+        let at = now.get();
+        let settled = model.header.with(|h| h.as_ref().is_some_and(|h| h.settled));
+        let view = live_view(LiveInputs {
+            connection: live.connection.get(),
+            paused: paused.get(),
+            held: held.with(Vec::len),
+            settled,
+            now: at,
+            last_update: last_update.get(),
+            utc_offset_minutes: utc_offset_minutes(),
+        });
+        bar.state.set(view.state);
+        bar.detail.set(view.detail);
+        bar.action.set(view.action);
+    });
+    let slot = expect_context::<LiveSlot>().0;
+    slot.set(Some(bar));
+    // Clears the slot only if it still holds this page's bar: a page replaced by another attempt
+    // may be cleaned up after its successor has set its own.
+    let mine = bar.state;
+    on_cleanup(move || {
+        slot.update(|current| {
+            if current.is_some_and(|b| b.state == mine) {
+                *current = None;
+            }
+        });
+    });
     let timeline_view = timeline.data;
     let data = Memo::new(move |_| match timeline_view.get() {
         Some(view) => timeline_data(
@@ -155,7 +222,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
                 None => view! { <Skeleton lines=6 /> }.into_any(),
                 Some(header) => {
                     view! {
-                        <PageHeader header=header connection=live.connection now=now />
+                        <PageHeader header=header now=now />
                         <Show when=move || model.awaiting_snapshot.get()>
                             <p role="status" data-testid="resync" class="rounded border border-border bg-tone-warning-bg p-2 text-sm text-tone-warning-fg">
                                 "Reconnecting to the live feed. This is the last known state; it is updating."
@@ -186,11 +253,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
 }
 
 #[component]
-fn PageHeader(
-    header: model::Header,
-    connection: ReadSignal<Connection>,
-    now: RwSignal<i64>,
-) -> impl IntoView {
+fn PageHeader(header: model::Header, now: RwSignal<i64>) -> impl IntoView {
     let result = header.result;
     let running = result.label == "Running";
     let started = header.started_ms;
@@ -210,16 +273,9 @@ fn PageHeader(
             <div class="flex flex-wrap items-center gap-3">
                 <h2 class="text-xl font-semibold" data-testid="pipeline-title">{header.title}</h2>
                 <span data-testid="pipeline-result">
-                    <StatusPill tone=result.tone label=result.label />
+                    <StatusPill mark=result.mark label=result.label />
                 </span>
                 <ProvenanceBadge provenance=header.result_provenance />
-                <span
-                    data-testid="connection"
-                    data-state=move || connection.get().label()
-                    class="ml-auto text-sm text-muted"
-                >
-                    {move || connection.get().label()}
-                </span>
             </div>
             <p class="text-sm text-muted">
                 {facts}
@@ -286,33 +342,36 @@ fn PlanTable(plans: RwSignal<Option<Vec<PlanView>>>) -> impl IntoView {
                 .iter()
                 .map(|plan| {
                     let view = PlanComparison::new(plan);
+                    let summary = view.summary();
                     view! {
                         <div class="mt-4 space-y-2" data-testid="plan">
                             <p class="text-xs text-muted">{format!("Plan {}", view.plan_id)}</p>
-                            <table class="w-full text-sm" data-testid="plan-shards">
-                                <thead class="text-left text-xs text-muted">
-                                    <tr>
-                                        <th class="font-medium">"Shard"</th>
-                                        <th class="font-medium">"Flows"</th>
-                                        <th class="font-medium">"Planned"</th>
-                                        <th class="font-medium">"Actual"</th>
-                                        <th class="font-medium">"Difference"</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="tabular-nums">
-                                    {view.shards.iter().map(|row| view! {
-                                        <tr data-testid="plan-shard">
-                                            <td>{row.shard_id}</td>
-                                            <td>{row.flows}</td>
-                                            <td>{show(row.planned_ms)}</td>
-                                            <td>{show(row.actual_ms)}</td>
-                                            <td>{row.difference_ms().map_or_else(|| "—".to_owned(), signed)}</td>
+                            <TableBox label="Plan shards">
+                                <table class="w-full text-sm" data-testid="plan-shards">
+                                    <thead class="text-left text-xs text-muted">
+                                        <tr>
+                                            <th class="font-medium">"Shard"</th>
+                                            <th class="font-medium">"Flows"</th>
+                                            <th class="font-medium">"Planned"</th>
+                                            <th class="font-medium">"Actual"</th>
+                                            <th class="font-medium">"Difference"</th>
                                         </tr>
-                                    }).collect_view()}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody class="tabular-nums">
+                                        {view.shards.iter().map(|row| view! {
+                                            <tr data-testid="plan-shard">
+                                                <td>{row.shard_id}</td>
+                                                <td>{row.flows}</td>
+                                                <td>{show(row.planned_ms)}</td>
+                                                <td>{show(row.actual_ms)}</td>
+                                                <td>{row.difference_ms().map_or_else(|| "—".to_owned(), signed)}</td>
+                                            </tr>
+                                        }).collect_view()}
+                                    </tbody>
+                                </table>
+                            </TableBox>
                             <ul class="space-y-1 text-sm text-muted" data-testid="plan-summary">
-                                {view.summary().into_iter().map(|line| view! { <li>{line}</li> }).collect_view()}
+                                {summary.into_iter().map(|line| view! { <li>{line}</li> }).collect_view()}
                             </ul>
                         </div>
                     }
@@ -349,7 +408,7 @@ fn FailuresCard(model: LiveModel) -> impl IntoView {
                             view! {
                                 <li class="flex flex-wrap items-center gap-2" data-testid="failure">
                                     <A href=f.href.clone() attr:class="font-medium text-primary hover:underline">{f.name.clone()}</A>
-                                    <StatusPill tone=f.state.tone label=f.state.label />
+                                    <StatusPill mark=f.state.mark label=f.state.label />
                                     <ProvenanceBadge provenance=f.provenance />
                                     {f.message.clone().map(|m| view! { <span class="text-sm text-muted">{m}</span> })}
                                 </li>
@@ -424,7 +483,7 @@ fn JobCard(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl Int
                     let j = job.get();
                     let pill = job_pill(&j.lifecycle, j.outcome.as_deref());
                     view! {
-                        <StatusPill tone=pill.tone label=pill.label />
+                        <StatusPill mark=pill.mark label=pill.label />
                         {j.outcome.is_some().then(|| view! {
                             <ProvenanceBadge provenance=source_provenance(j.outcome_source.as_deref()) />
                         })}
@@ -459,7 +518,7 @@ fn RunRow(model: LiveModel, id: Uuid) -> impl IntoView {
                 <span data-testid="run-liveness">
                     {move || {
                         let pill = liveness_pill(run.get().liveness);
-                        view! { <StatusPill tone=pill.tone label=pill.label /> }
+                        view! { <StatusPill mark=pill.mark label=pill.label /> }
                     }}
                 </span>
             </div>
@@ -532,7 +591,7 @@ fn SuiteBlock(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl 
                     let s = suite.get();
                     let pill = suite_pill(&s.lifecycle, s.outcome.as_deref());
                     view! {
-                        <StatusPill tone=pill.tone label=pill.label />
+                        <StatusPill mark=pill.mark label=pill.label />
                         {s.outcome.is_some().then(|| view! {
                             <ProvenanceBadge provenance=source_provenance(s.outcome_source.as_deref()) />
                         })}
@@ -589,7 +648,7 @@ fn FlowRow(model: LiveModel, project: StoredValue<String>, id: Uuid) -> impl Int
             </A>
             {move || {
                 let pill = flow_state_pill(&flow.read().state);
-                view! { <StatusPill tone=pill.tone label=pill.label /> }
+                view! { <StatusPill mark=pill.mark label=pill.label /> }
             }}
             <span data-testid="flow-provenance"><ProvenanceBadge provenance=provenance /></span>
             {move || device().map(|d| view! { <span class="text-xs text-muted">{d}</span> })}

@@ -9,7 +9,7 @@
 
 use fleet_protocol::rest::FlowDetailView;
 use fleet_ui::{
-    components::display::{Card, ProvenanceBadge},
+    components::display::{Card, ProvenanceBadge, TableBox},
     steps::view::StepTreeView,
     tone::Tone,
 };
@@ -196,16 +196,18 @@ fn ClaimsCard(
     let body = match claims {
         ClaimsSection::Empty(text) => view! { <p class="text-muted">{text}</p> }.into_any(),
         ClaimsSection::Claims(rows) => view! {
-            <table class="w-full text-left text-sm">
-                <caption class="sr-only">"Every source's claim about this flow's outcome"</caption>
-                <thead class="border-b border-border text-muted">
-                    <tr>
-                        {["Source", "Provenance", "Claimed", "Observed", "Recorded", "Parser", ""]
-                            .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                    </tr>
-                </thead>
-                <tbody>{rows.into_iter().map(claim_row).collect_view()}</tbody>
-            </table>
+            <TableBox label="Outcome claims">
+                <table class="w-full text-left text-sm">
+                    <caption class="sr-only">"Every source's claim about this flow's outcome"</caption>
+                    <thead class="border-b border-border text-muted">
+                        <tr>
+                            {["Source", "Provenance", "Claimed", "Observed", "Recorded", "Parser", ""]
+                                .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                        </tr>
+                    </thead>
+                    <tbody>{rows.into_iter().map(claim_row).collect_view()}</tbody>
+                </table>
+            </TableBox>
         }
         .into_any(),
     };
@@ -290,36 +292,38 @@ fn PreviousCard(
         view! { <p class="text-muted">"No earlier executions of this flow."</p> }.into_any()
     } else {
         view! {
-            <table class="w-full text-left text-sm">
-                <caption class="sr-only">"Earlier executions of this flow, newest first"</caption>
-                <thead class="border-b border-border text-muted">
-                    <tr>
-                        {["Started", "Outcome", "Duration", "Pipeline"]
-                            .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                    </tr>
-                </thead>
-                <tbody>
-                    {previous
-                        .into_iter()
-                        .map(|p| {
-                            view! {
-                                <tr class="border-b border-border">
-                                    <td class="px-2 py-1 tabular-nums">
-                                        <a class="underline" href=p.href>{p.started}</a>
-                                    </td>
-                                    <td class="px-2 py-1">
-                                        <Outcome pill=p.state provenance=p.provenance />
-                                    </td>
-                                    <td class="px-2 py-1">{p.duration.unwrap_or_else(|| "—".to_owned())}</td>
-                                    <td class="px-2 py-1">
-                                        <a class="underline" href=p.pipeline_href>"Pipeline"</a>
-                                    </td>
-                                </tr>
-                            }
-                        })
-                        .collect_view()}
-                </tbody>
-            </table>
+            <TableBox label="Earlier executions">
+                <table class="w-full text-left text-sm">
+                    <caption class="sr-only">"Earlier executions of this flow, newest first"</caption>
+                    <thead class="border-b border-border text-muted">
+                        <tr>
+                            {["Started", "Outcome", "Duration", "Pipeline"]
+                                .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {previous
+                            .into_iter()
+                            .map(|p| {
+                                view! {
+                                    <tr class="border-b border-border">
+                                        <td class="px-2 py-1 tabular-nums">
+                                            <a class="underline" href=p.href>{p.started}</a>
+                                        </td>
+                                        <td class="px-2 py-1">
+                                            <Outcome pill=p.state provenance=p.provenance />
+                                        </td>
+                                        <td class="px-2 py-1">{p.duration.unwrap_or_else(|| "—".to_owned())}</td>
+                                        <td class="px-2 py-1">
+                                            <a class="underline" href=p.pipeline_href>"Pipeline"</a>
+                                        </td>
+                                    </tr>
+                                }
+                            })
+                            .collect_view()}
+                    </tbody>
+                </table>
+            </TableBox>
         }
         .into_any()
     };

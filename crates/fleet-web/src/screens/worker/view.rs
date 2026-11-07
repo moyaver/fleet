@@ -10,7 +10,7 @@
 use fleet_protocol::rest::{MetricsView, TimelineView, WorkerRunPage, WorkerView};
 use fleet_ui::{
     charts::series::Reading,
-    components::display::{Card, EmptyState, ProvenanceBadge},
+    components::display::{Card, EmptyState, ProvenanceBadge, TableBox},
     tone::Tone,
 };
 use leptos::prelude::*;
@@ -246,16 +246,18 @@ fn RunsSection(
                 }
                 let next = list.next_page();
                 view! {
-                    <table class="w-full text-left text-sm">
-                        <caption class="sr-only">"Runs on this worker, newest first"</caption>
-                        <thead class="border-b border-border text-muted">
-                            <tr>
-                                {["Job", "State", "Started", "Duration", "Exit code", "Data gaps"]
-                                    .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                            </tr>
-                        </thead>
-                        <tbody>{list.rows().iter().map(run_row).collect_view()}</tbody>
-                    </table>
+                    <TableBox label="Runs on this worker">
+                        <table class="w-full text-left text-sm">
+                            <caption class="sr-only">"Runs on this worker, newest first"</caption>
+                            <thead class="border-b border-border text-muted">
+                                <tr>
+                                    {["Job", "State", "Started", "Duration", "Exit code", "Data gaps"]
+                                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                                </tr>
+                            </thead>
+                            <tbody>{list.rows().iter().map(run_row).collect_view()}</tbody>
+                        </table>
+                    </TableBox>
                     {(next != NextPage::Done)
                         .then(|| {
                             view! {
@@ -312,35 +314,37 @@ fn DevicesSection(
                     .into_any()
             } else {
                 view! {
-                    <table class="w-full text-left text-sm">
-                        <caption class="sr-only">"Devices hosted by this worker"</caption>
-                        <thead class="border-b border-border text-muted">
-                            <tr>
-                                {["Device", "State", "Profile", "Job", "Last seen"]
-                                    .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {devices
-                                .into_iter()
-                                .map(|d| {
-                                    view! {
-                                        <tr class="border-b border-border">
-                                            <td class="px-2 py-1">
-                                                <a class="underline" href=d.href>{d.serial}</a>
-                                            </td>
-                                            <td class="px-2 py-1"><PillView pill=d.state /></td>
-                                            <td class="px-2 py-1">
-                                                {d.profile.unwrap_or_else(|| "Not reported".to_owned())}
-                                            </td>
-                                            <td class="px-2 py-1">{d.job_key}</td>
-                                            <td class="px-2 py-1">{d.last_seen}</td>
-                                        </tr>
-                                    }
-                                })
-                                .collect_view()}
-                        </tbody>
-                    </table>
+                    <TableBox label="Devices on this runner">
+                        <table class="w-full text-left text-sm">
+                            <caption class="sr-only">"Devices hosted by this worker"</caption>
+                            <thead class="border-b border-border text-muted">
+                                <tr>
+                                    {["Device", "State", "Profile", "Job", "Last seen"]
+                                        .map(|h| view! { <th scope="col" class="px-2 py-1 font-medium">{h}</th> })}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {devices
+                                    .into_iter()
+                                    .map(|d| {
+                                        view! {
+                                            <tr class="border-b border-border">
+                                                <td class="px-2 py-1">
+                                                    <a class="underline" href=d.href>{d.serial}</a>
+                                                </td>
+                                                <td class="px-2 py-1"><PillView pill=d.state /></td>
+                                                <td class="px-2 py-1">
+                                                    {d.profile.unwrap_or_else(|| "Not reported".to_owned())}
+                                                </td>
+                                                <td class="px-2 py-1">{d.job_key}</td>
+                                                <td class="px-2 py-1">{d.last_seen}</td>
+                                            </tr>
+                                        }
+                                    })
+                                    .collect_view()}
+                            </tbody>
+                        </table>
+                    </TableBox>
                 }
                     .into_any()
             }}

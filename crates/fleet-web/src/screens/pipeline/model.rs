@@ -8,12 +8,13 @@ use fleet_protocol::{
     live::{AgentRunView, FlowView, JobView, SuiteView},
     rest::JobCounts,
 };
-use fleet_ui::{live_store::AttemptState, provenance::Provenance};
+use fleet_ui::{components::live::LiveState, live_store::AttemptState, provenance::Provenance};
 use uuid::Uuid;
 
 use crate::{
     clock::unix_ms,
-    format::{ref_name, short_commit},
+    format::{ref_name, short_commit, time_of_day},
+    live::socket::Connection,
     paths::{ci_run_url, flow_href},
     status::{Pill, attempt_pill, flow_provenance, flow_state_pill, job_pill, source_provenance},
 };
@@ -119,6 +120,8 @@ pub struct Header {
     pub result: Pill,
     /// How settled the result is: the weakest evidence among the closed jobs.
     pub result_provenance: Provenance,
+    /// Whether every job has closed: no further updates will come for this attempt.
+    pub settled: bool,
 }
 
 /// The header of an attempt.
@@ -127,6 +130,7 @@ pub fn header(state: &AttemptState) -> Header {
     let at = state.attempt();
     let jobs: Vec<&JobView> = state.jobs().collect();
     let (result, result_provenance) = result(&jobs);
+    let settled = !jobs.is_empty() && jobs.iter().all(|j| j.lifecycle == "closed");
     Header {
         title: at.repository.clone().unwrap_or_else(|| at.run_key.clone()),
         git_ref: at.git_ref.as_deref().map(|r| ref_name(r).to_owned()),
@@ -136,6 +140,76 @@ pub fn header(state: &AttemptState) -> Header {
         ci_url: ci_run_url(&at.provider, at.repository.as_deref(), &at.run_key),
         result,
         result_provenance,
+        settled,
+    }
+}
+
+/// What the top bar's live indicator shows while the page is open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LiveView {
+    /// The state's word.
+    pub state: LiveState,
+    /// What follows the word, such as "updated 2 s ago". Empty when there is nothing to add.
+    pub detail: String,
+    /// The menu's action, such as "Pause". `None` when there is no menu.
+    pub action: Option<String>,
+}
+
+/// What the page knows at one moment, all in unix milliseconds except the counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LiveInputs {
+    /// The socket's state.
+    pub connection: Connection,
+    /// Whether the person paused updates.
+    pub paused: bool,
+    /// Frames held while paused.
+    pub held: usize,
+    /// Whether every job has closed: no further updates will come.
+    pub settled: bool,
+    /// The time now.
+    pub now: i64,
+    /// When the last frame arrived.
+    pub last_update: i64,
+    /// The viewer's offset from UTC, in minutes.
+    pub utc_offset_minutes: i32,
+}
+
+/// The live indicator's state, detail and menu action. A settled run wins over everything: its
+/// feed is over, so there is nothing to pause. Otherwise a lost socket wins over a pause, and a
+/// pause over the socket's own state.
+#[must_use]
+pub fn live_view(i: LiveInputs) -> LiveView {
+    let state = if i.settled {
+        LiveState::Settled
+    } else if i.connection == Connection::Reconnecting {
+        LiveState::Reconnecting
+    } else if i.paused {
+        LiveState::Paused
+    } else if i.connection == Connection::Live {
+        LiveState::Live
+    } else {
+        LiveState::Connecting
+    };
+    let detail = match state {
+        LiveState::Live => format!("updated {} s ago", ((i.now - i.last_update) / 1000).max(0)),
+        LiveState::Reconnecting => format!(
+            "showing data from {}",
+            time_of_day(i.last_update, i.utc_offset_minutes)
+        ),
+        // No finish time is on the attempt or job data, so the word alone is shown: a time the
+        // page merely saw would be a made-up number.
+        LiveState::Settled | LiveState::Connecting | LiveState::Paused => String::new(),
+    };
+    let action = match state {
+        LiveState::Live => Some("Pause".to_owned()),
+        LiveState::Paused if i.held == 0 => Some("Resume updates".to_owned()),
+        LiveState::Paused => Some(format!("Show {} updates", i.held)),
+        LiveState::Connecting | LiveState::Reconnecting | LiveState::Settled => None,
+    };
+    LiveView {
+        state,
+        detail,
+        action,
     }
 }
 
@@ -246,7 +320,7 @@ pub fn failures(state: &AttemptState, project: &str) -> Vec<FailureRow> {
 #[cfg(test)]
 mod tests {
     use fleet_protocol::live::LiveFrame;
-    use fleet_ui::{live_store::LiveStore, tone::Tone};
+    use fleet_ui::{live_store::LiveStore, mark::Mark};
 
     use super::{super::fixtures::*, *};
 
@@ -304,7 +378,7 @@ mod tests {
             vec![],
         ));
         let h = header(&s);
-        assert_eq!((h.result.label, h.result.tone), ("Running", Tone::Info));
+        assert_eq!((h.result.label, h.result.mark), ("Running", Mark::Running));
     }
 
     #[test]
@@ -320,7 +394,7 @@ mod tests {
             vec![],
         ));
         let h = header(&s);
-        assert_eq!((h.result.label, h.result.tone), ("Failed", Tone::Danger));
+        assert_eq!((h.result.label, h.result.mark), ("Failed", Mark::Failed));
         assert_eq!(
             h.result_provenance,
             Provenance::Observed,
@@ -391,5 +465,105 @@ mod tests {
         assert_eq!(provisional[0].provenance, Provenance::Provisional);
         assert_eq!(verified[0].provenance, Provenance::Final);
         assert_ne!(failure_key(&provisional[0]), failure_key(&verified[0]));
+    }
+}
+
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+
+    const T0: i64 = 1_700_000_000_000; // 22:13:20 UTC
+
+    fn inputs() -> LiveInputs {
+        LiveInputs {
+            connection: Connection::Live,
+            paused: false,
+            held: 0,
+            settled: false,
+            now: T0 + 3_000,
+            last_update: T0,
+            utc_offset_minutes: 0,
+        }
+    }
+
+    #[test]
+    fn a_live_page_says_how_long_since_the_last_update_and_offers_pause() {
+        let v = live_view(inputs());
+        assert_eq!(v.state, LiveState::Live);
+        assert_eq!(v.detail, "updated 3 s ago");
+        assert_eq!(v.action.as_deref(), Some("Pause"));
+    }
+
+    #[test]
+    fn a_clock_behind_the_last_frame_never_reads_negative() {
+        let v = live_view(LiveInputs {
+            now: T0 - 5_000,
+            ..inputs()
+        });
+        assert_eq!(v.detail, "updated 0 s ago");
+    }
+
+    #[test]
+    fn a_pause_holds_the_page_and_offers_to_show_what_was_held() {
+        let v = live_view(LiveInputs {
+            paused: true,
+            held: 12,
+            ..inputs()
+        });
+        assert_eq!(v.state, LiveState::Paused);
+        assert_eq!(v.detail, "");
+        assert_eq!(v.action.as_deref(), Some("Show 12 updates"));
+        let none_held = live_view(LiveInputs {
+            paused: true,
+            ..inputs()
+        });
+        assert_eq!(none_held.action.as_deref(), Some("Resume updates"));
+    }
+
+    #[test]
+    fn a_lost_socket_shows_the_time_of_the_data_on_screen_and_no_menu() {
+        let v = live_view(LiveInputs {
+            connection: Connection::Reconnecting,
+            paused: true,
+            ..inputs()
+        });
+        assert_eq!(v.state, LiveState::Reconnecting);
+        assert_eq!(v.detail, "showing data from 22:13:20");
+        assert_eq!(v.action, None);
+    }
+
+    #[test]
+    fn a_settled_run_says_settled_with_no_made_up_time_and_no_pause() {
+        let v = live_view(LiveInputs {
+            settled: true,
+            paused: true,
+            held: 4,
+            connection: Connection::Reconnecting,
+            ..inputs()
+        });
+        assert_eq!(
+            v,
+            LiveView {
+                state: LiveState::Settled,
+                detail: String::new(),
+                action: None,
+            }
+        );
+    }
+
+    #[test]
+    fn the_first_load_is_connecting_with_nothing_to_add() {
+        let v = live_view(LiveInputs {
+            connection: Connection::Connecting,
+            ..inputs()
+        });
+        assert_eq!(
+            v,
+            LiveView {
+                state: LiveState::Connecting,
+                detail: String::new(),
+                action: None,
+            }
+        );
     }
 }

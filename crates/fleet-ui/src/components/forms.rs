@@ -11,7 +11,7 @@ use crate::{
     keyboard::Key,
 };
 
-const INPUT_CLASS: &str = "rounded border border-border bg-surface px-2 py-1 text-sm text-fg";
+const INPUT_CLASS: &str = "rounded border border-line-strong bg-bg px-2 py-1 text-sm text-fg";
 
 /// An APG editable combobox with a listbox popup. `on_select` gets the chosen option's value, or
 /// `None` when the selection is lost by editing.

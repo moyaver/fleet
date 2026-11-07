@@ -7,7 +7,7 @@
     reason = "Leptos's #[component] macro generates the props structs"
 )]
 
-use fleet_ui::components::display::{Card, EmptyState, ProvenanceBadge, StatTile};
+use fleet_ui::components::display::{Card, EmptyState, ProvenanceBadge, StatTile, TableBox};
 use leptos::prelude::*;
 use uuid::Uuid;
 
@@ -148,16 +148,18 @@ fn section(s: Section) -> impl IntoView {
                 {format!("{} ({})", s.heading, s.rows.len())}
                 <span class="ml-2 text-sm font-normal text-muted">{s.meaning}</span>
             </summary>
-            <table class="mt-2 w-full border-collapse text-sm">
-                <caption class="sr-only">{s.heading}</caption>
-                <thead class="border-b border-border">
-                    <tr>
-                        {["Flow", "A", "B", "Duration", "Why they differ"]
-                            .map(|h| view! { <th scope="col" class=TH>{h}</th> })}
-                    </tr>
-                </thead>
-                <tbody>{s.rows.into_iter().map(compare_row).collect_view()}</tbody>
-            </table>
+            <TableBox label=s.heading>
+                <table class="mt-2 w-full border-collapse text-sm">
+                    <caption class="sr-only">{s.heading}</caption>
+                    <thead class="border-b border-border">
+                        <tr>
+                            {["Flow", "A", "B", "Duration", "Why they differ"]
+                                .map(|h| view! { <th scope="col" class=TH>{h}</th> })}
+                        </tr>
+                    </thead>
+                    <tbody>{s.rows.into_iter().map(compare_row).collect_view()}</tbody>
+                </table>
+            </TableBox>
         </details>
     }
 }

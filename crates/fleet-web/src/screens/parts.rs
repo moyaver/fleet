@@ -79,7 +79,7 @@ pub fn PillView(
     /// What to show.
     pill: Pill,
 ) -> impl IntoView {
-    view! { <fleet_ui::components::display::StatusPill tone=pill.tone label=pill.label /> }
+    view! { <fleet_ui::components::display::StatusPill mark=pill.mark label=pill.label /> }
 }
 
 /// Labelled facts as a description list. A fact the server doesn't have reads "Not reported".

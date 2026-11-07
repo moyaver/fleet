@@ -4,7 +4,7 @@
 use leptos::prelude::*;
 
 use crate::components::display::{ProvenanceBadge, StatusPill};
-use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_tone};
+use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_mark};
 
 fn key_of(name: &str) -> Option<Key> {
     Some(match name {
@@ -37,7 +37,7 @@ pub fn StepTreeView(
     };
     view! {
         <ul
-            class="divide-y divide-border rounded border border-border bg-surface text-fg"
+            class="divide-y divide-line text-fg"
             role="tree"
             aria-label="Steps"
             on:keydown=move |ev: web_sys::KeyboardEvent| {
@@ -61,7 +61,7 @@ pub fn StepTreeView(
                     );
                     let item = view! {
                         <li
-                            class="flex items-center gap-2 px-2 py-1 focus:outline-2 focus:outline-focus"
+                            class="flex min-w-0 flex-wrap items-center gap-2 px-2 py-1 focus:outline-2 focus:outline-focus"
                             role="treeitem"
                             aria-expanded=row.expanded.map(|e| e.to_string())
                             tabindex=if row.focused { "0" } else { "-1" }
@@ -77,8 +77,8 @@ pub fn StepTreeView(
                                 notify();
                             }
                         >
-                            <span class="flex-1" style:padding-left=format!("{}rem", row.level.saturating_sub(1))>{row.label}</span>
-                            <StatusPill tone=status_tone(row.status) label=status_label(row.status) />
+                            <span class="min-w-0 flex-1" style:padding-left=format!("{}rem", row.level.saturating_sub(1))>{row.label}</span>
+                            <StatusPill mark=status_mark(row.status) label=status_label(row.status) />
                             {row.attempt.map(|a| view! { <span class="text-xs text-muted">{a}</span> })}
                             {row.duration.map(|d| view! { <span class="text-xs text-muted">{d}</span> })}
                             <ProvenanceBadge provenance=provenance_of(row.source) />

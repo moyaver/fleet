@@ -1,24 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Wording, colour roles and provenance for the states the server reports (invariant I4).
+//! Wording, marks and provenance for the states the server reports (invariant I4).
 //!
 //! The server sends states as words (`running`, `junit_final`, …). Every mapping here is total:
 //! a word this build doesn't know gets a neutral, honest label, never a success.
+//!
+//! The words are one Title Case vocabulary: Passed, Failed, Running, Not started, Interrupted,
+//! Skipped, Unknown (the redesign's Foundations). A job that ran to its end is `Completed`, with a
+//! neutral end mark, never a check (I3).
 
 use fleet_protocol::{live::Liveness, rest::JobCounts};
-use fleet_ui::{provenance::Provenance, tone::Tone};
+use fleet_ui::{mark::Mark, provenance::Provenance};
 
 /// What a status pill shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pill {
-    /// The words, always shown: colour only reinforces them.
+    /// The word, always shown: the icon and colour only reinforce it.
     pub label: &'static str,
-    /// The colour role.
-    pub tone: Tone,
+    /// The icon and colour of the word.
+    pub mark: Mark,
 }
 
 impl Pill {
-    const fn new(label: &'static str, tone: Tone) -> Self {
-        Self { label, tone }
+    const fn new(label: &'static str, mark: Mark) -> Self {
+        Self { label, mark }
     }
 }
 
@@ -26,13 +30,13 @@ impl Pill {
 #[must_use]
 pub fn flow_state_pill(state: &str) -> Pill {
     match state {
-        "pending" => Pill::new("Pending", Tone::Neutral),
-        "running" => Pill::new("Running", Tone::Info),
-        "passed" => Pill::new("Passed", Tone::Success),
-        "failed" => Pill::new("Failed", Tone::Danger),
-        "skipped" => Pill::new("Skipped", Tone::Muted),
-        "interrupted" => Pill::new("Interrupted", Tone::Warning),
-        _ => Pill::new("Unknown", Tone::Neutral),
+        "pending" => Pill::new("Not started", Mark::NotStarted),
+        "running" => Pill::new("Running", Mark::Running),
+        "passed" => Pill::new("Passed", Mark::Passed),
+        "failed" => Pill::new("Failed", Mark::Failed),
+        "skipped" => Pill::new("Skipped", Mark::Skipped),
+        "interrupted" => Pill::new("Interrupted", Mark::Interrupted),
+        _ => Pill::new("Unknown", Mark::Unknown),
     }
 }
 
@@ -42,13 +46,13 @@ pub fn job_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
     match (lifecycle, outcome) {
         ("closed", Some(outcome)) => match outcome {
             // "Completed" says Maestro ran to the end, not that the flows passed (I3): neutral.
-            "completed" => Pill::new("Completed", Tone::Neutral),
-            "failed" => Pill::new("Failed", Tone::Danger),
-            "cancelled" => Pill::new("Cancelled", Tone::Muted),
-            "interrupted" => Pill::new("Interrupted", Tone::Warning),
-            _ => Pill::new("Unknown", Tone::Neutral),
+            "completed" => Pill::new("Completed", Mark::End),
+            "failed" => Pill::new("Failed", Mark::Failed),
+            "cancelled" => Pill::new("Cancelled", Mark::Skipped),
+            "interrupted" => Pill::new("Interrupted", Mark::Interrupted),
+            _ => Pill::new("Unknown", Mark::Unknown),
         },
-        ("closed", None) => Pill::new("Closed", Tone::Neutral),
+        ("closed", None) => Pill::new("Closed", Mark::End),
         _ => open_pill(lifecycle),
     }
 }
@@ -56,11 +60,11 @@ pub fn job_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
 /// A job or suite that has not closed.
 fn open_pill(lifecycle: &str) -> Pill {
     match lifecycle {
-        "starting" => Pill::new("Starting", Tone::Info),
-        "running" => Pill::new("Running", Tone::Info),
-        "finalizing" => Pill::new("Finalizing", Tone::Info),
-        "reporting" => Pill::new("Reporting", Tone::Info),
-        _ => Pill::new("Unknown", Tone::Neutral),
+        "starting" => Pill::new("Starting", Mark::Running),
+        "running" => Pill::new("Running", Mark::Running),
+        "finalizing" => Pill::new("Finalizing", Mark::Running),
+        "reporting" => Pill::new("Reporting", Mark::Running),
+        _ => Pill::new("Unknown", Mark::Unknown),
     }
 }
 
@@ -68,11 +72,11 @@ fn open_pill(lifecycle: &str) -> Pill {
 #[must_use]
 pub fn suite_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
     match (lifecycle, outcome) {
-        ("closed", Some("passed")) => Pill::new("Passed", Tone::Success),
-        ("closed", Some("failed")) => Pill::new("Failed", Tone::Danger),
-        ("closed", Some("interrupted")) => Pill::new("Interrupted", Tone::Warning),
-        ("closed", Some(_)) => Pill::new("Unknown", Tone::Neutral),
-        ("closed", None) => Pill::new("Closed", Tone::Neutral),
+        ("closed", Some("passed")) => Pill::new("Passed", Mark::Passed),
+        ("closed", Some("failed")) => Pill::new("Failed", Mark::Failed),
+        ("closed", Some("interrupted")) => Pill::new("Interrupted", Mark::Interrupted),
+        ("closed", Some(_)) => Pill::new("Unknown", Mark::Unknown),
+        ("closed", None) => Pill::new("Closed", Mark::End),
         _ => open_pill(lifecycle),
     }
 }
@@ -81,25 +85,25 @@ pub fn suite_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
 #[must_use]
 pub fn liveness_pill(liveness: Option<Liveness>) -> Pill {
     match liveness {
-        Some(Liveness::Online) => Pill::new("Online", Tone::Success),
-        Some(Liveness::Stale) => Pill::new("Stale", Tone::Warning),
-        Some(Liveness::Disconnected) => Pill::new("Disconnected", Tone::Danger),
-        Some(Liveness::Completed) => Pill::new("Completed", Tone::Neutral),
-        None => Pill::new("Unknown", Tone::Muted),
+        Some(Liveness::Online) => Pill::new("Online", Mark::Passed),
+        Some(Liveness::Stale) => Pill::new("Stale", Mark::Stale),
+        Some(Liveness::Disconnected) => Pill::new("Disconnected", Mark::Failed),
+        Some(Liveness::Completed) => Pill::new("Completed", Mark::End),
+        None => Pill::new("Unknown", Mark::Unknown),
     }
 }
 
-/// An attempt's overall state from its jobs.
+/// An attempt's overall state from its jobs, while the pipeline verdict is still this one.
 #[must_use]
 pub fn attempt_pill(jobs: &JobCounts) -> Pill {
     if jobs.starting + jobs.running + jobs.finalizing > 0 {
-        Pill::new("Running", Tone::Info)
+        Pill::new("Running", Mark::Running)
     } else if jobs.pending > 0 {
-        Pill::new("Pending", Tone::Neutral)
+        Pill::new("Not started", Mark::NotStarted)
     } else if jobs.closed > 0 {
-        Pill::new("Finished", Tone::Neutral)
+        Pill::new("Finished", Mark::End)
     } else {
-        Pill::new("No jobs yet", Tone::Muted)
+        Pill::new("No jobs yet", Mark::NotStarted)
     }
 }
 
@@ -136,21 +140,21 @@ pub fn source_provenance(source: Option<&str>) -> Provenance {
 mod tests {
     use super::*;
 
-    fn pill(label: &'static str, tone: Tone) -> Pill {
-        Pill { label, tone }
+    fn pill(label: &'static str, mark: Mark) -> Pill {
+        Pill { label, mark }
     }
 
     #[test]
-    fn flow_states_are_spelled_out_and_an_unknown_state_is_neutral() {
+    fn flow_states_are_title_case_and_an_unknown_state_is_unknown() {
         let cases = [
-            ("pending", pill("Pending", Tone::Neutral)),
-            ("running", pill("Running", Tone::Info)),
-            ("passed", pill("Passed", Tone::Success)),
-            ("failed", pill("Failed", Tone::Danger)),
-            ("skipped", pill("Skipped", Tone::Muted)),
-            ("interrupted", pill("Interrupted", Tone::Warning)),
-            ("unknown", pill("Unknown", Tone::Neutral)),
-            ("from-the-future", pill("Unknown", Tone::Neutral)),
+            ("pending", pill("Not started", Mark::NotStarted)),
+            ("running", pill("Running", Mark::Running)),
+            ("passed", pill("Passed", Mark::Passed)),
+            ("failed", pill("Failed", Mark::Failed)),
+            ("skipped", pill("Skipped", Mark::Skipped)),
+            ("interrupted", pill("Interrupted", Mark::Interrupted)),
+            ("unknown", pill("Unknown", Mark::Unknown)),
+            ("from-the-future", pill("Unknown", Mark::Unknown)),
         ];
         for (state, expected) in cases {
             assert_eq!(flow_state_pill(state), expected, "{state}");
@@ -159,66 +163,78 @@ mod tests {
 
     #[test]
     fn a_job_shows_its_outcome_once_closed_and_its_lifecycle_before() {
-        assert_eq!(job_pill("running", None), pill("Running", Tone::Info));
-        assert_eq!(job_pill("finalizing", None), pill("Finalizing", Tone::Info));
-        assert_eq!(job_pill("starting", None), pill("Starting", Tone::Info));
+        assert_eq!(job_pill("running", None), pill("Running", Mark::Running));
+        assert_eq!(
+            job_pill("finalizing", None),
+            pill("Finalizing", Mark::Running)
+        );
+        assert_eq!(job_pill("starting", None), pill("Starting", Mark::Running));
         assert_eq!(
             job_pill("closed", Some("completed")),
-            pill("Completed", Tone::Neutral)
+            pill("Completed", Mark::End)
         );
         assert_eq!(
             job_pill("closed", Some("failed")),
-            pill("Failed", Tone::Danger)
+            pill("Failed", Mark::Failed)
         );
         assert_eq!(
             job_pill("closed", Some("cancelled")),
-            pill("Cancelled", Tone::Muted)
+            pill("Cancelled", Mark::Skipped)
         );
         assert_eq!(
             job_pill("closed", Some("interrupted")),
-            pill("Interrupted", Tone::Warning)
+            pill("Interrupted", Mark::Interrupted)
         );
         assert_eq!(
             job_pill("closed", Some("unknown")),
-            pill("Unknown", Tone::Neutral)
+            pill("Unknown", Mark::Unknown)
         );
-        assert_eq!(job_pill("closed", None), pill("Closed", Tone::Neutral));
+        assert_eq!(job_pill("closed", None), pill("Closed", Mark::End));
         assert_eq!(
             job_pill("closed", Some("odd")),
-            pill("Unknown", Tone::Neutral)
+            pill("Unknown", Mark::Unknown)
         );
     }
 
     #[test]
+    fn a_completed_job_is_never_drawn_as_a_check() {
+        // Invariant I3: "Completed" says the run reached its end, not that the flows passed.
+        assert_ne!(job_pill("closed", Some("completed")).mark, Mark::Passed);
+    }
+
+    #[test]
     fn a_suite_shows_passed_or_failed_once_closed() {
-        assert_eq!(suite_pill("running", None), pill("Running", Tone::Info));
-        assert_eq!(suite_pill("reporting", None), pill("Reporting", Tone::Info));
+        assert_eq!(suite_pill("running", None), pill("Running", Mark::Running));
+        assert_eq!(
+            suite_pill("reporting", None),
+            pill("Reporting", Mark::Running)
+        );
         assert_eq!(
             suite_pill("closed", Some("passed")),
-            pill("Passed", Tone::Success)
+            pill("Passed", Mark::Passed)
         );
         assert_eq!(
             suite_pill("closed", Some("failed")),
-            pill("Failed", Tone::Danger)
+            pill("Failed", Mark::Failed)
         );
         assert_eq!(
             suite_pill("closed", Some("interrupted")),
-            pill("Interrupted", Tone::Warning)
+            pill("Interrupted", Mark::Interrupted)
         );
-        assert_eq!(suite_pill("closed", None), pill("Closed", Tone::Neutral));
+        assert_eq!(suite_pill("closed", None), pill("Closed", Mark::End));
     }
 
     #[test]
     fn liveness_is_spelled_out_and_unknown_when_the_server_did_not_say() {
         let cases = [
-            (Some(Liveness::Online), pill("Online", Tone::Success)),
-            (Some(Liveness::Stale), pill("Stale", Tone::Warning)),
+            (Some(Liveness::Online), pill("Online", Mark::Passed)),
+            (Some(Liveness::Stale), pill("Stale", Mark::Stale)),
             (
                 Some(Liveness::Disconnected),
-                pill("Disconnected", Tone::Danger),
+                pill("Disconnected", Mark::Failed),
             ),
-            (Some(Liveness::Completed), pill("Completed", Tone::Neutral)),
-            (None, pill("Unknown", Tone::Muted)),
+            (Some(Liveness::Completed), pill("Completed", Mark::End)),
+            (None, pill("Unknown", Mark::Unknown)),
         ];
         for (liveness, expected) in cases {
             assert_eq!(liveness_pill(liveness), expected);
@@ -236,27 +252,27 @@ mod tests {
         };
         assert_eq!(
             attempt_pill(&jobs(0, 0, 0, 0, 0)),
-            pill("No jobs yet", Tone::Muted)
+            pill("No jobs yet", Mark::NotStarted)
         );
         assert_eq!(
             attempt_pill(&jobs(1, 0, 0, 0, 0)),
-            pill("Pending", Tone::Neutral)
+            pill("Not started", Mark::NotStarted)
         );
         assert_eq!(
             attempt_pill(&jobs(1, 0, 1, 0, 2)),
-            pill("Running", Tone::Info)
+            pill("Running", Mark::Running)
         );
         assert_eq!(
             attempt_pill(&jobs(0, 1, 0, 0, 0)),
-            pill("Running", Tone::Info)
+            pill("Running", Mark::Running)
         );
         assert_eq!(
             attempt_pill(&jobs(0, 0, 0, 1, 3)),
-            pill("Running", Tone::Info)
+            pill("Running", Mark::Running)
         );
         assert_eq!(
             attempt_pill(&jobs(0, 0, 0, 0, 3)),
-            pill("Finished", Tone::Neutral)
+            pill("Finished", Mark::End)
         );
     }
 

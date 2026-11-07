@@ -495,6 +495,7 @@ fn duration_value(ms: i64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fleet_ui::mark::Mark;
 
     const A: &str = "00000000-0000-0000-0000-0000000000a1";
     const B: &str = "00000000-0000-0000-0000-0000000000b2";
@@ -583,8 +584,8 @@ mod tests {
         assert_eq!(failed.href, format!("/flows/{A}?project=shop"));
         assert_eq!(failed.time, "2026-01-01 10:30:00");
         assert_eq!(
-            (failed.state.label, failed.state.tone),
-            ("Failed", Tone::Danger)
+            (failed.state.label, failed.state.mark),
+            ("Failed", Mark::Failed)
         );
         assert_eq!(failed.provenance, Provenance::Final);
         assert_eq!(failed.branch.as_deref(), Some("feat/pay"));

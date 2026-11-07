@@ -21,8 +21,8 @@ impl ButtonVariant {
     const fn class(self) -> &'static str {
         match self {
             Self::Primary => "bg-primary text-primary-fg hover:opacity-90",
-            Self::Secondary => "border border-border bg-surface text-fg hover:bg-tone-neutral-bg",
-            Self::Ghost => "text-fg hover:bg-tone-neutral-bg",
+            Self::Secondary => "border border-line-strong text-fg hover:bg-band",
+            Self::Ghost => "text-fg hover:bg-band",
         }
     }
 }
@@ -43,7 +43,7 @@ pub fn Button(
     children: Children,
 ) -> impl IntoView {
     let class = format!(
-        "inline-flex items-center rounded px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 {}",
+        "inline-flex min-h-8 items-center rounded px-3 py-1.5 text-sm font-medium max-[720px]:min-h-11 disabled:cursor-not-allowed disabled:opacity-50 {}",
         variant.class()
     );
     view! {

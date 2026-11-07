@@ -17,6 +17,16 @@ pub fn ref_name(git_ref: &str) -> &str {
         .unwrap_or(git_ref)
 }
 
+/// The time of day of a unix time in milliseconds, `HH:MM:SS`, at the viewer's offset.
+#[must_use]
+pub fn time_of_day(unix_ms: i64, utc_offset_minutes: i32) -> String {
+    fleet_ui::charts::format::format_timestamp(unix_ms, utc_offset_minutes)
+        .rsplit(' ')
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
 /// `linux/x86_64` from what the agent reported; `None` when it reported neither.
 #[must_use]
 pub fn platform(os: Option<&str>, arch: Option<&str>) -> Option<String> {
@@ -30,6 +40,14 @@ pub fn platform(os: Option<&str>, arch: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_time_of_day_is_the_clock_time_at_the_viewers_offset() {
+        // 2023-11-14 22:13:20 UTC.
+        let t = 1_700_000_000_000;
+        assert_eq!(time_of_day(t, 0), "22:13:20");
+        assert_eq!(time_of_day(t, 120), "00:13:20");
+    }
 
     #[test]
     fn a_commit_is_cut_to_seven_characters_and_short_ones_stay() {

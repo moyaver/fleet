@@ -19,6 +19,7 @@ pub mod filter_bar;
 pub mod keyboard;
 pub mod live_store;
 pub mod logview;
+pub mod mark;
 pub mod menu;
 pub mod pagination;
 pub mod provenance;

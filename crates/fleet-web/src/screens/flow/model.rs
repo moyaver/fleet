@@ -432,7 +432,7 @@ fn steps(view: &FlowDetailView) -> StepsSection {
 
 #[cfg(test)]
 mod tests {
-    use fleet_ui::tone::Tone;
+    use fleet_ui::mark::Mark;
 
     use super::*;
 
@@ -533,7 +533,7 @@ mod tests {
         let h = page().header;
         assert_eq!(h.title, "checkout");
         assert_eq!(h.path.as_deref(), Some("flows/checkout.yaml"));
-        assert_eq!((h.state.label, h.state.tone), ("Failed", Tone::Danger));
+        assert_eq!((h.state.label, h.state.mark), ("Failed", Mark::Failed));
         assert_eq!(h.provenance, Provenance::Final);
         assert_eq!(
             h.finality_note,

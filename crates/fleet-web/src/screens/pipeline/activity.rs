@@ -8,10 +8,22 @@
 use std::collections::{HashMap, VecDeque};
 
 use fleet_protocol::live::{AgentRunView, FlowView, JobView};
-use fleet_ui::{live_store::AttemptState, tone::Tone};
+use fleet_ui::{live_store::AttemptState, mark::Mark, tone::Tone};
 use uuid::Uuid;
 
 use crate::status::{job_pill, liveness_pill};
+
+/// The colour of an activity entry for a status mark.
+fn tone_of(mark: Mark) -> Tone {
+    match mark {
+        Mark::Passed => Tone::Success,
+        Mark::Failed => Tone::Danger,
+        Mark::Running => Tone::Info,
+        Mark::Interrupted => Tone::Warning,
+        Mark::Skipped | Mark::Stale => Tone::Muted,
+        Mark::NotStarted | Mark::Unknown | Mark::End => Tone::Neutral,
+    }
+}
 
 /// The stream keeps this many entries.
 pub const MAX_ENTRIES: usize = 50;
@@ -68,7 +80,7 @@ impl ActivityLog {
                     let pill = job_pill(&job.lifecycle, job.outcome.as_deref());
                     found.push((
                         format!("Job {name} closed: {}", pill.label),
-                        pill.tone,
+                        tone_of(pill.mark),
                         None,
                     ));
                 }
@@ -83,7 +95,7 @@ impl ActivityLog {
                     let pill = liveness_pill(run.liveness);
                     found.push((
                         format!("Runner {name} is now {}", pill.label),
-                        pill.tone,
+                        tone_of(pill.mark),
                         None,
                     ));
                 }
@@ -240,7 +252,8 @@ mod tests {
         log.observe(1000, &before, &quiet);
         log.observe(2000, &quiet, &quiet);
         assert_eq!(texts(&log), ["Runner runner-1 is now Stale"]);
-        assert_eq!(log.entries().next().unwrap().tone, Tone::Warning);
+        // Stale is about freshness, not failure: no warning colour (the redesign's Foundations).
+        assert_eq!(log.entries().next().unwrap().tone, Tone::Muted);
     }
 
     #[test]

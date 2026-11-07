@@ -11,7 +11,7 @@ use fleet_ui::{
     charts::view::TimeSeriesChart,
     components::{
         controls::{Button, ButtonVariant},
-        display::{Badge, Card, EmptyState, ProvenanceBadge, StatTile},
+        display::{Badge, Card, EmptyState, ProvenanceBadge, StatTile, TableBox},
         forms::FilterBar,
     },
 };
@@ -130,21 +130,23 @@ pub fn HistoryTableView(
                     .into_any()
             } else {
                 view! {
-                    <table data-testid="history-table" class="w-full border-collapse text-sm">
-                        <caption class="sr-only">"Finished flow executions, newest first"</caption>
-                        <thead class="border-b border-border">
-                            <tr>
-                                {["When", "Flow", "Outcome", "Branch", "Duration", "Failure", "Conditions", ""]
-                                    .map(|h| view! { <th scope="col" class=TH>{h}</th> })}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows
-                                .into_iter()
-                                .map(|r| history_row(r, on_stats))
-                                .collect_view()}
-                        </tbody>
-                    </table>
+                    <TableBox label="Finished flow executions">
+                        <table data-testid="history-table" class="w-full border-collapse text-sm">
+                            <caption class="sr-only">"Finished flow executions, newest first"</caption>
+                            <thead class="border-b border-border">
+                                <tr>
+                                    {["When", "Flow", "Outcome", "Branch", "Duration", "Failure", "Conditions", ""]
+                                        .map(|h| view! { <th scope="col" class=TH>{h}</th> })}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows
+                                    .into_iter()
+                                    .map(|r| history_row(r, on_stats))
+                                    .collect_view()}
+                            </tbody>
+                        </table>
+                    </TableBox>
                 }
                     .into_any()
             }}
