@@ -144,15 +144,15 @@ Fleet's own code is AGPL-3.0-only, but dependencies stay permissive so the owner
 maestro-fleet/
 ├─ Cargo.toml                 # [workspace] members, [workspace.package], [workspace.dependencies], lints
 ├─ Cargo.lock                 # committed
-├─ rust-toolchain.toml        # channel = latest stable (1.99 at M0), components rustfmt, clippy; targets wasm32-unknown-unknown,
+├─ rust-toolchain.toml        # channel = 1.99 (pinned), components rustfmt, clippy; targets wasm32-unknown-unknown,
 │                             # x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin
-├─ .cargo/config.toml         # alias xtask = "run -p xtask --"
+├─ .cargo/config.toml         # alias xtask = "run --quiet -p xtask --"
 ├─ deny.toml  about.toml  about.hbs  rustfmt.toml  clippy.toml  .editorconfig  .gitignore
-├─ LICENSE.md  LICENSING.md  CLA.md  CLA-CORPORATE.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md  SECURITY.md
+├─ LICENSE  LICENSING.md  CLA.md  CLA-CORPORATE.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md  SECURITY.md
 ├─ README.md  CHANGELOG.md
 ├─ .github/
-│  ├─ FUNDING.yml  CODEOWNERS  pull_request_template.md  ISSUE_TEMPLATE/{bug,feature,maestro-version}.yml
-│  └─ workflows/ ci.yml  cla.yml  release.yml  image.yml  nightly-emulator.yml  audit.yml
+│  ├─ FUNDING.yml  CODEOWNERS  dependabot.yml  pull_request_template.md  ISSUE_TEMPLATE/{bug,feature,maestro-version}.yml
+│  └─ workflows/ ci.yml  cla.yml  release.yml  image.yml  nightly-emulator.yml
 ├─ crates/
 │  ├─ fleet-protocol/         # wire types, REST DTOs, IDs, JSON Schema (schemars) — no tokio, wasm-safe
 │  ├─ fleet-core/             # pure domain: state machines, claim lattice, reconciliation, fingerprinting,
@@ -162,13 +162,14 @@ maestro-fleet/
 │  ├─ fleet-agent/            # `maestro-fleet` binary: supervisor + observer
 │  ├─ fleet-store/            # sqlx repositories, ingest transaction, partitions, rollups, migrations
 │  ├─ fleet-blob/             # BlobStore trait: S3 (object_store) + LocalFs + signed upload tokens
-│  ├─ fleet-server/           # `fleet` binary: serve | migrate | check-config | healthcheck | create-admin
+│  ├─ fleet-server/           # `fleet` binary: serve | migrate | check-config | healthcheck | api-key
 │  ├─ fleet-ui/               # Leptos component kit (accessible primitives, charts, timeline, log viewer)
 │  ├─ fleet-web/              # Leptos CSR app (screens A–G), built by Trunk → dist/
 │  ├─ fleet-web-assets/       # embeds fleet-web/dist into the server (rust-embed), keeps rebuilds fast
 │  ├─ fleet-loadgen/          # protocol load generator (simulated agents)
-│  └─ fleet-e2e/              # browser E2E tests (thirtyfour/WebDriver) + full-stack scenarios
-├─ xtask/                     # cargo xtask: setup ci fmt lint test web sqlx fixtures dist licenses compose
+│  ├─ fleet-planner/          # static duration-aware Maestro shard planner
+│  └─ fleet-e2e/              # browser E2E tests (fantoccini/WebDriver) + full-stack scenarios
+├─ xtask/                     # cargo xtask: setup tools ci lint sqlx schema web fixtures bench-overhead
 ├─ migrations/                # 0001_init.sql … (forward-only, expand/contract)
 ├─ .sqlx/                     # sqlx offline query metadata (committed)
 ├─ deploy/
@@ -181,7 +182,7 @@ maestro-fleet/
 ├─ docs/                      # mdBook: user guide, operator guide, runner guide, protocol reference
 │  ├─ book.toml  src/SUMMARY.md …
 │  ├─ PLAN.md  spec-v1.0.md  decisions/
-└─ research/                  # research reports 00–07 (kept as-is for reference)
+└─ research/                  # research reports 00–10 (kept as-is for reference)
 ```
 
 ### 4.1 Naming in one place
@@ -193,8 +194,8 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 - `fleet-protocol` → only serde, serde_json, uuid, time, schemars (feature) and utoipa (optional `openapi` feature, enabled only by fleet-server for OpenAPI). No async runtime, must build for wasm32.
 - `fleet-core`, `fleet-maestro` → `fleet-protocol` + pure crates. No tokio, sqlx, reqwest or filesystem I/O.
 - `fleet-agent` → `fleet-protocol`, `fleet-core`, `fleet-maestro`. **Never** `fleet-store`/`fleet-server`.
-- `fleet-web`, `fleet-ui` → `fleet-protocol`, `fleet-core` (wasm-safe subset). No tokio.
-- `fleet-server` → everything except `fleet-agent`, `fleet-web`.
+- `fleet-ui` → `fleet-protocol`, `fleet-core`. `fleet-web` → the same and `fleet-ui`. Both wasm-safe, no tokio.
+- `fleet-server` → everything except `fleet-agent`, `fleet-web`, `fleet-maestro`.
 
 ---
 
@@ -229,7 +230,7 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 | Spool | Own append-only segment file (length + `crc32fast` frames) |
 | Parsing | `quick-xml` 0.42 (serialize), `regex` 1, `strip-ansi-escapes` 0.2, `semver` 1 |
 | CLI/config | `clap` 4.6 (derive, env), `toml` 1, `secrecy` 0.10 |
-| Packaging | `cargo-zigbuild` 0.24 (Linux musl x86_64 and aarch64), native macOS arm64 build, `cargo-dist` 0.34 releases |
+| Packaging | `cargo-dist` 0.34 (`dist-workspace.toml`): agent builds for Linux musl x86_64 and aarch64, and macOS arm64 |
 
 ### 5.3 Server (research 03 §2)
 | Purpose | Crate |
@@ -252,15 +253,15 @@ The product name, binary names (`maestro-fleet`, `fleet`), env-var prefix (`FLEE
 | Purpose | Choice |
 |---|---|
 | Framework | `leptos` **=0.8.23** (`csr`), `leptos_router` =0.8.17. **No SSR or hydration**; the 0.9 upgrade gets its own ADR after 0.9.0 final. |
-| Build | **Trunk 0.22.1**; release profile `opt-level="z"`, `lto=true`, `codegen-units=1`, `panic="abort"`; `wasm-opt -Oz` |
-| Browser APIs | `wasm-bindgen` =0.2.130, `web-sys` 0.3, `js-sys`, `gloo-net` 0.7 (REST), `leptos-use` 0.20 (WebSocket, observers, intervals) |
+| Build | **Trunk**, unpinned: latest release via `cargo install --locked trunk` (`xtask setup`, image build) or taiki-e (CI); `wasm-release` profile (inherits `release`: `opt-level="z"`, `lto=true`, `codegen-units=1`, `panic="abort"`); `wasm-opt -Oz` |
+| Browser APIs | `web-sys` 0.3, `js-sys`, `gloo-net` 0.7 (REST and WebSocket), `gloo-timers` 0.4. `wasm-bindgen` is not a direct dependency: 0.2.130 comes from `Cargo.lock` (no exact pin); `deploy/docker` installs wasm-bindgen-cli 0.2.130 |
 | Styling | **Tailwind CSS 4 standalone CLI** (a single native binary, no Node), downloaded and checksum-verified by `cargo xtask setup`, run by Trunk's tailwind asset. Design tokens are CSS custom properties with light and dark themes. |
 | Components | **Own kit in `fleet-ui`** (no third-party Leptos UI library; none is mature and accessible on 0.8). Built on native elements first: `<dialog>`, the Popover API, `<details>`, `<select>`, `<input type=datetime-local>`. Follow the WAI-ARIA Authoring Practices for anything custom. |
 | Charts | **Native Rust**: SVG line/area charts with LTTB downsampling (`fleet-core::downsample`), canvas (`web-sys` `CanvasRenderingContext2d`) above ~5k points. No uPlot or ECharts. |
 | Timeline (Gantt) | Native canvas swimlanes (devices × time) with hit-testing, zoom and pan, **plus an equivalent accessible table view** |
 | Tables | `fleet-ui::Table` (sorting, filtering, column visibility) + `fleet-ui::VirtualList` (fixed row height windowing) |
 | Log viewer | Virtualized; ANSI parsed with `vte` into styled spans; **text nodes only, never `inner_html`** |
-| E2E | `fleet-e2e` with `thirtyfour` (WebDriver) + chromedriver. Optional accessibility checks inject vendored `axe-core` **in tests only** (never shipped; exempted from I9 by path). |
+| E2E | `fleet-e2e` with `fantoccini` 0.22 (WebDriver) + chromedriver. Planned, not implemented: accessibility checks injecting vendored `axe-core` **in tests only** (never shipped; exempted from I9 by path). |
 
 **Known Leptos pitfalls to design around** (measured in research 04 §3):
 - Use **fine-grained per-entity signals**: a store of `RwSignal<Row>` keyed by entity ID, not one big `Vec` signal. The naive version was slower than React under live updates.
@@ -300,7 +301,7 @@ CI shell ──waits on──► P1 supervisor (std only) ──spawn──► C
 ```
 - P2 failing to start or crashing → P1 logs one warning line to stderr and carries on.
 - P1 waits for P2's finalization at most `finalize_timeout` (default 60 s; configurable), then exits regardless.
-- On the first SIGINT/SIGTERM, P2 sends `run.signal_received` with a priority flush. GitHub allows only 7.5 s + 2.5 s.
+- On the first SIGINT/SIGTERM, P2 sends `run.signal` with a priority flush. GitHub allows only 7.5 s + 2.5 s.
 
 ### 6.3 Invocation handling (`fleet-maestro::invocation`)
 - **Parse** the user's `maestro …` argv to learn: format and output path, debug/test output dirs, shard flags, devices, flow paths and config.
@@ -362,7 +363,7 @@ Every parser is version-profiled (`≥2.7` bundle layout; `<2.7` best-effort). U
 
 ### 7.1 Modules (`crates/fleet-server/src`)
 ```
-main.rs (clap: serve | migrate | check-config | healthcheck | create-admin)
+main.rs (clap: serve | migrate | check-config | healthcheck | api-key)
 config.rs  app.rs (routers: app origin + usercontent origin)  state.rs  telemetry.rs
 auth/      oidc.rs  session_store.rs  gha_oidc.rs (JWKS cache)  api_keys.rs  agent_tokens.rs  extractors.rs
 ingest/    agent_ws.rs  batch_http.rs  batcher.rs  ack.rs  limits.rs
@@ -426,7 +427,7 @@ Upload is relayed through the server by default; presigned direct upload is opti
 
 - **Envelope:** `{ op, … }` frames over the `fleet.v1+json` subprotocol. Journal events: `{ seq, type, v, at: {wall, mono_ms}, subject: {ids…}, provenance, body }`.
 - **Event families:**
-  - `run.*`: started, signal_received, ended.
+  - `run.*`: started, signal, finalizing, ended.
   - `plan.*`: declared, observed.
   - `device.*`: session_started, state_changed, lost.
   - `suite.*`, `shard.*`.
@@ -508,24 +509,27 @@ Upload is relayed through the server by default; presigned direct upload is opti
 ### 11.1 `cargo xtask`
 | Command | Does |
 |---|---|
-| `setup` | Install pinned tools: nextest, deny, about, sqlx-cli, trunk, wasm-bindgen-cli (matching version), zigbuild, mdbook, Tailwind standalone (checksum-verified); add rustup targets |
-| `ci` | fmt --check → clippy (`-D warnings`, all targets) → lint (headers, I8, I9, dependency rules) → deny → nextest → sqlx prepare --check → schema-drift check → web build |
-| `web [--release]` | `trunk build` for `fleet-web` → `crates/fleet-web/dist` |
+| `setup` | `rustup toolchain install` (components and targets from `rust-toolchain.toml`); `cargo install --locked` of nextest, deny, about, sqlx-cli, trunk and mdbook, all at their latest releases (unpinned); then `tools` |
+| `tools` | Download the Tailwind standalone CLI (checksum-verified) and chromedriver into `target/tools/` |
+| `ci` | schema `--check` → Postgres 18 and migrations → fmt `--check` → clippy (`-D warnings`, all targets; wasm32 for the browser-side crates) → lint → deny → tools → web build → nextest → sqlx prepare `--check` → doc tests → `cargo doc` → mdbook build |
+| `lint` | Repository rules: SPDX header, I8 (no provider SDK crates), I9 (no npm or JS/TS files), `unsafe` allowlist, crate dependency rules (§4.2) |
 | `sqlx` | Start a throwaway PG 18 (docker), migrate, `cargo sqlx prepare --workspace` |
-| `fixtures import <dir>` | Normalize a captured Phase 0 run into `fixtures/maestro/<ver>/<scenario>/` (redacting) |
-| `dist` | Local release build of all targets |
-| `licenses` | `cargo about generate` → `THIRD_PARTY_LICENSES.html` |
-| `compose up/down` | Run the reference deployment locally |
+| `schema [--check]` | Write the protocol JSON Schema to `docs/src/protocol/schema/` (`--check`: fail on drift) |
+| `web [--release]` | `trunk build` for `fleet-web` → `crates/fleet-web/dist` |
+| `fixtures capture` / `fixtures import` | Record a Maestro run (`capture --out <dir> -- <command>`), then normalize it into `fixtures/maestro/<version>/<scenario>/` with redaction (`import <capture-dir> <version>/<scenario>`) |
+| `bench-overhead` | The agent's overhead on a suite run: `--runs N` with and without `fleet-agent run` (wall time, CPU, peak RSS). Not part of `ci` |
+
+The full-stack local run is documented in `deploy/compose/README.md`.
 
 ### 11.2 GitHub workflows
 | Workflow | Trigger | Content |
 |---|---|---|
-| `ci.yml` | PR, push to main | `cargo xtask ci` on ubuntu-latest (Postgres 18 service); macOS arm64 job for agent build + tests; wasm build |
-| `cla.yml` | PR, comments | CLA Assistant Lite (pinned SHA) |
-| `release.yml` | Tag `v*` | cargo-dist: agent for linux-musl x86_64/aarch64 and macOS arm64, server for linux x86_64/aarch64; SHA-256 checksums and GitHub artifact attestations (verified with `gh attestation verify`; no minisign); THIRD_PARTY_LICENSES |
-| `image.yml` | Tag `v*` | Multi-arch `ghcr.io/<owner>/fleet` (native arm64 runner), SBOM, attestation |
+| `ci.yml` | PR, push to main | Job `ci`: `cargo xtask ci` on ubuntu-latest with a Postgres 18 service. Job `agent-macos`: agent tests and release build on the `fleet-mac` runner (`macos-latest` for fork PRs) |
+| `cla.yml` | PR (`pull_request_target`), comments | CLA check in the repo, replacing the archived CLA Assistant Lite; signatures on the `cla-signatures` branch; never checks out PR code |
+| `release.yml` | Tag `v*` | cargo-dist: agent for linux-musl x86_64/aarch64 and macOS arm64; SHA-256 checksums and GitHub artifact attestations (verified with `gh attestation verify`; no minisign); THIRD_PARTY_LICENSES. The server ships as the image (`image.yml`). |
+| `image.yml` | Tag `v*`; PRs touching `deploy/docker/` (build only) | Multi-arch `ghcr.io/<owner>/fleet` (native amd64 and arm64 runners), SBOM, attestation |
 | `nightly-emulator.yml` | Nightly (02:21 UTC) + manual | Self-hosted Apple Silicon Mac (`fleet-mac` runner), not Linux KVM: GitHub-hosted runners have no GPU, and every Android 37 image crashed there under SwiftShader, while the fixtures were captured on this Mac with the same image and GPU mode. Starts Docker Desktop if needed; creates a throwaway AVD on port 5580 (API 37.1, `google_apis_playstore_ps16k`, arm64-v8a); Maestro pinned; runs the Compose stack and the flows in `examples/flows/phase0/` through the agent; asserts the reconciled results; uploads its artifacts; removes the emulator and the stack in an always-run step |
-| `audit.yml` | Weekly | cargo-deny advisories, `cargo outdated` report |
+| `dependabot.yml` | Weekly | Updates for actions (grouped) and cargo (minor and patch grouped). `cargo deny` runs in `cargo xtask ci`; there is no audit workflow |
 
 Pin every third-party action by commit SHA. Use `permissions:` least-privilege per workflow.
 
@@ -633,7 +637,7 @@ Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the 
 | Agent integration | Fake-Maestro binary scripted from fixtures (timed replay of stdout, log and files, then exit or signal) | assert_cmd, nextest |
 | Server integration | Ingest, idempotency, fencing, restart recovery, auth boundaries | sqlx::test, testcontainers, axum-test |
 | Load/resilience | Reconnect storms, duplicates, reordering, clock skew, full buffers, giant logs | fleet-loadgen |
-| UI | Component logic (wasm-bindgen-test); E2E flows and accessibility smoke | thirtyfour + chromedriver, vendored axe-core (tests only) |
+| UI | Component logic (wasm-bindgen-test); E2E flows and accessibility smoke | fantoccini + chromedriver; axe-core planned (tests only) |
 | Real world | Nightly emulator job; Maestro version matrix (current, N−1) | Self-hosted Apple Silicon Mac (`fleet-mac`), see §11.2 |
 | Security | Header and CSP assertions, XSS corpus in flow names and logs, archive bombs, authZ matrix | custom tests |
 
@@ -659,12 +663,12 @@ Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the 
 | `maestro.log` is not flushed live (M1) | Step-level live progress lost | Fall back to per-flow progress; push the upstream `--events` reporter; the UI already handles both levels |
 | Maestro output or layout changes (2.7 changed everything) | Parsers break | Version profiles, degraded mode, nightly version matrix, fixture-first rule |
 | Leptos 0.x churn (0.9 RC now) | Upgrade cost | Pin `=0.8.23`; isolate the framework in `fleet-ui`/`fleet-web`; upgrade by ADR |
-| Building accessible UI primitives in-house | Time, a11y bugs | Native elements first; APG patterns; axe in E2E; a small, fixed component list |
+| Building accessible UI primitives in-house | Time, a11y bugs | Native elements first; APG patterns; axe in E2E (planned); a small, fixed component list |
 | Employer IP claim | Ownership dispute | §2.5 written confirmation before code |
 | A non-OSI license deters contributors and some company legal teams | Fewer contributors | Clear `LICENSING.md`; internal use is free; CLA explained; option of a commercial/other license on request |
 | Postgres write rate | Ingest latency | Batch per socket, telemetry checkpoints, COPY/UNNEST, partitions |
 | Corporate proxies, CAs, WS blocking | Agent can't publish | CONNECT proxy, custom CA, HTTPS batch fallback, `check` diagnostics, fail-open |
-| GitHub cancel window (10 s) | Lost finalization | Pre-emptive `run.signal_received`, spool + `flush` post-step |
+| GitHub cancel window (10 s) | Lost finalization | Pre-emptive `run.signal`, spool + `flush` post-step |
 | Name confusion with Maestro (mobile.dev) | Trademark or brand issue | Decide O1 before going public; describe it as "for Maestro"; centralised naming (§4.1) |
 
 ---
