@@ -404,7 +404,9 @@ async fn store_body(
 fn blob_class(class: ArtifactClass) -> BlobClass {
     match class {
         ArtifactClass::FailureScreenshot => BlobClass::Screenshot,
-        ArtifactClass::Commands | ArtifactClass::MaestroLog => BlobClass::Log,
+        ArtifactClass::Commands | ArtifactClass::MaestroLog | ArtifactClass::FailureHierarchy => {
+            BlobClass::Log
+        }
         ArtifactClass::Junit => BlobClass::Junit,
         ArtifactClass::HtmlReport => BlobClass::HtmlReport,
     }

@@ -26,6 +26,9 @@ use uuid::Uuid;
 pub enum ArtifactClass {
     /// A screenshot Maestro took at a failing step (PNG, JPEG or WebP).
     FailureScreenshot,
+    /// Maestro's UI hierarchy of a failing step (`screen-hierarchy/step-NNN-….json`), with its
+    /// on-screen text values redacted by the agent (JSON).
+    FailureHierarchy,
     /// A flow's `commands.json`, redacted by the agent (text).
     Commands,
     /// The JUnit XML report.
@@ -38,8 +41,9 @@ pub enum ArtifactClass {
 
 impl ArtifactClass {
     /// Every class the server accepts.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::FailureScreenshot,
+        Self::FailureHierarchy,
         Self::Commands,
         Self::Junit,
         Self::MaestroLog,
@@ -51,6 +55,7 @@ impl ArtifactClass {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::FailureScreenshot => "failure_screenshot",
+            Self::FailureHierarchy => "failure_hierarchy",
             Self::Commands => "commands",
             Self::Junit => "junit",
             Self::MaestroLog => "maestro_log",
@@ -69,6 +74,7 @@ impl ArtifactClass {
     pub fn content_types(self) -> &'static [&'static str] {
         match self {
             Self::FailureScreenshot => &["image/png", "image/jpeg", "image/webp"],
+            Self::FailureHierarchy => &["application/json"],
             Self::Commands => &["application/json", "text/plain"],
             Self::Junit => &["application/xml", "text/xml"],
             Self::MaestroLog => &["text/plain"],

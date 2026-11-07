@@ -31,7 +31,9 @@ pub fn default_retention(class: ArtifactClass) -> &'static str {
     match class {
         ArtifactClass::Junit | ArtifactClass::HtmlReport => "report",
         ArtifactClass::MaestroLog => "debug_log",
-        ArtifactClass::FailureScreenshot | ArtifactClass::Commands => "success_evidence",
+        ArtifactClass::FailureScreenshot
+        | ArtifactClass::FailureHierarchy
+        | ArtifactClass::Commands => "success_evidence",
     }
 }
 

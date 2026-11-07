@@ -206,6 +206,84 @@ async fn an_agent_uploads_a_failure_screenshot_and_the_flow_lists_it() {
     assert_eq!(blob.map(|b| b.size), Some(67));
 }
 
+/// A failing step's UI hierarchy is an allowlisted JSON class of its own: its own content type,
+/// its own size limit, and it is stored and listed like a screenshot (issue #74).
+#[tokio::test]
+async fn an_agent_uploads_a_failure_hierarchy_within_its_own_limit() {
+    // 128 bytes: the JSON below fits, the 67-byte PNG fits, a padded copy does not.
+    let (rig, _) = artifact_rig(|c| c.artifacts.max_bytes.failure_hierarchy = 128).await;
+    let run = run_with_failed_flow(&rig, "940").await;
+    let json = br#"{"children":[{"attributes":{"text":"[REDACTED]"}}]}"#;
+    let path = "checkout/screen-hierarchy/step-001-assertVisible-Done.json";
+
+    let result = rig
+        .upload(
+            &request(&run, "failure_hierarchy", path, "application/json", json),
+            json,
+        )
+        .await;
+    assert!(
+        matches!(result, UploadResult::Available { .. }),
+        "{result:?}"
+    );
+    let listed = rig.artifacts_of(run.flow).await;
+    let a = &listed["artifacts"][0];
+    assert_eq!(a["class"], "failure_hierarchy", "{listed}");
+    assert_eq!(a["name"], "step-001-assertVisible-Done.json");
+    // Served as the text it verifies as, like commands.json, not as the declared type.
+    assert_eq!(a["content_type"], "text/plain");
+    assert_eq!(a["state"], "available");
+    assert_eq!(a["retention_class"], "failure_evidence");
+
+    // Declared as a picture, or as a screenshot's bytes, it is refused and nothing is kept.
+    let g = rig
+        .grant(&request(
+            &run,
+            "failure_hierarchy",
+            "a.json",
+            "image/png",
+            json,
+        ))
+        .await;
+    assert_eq!(refused(g), RejectReason::ContentTypeNotAllowed);
+    // The bytes are checked once they arrive: a screenshot's bytes are not a hierarchy.
+    let result = rig
+        .upload(
+            &request(&run, "failure_hierarchy", "b.json", "application/json", PNG),
+            PNG,
+        )
+        .await;
+    assert!(
+        matches!(
+            result,
+            UploadResult::Rejected {
+                reason: RejectReason::TypeNotAllowed,
+                ..
+            }
+        ),
+        "{result:?}"
+    );
+    let big = [json.as_slice(), &[b' '; 128]].concat();
+    let g = rig
+        .grant(&request(
+            &run,
+            "failure_hierarchy",
+            "c.json",
+            "application/json",
+            &big,
+        ))
+        .await;
+    assert_eq!(refused(g), RejectReason::TooLarge);
+    let listed = rig.artifacts_of(run.flow).await;
+    let available = listed["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|a| a["state"] == "available")
+        .count();
+    assert_eq!(available, 1, "{listed}");
+}
+
 fn refused(g: UploadGrant) -> RejectReason {
     match g {
         UploadGrant::Rejected { reason, .. } => reason,

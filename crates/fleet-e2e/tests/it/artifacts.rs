@@ -106,6 +106,33 @@ async fn a_failed_runs_evidence_is_uploaded_redacted_and_opens_only_on_the_userc
     let (status, _, body) = get_as(stack.addr(), APP, &path).await;
     assert_eq!(status, 404);
     assert!(body.len() < 1000, "not the screenshot");
+
+    // The failing step's UI hierarchy is listed on that step and downloads as the same tree with
+    // its on-screen text hidden (issue #74): the settings screen's labels are gone, the structure
+    // is kept.
+    let hierarchy = find("failure_hierarchy");
+    assert_eq!(hierarchy["step"], 4, "{hierarchy}");
+    assert_eq!(
+        hierarchy["content_type"], "text/plain",
+        "served as the text it is"
+    );
+    let link = hierarchy["link"]["url"].as_str().unwrap();
+    let path = url::Url::parse(link).unwrap().path().to_owned();
+    let (status, head, body) = get_as(stack.addr(), USERCONTENT, &path).await;
+    assert_eq!(status, 200, "{head}");
+    assert!(head.contains("content-security-policy: sandbox;"), "{head}");
+    let text = String::from_utf8(body).unwrap();
+    for shown in ["Wallpaper & style", "Network & internet", "2:25"] {
+        assert!(!text.contains(shown), "on-screen text {shown:?} was served");
+    }
+    assert!(
+        text.contains("[REDACTED]"),
+        "the hidden text should show where it was"
+    );
+    assert!(
+        text.contains("com.android.systemui:id/status_bar_container"),
+        "the structure is kept"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

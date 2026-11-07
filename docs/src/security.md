@@ -8,6 +8,8 @@ I6 covers a measurable set of secret sources and representations. The agent coll
 
 Known values are replaced in plain text, JSON-escaped text, percent encoding with upper- or lowercase hex digits, and standard or URL-safe base64 with or without padding. Token patterns cover GitHub tokens, Fleet API keys, AWS access-key IDs, Slack tokens, bearer tokens, JWT shapes and PEM private keys. The captured Phase 0 planted secrets and adversarial encoding tests exercise these rules. The same redactor handles event text and exported text artifacts.
 
+UI hierarchies of failing steps are exported with the text they show hidden: the value of every `text` and `accessibilityText` attribute becomes `[REDACTED]`, and the tree, its classes, bounds and resource IDs stay. The same redactor then runs over the result, so a known value is replaced wherever it appears. A hierarchy that is not JSON of the expected shape is not uploaded.
+
 Before exporting `commands.json`, Fleet withholds resolved `evaluatedCommand` payloads and variable definitions while retaining command types, status, sequence, depth and duration. This protects values created inside the flow that are absent from the runner environment.
 
 Text artifacts must be valid UTF-8, contain no NUL bytes and fit within the 16 MiB per-file redaction limit. Otherwise the agent records `not_redactable` and sends no upload request. Redaction runs before hashing and transmission, so the digest identifies the exported bytes.
