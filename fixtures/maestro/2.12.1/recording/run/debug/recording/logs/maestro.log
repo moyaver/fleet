@@ -1,0 +1,27 @@
+01:37:13.054 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+01:37:13.057 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+01:37:13.057 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:37:13.058 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:37:13.058 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+01:37:13.102 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+01:37:13.102 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+01:37:13.274 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+01:37:13.275 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Start recording fleet-recording RUNNING
+01:37:13.277 [ INFO] maestro.Maestro.startScreenRecording: Starting screen recording
+01:37:13.277 [ INFO] maestro.Maestro.startScreenRecording: Starting screen recording
+01:37:13.541 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Start recording fleet-recording COMPLETED
+01:37:13.542 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+01:37:14.765 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+01:37:16.081 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+01:37:16.084 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait
+01:37:17.565 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+01:37:17.566 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+01:37:17.567 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+01:37:17.675 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+01:37:17.675 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+01:37:17.676 [ INFO] maestro.Maestro.backPress: Pressing back
+01:37:18.663 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+01:37:18.663 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Stop recording RUNNING
+01:37:18.663 [ INFO] maestro.Maestro.close: Stopping screen recording
+01:37:21.980 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Stop recording COMPLETED
+01:37:21.980 [ INFO] maestro.Maestro.close: Stopping screen recording

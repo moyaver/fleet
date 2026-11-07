@@ -1,0 +1,373 @@
+{"src":"proc","t_ms":53,"tree":[{"command":"/bin/sh /opt/homebrew/bin/maestro --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"0.0","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"144"}]}
+{"src":"proc","t_ms":2297,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"59.1","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"111616"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":2455}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":2455}
+{"bytes":248,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @184cf7cf (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":2534}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":2534}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":2534}
+{"event":"dir","path":"run/debug","src":"fs","t_ms":2908}
+{"event":"created","path":"run/debug/maestro.log","size":628,"src":"fs","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910285|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910286|main|INFO|MAESTRO|---- System Info ----\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|Maestro Version: 2.12.1\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|CI: Undefined\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|OS Name: Mac OS X\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|OS Version: 26.7.1\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|Architecture: aarch64\n","src":"log","t_ms":2908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910287|main|INFO|MAESTRO|Java Version: 27\n","src":"log","t_ms":2908}
+{"event":"size","path":"run/debug/maestro.log","size":876,"src":"fs","t_ms":3069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910436|main|INFO|MAESTRO|Xcode Version: 27.1\n","src":"log","t_ms":3069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910441|main|INFO|MAESTRO|Flutter Version: Undefined\n","src":"log","t_ms":3069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910445|main|INFO|MAESTRO|Flutter Channel: Undefined\n","src":"log","t_ms":3069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910445|main|INFO|MAESTRO|---------------------\n","src":"log","t_ms":3069}
+{"event":"size","path":"run/debug/maestro.log","size":1028,"src":"fs","t_ms":3386}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008910752|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework\n","src":"log","t_ms":3386}
+{"src":"proc","t_ms":4368,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"23.9","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"209968"},{"command":"/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl list -j","cpu":"34.4","pgid":"72356","pid":72609,"ppid":72459,"rss_kib":"17536"}]}
+{"event":"size","path":"run/debug/maestro.log","size":1713,"src":"fs","t_ms":4762}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008912131|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5582 using port 58590 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/nested.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))\n","src":"log","t_ms":4762}
+{"src":"proc","t_ms":6453,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"4.6","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"185264"}]}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":8328}
+{"bytes":33,"line":"Waiting for flows to complete...\n","src":"stdout","t_ms":8328}
+{"event":"size","path":"run/debug/maestro.log","size":1913,"src":"fs","t_ms":8387}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008915729|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow nested\n","src":"log","t_ms":8387}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008915744|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info\n","src":"log","t_ms":8387}
+{"event":"dir","path":"run/debug/nested","src":"fs","t_ms":8387}
+{"bytes":75,"line":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\n","src":"stderr","t_ms":8504}
+{"bytes":187,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/protobuf-java-3.21.9.jar)\n","src":"stderr","t_ms":8504}
+{"bytes":114,"line":"WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\n","src":"stderr","t_ms":8504}
+{"bytes":78,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n","src":"stderr","t_ms":8504}
+{"src":"proc","t_ms":8553,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"33.6","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"126480"}]}
+{"event":"size","path":"run/debug/maestro.log","size":2097,"src":"fs","t_ms":8622}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008915988|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)\n","src":"log","t_ms":8623}
+{"event":"dir","path":"run/debug/nested/logs","src":"fs","t_ms":8743}
+{"event":"created","path":"run/debug/nested/logs/maestro.log","size":0,"src":"fs","t_ms":8743}
+{"event":"size","path":"run/debug/maestro.log","size":2699,"src":"fs","t_ms":8861}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916201|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING\n","src":"log","t_ms":8861}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916208|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED\n","src":"log","t_ms":8861}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916209|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":8861}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916209|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":8861}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":8861}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":533,"src":"fs","t_ms":8861}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.201 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING\n","src":"log","t_ms":8861}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.208 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED\n","src":"log","t_ms":8861}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":8861}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":8861}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.210 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":8861}
+{"event":"size","path":"run/debug/maestro.log","size":2918,"src":"fs","t_ms":8914}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916293|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings\n","src":"log","t_ms":8914}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916293|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch\n","src":"log","t_ms":8914}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":730,"src":"fs","t_ms":8914}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.293 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings\n","src":"log","t_ms":8914}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.293 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch\n","src":"log","t_ms":8914}
+{"event":"size","path":"run/debug/maestro.log","size":3181,"src":"fs","t_ms":9031}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.android.settings\" COMPLETED\n","src":"log","t_ms":9031}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run subflows/nested-outer.yaml RUNNING\n","src":"log","t_ms":9031}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":966,"src":"fs","t_ms":9031}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.android.settings\" COMPLETED\n","src":"log","t_ms":9031}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run subflows/nested-outer.yaml RUNNING\n","src":"log","t_ms":9031}
+{"event":"size","path":"run/debug/maestro.log","size":3919,"src":"fs","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916417|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":9093}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008916419|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":9093}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":1620,"src":"fs","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.417 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":9093}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:36.419 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":9093}
+{"src":"proc","t_ms":10636,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"14.3","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"178176"}]}
+{"event":"size","path":"run/debug/maestro.log","size":4063,"src":"fs","t_ms":11191}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008918537|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":11191}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":1752,"src":"fs","t_ms":11191}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:38.537 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":11191}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:38.552 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":11191}
+{"event":"size","path":"run/debug/maestro.log","size":4175,"src":"fs","t_ms":11241}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008918552|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":11241}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":1849,"src":"fs","t_ms":11241}
+{"event":"size","path":"run/debug/maestro.log","size":4745,"src":"fs","t_ms":11459}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008918790|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":11459}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":2401,"src":"fs","t_ms":11459}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:38.790 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":11459}
+{"src":"proc","t_ms":12699,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"0.3","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"113904"}]}
+{"event":"size","path":"run/debug/maestro.log","size":4973,"src":"fs","t_ms":12776}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008920149|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":12776}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008920155|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":12776}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":2607,"src":"fs","t_ms":12776}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:40.149 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":12776}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:40.155 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":12776}
+{"event":"size","path":"run/debug/maestro.log","size":5351,"src":"fs","t_ms":14635}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008921982|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":14635}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008921982|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":14635}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008921983|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":14635}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":2954,"src":"fs","t_ms":14635}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:41.982 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":14635}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:41.982 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":14635}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:41.983 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":14635}
+{"event":"size","path":"run/debug/maestro.log","size":5672,"src":"fs","t_ms":14749}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008922088|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":14749}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008922088|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":14749}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008922093|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":14749}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":3228,"src":"fs","t_ms":14749}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:42.088 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":14749}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:42.088 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":14749}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:42.093 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":14749}
+{"src":"proc","t_ms":14788,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"14.4","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"129312"}]}
+{"event":"size","path":"run/debug/maestro.log","size":5925,"src":"fs","t_ms":15845}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923207|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":15845}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923207|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":15845}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":3454,"src":"fs","t_ms":15845}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.207 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":15845}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.207 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":15845}
+{"event":"size","path":"run/debug/maestro.log","size":6540,"src":"fs","t_ms":15952}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923313|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":15952}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923313|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":15952}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923317|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Retry 2 times RUNNING\n","src":"log","t_ms":15952}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008923319|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING\n","src":"log","t_ms":15952}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":4015,"src":"fs","t_ms":15952}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":15952}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":15952}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.317 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Retry 2 times RUNNING\n","src":"log","t_ms":15952}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:43.319 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING\n","src":"log","t_ms":15952}
+{"src":"proc","t_ms":16889,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"125.8","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"263728"}]}
+{"event":"size","path":"run/debug/maestro.log","size":6919,"src":"fs","t_ms":16981}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008924356|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED\n","src":"log","t_ms":16981}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008924357|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"${output.target}\" is visible RUNNING\n","src":"log","t_ms":16981}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":4367,"src":"fs","t_ms":16981}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:44.356 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED\n","src":"log","t_ms":16981}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:48:44.357 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"${output.target}\" is visible RUNNING\n","src":"log","t_ms":16981}
+{"src":"proc","t_ms":18958,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"11.4","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"156832"}]}
+{"src":"proc","t_ms":21024,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"7.3","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"179472"}]}
+{"src":"proc","t_ms":23085,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"4.8","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"164176"}]}
+{"src":"proc","t_ms":25151,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"6.4","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"128608"}]}
+{"src":"proc","t_ms":27212,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"5.2","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"136528"}]}
+{"src":"proc","t_ms":29279,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"8.9","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"139776"}]}
+{"src":"proc","t_ms":31374,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"5.9","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"136976"}]}
+{"src":"proc","t_ms":33453,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"3.2","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"131936"}]}
+{"event":"dir","path":"run/debug/nested/screen-hierarchy","src":"fs","t_ms":34416}
+{"event":"created","path":"run/debug/nested/screen-hierarchy/step-015-assertCondition-${output.target}.json","size":0,"src":"fs","t_ms":34416}
+{"event":"size","path":"run/debug/maestro.log","size":7121,"src":"fs","t_ms":34528}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008941887|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Taking screenshot\n","src":"log","t_ms":34528}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008941889|DefaultDispatcher-worker-1|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink\n","src":"log","t_ms":34528}
+{"event":"dir","path":"run/debug/nested/screenshots","src":"fs","t_ms":34528}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":4538,"src":"fs","t_ms":34528}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:01.887 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot\n","src":"log","t_ms":34528}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:01.889 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink\n","src":"log","t_ms":34528}
+{"event":"created","path":"run/debug/nested/screenshots/step-015-assertCondition-${output.target}.png.tmp","size":0,"src":"fs","t_ms":34528}
+{"event":"size","path":"run/debug/nested/screen-hierarchy/step-015-assertCondition-${output.target}.json","size":103604,"src":"fs","t_ms":34528}
+{"event":"size","path":"run/debug/nested/screenshots/step-015-assertCondition-${output.target}.png.tmp","size":194720,"src":"fs","t_ms":34744}
+{"event":"size","path":"run/debug/maestro.log","size":10112,"src":"fs","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942135|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"${output.target}\" is visible FAILED\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942142|DefaultDispatcher-worker-3|ERROR|maestro.orchestra.Orchestra|Attempt 1 failed for retry command\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"maestro.MaestroException$AssertionFailure: Assertion is false: \"Fleet never shows this\" is visible\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942144|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED\n","src":"log","t_ms":34800}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"${output.target}\" is visible RUNNING\n","src":"log","t_ms":34800}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":7457,"src":"fs","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.135 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"${output.target}\" is visible FAILED\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.142 [ERROR] maestro.orchestra.Orchestra.retryCommand: Attempt 1 failed for retry command\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"maestro.MaestroException$AssertionFailure: Assertion is false: \"Fleet never shows this\" is visible\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"\tat kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.144 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.154 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED\n","src":"log","t_ms":34800}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"${output.target}\" is visible RUNNING\n","src":"log","t_ms":34800}
+{"event":"created","path":"run/debug/nested/screenshots/step-015-assertCondition-${output.target}.png","size":194720,"src":"fs","t_ms":34800}
+{"event":"size","path":"run/debug/maestro.log","size":10981,"src":"fs","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942325|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"${output.target}\" is visible COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942325|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Retry 2 times COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942326|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 2 times RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942327|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942345|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942346|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942347|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":34961}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":8230,"src":"fs","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.325 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"${output.target}\" is visible COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.325 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Retry 2 times COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.326 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 2 times RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.327 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.345 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.346 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":34961}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.347 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":34961}
+{"event":"size","path":"run/debug/maestro.log","size":11237,"src":"fs","t_ms":35081}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942458|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":35081}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942459|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":35081}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":8459,"src":"fs","t_ms":35081}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.458 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":35081}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":35081}
+{"event":"size","path":"run/debug/maestro.log","size":11807,"src":"fs","t_ms":35314}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008942654|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":35314}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":9011,"src":"fs","t_ms":35314}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:02.654 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":35314}
+{"src":"proc","t_ms":35578,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"9.7","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"198688"}]}
+{"event":"size","path":"run/debug/maestro.log","size":12035,"src":"fs","t_ms":36562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008943902|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":36562}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008943903|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":36562}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":9217,"src":"fs","t_ms":36562}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:03.902 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":36562}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:03.903 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":36562}
+{"src":"proc","t_ms":37625,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"0.5","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"198928"}]}
+{"event":"size","path":"run/debug/maestro.log","size":12413,"src":"fs","t_ms":37972}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":37972}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":37972}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":37972}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":9564,"src":"fs","t_ms":37972}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.335 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":37972}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.335 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":37972}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.335 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":37972}
+{"event":"size","path":"run/debug/maestro.log","size":12734,"src":"fs","t_ms":38029}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":38029}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":38029}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":38029}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":9838,"src":"fs","t_ms":38029}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.412 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":38029}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.412 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":38029}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:05.412 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":38029}
+{"event":"size","path":"run/debug/maestro.log","size":12987,"src":"fs","t_ms":38951}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946328|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":38951}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946328|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":38951}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":10064,"src":"fs","t_ms":38951}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.328 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":38951}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.328 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":38951}
+{"event":"size","path":"run/debug/maestro.log","size":14624,"src":"fs","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":39064}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":11515,"src":"fs","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Run nested-inner.yaml PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Apply configuration PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that \"Network & internet\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on \"Apps\" PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that \"Apps\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that \"Network & internet\" is visible PENDING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":39064}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":39064}
+{"event":"size","path":"run/debug/maestro.log","size":14880,"src":"fs","t_ms":39116}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946500|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":39116}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946501|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" RUNNING\n","src":"log","t_ms":39116}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":11744,"src":"fs","t_ms":39116}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.500 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":39116}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on \"Apps\" RUNNING\n","src":"log","t_ms":39116}
+{"event":"size","path":"run/debug/maestro.log","size":15450,"src":"fs","t_ms":39227}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008946586|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":39227}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":12296,"src":"fs","t_ms":39227}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:06.586 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))\n","src":"log","t_ms":39227}
+{"src":"proc","t_ms":39674,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"2.3","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"204272"}]}
+{"event":"size","path":"run/debug/maestro.log","size":15550,"src":"fs","t_ms":40460}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008947845|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy\n","src":"log","t_ms":40460}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":12378,"src":"fs","t_ms":40460}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:07.845 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy\n","src":"log","t_ms":40460}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:07.846 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":40460}
+{"event":"size","path":"run/debug/maestro.log","size":15678,"src":"fs","t_ms":40512}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008947846|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait\n","src":"log","t_ms":40512}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":12502,"src":"fs","t_ms":40512}
+{"event":"size","path":"run/debug/maestro.log","size":16056,"src":"fs","t_ms":41572}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008948942|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":41572}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008948943|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":41572}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008948943|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":41572}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":12849,"src":"fs","t_ms":41572}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:08.942 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.\n","src":"log","t_ms":41572}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:08.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on \"Apps\" COMPLETED\n","src":"log","t_ms":41572}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:08.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Apps\" is visible RUNNING\n","src":"log","t_ms":41572}
+{"event":"size","path":"run/debug/maestro.log","size":16377,"src":"fs","t_ms":41675}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":41675}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING\n","src":"log","t_ms":41675}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back\n","src":"log","t_ms":41675}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":13123,"src":"fs","t_ms":41675}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:09.034 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Apps\" is visible COMPLETED\n","src":"log","t_ms":41675}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:09.034 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING\n","src":"log","t_ms":41675}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:09.034 [ INFO] maestro.Maestro.backPress: Pressing back\n","src":"log","t_ms":41675}
+{"src":"proc","t_ms":41751,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"11.0","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"158304"}]}
+{"event":"size","path":"run/debug/maestro.log","size":16630,"src":"fs","t_ms":42954}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950334|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED\n","src":"log","t_ms":42954}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950334|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":42954}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":13349,"src":"fs","t_ms":42954}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.334 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED\n","src":"log","t_ms":42954}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.334 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Network & internet\" is visible RUNNING\n","src":"log","t_ms":42954}
+{"event":"size","path":"run/debug/maestro.log","size":17142,"src":"fs","t_ms":43069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 2 times COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run subflows/nested-outer.yaml COMPLETED\n","src":"log","t_ms":43069}
+{"event":"size","path":"run/debug/nested/logs/maestro.log","size":13813,"src":"fs","t_ms":43069}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Network & internet\" is visible COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Repeat 2 times COMPLETED\n","src":"log","t_ms":43069}
+{"file":"run/debug/nested/logs/maestro.log","line":"01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run subflows/nested-outer.yaml COMPLETED\n","src":"log","t_ms":43069}
+{"event":"created","path":"run/debug/nested/commands.json","size":0,"src":"fs","t_ms":43129}
+{"event":"size","path":"run/debug/nested/commands.json","size":41662,"src":"fs","t_ms":43349}
+{"event":"created","path":"run/debug/nested/logs/device-logcat.txt","size":5332408,"src":"fs","t_ms":43521}
+{"bytes":22,"line":"[Passed] nested (35s)\n","src":"stdout","t_ms":43752}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":43759}
+{"bytes":23,"line":"1/1 Flow Passed in 35s\n","src":"stdout","t_ms":43759}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":43759}
+{"event":"created","path":"run/report.xml","size":0,"src":"fs","t_ms":43805}
+{"event":"created","path":"run/debug/nested/manifest.json","size":775,"src":"fs","t_ms":43805}
+{"src":"proc","t_ms":43856,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5582 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/nested.yaml","cpu":"115.3","pgid":"72356","pid":72459,"ppid":72364,"rss_kib":"259264"}]}
+{"event":"size","path":"run/report.xml","size":374,"src":"fs","t_ms":43871}

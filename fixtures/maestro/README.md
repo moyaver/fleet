@@ -12,6 +12,7 @@ Layout: `<maestro version>/<scenario>/`
 | `meta.json` | the exact command and environment |
 | `run/` | what Maestro wrote: `debug/` (session `maestro.log`, flow bundles) and `report.xml` |
 | `state/` | `$XDG_STATE_HOME/maestro` (Maestro's own state) |
+| `device.json` | Maestro version, device, API and emulator setup (scenarios captured for #77 on) |
 
 Paths are normalized to `<REPO>`, `<CAPTURE>`, `<MAESTRO_HOME>`, `<HOME>` and `<USER>`; device logcat is cut to 32 KiB. The values `fleet-planted-…` are fake secrets planted on purpose, so redaction can be tested against real output.
 
@@ -31,6 +32,10 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | `features` | `MP --env MAESTRO_FLEET_TOKEN=fleet-planted-maestro-secret-91c2` | `--device A test CANON -e PASSWORD=fleet-planted-e-secret-7f3a features.yaml` |
 | `retry-fail` | `MP` | `--device A test CANON retry-fail.yaml` |
 | `execution-order` | `MP` | `--device A test CANON ordered` |
+| `crash` | `MP`, under `sh -c` (see [provenance](#provenance-of-the-2121-scenarios-added-for-77)) | `--device emulator-5582 test CANON crash.yaml` |
+| `nested` | `MP` | `--device emulator-5582 test CANON nested.yaml` |
+| `screenshot` | `MP` | `--device emulator-5582 test CANON screenshot.yaml` |
+| `recording` | `MP` | `--device emulator-5582 test CANON recording.yaml` |
 | `single-flow-no-format` | `MP` | `--device A test pass.yaml` |
 | `verbose` | `MP` | `--verbose --device A test CANON pass.yaml` |
 | `bad-flag` | | `--device A test --not-a-real-flag pass.yaml` |
@@ -45,6 +50,22 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | `shard-all-2` | `MP` | `--device "A,B" test --shard-all 2 CANON suite` |
 | `sigint`, `sigterm`, `sigkill` | `MP --signal INT\|TERM\|KILL --signal-after-ms 30000` | `--device A test CANON slow.yaml` |
 | `device-killed` | `MP`, plus `adb -s B emu kill` after 35 s | `--device B test CANON slow.yaml` |
+
+### Provenance of the 2.12.1 scenarios added for #77
+
+Captured on 2026-11-07 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula (`/opt/homebrew/Cellar/maestro/2.12.1`). The device was a throwaway AVD set up the way the nightly job does it (`.github/workflows/nightly-emulator.yml`): `system-images;android-37.1;google_apis_playstore_ps16k;arm64-v8a` (Android 17, build `CP31.260623.012`), `hw.gpu.enabled=yes`, `hw.gpu.mode=auto`, 1080x2424 at 420 dpi, 3 GB RAM, booted headless on port 5582 (serial `emulator-5582`, AVD `fleet-fixtures-77`). The AVD lived in a temporary `ANDROID_AVD_HOME` and was deleted afterwards. The owner's emulator was not used. `device.json` in each scenario records these values.
+
+Imports normalize paths and cut `device-logcat.txt` to 32 KiB head and tail, and files over 1 MiB are listed in `SKIPPED.txt`.
+
+- **`crash`**: a real app crash during a wait. `crash.yaml` launches Settings, asserts "Network & internet", then waits 20 s for text that never shows. The capture's `sh -c` loop waits until `com.android.settings` has a pid, sleeps 4 s, then runs `adb -s emulator-5582 shell am crash com.android.settings`. Settings dies with `RemoteServiceException$CrashedByAdbException: shell-induced crash` and the flow fails with `Assertion is false: "Fleet never shows this" is visible` after 22 s. Maestro wrote `logs/crash-report.txt`. The import cut the middle of `logs/device-logcat.txt`, so `FATAL EXCEPTION` is not in the fixture. The 1.25 MB failure screenshot is over the import limit and is in `SKIPPED.txt`.
+- **`nested`**: `nested.yaml` runs `subflows/nested-outer.yaml`, which has `runFlow` (inside it, `nested-inner.yaml`), then `retry` (2 retries) around an inline `evalScript` and `assertVisible: "${output.target}"`, then `repeat` (2) around `runFlow: nested-inner.yaml`. The `evalScript` aims at text that is absent on attempt 1 and present on attempt 2, so the log shows `Attempt 1 failed for retry command` and the flow passes. `features` already covers one-level `runFlow`, a `retry` that passes first time and `repeat`, so it is not repeated. `retry-fail` covers an exhausted retry. The target is changed rather than thrown because a `runScript` that throws was not retried by Maestro in a trial run. Repo rules forbid `.js` files (invariant I9), so there is no script file.
+- **`screenshot`**: two `takeScreenshot` steps. Maestro writes `debug/<flow>/takeScreenshot/<name>.png`, not into the working directory.
+- **`recording`**: `startRecording: fleet-recording` … `stopRecording`. Maestro writes `debug/<flow>/startRecording/fleet-recording.mp4` (408 KB, kept).
+- **`anr`: not captured.** Tried, none reproduced an app ANR:
+  - `adb shell am hang`: hangs the whole system (`Watchdog: WAITED_UNTIL_PRE_WATCHDOG`). It is not an app ANR.
+  - `adb shell am freeze com.android.settings` with Settings in the foreground, then `input tap`: Settings died (`ActivityTaskManager: Force removing ActivityRecord … app died`). No "isn't responding" dialog and no `am_anr` event.
+  - Stopping the process with `SIGSTOP`: needs root, and `adb root` on this `google_apis_playstore` image returns `adbd cannot run as root in production builds`.
+  - A reproducible ANR needs an app whose main thread blocks, such as a test APK that sleeps in a broadcast receiver or in `onCreate`. Adding such an app to the repo is the owner's call.
 
 ## Capturing a new version
 

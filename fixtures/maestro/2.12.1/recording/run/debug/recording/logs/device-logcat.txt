@@ -1,0 +1,182 @@
+--------- beginning of main
+11-07 01:37:13.323 I/adbd    ( 1740): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+--------- beginning of system
+11-07 01:37:13.339 I/PackageManager(  643): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-07 01:37:13.344 I/adbd    ( 1740): adbd service requested 'sync:'
+11-07 01:37:13.367 I/adbd    ( 1740): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-07 01:37:13.377 I/ActivityManager(  643): Force stopping com.android.settings appid=1000 user=0: from pid 8763
+11-07 01:37:13.377 I/ActivityManager(  643): Killing 8529:com.android.settings/1000 (adj 0): stop com.android.settings due to from pid 8763
+11-07 01:37:13.382 W/ActivityTaskManager(  643): Force removing ActivityRecord{18428094 u0 com.android.settings/.SubSettings t13 f}: app died, no saved state
+11-07 01:37:13.383 V/WindowManagerShell( 1100): Transition requested (#29): android.os.BinderProxy@2843b5b TransitionRequestInfo { type = CLOSE, triggerTask = null, pipChange = null, remoteTransitionInfo = null, displayChanges = null, requestedLocation = null, userChange = null, windowingLayerChange = null, fullscreenRequestChange = null, flags = 0, debugId = 29 }
+11-07 01:37:13.383 V/ShellDesktopMode( 1100): DesktopTasksController: skipping handleRequest reason=triggerTask is null
+11-07 01:37:13.384 W/ActivityTaskManager(  643): Force removing ActivityRecord{135909366 u0 com.android.settings/.Settings t13 f}: app died, no saved state
+11-07 01:37:13.384 W/TransitionChain(  643): Combining appDied into #29(CLOSE|R|0x0) from appDied
+11-07 01:37:13.385 W/InputDispatcher(  643): channel 'a6d68e8 com.android.settings/com.android.settings.SubSettings' ~ Consumer closed input channel or an error occurred.  events=0x9
+11-07 01:37:13.385 E/InputDispatcher(  643): channel 'a6d68e8 com.android.settings/com.android.settings.SubSettings' ~ Channel is unrecoverably broken and will be disposed!
+11-07 01:37:13.386 D/ConnectivityService(  643): ConnectivityDiagnosticsCallback IBinder died.
+11-07 01:37:13.387 D/ConnectivityService(  643): releasing NetworkRequest [ REQUEST id=453, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 1000 RequestorUid: 1000 RequestorPkg: com.android.settings UnderlyingNetworks: Null] ] (release request)
+11-07 01:37:13.387 I/ImeTracker(  643): com.android.settings:65d0b46d: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false userId 0 displayId 0
+11-07 01:37:13.387 W/InputChannel-JNI( 7075): Channel already disposed.
+11-07 01:37:13.388 I/ImeTracker(  643): com.android.settings:65d0b46d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-07 01:37:13.388 D/ConnectivityService(  643): releasing NetworkRequest [ REQUEST id=434, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 1000 RequestorUid: 1000 RequestorPkg: com.android.settings UnderlyingNetworks: Null] ] (release request)
+11-07 01:37:13.388 I/libprocessgroup(  643): Removed cgroup /sys/fs/cgroup/system/uid_1000/pid_8529
+11-07 01:37:13.388 D/ConnectivityService(  643): releasing NetworkRequest [ REQUEST id=432, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 1000 RequestorUid: 1000 RequestorPkg: com.android.settings UnderlyingNetworks: Null] ] (release request)
+11-07 01:37:13.388 D/ConnectivityService(  643): releasing NetworkRequest [ REQUEST id=457, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 1000 RequestorUid: 1000 RequestorPkg: com.android.settings UnderlyingNetworks: Null] ] (release request)
+11-07 01:37:13.388 I/Zygote  (  445): Process 8529 exited due to signal 9 (Killed)
+11-07 01:37:13.391 D/WindowManager(  643): TaskFragmentOrganizer=android.window.ITaskFragmentOrganizer$Stub$Proxy@59e863b died
+11-07 01:37:13.393 V/WindowManager(  643): Defer transition id=29 for TaskFragmentTransaction=android.os.Binder@e075158
+11-07 01:37:13.393 I/WindowManager(  643): WINDOW DIED Window{a6d68e8 u0 com.android.settings/com.android.settings.SubSettings}
+11-07 01:37:13.394 D/ViewRootImpl( 1410): Skipping stats log for color mode
+11-07 01:37:13.394 D/BaseActivity( 1410): Launcher flags updated: [state_started] +[state_started]
+11-07 01:37:13.396 W/UsageStatsService(  643): Unexpected activity event reported! (com.android.settings/com.android.settings.homepage.SettingsHomepageActivity event : 23 instanceId : 54025828)
+11-07 01:37:13.396 I/WindowManager(  643): WIN DEATH: Window{a6d68e8 u0 com.android.settings/com.android.settings.SubSettings EXITING}
+11-07 01:37:13.396 I/WindowManager(  643): WIN DEATH: Window{565134c u0 com.android.settings/com.android.settings.Settings}
+11-07 01:37:13.397 V/ActivityManager(  643): Got obituary of 8529:com.android.settings
+11-07 01:37:13.399 D/BaseActivity( 1410): Launcher flags updated: [state_started|state_resumed|state_user_active] +[state_resumed|state_user_active]
+11-07 01:37:13.399 D/BaseActivity( 1410): Launcher flags updated: [state_started|state_resumed|state_user_active] +[]
+11-07 01:37:13.399 D/BaseActivity( 1410): Launcher flags updated: [state_started|state_resumed|state_deferred_resumed|state_user_active] +[state_deferred_resumed]
+11-07 01:37:13.399 D/StatsLog( 1410): LAUNCHER_ONRESUME
+11-07 01:37:13.400 V/WindowManager(  643): Continue transition id=29 for TaskFragmentTransaction=android.os.Binder@e075158
+11-07 01:37:13.401 D/QuickstepModelDelegate( 1410): notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+11-07 01:37:13.401 V/RecentTasksController( 1100): Notify recent tasks changed: 1
+11-07 01:37:13.404 D/CarrierSvcBindHelper( 1232): onHandleForceStop: [com.android.settings]
+11-07 01:37:13.405 D/CarrierSvcBindHelper( 1232): No carrier app for: 0
+11-07 01:37:13.405 I/adbd    ( 1740): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-07 01:37:13.405 W/ActivityManager(  643): setHasOverlayUi called on unknown pid: 8529
+11-07 01:37:13.409 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.409 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.410 V/WindowManager(  643): Unknown focus tokens, dropping reportFocusChanged
+11-07 01:37:13.410 I/AiAiEcho( 2943): Predicting[0]:  [CONTEXT sampling_count=5 ]
+11-07 01:37:13.410 I/AiAiEcho( 2943): EchoTargets: 
+11-07 01:37:13.410 I/AiAiEcho( 2943): Filtered by AiAi flag check: 
+11-07 01:37:13.410 I/AiAiEcho( 2943): [CONTEXT ratelimit_period="10 SECONDS" ]
+11-07 01:37:13.410 I/AiAiEcho( 2943): #remoteViewsTwiddler: feature disabled.
+11-07 01:37:13.410 D/SmartspaceInteractor( 1410): notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+11-07 01:37:13.415 I/Surface ( 1410): Creating surface for consumer unnamed-1410-140 with slotExpansion=1 for 64 slots
+11-07 01:37:13.417 D/WindowManager(  643): setClientSurface Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#269)/@0xe901ecc for 3184e44 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+11-07 01:37:13.417 I/AiAiEcho( 2943): #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+11-07 01:37:13.417 I/Surface ( 1410): Creating surface for consumer VRI[NexusLauncherActivity]#10(BLAST Consumer)10 with slotExpansion=1 for 64 slots
+11-07 01:37:13.418 I/AiAiEcho( 2943): AmbientDataPredictorImpl No tracked ambient data found for ID: null; for event type: 6, skipping event processing.
+11-07 01:37:13.418 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.418 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.418 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.418 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.418 I/SsBaseTemplateCard( 1410): Secondary card pane is null
+11-07 01:37:13.420 D/BaseDepthController( 1410): setSurface:
+11-07 01:37:13.420 D/BaseDepthController( 1410): 	mWaitingOnSurfaceValidity: false
+11-07 01:37:13.420 D/BaseDepthController( 1410): 	mBaseSurface: Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#269)/@0xbcddec2
+11-07 01:37:13.420 V/BaseDepthController( 1410): Applying blur: 0 to Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#269)/@0xbcddec2 applyImmediately: false
+11-07 01:37:13.422 D/BaseDepthController( 1410): shouldBlurWorkspace: false targetState: Normal currentStableState: Normal mCurrentBlur: 0 mLauncher.getDepthBlurTargets(): [com.android.launcher3.Workspace{c9324d3 V.ED..... ......ID 0,0-1080,2424 #7f0a0498 app:id/workspace}, com.android.launcher3.Hotseat{e112810 V.ED..... .......D 0,1929-1080,2424 #7f0a01f8 app:id/hotseat}]
+11-07 01:37:13.425 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.425 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.427 D/WallpaperService( 1100): onVisibilityChanged(true): com.android.systemui.wallpapers.ImageWallpaper$CanvasEngine@7e84667
+11-07 01:37:13.435 I/PackageManager(  643): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-07 01:37:13.438 I/Finsky  ( 7159): [2] SCH: job service start with id 9298.
+11-07 01:37:13.442 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.442 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.447 I/Finsky  ( 7159): [64] SCH: Satisfied jobs for 9298 are: 12-1
+11-07 01:37:13.448 I/Finsky  ( 7159): [149] SCH: Job 12-1 starting
+11-07 01:37:13.449 I/Finsky  ( 7159): [2] WM::SCH: Logging work start for 12-1
+11-07 01:37:13.449 I/Finsky  ( 7159): [2] [ContentSync] job started
+11-07 01:37:13.451 D/RecentTasksList( 1410): invalidateLoadedTasks - previous requestLoadId: -1
+11-07 01:37:13.461 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.461 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.461 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.461 D/SsBaseTemplateCard( 1410): Passed-in item info is null
+11-07 01:37:13.461 I/SsBaseTemplateCard( 1410): Secondary card pane is null
+11-07 01:37:13.466 V/SharedSurfaceAnimation(  643): Checking SharedSurface matching for: ComponentInfo{com.android.settings/com.android.settings.SubSettings}, user= 0
+11-07 01:37:13.467 V/SharedSurfaceAnimation(  643):   No matching provider found.
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.468 W/skia    (  504): AGTM parsing failed flags.readFromStream(s) at 159
+11-07 01:37:13.469 V/WindowManagerShell( 1100): onTransitionReady(transaction=2761663973288)
+11-07 01:37:13.469 V/WindowManagerShell( 1100): onTransitionReady (#29) android.os.BinderProxy@2843b5b: {id=29 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+11-07 01:37:13.469 V/WindowManagerShell( 1100):         {m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP|FLAG_CHANGED_INTERACTIVE leash=Surface(name=Task=1#33)/@0xd632cd1 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1 winMode=1 userId=0},
+11-07 01:37:13.469 V/WindowManagerShell( 1100):         {m=TO_BACK f=FLAG_CHANGED_INTERACTIVE leash=Surface(name=Task=13#246)/@0x587f336 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1 winMode=1 userId=0},
+11-07 01:37:13.469 V/WindowManagerShell( 1100):         {m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{3996d62}#45)/@0x8c13237 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}
+11-07 01:37:13.469 V/WindowManagerShell( 1100):     ]}
+11-07 01:37:13.470 V/WindowManagerShell( 1100): FocusTransitionObserver: Updating focus state for transition #29
+11-07 01:37:13.470 D/WindowManagerShell( 1100): FocusTransitionObserver: Focus updated on displayId=0 to taskId=1
+11-07 01:37:13.473 V/WindowManagerShell( 1100): FocusTransitionObserver: Notifying local listeners of task focus change: taskId=1, isFocusedOnDisplay=true, isFocusedGlobally=true
+11-07 01:37:13.473 V/RecentTasksController( 1100): Notify recent tasks changed: 2
+11-07 01:37:13.473 V/WindowManagerShell( 1100): FocusTransitionObserver: Notifying local listeners of task focus change: taskId=13, isFocusedOnDisplay=false, isFocusedGlobally=false
+11-07 01:37:13.473 V/WindowManagerShell( 1100): Playing animation for (#29) android.os.BinderProxy@2843b5b@0
+11-07 01:37:13.473 D/ShellSplitScreen( 1100): startAnimation: transition=29 isSplitActive=false
+11-07 01:37:13.473 V/ShellRecents( 1100): RecentsTransitionHandler.startAnimation: no controller found
+11-07 01:37:13.473 V/ShellDesktopMode( 1100): DesktopMixedTransitionHandler: No pending desktop transition
+11-07 01:37:13.473 V/ShellDesktopMode( 1100): DesktopHomeScreenPeekTransitionHandler: startAnimation
+11-07 01:37:13.474 V/WindowManagerShell( 1100): Transition doesn't have explicit remote, search filters for match for {id=29 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP|FLAG_CHANGED_INTERACTIVE leash=Surface(name=Task=1#33)/@0xd632cd1 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1 winMode=1 userId=0},{m=TO_BACK f=FLAG_CHANGED_INTERACTIVE leash=Surface(name=Task=13#246)/@0x587f336 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0 taskParent=-1 winMode=1 userId=0},{m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{3996d62}#45)/@0x8c13237 sb=Rect(0, 0 - 1080, 2424) eb=Rect(0, 0 - 1080, 2424) epz=Point(1080, 2424) d=0}]}
+11-07 01:37:13.474 V/WindowManagerShell( 1100):  Checking filter Pair{{types=[] flags=0x0 notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@b5e1981 windowingMode=undefined isCrossDisplayMove=false}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@d9c5a26, appThread = android.app.IApplicationThread$Stub$Proxy@e6e2667, debugName = overlayBackTransition, filter = {types=[] flags=0x0 notFlags=0x0 checks=[{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null taskFragmentToken=android.os.BinderProxy@b5e1981 windowingMode=undefined isCrossDisplayMove=false}]} }}
+11-07 01:37:13.474 D/RecentTasksList( 1410): invalidateLoadedTasks - previous requestLoadId: -1
+11-07 01:37:13.474 V/WindowManagerShell( 1100):  Checking filter Pair{{types=[] flags=0x0 notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined isCrossDisplayMove=false},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined isCrossDisplayMove=false}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@f43ec14, appThread = android.app.IApplicationThread$Stub$Proxy@d51ccbd, debugName = LauncherToDream, filter = {types=[] flags=0x0 notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null windowingMode=undefined isCrossDisplayMove=fals
+[... fleet fixtures import: 451314 bytes cut ...]
+ctivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.442 D/SatelliteController( 1232): isSatelliteSupportedViaCarrier: using CarrierConfig for subId=1, isAttachSupported=false
+11-07 01:37:21.442 D/SatelliteController( 1232): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-07 01:37:21.442 D/SatelliteController( 1232): getCarrierRoamingNtnConnectType: config: null
+11-07 01:37:21.442 D/TelephonyConfigUpdateInstallReceiver( 1232): getConfigParser: domain=satellite
+11-07 01:37:21.442 V/SatelliteController( 1232): satelliteConfigParser is not ready
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-07 01:37:21.443 D/SatelliteController( 1232): getConfigForSubId: subId= 1, config= PersistableBundle[{satellite_esos_supported_bool=false, satellite_connection_hysteresis_sec_int=180, satellite_supported_disaster_plmn_string_array=[], regional_satellite_earfcn_bundle=PersistableBundle[{}], satellite_entitlement_supported_bool=false, satellite_supported_emergency_plmn_string_array=[], satellite_configs_per_plmn_bundle=PersistableBundle[{}], satellite_sos_max_datagram_size_bytes_int=255, satellite_supported_msg_apps_string_array=[com.google.android.apps.messaging], satellite_connected_notification_throttle_millis_int=604800000, satellite_display_name_string=, satellite_roaming_p2p_sms_inactivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-07 01:37:21.443 D/TelephonyConfigUpdateInstallReceiver( 1232): getConfigParser: domain=satellite
+11-07 01:37:21.443 V/SatelliteController( 1232): satelliteConfigParser is not ready
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-07 01:37:21.443 D/SatelliteController( 1232): getConfigForSubId: subId= 1, config= PersistableBundle[{satellite_esos_supported_bool=false, satellite_connection_hysteresis_sec_int=180, satellite_supported_disaster_plmn_string_array=[], regional_satellite_earfcn_bundle=PersistableBundle[{}], satellite_entitlement_supported_bool=false, satellite_supported_emergency_plmn_string_array=[], satellite_configs_per_plmn_bundle=PersistableBundle[{}], satellite_sos_max_datagram_size_bytes_int=255, satellite_supported_msg_apps_string_array=[com.google.android.apps.messaging], satellite_connected_notification_throttle_millis_int=604800000, satellite_display_name_string=, satellite_roaming_p2p_sms_inactivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteSupportedViaCarrier: using CarrierConfig for subId=1, isAttachSupported=false
+11-07 01:37:21.443 D/SatelliteController( 1232): isInSatelliteModeForCarrierRoaming: subId=1, connectType=0, result=false
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-07 01:37:21.443 D/TelephonyConfigUpdateInstallReceiver( 1232): getConfigParser: domain=satellite
+11-07 01:37:21.443 V/SatelliteController( 1232): satelliteConfigParser is not ready
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-07 01:37:21.443 D/SatelliteController( 1232): getConfigForSubId: subId= 1, config= PersistableBundle[{satellite_esos_supported_bool=false, satellite_connection_hysteresis_sec_int=180, satellite_supported_disaster_plmn_string_array=[], regional_satellite_earfcn_bundle=PersistableBundle[{}], satellite_entitlement_supported_bool=false, satellite_supported_emergency_plmn_string_array=[], satellite_configs_per_plmn_bundle=PersistableBundle[{}], satellite_sos_max_datagram_size_bytes_int=255, satellite_supported_msg_apps_string_array=[com.google.android.apps.messaging], satellite_connected_notification_throttle_millis_int=604800000, satellite_display_name_string=, satellite_roaming_p2p_sms_inactivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteSupportedViaCarrier: using CarrierConfig for subId=1, isAttachSupported=false
+11-07 01:37:21.443 D/SatelliteController( 1232): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectType: config: null
+11-07 01:37:21.443 D/TelephonyConfigUpdateInstallReceiver( 1232): getConfigParser: domain=satellite
+11-07 01:37:21.443 V/SatelliteController( 1232): satelliteConfigParser is not ready
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-07 01:37:21.443 D/SatelliteController( 1232): getConfigForSubId: subId= 1, config= PersistableBundle[{satellite_esos_supported_bool=false, satellite_connection_hysteresis_sec_int=180, satellite_supported_disaster_plmn_string_array=[], regional_satellite_earfcn_bundle=PersistableBundle[{}], satellite_entitlement_supported_bool=false, satellite_supported_emergency_plmn_string_array=[], satellite_configs_per_plmn_bundle=PersistableBundle[{}], satellite_sos_max_datagram_size_bytes_int=255, satellite_supported_msg_apps_string_array=[com.google.android.apps.messaging], satellite_connected_notification_throttle_millis_int=604800000, satellite_display_name_string=, satellite_roaming_p2p_sms_inactivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.443 D/SatelliteController( 1232): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-07 01:37:21.443 D/TelephonyConfigUpdateInstallReceiver( 1232): getConfigParser: domain=satellite
+11-07 01:37:21.443 V/SatelliteController( 1232): satelliteConfigParser is not ready
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-07 01:37:21.443 D/SatelliteController( 1232): getConfigForSubId: subId= 1, config= PersistableBundle[{satellite_esos_supported_bool=false, satellite_connection_hysteresis_sec_int=180, satellite_supported_disaster_plmn_string_array=[], regional_satellite_earfcn_bundle=PersistableBundle[{}], satellite_entitlement_supported_bool=false, satellite_supported_emergency_plmn_string_array=[], satellite_configs_per_plmn_bundle=PersistableBundle[{}], satellite_sos_max_datagram_size_bytes_int=255, satellite_supported_msg_apps_string_array=[com.google.android.apps.messaging], satellite_connected_notification_throttle_millis_int=604800000, satellite_display_name_string=, satellite_roaming_p2p_sms_inactivity_timeout_sec_int=180, satellite_roaming_turn_off_session_for_emergency_call_bool=true, emergency_messaging_supported_bool=false, carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle=PersistableBundle[{}], satellite_data_support_mode_int=0, carrier_roaming_ntn_connect_type_int=0, satellite_attach_supported_bool=false, carrier_roaming_satellite_emergency_messaging_redirection_destination_string=, satellite_nidd_apn_name_string=, carrier_supported_satellite_services_per_provider_bundle=PersistableBundle[{310830=[2, 3, 6]}], satellite_roaming_esos_inactivity_timeout_sec_int=300, carrier_supported_satellite_notification_hysteresis_sec_int=180, carrier_config_applied_bool=true, carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int=2, carrier_roaming_satellite_default_services_int_array=[2, 3, 6], imsserviceentitlement.entitlement_server_url_string=, emergency_call_to_satellite_t911_handover_timeout_millis_int=30000, satellite_roaming_p2p_sms_supported_bool=false, carrier_config_version_string=, satellite_roaming_screen_off_inactivity_timeout_sec_int=30}]
+11-07 01:37:21.443 D/SatelliteController( 1232): isSatelliteSupportedViaCarrier: using CarrierConfig for subId=1, isAttachSupported=false
+11-07 01:37:21.443 D/SatelliteController( 1232): isInSatelliteModeForCarrierRoaming: subId=1, connectType=0, result=false
+11-07 01:37:21.901 I/keystore2(  315): system/security/keystore2/watchdog/src/lib.rs:371 - Watchdog thread idle -> terminating. Have a great day.
+11-07 01:37:21.917 D/ActivityManager(  643): freezing 4415 com.google.android.packageinstaller
+11-07 01:37:21.919 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-07 01:37:21.919 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-07 01:37:21.919 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={10122} in 1ms
+11-07 01:37:22.054 D/ActivityManager(  643): freezing 5832 com.android.vending:background
+11-07 01:37:22.237 I/adbd    ( 1740): adbd service requested 'sync:'
+11-07 01:37:22.244 I/adbd    ( 1740): adbd service requested 'shell,v2,raw:killall -INT screenrecord screenrecord-bin'
+11-07 01:37:22.620 D/OomAdjuster(  643): Not killing cached processes
+11-07 01:37:22.740 I/HidDeviceService( 1234): unregisterAppUid(): uid=10105
+11-07 01:37:22.740 W/HidDeviceService( 1234): unregisterAppUid(): caller UID doesn't match user UID
+11-07 01:37:22.771 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-07 01:37:22.781 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-07 01:37:23.036 D/WifiConfigStore(  643): Writing to stores completed in 10 ms.
+11-07 01:37:23.204 E/WifiDataStall(  643): Ignore this poll. newStats: null txLinkSpeedMbps: 1 rxLinkSpeedMbps: 2 rssi: -50 connectionCapabilities: com.android.server.wifi.WifiNative$ConnectionCapabilities@2052bd
+11-07 01:37:23.743 D/ActivityManager(  643): freezing 7159 com.android.vending
+11-07 01:37:23.747 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-07 01:37:23.747 D/InetDiagMessage(  643): Destroyed 4 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-07 01:37:23.747 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={10147} in 2ms
+11-07 01:37:23.805 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-07 01:37:24.083 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-07 01:37:24.964 D/AidlBufferPoolAcc(  572): evictor expired: 1, evicted: 0
+11-07 01:37:24.997 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-07 01:37:24.998 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-07 01:37:24.998 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={10155} in 1ms
+11-07 01:37:24.998 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-07 01:37:24.998 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-07 01:37:24.998 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={20155} in 1ms
+11-07 01:37:25.267 I/adbd    ( 1740): adbd service requested 'sync:'
+11-07 01:37:25.655 I/adbd    ( 1740): adbd service requested 'shell,v2,raw:logcat -v time -d'

@@ -1,0 +1,13 @@
+appId: com.android.settings
+---
+- runFlow: nested-inner.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      # Attempt 1 aims at text that is absent, so the assertion fails and retry runs attempt 2.
+      - evalScript: "${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'}"
+      - assertVisible: "${output.target}"
+- repeat:
+    times: 2
+    commands:
+      - runFlow: nested-inner.yaml

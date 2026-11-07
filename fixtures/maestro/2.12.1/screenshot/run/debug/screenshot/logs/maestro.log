@@ -1,0 +1,24 @@
+01:36:59.378 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+01:36:59.384 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+01:36:59.385 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:36:59.385 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:36:59.385 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+01:36:59.446 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+01:36:59.446 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+01:36:59.734 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+01:36:59.735 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:37:01.291 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:37:01.293 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot fleet-main RUNNING
+01:37:01.295 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+01:37:01.299 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+01:37:01.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot fleet-main COMPLETED
+01:37:01.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Network & internet" RUNNING
+01:37:01.635 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Network & internet, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,586][566,643], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=586, width=345, height=57))
+01:37:02.948 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+01:37:02.952 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (393, 614) using hierarchy based logic for wait
+01:37:04.469 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+01:37:04.469 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Network & internet" COMPLETED
+01:37:04.469 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot fleet-network RUNNING
+01:37:04.470 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+01:37:04.470 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+01:37:04.584 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot fleet-network COMPLETED

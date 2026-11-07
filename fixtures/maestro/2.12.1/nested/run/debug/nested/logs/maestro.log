@@ -1,0 +1,117 @@
+01:48:36.201 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+01:48:36.208 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+01:48:36.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:48:36.209 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:48:36.210 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+01:48:36.293 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+01:48:36.293 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+01:48:36.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+01:48:36.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run subflows/nested-outer.yaml RUNNING
+01:48:36.417 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING
+01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:48:36.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:48:36.419 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:48:38.537 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:48:38.552 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+01:48:38.790 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+01:48:40.149 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+01:48:40.155 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait
+01:48:41.982 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+01:48:41.982 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+01:48:41.983 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+01:48:42.088 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+01:48:42.088 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+01:48:42.093 [ INFO] maestro.Maestro.backPress: Pressing back
+01:48:43.207 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+01:48:43.207 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:48:43.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:48:43.313 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED
+01:48:43.317 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Retry 2 times RUNNING
+01:48:43.319 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING
+01:48:44.356 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED
+01:48:44.357 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "${output.target}" is visible RUNNING
+01:49:01.887 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+01:49:01.889 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+01:49:02.135 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "${output.target}" is visible FAILED
+01:49:02.142 [ERROR] maestro.orchestra.Orchestra.retryCommand: Attempt 1 failed for retry command
+maestro.MaestroException$AssertionFailure: Assertion is false: "Fleet never shows this" is visible
+	at maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)
+	at maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)
+	at maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)
+	at maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)
+	at maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)
+	at maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)
+	at maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+01:49:02.144 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING
+01:49:02.154 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED
+01:49:02.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "${output.target}" is visible RUNNING
+01:49:02.325 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "${output.target}" is visible COMPLETED
+01:49:02.325 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Retry 2 times COMPLETED
+01:49:02.326 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 2 times RUNNING
+01:49:02.327 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING
+01:49:02.345 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:49:02.346 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:49:02.347 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:49:02.458 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:49:02.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+01:49:02.654 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+01:49:03.902 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+01:49:03.903 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait
+01:49:05.335 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+01:49:05.335 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+01:49:05.335 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+01:49:05.412 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+01:49:05.412 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+01:49:05.412 [ INFO] maestro.Maestro.backPress: Pressing back
+01:49:06.328 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+01:49:06.328 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:49:06.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:49:06.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Run nested-inner.yaml PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Apply configuration PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that "Network & internet" is visible PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Tap on "Apps" PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that "Apps" is visible PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press back PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that "Network & internet" is visible PENDING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run nested-inner.yaml RUNNING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+01:49:06.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:49:06.500 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:49:06.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Apps" RUNNING
+01:49:06.586 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+01:49:07.845 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+01:49:07.846 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (269, 1045) using hierarchy based logic for wait
+01:49:08.942 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+01:49:08.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Apps" COMPLETED
+01:49:08.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Apps" is visible RUNNING
+01:49:09.034 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Apps" is visible COMPLETED
+01:49:09.034 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press back RUNNING
+01:49:09.034 [ INFO] maestro.Maestro.backPress: Pressing back
+01:49:10.334 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press back COMPLETED
+01:49:10.334 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible COMPLETED
+01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run nested-inner.yaml COMPLETED
+01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Repeat 2 times COMPLETED
+01:49:10.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run subflows/nested-outer.yaml COMPLETED

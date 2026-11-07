@@ -1,0 +1,76 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "nested": {
+      "commands": "final(32)",
+      "failure_screenshots": 1,
+      "flow": "nested",
+      "manifest": true,
+      "shard": null
+    }
+  },
+  "exit": 0,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "nested",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "maestro_version": "2.12.1",
+    "orphan_lines": 0,
+    "other": {
+      "retry_attempt_failed_1": 1
+    },
+    "records": 108,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5582",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 31,
+      "Failed": 1,
+      "Pending": 7,
+      "Running": 32
+    },
+    "with_continuation": 1
+  },
+  "report": {
+    "status": "Complete",
+    "suites": [
+      {
+        "cases": [
+          {
+            "has_failure": false,
+            "name": "nested",
+            "outcome": "Passed"
+          }
+        ],
+        "device": "fleet-fixtures-77"
+      }
+    ]
+  },
+  "stdout": {
+    "flow_results": [
+      {
+        "duration_ms": 35000,
+        "message": null,
+        "name": "nested",
+        "passed": true,
+        "shard": null
+      }
+    ],
+    "other": [
+      "Summary { shard: None, count: 1, total: 1, all_passed: true }"
+    ],
+    "unrecognized": 0
+  }
+}

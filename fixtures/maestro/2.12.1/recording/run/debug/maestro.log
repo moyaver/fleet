@@ -1,0 +1,44 @@
+MFLT1|1794008229000|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1794008229001|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1794008229001|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1794008229002|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1794008229002|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1794008229002|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1794008229002|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1794008229002|main|INFO|MAESTRO|Java Version: 27
+MFLT1|1794008229054|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1794008229147|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1794008229151|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1794008229159|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1794008229159|main|INFO|MAESTRO|---------------------
+MFLT1|1794008230167|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5582 using port 49354 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/recording.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1794008232750|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow recording
+MFLT1|1794008232759|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1794008232901|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1794008233054|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1794008233057|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1794008233057|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008233058|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008233058|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1794008233102|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1794008233102|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1794008233274|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1794008233275|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Start recording fleet-recording RUNNING
+MFLT1|1794008233277|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Starting screen recording
+MFLT1|1794008233277|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Starting screen recording
+MFLT1|1794008233541|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Start recording fleet-recording COMPLETED
+MFLT1|1794008233542|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1794008234765|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+MFLT1|1794008236081|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1794008236084|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait
+MFLT1|1794008237565|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1794008237566|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1794008237567|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible RUNNING
+MFLT1|1794008237675|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible COMPLETED
+MFLT1|1794008237675|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1794008237676|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1794008238663|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1794008238663|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Stop recording RUNNING
+MFLT1|1794008238663|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Stopping screen recording
+MFLT1|1794008241980|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Stop recording COMPLETED
+MFLT1|1794008241980|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Stopping screen recording

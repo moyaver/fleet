@@ -1,0 +1,134 @@
+MFLT1|1794008910285|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1794008910286|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1794008910287|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1794008910287|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1794008910287|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1794008910287|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1794008910287|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1794008910287|main|INFO|MAESTRO|Java Version: 27
+MFLT1|1794008910436|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1794008910441|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1794008910445|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1794008910445|main|INFO|MAESTRO|---------------------
+MFLT1|1794008910752|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1794008912131|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5582 using port 58590 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/nested.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1794008915729|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow nested
+MFLT1|1794008915744|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1794008915988|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1794008916201|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1794008916208|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1794008916209|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008916209|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008916210|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1794008916293|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1794008916293|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1794008916414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1794008916414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run subflows/nested-outer.yaml RUNNING
+MFLT1|1794008916417|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING
+MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008916418|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008916419|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008918537|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008918552|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1794008918790|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+MFLT1|1794008920149|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1794008920155|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait
+MFLT1|1794008921982|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1794008921982|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1794008921983|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible RUNNING
+MFLT1|1794008922088|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible COMPLETED
+MFLT1|1794008922088|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1794008922093|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1794008923207|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1794008923207|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008923313|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008923313|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED
+MFLT1|1794008923317|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Retry 2 times RUNNING
+MFLT1|1794008923319|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING
+MFLT1|1794008924356|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED
+MFLT1|1794008924357|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "${output.target}" is visible RUNNING
+MFLT1|1794008941887|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Taking screenshot
+MFLT1|1794008941889|DefaultDispatcher-worker-1|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink
+MFLT1|1794008942135|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "${output.target}" is visible FAILED
+MFLT1|1794008942142|DefaultDispatcher-worker-3|ERROR|maestro.orchestra.Orchestra|Attempt 1 failed for retry command
+maestro.MaestroException$AssertionFailure: Assertion is false: "Fleet never shows this" is visible
+	at maestro.orchestra.Orchestra.assertConditionCommand(Orchestra.kt:571)
+	at maestro.orchestra.Orchestra.access$assertConditionCommand(Orchestra.kt:137)
+	at maestro.orchestra.Orchestra$assertConditionCommand$1.invokeSuspend(Orchestra.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:502)
+	at maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:133)
+	at maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:64)
+	at maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:477)
+	at maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+MFLT1|1794008942144|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} RUNNING
+MFLT1|1794008942154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run ${output.attempts = (output.attempts || 0) + 1; output.target = output.attempts < 2 ? 'Fleet never shows this' : 'Network & internet'} COMPLETED
+MFLT1|1794008942155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "${output.target}" is visible RUNNING
+MFLT1|1794008942325|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "${output.target}" is visible COMPLETED
+MFLT1|1794008942325|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Retry 2 times COMPLETED
+MFLT1|1794008942326|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 2 times RUNNING
+MFLT1|1794008942327|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING
+MFLT1|1794008942345|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008942346|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008942347|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008942458|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008942459|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1794008942654|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+MFLT1|1794008943902|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1794008943903|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait
+MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1794008945335|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible RUNNING
+MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible COMPLETED
+MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1794008945412|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1794008946328|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1794008946328|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008946414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008946414|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible PENDING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml RUNNING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794008946415|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008946500|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008946501|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" RUNNING
+MFLT1|1794008946586|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Apps, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=android:id/title, clickable=false, bounds=[221,1017][318,1074], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=221, y=1017, width=97, height=57))
+MFLT1|1794008947845|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tap aimed via settled hierarchy
+MFLT1|1794008947846|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Tapping at (269, 1045) using hierarchy based logic for wait
+MFLT1|1794008948942|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Something has changed in the UI judging by view hierarchy. Proceed.
+MFLT1|1794008948943|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Tap on "Apps" COMPLETED
+MFLT1|1794008948943|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible RUNNING
+MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Apps" is visible COMPLETED
+MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back RUNNING
+MFLT1|1794008949034|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing back
+MFLT1|1794008950334|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press back COMPLETED
+MFLT1|1794008950334|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible COMPLETED
+MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run nested-inner.yaml COMPLETED
+MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 2 times COMPLETED
+MFLT1|1794008950441|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Run subflows/nested-outer.yaml COMPLETED
