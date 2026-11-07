@@ -110,7 +110,7 @@ This plan is not legal advice. A short review by a lawyer of the license choice,
 
 ### 2.6 Third-party dependency licenses
 
-Licensing the project's own code under PolyForm is compatible with permissive dependencies. Shipping binaries still requires including their notices.
+Fleet's own code is AGPL-3.0-only, but dependencies stay permissive so the owner can still offer a commercial license (ADR-0012). Shipping binaries still requires including their notices.
 
 - **`deny.toml` (cargo-deny):**
   - Allow MIT, Apache-2.0, Apache-2.0 WITH LLVM-exception, BSD-2-Clause, BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, CC0-1.0, MPL-2.0 (file-level copyleft; acceptable, unmodified).
@@ -542,8 +542,8 @@ Effort assumes one experienced Rust engineer part-time. Treat estimates as rough
 ### M0: Repository bootstrap (1–2 days). **The executing agent does this now.**
 1. Create the repo `<owner>/maestro-fleet` (or the chosen name, O1) on the owner's personal GitHub account. **Private until the owner flips it public.**
 2. Import the existing material unchanged: `docs/spec-v1.0.md`, `docs/PLAN.md` (this file), `docs/decisions/*`, `research/*` (including `research/fixtures/`).
-3. Licensing and governance files from §2: `LICENSE.md` (verbatim PolyForm Internal Use 1.0.0 + Required Notice), `LICENSING.md`, `CLA.md`, `CLA-CORPORATE.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/FUNDING.yml`.
-4. Workspace skeleton (§4): every crate compiles with a stub `lib.rs`/`main.rs`, SPDX headers, `publish = false`, `license-file`. Workspace lints: `unsafe_code = "deny"` except in `fleet-agent::sys` (documented), `clippy::pedantic` warn.
+3. Licensing and governance files from §2: `LICENSE` (verbatim GNU AGPL v3, ADR-0012; M0 originally shipped PolyForm Internal Use 1.0.0), `LICENSING.md`, `CLA.md`, `CLA-CORPORATE.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/FUNDING.yml`.
+4. Workspace skeleton (§4): every crate compiles with a stub `lib.rs`/`main.rs`, SPDX headers, `publish = false`, `license = "AGPL-3.0-only"` from the workspace. Workspace lints: `unsafe_code = "deny"` except in `fleet-agent::sys` (documented), `clippy::pedantic` warn.
 5. `xtask` with `setup`, `ci`, `lint`, `web`.
 6. `deny.toml` and `about.toml` per §2.6.
 7. `ci.yml` and `cla.yml` green on an empty PR.
