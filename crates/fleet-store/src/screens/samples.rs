@@ -66,6 +66,11 @@ pub struct DeviceRow {
     pub emu_cpu_pct: Option<f64>,
     /// The emulator process's resident memory, bytes (the bucket's maximum when aggregated).
     pub emu_rss_bytes: Option<f64>,
+    /// adb's state as its code (`device_samples.adb_state`: 0 device, 1 offline, 2 unauthorized,
+    /// 3 absent, 4 another state; raw samples only).
+    pub adb_state: Option<f64>,
+    /// Whether `sys.boot_completed` was set, as 1 or 0 (raw samples only).
+    pub boot_completed: Option<f64>,
     /// The guest's CPU, percent (raw samples only).
     pub guest_cpu_pct: Option<f64>,
     /// The guest's available memory, bytes (raw samples only).
@@ -303,6 +308,8 @@ impl Store {
                     DeviceRow,
                     "SELECT ts AS \"at!\", emu_cpu_pct::float8 AS emu_cpu_pct,
                             emu_rss_bytes::float8 AS emu_rss_bytes,
+                            adb_state::float8 AS adb_state,
+                            boot_completed::int::float8 AS boot_completed,
                             guest_cpu_pct::float8 AS guest_cpu_pct,
                             guest_mem_available_bytes::float8 AS guest_mem_available_bytes
                        FROM device_samples
@@ -322,6 +329,7 @@ impl Store {
                     DeviceRow,
                     "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,
                             emu_rss_max::float8 AS emu_rss_bytes,
+                            NULL::float8 AS adb_state, NULL::float8 AS boot_completed,
                             NULL::float8 AS guest_cpu_pct,
                             NULL::float8 AS guest_mem_available_bytes
                        FROM device_rollup_1m
@@ -342,6 +350,7 @@ impl Store {
                     DeviceRow,
                     "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,
                             emu_rss_max::float8 AS emu_rss_bytes,
+                            NULL::float8 AS adb_state, NULL::float8 AS boot_completed,
                             NULL::float8 AS guest_cpu_pct,
                             NULL::float8 AS guest_mem_available_bytes
                        FROM device_rollup_1h

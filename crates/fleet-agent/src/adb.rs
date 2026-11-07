@@ -82,6 +82,133 @@ async fn track_once(addr: &str, tx: &mpsc::Sender<Vec<(String, AdbState)>>) -> s
     }
 }
 
+/// The longest reply a shell command may send back. A device probe's is about 2 KiB; anything
+/// longer is cut off, which keeps memory bounded (I10).
+const MAX_SHELL_REPLY: u64 = 64 * 1024;
+/// The longest `FAIL` message read in full; adb's messages are one line.
+const MAX_FAIL_MESSAGE: usize = 4096;
+
+/// Runs `command` on the device `serial` through the adb server: `host:transport:<serial>`, then
+/// `shell:<command>` on the same connection, and returns what the command printed. The server
+/// answers each request with `OKAY`, or `FAIL` and a message (for example an unknown serial),
+/// which is an error here. Nothing is started or killed (see the module docs).
+///
+/// # Cancel safety
+/// Not cancel-safe: dropping the future closes the connection. Bound it with a timeout.
+pub(crate) async fn shell(addr: &str, serial: &str, command: &str) -> std::io::Result<Vec<u8>> {
+    let mut s = TcpStream::connect(addr).await?;
+    request(&mut s, &format!("host:transport:{serial}")).await?;
+    request(&mut s, &format!("shell:{command}")).await?;
+    let mut out = Vec::new();
+    (&mut s).take(MAX_SHELL_REPLY).read_to_end(&mut out).await?;
+    Ok(out)
+}
+
+/// Sends one request on the smart socket and reads its status.
+async fn request(s: &mut TcpStream, body: &str) -> std::io::Result<()> {
+    s.write_all(format!("{:04x}{body}", body.len()).as_bytes())
+        .await?;
+    let mut status = [0u8; 4];
+    s.read_exact(&mut status).await?;
+    match &status {
+        b"OKAY" => Ok(()),
+        b"FAIL" => {
+            let message = read_hex_prefixed(s).await?;
+            Err(std::io::Error::other(message))
+        }
+        _ => Err(std::io::Error::other("adb replied with an unknown status")),
+    }
+}
+
+/// Reads a four-hex-digit length and that many bytes of text (a `FAIL` message).
+async fn read_hex_prefixed(s: &mut TcpStream) -> std::io::Result<String> {
+    let mut len = [0u8; 4];
+    s.read_exact(&mut len).await?;
+    let len = usize::from_str_radix(
+        std::str::from_utf8(&len).map_err(std::io::Error::other)?,
+        16,
+    )
+    .map_err(std::io::Error::other)?;
+    let mut text = vec![0u8; len.min(MAX_FAIL_MESSAGE)];
+    s.read_exact(&mut text).await?;
+    Ok(String::from_utf8_lossy(&text).into_owned())
+}
+
+/// A fake adb server for tests: it answers each connection as the real server does for one
+/// request sequence, so the client's code runs against recorded bytes.
+#[cfg(test)]
+pub(crate) mod fake {
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    /// Accepts connections forever. Each one must send `host:transport:<serial>` then
+    /// `shell:<command>` (with `command` as given), and gets `reply` written back in full.
+    /// Returns the address and how many connections were accepted.
+    pub(crate) async fn device(
+        serial: &'static str,
+        command: &'static str,
+        reply: &'static [u8],
+    ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = std::sync::Arc::clone(&count);
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut s, _)) = listener.accept().await else {
+                    return;
+                };
+                seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let body = read_request(&mut s).await;
+                assert_eq!(body, format!("host:transport:{serial}"));
+                s.write_all(b"OKAY").await.unwrap();
+                let body = read_request(&mut s).await;
+                assert_eq!(body, format!("shell:{command}"));
+                s.write_all(reply).await.unwrap();
+            }
+        });
+        (addr, count)
+    }
+
+    /// A server that accepts and never answers: the client must give up on its own.
+    pub(crate) async fn silent() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((s, _)) = listener.accept().await {
+                held.push(s);
+            }
+        });
+        addr
+    }
+
+    async fn read_request(s: &mut tokio::net::TcpStream) -> String {
+        let mut len = [0u8; 4];
+        s.read_exact(&mut len).await.unwrap();
+        let n = usize::from_str_radix(std::str::from_utf8(&len).unwrap(), 16).unwrap();
+        let mut body = vec![0u8; n];
+        s.read_exact(&mut body).await.unwrap();
+        String::from_utf8(body).unwrap()
+    }
+
+    /// A fake server replying to one request sequence, step by step (see [`super::tests`]).
+    pub(crate) async fn scripted(steps: Vec<(String, Vec<u8>)>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            for (expect, reply) in steps {
+                assert_eq!(read_request(&mut s).await, expect);
+                s.write_all(&reply).await.unwrap();
+            }
+        });
+        addr
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,6 +227,78 @@ mod tests {
             ]
         );
         assert_eq!(parse(""), Vec::new());
+    }
+
+    /// The probe's real replies, captured from an emulator (fixtures/adb/android-37.1, see its
+    /// README): the transport's `OKAY`, then the shell's `OKAY` and what it printed.
+    #[tokio::test]
+    async fn shell_returns_what_the_device_printed() {
+        let captured: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/probe.raw");
+        let addr = fake::scripted(vec![
+            (
+                "host:transport:emulator-5584".into(),
+                captured[..4].to_vec(),
+            ),
+            (
+                format!("shell:{}", crate::device::PROBE),
+                captured[4..].to_vec(),
+            ),
+        ])
+        .await;
+        let out = shell(&addr, "emulator-5584", crate::device::PROBE)
+            .await
+            .unwrap();
+        assert!(
+            out.starts_with(b"boot=1\ncpu  "),
+            "{:?}",
+            String::from_utf8_lossy(&out)
+        );
+        assert_eq!(out, captured[8..]);
+    }
+
+    /// adb's own refusal, captured for an unknown serial, is an error carrying its message.
+    #[tokio::test]
+    async fn an_unknown_serial_is_an_error_with_adbs_message() {
+        let refused: &[u8] =
+            include_bytes!("../../../fixtures/adb/android-37.1/missing-device.raw");
+        let addr = fake::scripted(vec![(
+            "host:transport:emulator-5999".into(),
+            refused.to_vec(),
+        )])
+        .await;
+        let err = shell(&addr, "emulator-5999", crate::device::PROBE)
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "device 'emulator-5999' not found");
+    }
+
+    /// Nothing listening (adb not running): an error, no panic, no start of a server.
+    #[tokio::test]
+    async fn no_adb_server_is_an_error() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        drop(listener);
+        assert!(
+            shell(&addr, "emulator-5584", crate::device::PROBE)
+                .await
+                .is_err()
+        );
+    }
+
+    /// adb's own `host:track-devices` answer, captured from the same emulator: `OKAY`, the
+    /// payload's length, then one `serial<TAB>state` line per device.
+    #[test]
+    fn the_captured_device_list_parses() {
+        let captured: &[u8] =
+            include_bytes!("../../../fixtures/adb/android-37.1/track-devices.raw");
+        assert_eq!(&captured[..8], b"OKAY002a");
+        assert_eq!(
+            parse(&String::from_utf8_lossy(&captured[8..])),
+            vec![
+                ("emulator-5554".into(), AdbState::Device),
+                ("emulator-5584".into(), AdbState::Device),
+            ]
+        );
     }
 
     #[tokio::test]

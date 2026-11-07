@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Agent: at run end, `GITHUB_STEP_SUMMARY` gets a short Markdown summary: outcome counts, the flows that did not pass with their provenance and reason, and a dashboard link when `FLEET_SERVER` is set. A summary that cannot be written costs one notice; Maestro's output and exit status never change (#71).
+- Agent: the devices Maestro drives are sampled every 30 s with one read-only adb probe each: adb's state, whether `sys.boot_completed` is set, and the guest's CPU and available memory (`guest`, unknown when adb does not answer). The server stores them in `device_samples` and screen C serves them (#39).
 - Examples: a composite GitHub Action, `examples/github-actions/fleet-agent`, installs a pinned, checksum-verified agent release and runs a Maestro command under it (#71).
 - Dashboard: a flow's stats panel says how many of its failed runs a lost device excluded from flakiness (`excluded` on the flow's verdict; "2 runs excluded (device lost)"), and says nothing when there are none (#72).
 - Agent: a failing step's UI hierarchy (`screen-hierarchy/step-NNN-….json`) is uploaded as a `failure_hierarchy` artifact with its on-screen text values replaced by `[REDACTED]` (the tree and its attributes are kept); screen D lists it under its step, and the failing step's comes first (#74).

@@ -78,7 +78,7 @@ const SCOPES: [(MetricScope, &str); 6] = [
         "Emulator process (as the host sees it)",
     ),
     (MetricScope::Guest, "Inside the device (guest)"),
-    (MetricScope::Device, "Device sensors"),
+    (MetricScope::Device, "Device (adb and sensors)"),
 ];
 
 /// The kit's unit for a metric. CPU of a process is a percentage of one core, so it can exceed

@@ -2,7 +2,11 @@
 //! Screen C's series: `GET …/workers/{id}/metrics` and `GET …/devices/{id}/metrics` (acceptance
 //! criteria 4 and 5: labels, units, and "unavailable" instead of invented values).
 
-use fleet_protocol::{event::FlowOutcome, frame::Sample};
+use fleet_protocol::{
+    event::{AdbState, FlowOutcome},
+    frame::{DeviceSample, Sample, Telemetry},
+    journal::ClockSample,
+};
 use serde_json::{Value, json};
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 
@@ -413,6 +417,8 @@ async fn device_series_are_unavailable_when_no_device_readings_were_reported() {
         [
             "emu_cpu_pct",
             "emu_rss_bytes",
+            "adb_state",
+            "boot_completed",
             "guest_cpu_pct",
             "guest_mem_available_bytes",
             "device_thermal_c"
@@ -430,6 +436,92 @@ async fn device_series_are_unavailable_when_no_device_readings_were_reported() {
     for s in view["series"].as_array().unwrap() {
         assert_eq!(s["points"], json!([]));
     }
+}
+
+#[tokio::test]
+async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
+    let rig = rig().await;
+    let mut agent = Agent::new("620", "build", "runner-a");
+    agent.started();
+    let device = agent
+        .shard("emulator-5584", &["login"])
+        .device_session_id
+        .expect("a shard names its device session");
+    let t0 = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap() - Duration::minutes(5);
+    let device_at = |secs: i64| DeviceSample {
+        at: ClockSample {
+            wall: t0 + Duration::seconds(secs),
+            mono_ms: 0,
+        },
+        device_session_id: device,
+        adb_state: Some(AdbState::Device),
+        boot_completed: Some(true),
+        guest_cpu_pct: Some(12.5),
+        guest_mem_available_bytes: Some(2 << 30),
+    };
+    let later = DeviceSample {
+        guest_cpu_pct: Some(40.0),
+        guest_mem_available_bytes: None,
+        ..device_at(30)
+    };
+    // A probe that did not answer: adb's state only, every reading unknown.
+    let unknown = DeviceSample {
+        adb_state: None,
+        boot_completed: None,
+        guest_cpu_pct: None,
+        guest_mem_available_bytes: None,
+        ..device_at(60)
+    };
+    rig.publish(
+        &mut agent,
+        vec![Telemetry {
+            tseq_from: 1,
+            tseq_to: 1,
+            dropped_since_last: 0,
+            samples: vec![super::rig::sample(t0, 10.0)],
+            devices: vec![device_at(0), later, unknown],
+        }],
+    )
+    .await;
+
+    let view = rig
+        .json(&format!(
+            "/api/v1/projects/app/devices/{device}/metrics?from={}&to={}",
+            (t0 - Duration::minutes(1)).format(&Rfc3339).unwrap(),
+            (t0 + Duration::minutes(10)).format(&Rfc3339).unwrap()
+        ))
+        .await;
+
+    let values = |metric: &str| -> Vec<Value> {
+        series(&view, metric)["points"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["value"].clone())
+            .collect()
+    };
+    let guest = series(&view, "guest_cpu_pct");
+    assert_eq!(
+        (guest["available"].clone(), guest["scope"].clone()),
+        (json!(true), json!("guest"))
+    );
+    assert_eq!(
+        values("guest_cpu_pct"),
+        [json!(12.5), json!(40.0), Value::Null]
+    );
+    assert_eq!(
+        series(&view, "guest_cpu_pct")["points"][2]["reason"],
+        "the agent reported no value"
+    );
+    assert_eq!(
+        values("guest_mem_available_bytes"),
+        [json!(2_147_483_648.0), Value::Null, Value::Null]
+    );
+    assert_eq!(values("adb_state"), [json!(0.0), json!(0.0), Value::Null]);
+    assert_eq!(
+        values("boot_completed"),
+        [json!(1.0), json!(1.0), Value::Null]
+    );
 }
 
 #[tokio::test]

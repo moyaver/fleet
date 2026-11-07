@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,\n                            emu_rss_max::float8 AS emu_rss_bytes,\n                            NULL::float8 AS guest_cpu_pct,\n                            NULL::float8 AS guest_mem_available_bytes\n                       FROM device_rollup_1m\n                      WHERE project_id = $1 AND device_session_id = $2\n                        AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket LIMIT $5",
+  "query": "SELECT bucket AS \"at!\", emu_cpu_pct_avg::float8 AS emu_cpu_pct,\n                            emu_rss_max::float8 AS emu_rss_bytes,\n                            NULL::float8 AS adb_state, NULL::float8 AS boot_completed,\n                            NULL::float8 AS guest_cpu_pct,\n                            NULL::float8 AS guest_mem_available_bytes\n                       FROM device_rollup_1m\n                      WHERE project_id = $1 AND device_session_id = $2\n                        AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -28,12 +28,24 @@
       },
       {
         "ordinal": 3,
-        "name": "guest_cpu_pct",
+        "name": "adb_state",
         "type_info": "Float8",
         "origin": "Expression"
       },
       {
         "ordinal": 4,
+        "name": "boot_completed",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "guest_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
         "name": "guest_mem_available_bytes",
         "type_info": "Float8",
         "origin": "Expression"
@@ -53,8 +65,10 @@
       null,
       null,
       null,
+      null,
+      null,
       null
     ]
   },
-  "hash": "ec463cc222628a3c182cb31405b1e0dd4223877539cfb5d2ea488251542bfaf1"
+  "hash": "73fe20d301ee7171c1815fb461febe707a165d3763358918347f94bda518b0d8"
 }

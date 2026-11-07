@@ -247,6 +247,7 @@ mod tests {
                         tseq_from: 1,
                         tseq_to: 1,
                         dropped_since_last: 0,
+                        devices: Vec::new(),
                         samples: vec![sample],
                     },
                 }])

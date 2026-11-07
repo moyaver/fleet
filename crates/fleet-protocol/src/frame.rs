@@ -8,7 +8,10 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::journal::{ClockSample, EventEnvelope};
+use crate::{
+    event::AdbState,
+    journal::{ClockSample, EventEnvelope},
+};
 
 /// Agent → server.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -136,6 +139,36 @@ pub struct Telemetry {
     pub dropped_since_last: u32,
     /// The samples.
     pub samples: Vec<Sample>,
+    /// Device samples taken since the previous batch, one per device per sampling interval
+    /// (PLAN §6.5). Absent from older agents.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub devices: Vec<DeviceSample>,
+}
+
+/// One device's sample: what adb and the guest reported about a device session at one time.
+/// `None` means that reading was not observed; a device that could not be reached has `None`
+/// readings, never zeros.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DeviceSample {
+    /// When the probe was started.
+    pub at: ClockSample,
+    /// The device session the sample belongs to (its `shard.assigned` event names it).
+    pub device_session_id: Uuid,
+    /// adb's state for the device at sampling time, from the device list adb pushed. `Absent`
+    /// means the list did not contain it.
+    #[serde(default)]
+    pub adb_state: Option<AdbState>,
+    /// Whether `sys.boot_completed` was `1` when the probe ran. `None`: the probe did not answer.
+    #[serde(default)]
+    pub boot_completed: Option<bool>,
+    /// The guest's CPU use since the previous probe of this device, percent of all its cores.
+    /// `None` for the first probe and when the probe did not answer.
+    #[serde(default)]
+    pub guest_cpu_pct: Option<f32>,
+    /// The guest's `MemAvailable`, bytes. `None` when the probe did not answer.
+    #[serde(default)]
+    pub guest_mem_available_bytes: Option<u64>,
 }
 
 /// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
@@ -430,6 +463,41 @@ mod tests {
             ..old
         };
         let back: Sample = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
+        assert_eq!(back, full);
+    }
+
+    #[test]
+    fn device_samples_are_optional_and_unknown_readings_stay_unknown() {
+        // A telemetry frame from an agent that predates device samples.
+        let old: Telemetry =
+            serde_json::from_str(r#"{"tseq_from":1,"tseq_to":1,"samples":[]}"#).unwrap();
+        assert!(old.devices.is_empty(), "absent means no device samples");
+        assert!(
+            !serde_json::to_string(&old).unwrap().contains("devices"),
+            "an empty list is not sent, so older servers see the frame they know"
+        );
+        // A sample the probe could not complete: only what adb reported is set.
+        let unreachable: DeviceSample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},
+                "device_session_id":"00000000-0000-7000-8000-000000000001",
+                "adb_state":"offline"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                unreachable.adb_state,
+                unreachable.boot_completed,
+                unreachable.guest_cpu_pct,
+                unreachable.guest_mem_available_bytes
+            ),
+            (Some(AdbState::Offline), None, None, None),
+            "a missing reading is unknown, not zero"
+        );
+        let full = Telemetry {
+            devices: vec![unreachable],
+            ..old
+        };
+        let back: Telemetry = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
         assert_eq!(back, full);
     }
 
