@@ -39,6 +39,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `storage.backend` | `local_fs` | Where artifacts live: `local_fs` or `s3`; see [Artifact storage](#artifact-storage) |
 | `storage.path` | `/var/lib/fleet/blobs` | Blob directory for `local_fs` |
 | `storage.s3.*` | — | Endpoint, region, bucket and credentials for `s3` |
+| `storage.s3.public_endpoint` | — | Base URL agents reach the bucket at, for direct uploads; unset uses `endpoint` (see [Direct upload](#direct-upload)) |
 | `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification (local disk; one server instance per spool) |
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
@@ -106,7 +107,7 @@ The Compose reference deployment fixes its network to `10.77.0.0/24` and trusts 
 
 ## Artifact storage
 
-Screenshots, JUnit reports, logs, HTML reports and debug bundles are stored as **content-addressed blobs**: a blob's key is its project and the SHA-256 of its bytes. Uploading the same bytes twice to one project stores them once, and one project can never read or delete another project's blobs. A blob is only stored if its size and SHA-256 match what was declared; a mismatch stores nothing. The backend is chosen once, with `storage.backend`. Agents upload through the server (relayed: the store never needs to be reachable from runners or browsers); see [Artifact uploads](#artifact-uploads). The blob store is opened on first use, and the server logs a warning at start-up if it can't be opened.
+Screenshots, JUnit reports, logs, HTML reports and debug bundles are stored as **content-addressed blobs**: a blob's key is its project and the SHA-256 of its bytes. Uploading the same bytes twice to one project stores them once, and one project can never read or delete another project's blobs. A blob is only stored if its size and SHA-256 match what was declared; a mismatch stores nothing. The backend is chosen once, with `storage.backend`. Agents upload through the server by default (relayed: the store never needs to be reachable from runners or browsers). With `s3`, an agent that can reach the store may upload directly instead; see [Direct upload](#direct-upload) and [Artifact uploads](#artifact-uploads). The blob store is opened on first use, and the server logs a warning at start-up if it can't be opened.
 
 ### Filesystem (`local_fs`)
 
@@ -135,7 +136,18 @@ Fleet speaks only the generic S3 API, path-style, with static credentials, so an
 
 - The bucket needs no versioning. Give it a lifecycle rule that aborts incomplete multipart uploads after a day: an upload cut off mid-way (server restart, client gone) leaves its uploaded parts there until then. Blobs up to 8 MiB are written with one request and never leave parts behind.
 - Fleet makes no request when it starts, so a wrong endpoint or key shows on the first upload, not in `check-config`.
+- Staged direct uploads live under `uploads/` in the bucket. Fleet deletes them when their upload completes and sweeps leftovers after twice `artifacts.grant_ttl_seconds`; the lifecycle rule does not need to cover them.
 - The same contract test suite runs against the filesystem backend and against Garage (v2.5.0, pinned by digest) in CI, so a change that breaks either fails the build.
+
+### Direct upload
+
+With `s3`, an agent may `PUT` its bytes straight to the object store instead of through the server's HTTP path (PLAN §7.6, ADR-0007). The server presigns each `PUT` for one staging object of that artifact, signed for the file's SHA-256 (`x-amz-checksum-sha256`), so the store itself refuses bytes that are not the declared file. The agent then calls `complete` as usual, and the server **still reads every byte** from the store to verify it before the blob is written. What direct upload saves is the server's ingress for artifact bytes (the upload itself and the copy through the server), not the server's read of them.
+
+- **Reachability.** `storage.s3.public_endpoint` is the URL agents use, and presigned URLs name its host. Set it to a URL the agents can reach, over TLS if they are off-network. The Compose file keeps Garage internal and leaves it unset, so its agents upload through the server. An agent that cannot reach the endpoint falls back to the relayed upload after one failed `PUT` for each artifact.
+- **Fallback.** A store that cannot presign (the filesystem backend, or a signing failure) answers with the relayed grant. Nothing fails because direct upload did.
+- **Reuse.** A presigned URL is valid for `artifacts.grant_ttl_seconds` and can be used more than once in that time. It admits only bytes with the signed SHA-256, so reuse can stage the same file again and nothing else. The server reads the staged object once, at the first `complete`; a repeated `complete` returns the recorded outcome and never reads the object again, and it deletes any object staged after the artifact finished. A finished artifact cannot change.
+- **Conditional writes.** Garage ignores `If-None-Match`, so Fleet does not rely on it.
+- **Verification.** Bytes the store accepted but Fleet refuses (wrong magic bytes, a size or digest the declared values do not match, an unsafe archive) are rejected with their reason and never become a blob, exactly as relayed bytes are.
 
 ### What is checked before a blob is stored
 
@@ -157,7 +169,9 @@ Agents upload failure screenshots, each flow's `commands.json`, the JUnit report
 
 Retention is recorded per artifact and enforced by the retention jobs (see [Retention](#retention)).
 
-The spool is local: with several server instances, send a given upload's `PUT` and `complete` to the same instance (or share the spool directory).
+With `s3`, the agent asks for a direct upload first and falls back to the relayed `PUT` described above when the store cannot be used (see [Direct upload](#direct-upload)); the protocol steps are in [the protocol](protocol.md#artifact-uploads).
+
+The spool is local: with several server instances, send a given upload's `PUT` and `complete` to the same instance (or share the spool directory). A direct upload needs no spool entry before `complete`, so it is not affected by this.
 
 ## Retention
 

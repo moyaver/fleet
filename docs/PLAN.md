@@ -405,7 +405,7 @@ Implement exactly the transition tables in research 05 §6 and the claim lattice
 - **Policy:** a hand-rolled `authorize(principal, action, resource) -> Decision`, with a test table of every role × action.
 
 ### 7.6 Artifacts
-Upload is relayed through the server by default; presigned direct upload is optional. Then:
+Upload is relayed through the server by default. Presigned direct upload to S3 is built (issue #43, ADR-0007): the agent `PUT`s the bytes to a presigned staging URL bound to the declared SHA-256; the server reads the staged object once, at `complete`, and verifies it as below. A store that cannot presign, or an agent whose direct upload fails, is relayed. Then:
 1. **Verify:** size, sha256, magic bytes (`infer`), archive safety (no zip bombs, no path traversal).
 2. **Store:** content-addressed per project.
 3. **Retention:** promoted at finalization.
