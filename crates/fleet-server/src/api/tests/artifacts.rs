@@ -20,7 +20,7 @@ use super::rig::{Agent, Rig, rig_with};
 use crate::config::Config;
 
 /// A 1×1 transparent PNG.
-const PNG: &[u8] = &[
+pub(super) const PNG: &[u8] = &[
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
     0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
@@ -94,6 +94,7 @@ pub(super) fn request(
         content_type: ctype.into(),
         size: bytes.len() as u64,
         sha256: sha256(bytes),
+        direct: false,
     }
 }
 
@@ -355,6 +356,7 @@ async fn asking_again_is_idempotent_and_the_same_bytes_are_stored_once_per_proje
         content_type: "image/png".into(),
         size: PNG.len() as u64,
         sha256: sha256(PNG),
+        direct: false,
     };
     let res = rig.upload_request_as(other_key.expose(), &foreign).await;
     let grant: UploadGrant = res.json();

@@ -12,6 +12,15 @@
 //! run, expires, and its bytes are accepted once. The agent reports the result in its own journal
 //! (`artifact.uploaded` or `artifact.rejected`, see [`crate::event`]); the server's artifact
 //! table is the record the dashboard reads.
+//!
+//! **Direct upload.** An agent that sets [`UploadRequest::direct`] may get
+//! [`UploadGrant::Presigned`] instead: it `PUT`s the bytes straight to the object store at a
+//! presigned URL (no bearer credential, the listed headers exactly), then calls `complete` as
+//! usual. The server reads the staged bytes itself and verifies them as it does relayed bytes. A
+//! server whose storage cannot presign answers with [`UploadGrant::Upload`], so an agent that asks
+//! always gets a usable grant.
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -180,6 +189,10 @@ pub struct UploadRequest {
     pub size: u64,
     /// SHA-256 of the content: 64 lowercase hex digits.
     pub sha256: String,
+    /// Whether the agent can send the bytes straight to the object store (see the module docs).
+    /// Absent from agents that predate direct upload, which then get [`UploadGrant::Upload`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub direct: bool,
 }
 
 /// The server's answer to an [`UploadRequest`].
@@ -197,6 +210,26 @@ pub enum UploadGrant {
         /// Where to `PUT` the bytes.
         url: String,
         /// Where to `POST` once the bytes are sent.
+        complete_url: String,
+        /// The grant is void after this.
+        #[serde(with = "time::serde::rfc3339")]
+        #[cfg_attr(feature = "schema", schemars(schema_with = "crate::schema::rfc3339"))]
+        expires_at: OffsetDateTime,
+        /// The bytes to send, exactly.
+        size: u64,
+    },
+    /// Send the bytes straight to the object store: `PUT` them to `url` with exactly `headers`
+    /// and **no** bearer credential, then call `complete_url` with the credential as usual. The
+    /// URL is absolute and names the object store; it is short-lived and accepts bytes that
+    /// match the signed headers, which bind the content's SHA-256.
+    Presigned {
+        /// The artifact being uploaded.
+        artifact_id: Uuid,
+        /// The presigned `PUT` URL, absolute.
+        url: String,
+        /// Headers the `PUT` must carry, exactly as signed (for example `x-amz-checksum-sha256`).
+        headers: BTreeMap<String, String>,
+        /// Where to `POST` once the bytes are sent (relative to the server's address).
         complete_url: String,
         /// The grant is void after this.
         #[serde(with = "time::serde::rfc3339")]
@@ -260,6 +293,46 @@ mod tests {
             Some(RejectReason::UnsafeArchive)
         );
         assert_eq!(RejectReason::parse("nope"), None);
+    }
+
+    #[test]
+    fn direct_is_additive_so_an_older_agent_still_asks_for_the_relayed_path() {
+        let old = r#"{"agent_run_id":"0192f0a0-0000-7000-8000-000000000001","class":"junit",
+            "path":"j.xml","content_type":"application/xml","size":1,
+            "sha256":"0000000000000000000000000000000000000000000000000000000000000000"}"#;
+        let req: UploadRequest = serde_json::from_str(old).unwrap();
+        assert!(!req.direct, "absent means relayed");
+        let sent = serde_json::to_value(&req).unwrap();
+        assert!(
+            sent.get("direct").is_none(),
+            "an unset flag is not sent: {sent}"
+        );
+        let asked = UploadRequest {
+            direct: true,
+            ..req
+        };
+        assert_eq!(serde_json::to_value(&asked).unwrap()["direct"], true);
+    }
+
+    #[test]
+    fn a_presigned_grant_is_tagged_and_carries_the_headers_it_was_signed_for() {
+        let json = r#"{"disposition":"presigned","artifact_id":"0192f0a0-0000-7000-8000-000000000002",
+            "url":"https://files.example.org/b/uploads/x?X-Amz-Signature=1",
+            "headers":{"x-amz-checksum-sha256":"AAAA"},
+            "complete_url":"/api/v1/agent/artifacts/x/complete",
+            "expires_at":"2030-01-01T00:00:00Z","size":5}"#;
+        let grant: UploadGrant = serde_json::from_str(json).unwrap();
+        let UploadGrant::Presigned { headers, size, .. } = &grant else {
+            panic!("expected a presigned grant: {grant:?}");
+        };
+        assert_eq!(
+            headers.get("x-amz-checksum-sha256").map(String::as_str),
+            Some("AAAA")
+        );
+        assert_eq!(*size, 5);
+        let again: UploadGrant =
+            serde_json::from_value(serde_json::to_value(&grant).unwrap()).unwrap();
+        assert_eq!(again, grant);
     }
 
     #[test]
