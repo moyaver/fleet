@@ -39,7 +39,7 @@ use crate::{
     ipc::{Control, Frame, Stream},
     journal::Writer,
     layout,
-    metrics::{Pressure, SAMPLE, Sampler, Throttle},
+    metrics::{Pressure, SAMPLE_TICK, Sampler, Throttle},
     outbox::{Budget, Outbox},
     session::{Candidate, DrivenDevice, Observation, Session},
     transport::{self, Shared},
@@ -207,7 +207,7 @@ async fn observe() -> io::Result<Option<String>> {
     };
     let mut live: Option<Live> = None;
     let mut poll = tokio::time::interval(POLL);
-    let mut sample = tokio::time::interval(SAMPLE);
+    let mut sample = tokio::time::interval(SAMPLE_TICK);
     loop {
         tokio::select! {
             frame = frames.recv() => match frame {
@@ -298,8 +298,9 @@ async fn observe() -> io::Result<Option<String>> {
 /// readings. The loop runs it on every sampling interval.
 fn sample_tick(l: &mut Live, now: Instant, clock: &impl Fn() -> ClockSample) {
     // Host and process metrics are taken when due: every 5 s, or every 15 s while the
-    // host is under pressure (PLAN §6.5). Device probes keep their own interval.
-    let host = if l.throttle.due(now) {
+    // host is under pressure, unless the server's welcome set other intervals (PLAN §6.5).
+    // Device probes keep their own interval.
+    let host = if l.throttle.due(now, l.shared.cadence()) {
         let s = l.sampler.sample(clock());
         l.throttle.observe(now, Pressure::from(&s));
         l.tseq += 1;
@@ -1260,7 +1261,7 @@ mod tests {
         sample_tick(&mut l, now, &clock);
         l.probes.finished_one().await;
         // The next tick takes the finished probe and sends it with the host sample.
-        sample_tick(&mut l, now + SAMPLE, &clock);
+        sample_tick(&mut l, now + crate::metrics::SAMPLE, &clock);
 
         assert!(frames.try_recv().is_ok_and(|f| f.devices.is_empty()));
         let frame = frames.try_recv().expect("the second host sample's frame");

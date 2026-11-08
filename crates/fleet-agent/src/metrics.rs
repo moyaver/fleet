@@ -290,12 +290,58 @@ fn tv(t: nix::sys::time::TimeVal) -> Duration {
     Duration::from_secs(secs) + Duration::from_micros(micros)
 }
 
-/// The observer's sampling tick, and the interval of host and process metrics while the host is
-/// calm (PLAN §6.5).
+/// The observer's sampling tick. It is the finest interval a server can ask for, so every interval
+/// the server may set is a whole number of ticks (PLAN §6.5).
+pub(crate) const SAMPLE_TICK: Duration = Duration::from_secs(1);
+
+/// The default interval of host and process metrics while the host is calm (PLAN §6.5).
 pub(crate) const SAMPLE: Duration = Duration::from_secs(5);
 
-/// The interval of host and process metrics while the host is under pressure (PLAN §6.5).
+/// The default interval of host and process metrics while the host is under pressure (PLAN §6.5).
 pub(crate) const THROTTLED_INTERVAL: Duration = Duration::from_secs(15);
+
+/// Bounds, in ms, of a sampling interval the server sets (the welcome's limits).
+const INTERVAL_MIN_MS: u64 = 1_000;
+const INTERVAL_MAX_MS: u64 = 300_000;
+
+/// A server's sampling interval, in ms, clamped to [1 s, 300 s].
+pub(crate) fn clamp_interval_ms(ms: u64) -> u64 {
+    ms.clamp(INTERVAL_MIN_MS, INTERVAL_MAX_MS)
+}
+
+/// The intervals of host and process metrics: the calm one, and the one under pressure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Cadence {
+    pub(crate) calm: Duration,
+    pub(crate) pressure: Duration,
+}
+
+impl Default for Cadence {
+    fn default() -> Self {
+        Self {
+            calm: SAMPLE,
+            pressure: THROTTLED_INTERVAL,
+        }
+    }
+}
+
+impl Cadence {
+    /// The cadence the transport stored from the server's welcome, in ms, where 0 is absent and
+    /// means the default.
+    pub(crate) fn from_stored(calm_ms: u64, pressure_ms: u64) -> Self {
+        let or = |ms: u64, default: Duration| {
+            if ms == 0 {
+                default
+            } else {
+                Duration::from_millis(ms)
+            }
+        };
+        Self {
+            calm: or(calm_ms, SAMPLE),
+            pressure: or(pressure_ms, THROTTLED_INTERVAL),
+        }
+    }
+}
 
 const PSI_CPU_CRITICAL: f32 = 40.0;
 const PSI_MEMORY_CRITICAL: f32 = 20.0;
@@ -355,17 +401,18 @@ impl Throttle {
         self.critical
     }
 
-    /// Whether a sample is due at `now`: none has been taken, or the current interval has passed
-    /// since the last one. Half a [`SAMPLE`] of slack absorbs the tick's scheduling jitter, so a
-    /// 15 s interval is not missed by a few milliseconds.
-    pub(crate) fn due(&self, now: Instant) -> bool {
+    /// Whether a sample is due at `now`: none has been taken, or the interval of `cadence` for the
+    /// current state has passed since the last one. Half a [`SAMPLE_TICK`] of slack absorbs the
+    /// tick's scheduling jitter, so an interval is completed on the tick that ends it, not missed by
+    /// a few milliseconds and not sampled a tick early.
+    pub(crate) fn due(&self, now: Instant, cadence: Cadence) -> bool {
         let interval = if self.critical {
-            THROTTLED_INTERVAL
+            cadence.pressure
         } else {
-            SAMPLE
+            cadence.calm
         };
         self.last
-            .is_none_or(|t| now.saturating_duration_since(t) + SAMPLE / 2 >= interval)
+            .is_none_or(|t| now.saturating_duration_since(t) + SAMPLE_TICK / 2 >= interval)
     }
 
     /// Records a sample taken at `now` and its host readings.
@@ -819,7 +866,7 @@ mod tests {
         throttle.observe(t0, Pressure::default());
         assert!(!throttle.throttled());
         assert!(
-            throttle.due(t0 + SAMPLE),
+            throttle.due(t0 + SAMPLE, Cadence::default()),
             "an unreadable host keeps sampling"
         );
         let hot = Pressure {
@@ -838,14 +885,16 @@ mod tests {
 
     #[test]
     fn samples_are_due_every_five_seconds_when_calm_and_every_fifteen_when_throttled() {
+        let cadence = Cadence::default();
         let t0 = Instant::now();
         let mut throttle = Throttle::default();
-        assert!(throttle.due(t0), "the first sample is due at once");
+        assert!(throttle.due(t0, cadence), "the first sample is due at once");
         throttle.observe(t0, CALM);
-        assert!(!throttle.due(t0 + Duration::from_secs(2)));
-        assert!(throttle.due(t0 + SAMPLE));
+        assert!(!throttle.due(t0 + Duration::from_secs(2), cadence));
+        assert!(!throttle.due(t0 + Duration::from_secs(4), cadence));
+        assert!(throttle.due(t0 + SAMPLE, cadence));
         assert!(
-            throttle.due(t0 + Duration::from_millis(4990)),
+            throttle.due(t0 + Duration::from_millis(4990), cadence),
             "tick jitter does not skip a sample"
         );
         let hot_at = t0 + SAMPLE;
@@ -856,8 +905,61 @@ mod tests {
                 ..CALM
             },
         );
-        assert!(!throttle.due(hot_at + SAMPLE), "throttled: not after 5 s");
-        assert!(!throttle.due(hot_at + Duration::from_secs(12)));
-        assert!(throttle.due(hot_at + Duration::from_millis(14_990)));
+        assert!(
+            !throttle.due(hot_at + SAMPLE, cadence),
+            "throttled: not after 5 s"
+        );
+        assert!(!throttle.due(hot_at + Duration::from_secs(12), cadence));
+        assert!(throttle.due(hot_at + Duration::from_millis(14_990), cadence));
+    }
+
+    #[test]
+    fn a_two_second_calm_interval_and_a_thirty_second_pressure_interval_are_honoured() {
+        let cadence = Cadence {
+            calm: Duration::from_secs(2),
+            pressure: Duration::from_secs(30),
+        };
+        let t0 = Instant::now();
+        let mut calm = Throttle::default();
+        calm.observe(t0, CALM);
+        assert!(!calm.due(t0 + Duration::from_secs(1), cadence));
+        assert!(calm.due(t0 + Duration::from_secs(2), cadence));
+
+        let mut hot = Throttle::default();
+        hot.observe(
+            t0,
+            Pressure {
+                host_cpu: Some(97.0),
+                ..CALM
+            },
+        );
+        assert!(
+            !hot.due(t0 + Duration::from_secs(15), cadence),
+            "under pressure: not at 15 s"
+        );
+        assert!(hot.due(t0 + Duration::from_secs(30), cadence));
+    }
+
+    #[test]
+    fn the_clamp_keeps_a_server_interval_within_one_second_and_five_minutes() {
+        assert_eq!(clamp_interval_ms(0), 1_000);
+        assert_eq!(clamp_interval_ms(999), 1_000);
+        assert_eq!(clamp_interval_ms(1_000), 1_000);
+        assert_eq!(clamp_interval_ms(2_000), 2_000);
+        assert_eq!(clamp_interval_ms(300_000), 300_000);
+        assert_eq!(clamp_interval_ms(300_001), 300_000);
+        assert_eq!(clamp_interval_ms(999_999_999), 300_000);
+    }
+
+    #[test]
+    fn stored_zero_is_absent_and_gives_the_defaults() {
+        assert_eq!(Cadence::from_stored(0, 0), Cadence::default());
+        assert_eq!(
+            Cadence::from_stored(2_000, 0),
+            Cadence {
+                calm: Duration::from_secs(2),
+                pressure: THROTTLED_INTERVAL,
+            }
+        );
     }
 }
