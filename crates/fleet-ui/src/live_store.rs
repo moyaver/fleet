@@ -304,6 +304,7 @@ mod tests {
             maestro_exit_code: None,
             maestro_version: None,
             maestro_profile_supported: None,
+            file_warnings: Vec::new(),
             rev: 1,
             liveness,
         }

@@ -7,10 +7,10 @@
 use fleet_protocol::{
     PROTOCOL_VERSION,
     event::{
-        AppCrashed, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed,
-        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
-        StepStatus, StepTiming, SuiteStarted,
+        AgentWarning, AppCrashed, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef,
+        FlowReported, FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited,
+        ReportParsed, ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded,
+        StepStarted, StepStatus, StepTiming, SuiteStarted,
     },
     frame::{AgentInfo, CiContext, ProtocolRange, ResumeState, RunOrigin},
     journal::{ClockSample, Provenance, SourceKind, StepRef, Subject},
@@ -1969,4 +1969,55 @@ async fn a_flows_step_alignment_warnings_are_kept_once_each(pool: PgPool) {
         detail.flow.state, "running",
         "no verdict comes from a warning"
     );
+}
+
+/// A commands file whose flow the log never named is kept on its agent run, once (issue #148). It
+/// has no flow, so a flow-less step warning is not kept there, and no flow is created.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_commands_file_the_log_never_named_is_kept_on_its_run_once(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("unnamed", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let warn = |a: &mut Agent, code: &str| {
+        a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::AgentWarning(AgentWarning {
+                code: code.into(),
+                message: "warned".into(),
+            }),
+        )
+    };
+    let events = [
+        warn(&mut a, "commands_flow_unnamed"),
+        warn(&mut a, "commands_flow_unnamed"),
+        warn(&mut a, "steps_not_aligned"),
+    ];
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert!(
+        applied.rejected.is_empty(),
+        "every event is accepted: {:?}",
+        applied.rejected
+    );
+    let kept = sqlx::query_scalar!("SELECT file_warnings FROM agent_runs WHERE id = $1", a.id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+    assert_eq!(kept, ["commands_flow_unnamed"]);
+    let flows: i64 = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM flow_executions WHERE agent_run_id = $1",
+        a.id
+    )
+    .fetch_one(store.pool())
+    .await
+    .unwrap();
+    assert_eq!(flows, 0, "the file creates no flow");
 }

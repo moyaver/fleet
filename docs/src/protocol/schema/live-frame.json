@@ -8,6 +8,13 @@
           "format": "int64",
           "type": "integer"
         },
+        "file_warnings": {
+          "description": "The warnings its own files raised, by code: `commands_flow_unnamed` (a final `commands.json`\nwhose flow the log never started, so its steps are not settled). Empty when none.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "gaps": {
           "description": "Explicitly recorded gaps (I5): journal and telemetry ranges known to be missing.",
           "format": "int64",

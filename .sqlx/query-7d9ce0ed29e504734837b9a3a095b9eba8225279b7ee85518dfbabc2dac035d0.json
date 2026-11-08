@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs\n                    SET file_warnings = array_append(file_warnings, $2), rev = rev + 1\n                  WHERE id = $1 AND NOT ($2 = ANY(file_warnings))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7d9ce0ed29e504734837b9a3a095b9eba8225279b7ee85518dfbabc2dac035d0"
+}

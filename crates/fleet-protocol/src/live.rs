@@ -127,6 +127,10 @@ pub struct AgentRunView {
     /// Whether the agent's parsers were built for that version. Absent until it is known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maestro_profile_supported: Option<bool>,
+    /// The warnings its own files raised, by code: `commands_flow_unnamed` (a final `commands.json`
+    /// whose flow the log never started, so its steps are not settled). Empty when none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub file_warnings: Vec<String>,
     /// Revision.
     pub rev: i64,
     /// Where the run's evidence came from: a published run is imported, not live.
