@@ -4,7 +4,7 @@
 
 use fleet_protocol::{
     event::{AdbState, FlowOutcome},
-    frame::{DeviceSample, DeviceUnavailable, Sample, Telemetry, Unavailable},
+    frame::{DeviceSample, DeviceUnavailable, Sample, SampleUnavailable, Telemetry, Unavailable},
     journal::ClockSample,
 };
 use serde_json::{Value, json};
@@ -236,6 +236,65 @@ async fn load_cores_swap_and_pressure_round_trip_and_are_unavailable_when_absent
     assert_eq!(latest("host_cpu_cores")["unit"], "number");
     assert_eq!(latest("host_load_1m")["value"], 1.5);
     assert_eq!(latest("host_psi_io_pct")["available"], false);
+}
+
+/// The runner's newest sample says why each host reading is unknown, in words for the machine: no
+/// pressure information on macOS, a probe that failed, and the first CPU sample. A reading the agent
+/// sent without a reason says that no value was reported, and the metric it never reports keeps its
+/// own reason.
+#[tokio::test]
+async fn the_latest_host_sample_says_why_each_unknown_reading_is_unknown() {
+    let rig = rig().await;
+    let mut newest = sample(at(0), 10.0);
+    newest.host_psi_cpu_pct = None;
+    newest.host_psi_memory_pct = None;
+    newest.host_psi_io_pct = None;
+    newest.host_load_1m = None;
+    newest.host_cpu_cores = None;
+    newest.unavailable = SampleUnavailable {
+        host_psi_cpu_pct: Some(Unavailable::NoPsi),
+        host_psi_memory_pct: Some(Unavailable::NoPsi),
+        host_psi_io_pct: Some(Unavailable::NoPsi),
+        host_load_1m: Some(Unavailable::ProbeFailed),
+        ..SampleUnavailable::default()
+    };
+    let worker = worker_with(&rig, vec![newest]).await;
+    let overview = rig.json("/api/v1/projects/app/overview").await;
+    assert_eq!(overview["workers"][0]["id"], worker);
+    let readings = overview["workers"][0]["latest"]["readings"]
+        .as_array()
+        .unwrap();
+    let latest = |metric: &str| {
+        readings
+            .iter()
+            .find(|r| r["metric"] == metric)
+            .unwrap_or_else(|| panic!("no reading {metric}"))
+            .clone()
+    };
+
+    assert_eq!(
+        latest("host_psi_cpu_pct")["reason"],
+        "the kernel has no pressure information (PSI), as on macOS"
+    );
+    assert_eq!(latest("host_psi_io_pct")["available"], false);
+    assert_eq!(
+        latest("host_load_1m")["reason"],
+        "the probe failed: the agent could not read it"
+    );
+    assert_eq!(
+        latest("host_cpu_cores")["reason"],
+        "the agent reported no value",
+        "a reading with no reason from an older agent says so"
+    );
+    assert_eq!(
+        latest("host_thermal_c")["reason"],
+        "the agent does not report this metric yet"
+    );
+    let cpu = latest("host_cpu_pct");
+    assert_eq!(
+        (cpu["value"].as_f64(), cpu.get("reason")),
+        (Some(10.0), None)
+    );
 }
 
 #[tokio::test]

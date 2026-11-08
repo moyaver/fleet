@@ -45,6 +45,8 @@ const REASON_PROBE_FAILED: &str = "the probe failed: adb did not answer it";
 const REASON_THROTTLED: &str = "throttled: the host is under pressure";
 const REASON_NO_BASELINE: &str = "the first probe only sets the CPU baseline";
 const REASON_NO_ADB_LIST: &str = "adb has not listed devices yet";
+const REASON_HOST_PROBE_FAILED: &str = "the probe failed: the agent could not read it";
+const REASON_HOST_NO_BASELINE: &str = "the first sample only sets the agent's CPU baseline";
 const REASON_NO_SYSTEM_INFO: &str = "the platform's system information could not be read";
 const REASON_NO_PSI: &str = "the kernel has no pressure information (PSI), as on macOS";
 const REASON_NO_PROCESS: &str = "the process is not known to this run yet, or it has exited";
@@ -423,6 +425,34 @@ fn parse(q: &MetricsQuery, known: &[&'static str]) -> Result<Request, String> {
     })
 }
 
+/// Why a host reading is unknown, as the agent sent it. `None` when it sent no reason (an agent that
+/// predates reasons, or a reading that has a value).
+fn host_unavailable(c: HostCol, row: &HostRow) -> Option<Unavailable> {
+    let u = row.unavailable.as_ref()?.0;
+    match c {
+        HostCol::CpuPct => u.host_cpu_pct,
+        HostCol::MemUsed => u.host_mem_used_bytes,
+        HostCol::MemTotal => u.host_mem_total_bytes,
+        HostCol::Load1m => u.host_load_1m,
+        HostCol::CpuCores => u.host_cpu_cores,
+        HostCol::SwapUsed => u.host_swap_used_bytes,
+        HostCol::SwapTotal => u.host_swap_total_bytes,
+        HostCol::PsiCpu => u.host_psi_cpu_pct,
+        HostCol::PsiMemory => u.host_psi_memory_pct,
+        HostCol::PsiIo => u.host_psi_io_pct,
+    }
+}
+
+/// A host reading's reason in words. A failed probe and the first CPU sample are worded for the
+/// machine; the other reasons read the same as a device's.
+fn host_unavailable_text(reason: Unavailable) -> &'static str {
+    match reason {
+        Unavailable::ProbeFailed => REASON_HOST_PROBE_FAILED,
+        Unavailable::NoBaseline => REASON_HOST_NO_BASELINE,
+        other => unavailable_text(other),
+    }
+}
+
 /// The machine's metrics of one sample: its value, or why there is none. Process metrics are
 /// per run and are not part of a worker's latest reading.
 pub(super) fn latest_readings(row: &HostRow) -> LatestReadings {
@@ -442,7 +472,11 @@ pub(super) fn latest_readings(row: &HostRow) -> LatestReadings {
                     available: value.is_some(),
                     reason: match (value, d.col) {
                         (Some(_), _) => None,
-                        (None, Some(_)) => Some(REASON_NO_VALUE.to_owned()),
+                        (None, Some(c)) => Some(
+                            host_unavailable(c, row)
+                                .map_or(REASON_NO_VALUE, host_unavailable_text)
+                                .to_owned(),
+                        ),
                         (None, None) => Some(REASON_NOT_REPORTED.to_owned()),
                     },
                 }
