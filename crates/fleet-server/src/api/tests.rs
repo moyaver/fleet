@@ -17,6 +17,7 @@ mod metrics;
 mod openapi;
 mod overview;
 mod plans;
+mod rerun;
 mod retention;
 mod rig;
 mod timeline;
