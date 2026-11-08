@@ -270,29 +270,32 @@ enum Step {
     Limited(String, Duration),
 }
 
+/// The bytes an item uploads, exactly as they leave the host (I6): text is read and redacted, a
+/// device log is cut to its excerpt, and structured text is redacted by class. Binary files are
+/// returned as they are. The offline bundle (`bundle.rs`) and the live uploads share this, so a
+/// bundle holds what an upload would have sent.
+pub(crate) async fn materialize(item: &Item) -> Result<Source, Outcome> {
+    let source = match &item.source {
+        Source::Text(path, redactor) => Source::Bytes(read_text(path, redactor).await?.into()),
+        Source::Logcat(logcat) => Source::Bytes(excerpt(logcat).await?.into()),
+        other => other.clone(),
+    };
+    match item.class {
+        ArtifactClass::Commands => {
+            structured(&source, redact_commands).map_err(|r| Outcome::Rejected(r.into()))
+        }
+        ArtifactClass::FailureHierarchy => {
+            structured(&source, redact_hierarchy).map_err(|r| Outcome::Rejected(r.into()))
+        }
+        _ => Ok(source),
+    }
+}
+
 impl Inner {
     async fn upload(&self, item: &Item) -> Outcome {
-        let source = match &item.source {
-            Source::Text(path, redactor) => match read_text(path, redactor).await {
-                Ok(bytes) => Source::Bytes(bytes.into()),
-                Err(outcome) => return outcome,
-            },
-            Source::Logcat(logcat) => match excerpt(logcat).await {
-                Ok(bytes) => Source::Bytes(bytes.into()),
-                Err(outcome) => return outcome,
-            },
-            other => other.clone(),
-        };
-        let source = match item.class {
-            ArtifactClass::Commands => match structured(&source, redact_commands) {
-                Ok(source) => source,
-                Err(reason) => return Outcome::Rejected(reason.into()),
-            },
-            ArtifactClass::FailureHierarchy => match structured(&source, redact_hierarchy) {
-                Ok(source) => source,
-                Err(reason) => return Outcome::Rejected(reason.into()),
-            },
-            _ => source,
+        let source = match materialize(item).await {
+            Ok(source) => source,
+            Err(outcome) => return outcome,
         };
         let item = &Item {
             class: item.class,

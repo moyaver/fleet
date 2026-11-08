@@ -27,6 +27,7 @@ futures-util.workspace = true
 getrandom.workspace = true
 nix.workspace = true
 reqwest = { workspace = true, features = ["stream"] }
+ruzstd.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 serde.workspace = true
@@ -34,6 +35,7 @@ serde_json.workspace = true
 sha2.workspace = true
 signal-hook.workspace = true
 sysinfo.workspace = true
+tar.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "net", "io-util", "fs"] }
 tokio-tungstenite.workspace = true

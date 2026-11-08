@@ -65,6 +65,12 @@ enum Cmd {
         #[arg(long, requires = "json")]
         events: bool,
     },
+    /// Send a finished run to the server: an offline bundle (`fleet-bundle.tar.zst`, or its
+    /// directory), or a Maestro output directory. Needs `FLEET_SERVER` and `FLEET_TOKEN`.
+    Publish {
+        /// The bundle or the output directory.
+        path: std::path::PathBuf,
+    },
     /// Send the events a crashed run left in its spool (use as an `if: always()` step).
     Flush {
         /// The spool file (`<run dir>/spool.bin`).
@@ -109,6 +115,9 @@ pub fn main() -> ! {
             exit(supervisor::run(&command, &opts))
         }
         Cmd::Inspect { dir, json, events } => exit(Outcome::Code(inspect(&dir, json, events))),
+        Cmd::Publish { path } => exit(Outcome::Code(report(
+            crate::publish::run(&path).map(|p| p.describe()),
+        ))),
         Cmd::Flush { spool, timeout } => exit(Outcome::Code(report(crate::commands::flush(
             &spool,
             Duration::from_secs(timeout),

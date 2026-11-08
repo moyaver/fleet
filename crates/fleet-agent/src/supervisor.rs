@@ -612,6 +612,9 @@ impl Observer {
         let mut truncated: Option<(u64, String)> = None;
         // `step-summary-failed <reason>`: the job summary could not be written (I2).
         let mut summary_failed: Option<String> = None;
+        // `bundle-written <path>` / `bundle-failed <reason>`: the offline bundle (issue #83).
+        let mut bundle: Option<String> = None;
+        let mut bundle_failed: Option<String> = None;
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
             match self.control.recv_timeout(left) {
                 Ok(line) if line == "finalized" => {
@@ -627,6 +630,10 @@ impl Observer {
                             .and_then(|(seq, reason)| Some((seq.parse().ok()?, reason.to_owned())));
                     } else if let Some(reason) = line.strip_prefix("step-summary-failed ") {
                         summary_failed = Some(reason.to_owned());
+                    } else if let Some(path) = line.strip_prefix("bundle-written ") {
+                        bundle = Some(path.to_owned());
+                    } else if let Some(why) = line.strip_prefix("bundle-failed ") {
+                        bundle_failed = Some(why.to_owned());
                     }
                 }
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
@@ -642,6 +649,16 @@ impl Observer {
                     "journal.jsonl stopped on a write error ({reason}) before seq {seq}, so events from seq {seq} on are not in it; the run is unaffected"
                 )
             });
+        }
+        if let Some(path) = bundle {
+            warnings.push(format!(
+                "no server: the run is kept as {path}; publish it later with `fleet-agent publish`"
+            ));
+        }
+        if let Some(why) = bundle_failed {
+            warnings.push(format!(
+                "the offline bundle was not written ({why}); the run is unaffected"
+            ));
         }
         if let Some(reason) = summary_failed {
             warnings.push(format!(

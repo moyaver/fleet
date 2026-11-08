@@ -193,6 +193,14 @@ pub(crate) fn agent_bin() -> PathBuf {
 /// Runs `fleet-agent run -- maestro test flows/` with the fake Maestro replaying `fixture`, in a
 /// cleared environment (CI sets `GITHUB_*`, which the agent would read) plus `env`.
 pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
+    run_agent_with(fixture_name, env, None).0
+}
+
+/// Like [`run_agent`], and also the run directory (`<run>`), where an offline run keeps its bundle.
+pub(crate) fn run_agent_keeping_run_dir(
+    fixture_name: &str,
+    env: &[(&str, &str)],
+) -> (Output, PathBuf) {
     run_agent_with(fixture_name, env, None)
 }
 
@@ -204,10 +212,14 @@ pub(crate) fn run_agent_planned(
     env: &[(&str, &str)],
     manifest: &Value,
 ) -> Output {
-    run_agent_with(fixture_name, env, Some(manifest))
+    run_agent_with(fixture_name, env, Some(manifest)).0
 }
 
-fn run_agent_with(fixture_name: &str, env: &[(&str, &str)], plan: Option<&Value>) -> Output {
+fn run_agent_with(
+    fixture_name: &str,
+    env: &[(&str, &str)],
+    plan: Option<&Value>,
+) -> (Output, PathBuf) {
     let dir = std::env::temp_dir().join(format!("fleet-e2e-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&dir).unwrap();
     std::os::unix::fs::symlink(
@@ -254,7 +266,7 @@ fn run_agent_with(fixture_name: &str, env: &[(&str, &str)], plan: Option<&Value>
     for (k, v) in env {
         cmd.env(k, v);
     }
-    cmd.output().unwrap()
+    (cmd.output().unwrap(), dir.join("run"))
 }
 
 fn b64(bytes: &[u8]) -> String {

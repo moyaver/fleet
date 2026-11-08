@@ -92,15 +92,16 @@ fn an_unwritable_summary_changes_nothing_and_costs_one_notice() {
     );
     assert_eq!(out.status.code(), Some(1), "exit status");
     assert_eq!(out.stdout, fs::read(fixture("fail/stdout.bin")).unwrap());
-    // The fake Maestro writes nothing to stderr, so the one notice is all that is there.
+    // The fake Maestro writes nothing to stderr, so the notices are all that is there: the
+    // offline run's bundle notice (issue #83), and the summary's.
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     assert_eq!(
         stderr.lines().count(),
-        1,
-        "one notice and nothing else: {stderr}"
+        2,
+        "two notices and nothing else: {stderr}"
     );
     assert!(
-        stderr.starts_with("[fleet-agent] could not write the job summary to GITHUB_STEP_SUMMARY"),
+        stderr.contains("[fleet-agent] could not write the job summary to GITHUB_STEP_SUMMARY"),
         "{stderr}"
     );
     assert!(!missing.exists());

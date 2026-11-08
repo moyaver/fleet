@@ -24,7 +24,7 @@ use fleet_maestro::{ReportState, stdout::strip_ansi};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{ArtifactRejected, ArtifactUploaded, EventBody, EvidenceSources},
-    frame::{DeviceSample, Telemetry},
+    frame::{CiContext, DeviceSample, Telemetry},
     journal::ClockSample,
 };
 use time::OffsetDateTime;
@@ -32,13 +32,14 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::{
+    bundle,
     device::{Probes, Target},
     emulator::Emulators,
     ipc::{Control, Frame, Stream},
     journal::Writer,
     metrics::{Pressure, SAMPLE, Sampler, Throttle},
     outbox::{Budget, Outbox},
-    session::{Observation, Session},
+    session::{Candidate, Observation, Session},
     transport::{self, Shared},
     upload::{self, Outcome, Source, Uploader},
     watch::{BundleScanner, LogTailer},
@@ -162,6 +163,14 @@ struct Live {
     uploader: Option<Uploader>,
     /// Maestro's debug output directory: where the files to upload are.
     debug: Option<PathBuf>,
+    /// The run directory: where the journal is, and where an offline bundle goes.
+    run_dir: Option<PathBuf>,
+    /// The artifacts an offline run would have uploaded, for its bundle (issue #83). `None` when
+    /// the run has a server, or no run directory.
+    bundle: Option<Vec<upload::Item>>,
+    /// This agent run, and its CI identity: what the bundle's manifest records.
+    agent_run_id: Uuid,
+    ci: CiContext,
 }
 
 /// Observes the run until it ends, and returns the Maestro version its session log named, if any.
@@ -375,7 +384,8 @@ fn start(
         ..Shared::default()
     });
     let journal =
-        run_dir.and_then(|d| Writer::create(&d.join("journal.jsonl"), journal_max_bytes).ok());
+        run_dir.and_then(|d| Writer::create(&d.join(bundle::JOURNAL), journal_max_bytes).ok());
+    let ci = crate::ci::context(|k| std::env::var(k).ok());
     let mut uploader = None;
     let (telemetry, transport) = match server_url() {
         Some(url) => {
@@ -394,12 +404,9 @@ fn start(
                     tls: crate::net::tls(std::env::var("FLEET_CA_FILE").ok().as_deref()),
                 })
             });
-            let cfg = transport::Config::from_env(
-                url,
-                agent_run_id,
-                crate::ci::context(|k| std::env::var(k).ok()),
-                |k| std::env::var(k).ok(),
-            );
+            let cfg = transport::Config::from_env(url, agent_run_id, ci.clone(), |k| {
+                std::env::var(k).ok()
+            });
             (
                 Some(tx),
                 Some(tokio::spawn(transport::run(
@@ -420,6 +427,12 @@ fn start(
     Live {
         uploader: uploader.flatten(),
         debug: debug.clone(),
+        // Offline (no server) with a run directory: the run keeps a bundle (issue #83). Artifacts
+        // are left out when `FLEET_UPLOAD_ARTIFACTS` turns them off, as they are for a live run.
+        bundle: (server_url().is_none() && run_dir.is_some() && uploads_enabled()).then(Vec::new),
+        run_dir: run_dir.map(Path::to_path_buf),
+        agent_run_id,
+        ci,
         session,
         tailer: debug
             .as_ref()
@@ -482,60 +495,76 @@ fn uploads_enabled() -> bool {
 /// Queues the files the session found worth uploading, and journals the uploads that finished.
 /// Never blocks and never fails: an upload problem is a journal entry and a log line (I2).
 fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
-    let candidates = l.session.take_uploads();
-    let Some(up) = l.uploader.as_ref() else {
-        return;
-    };
-    for c in candidates {
-        let Some(file) = l.debug.as_ref().map(|d| d.join(&c.rel)) else {
-            continue;
-        };
-        let label = l.session.label(&c.rel);
-        let (content_type, source) = match c.class {
-            ArtifactClass::FailureScreenshot => {
-                let ext = file
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(str::to_ascii_lowercase);
-                let ct = match ext.as_deref() {
-                    Some("png") => "image/png",
-                    Some("jpg" | "jpeg") => "image/jpeg",
-                    Some("webp") => "image/webp",
-                    _ => continue,
-                };
-                (ct, Source::File(file))
-            }
-            // The window of the device log around the failed step (issue #75).
-            ArtifactClass::DeviceLogcat => {
-                let Some(failure) = c.failure else { continue };
-                (
-                    "text/plain",
-                    Source::Logcat(upload::Logcat {
-                        path: file,
-                        failure,
-                        redactor: Arc::new(l.session.redactor().clone()),
-                    }),
-                )
-            }
-            // The flow's commands carry resolved `inputText`: redacted like a log.
-            _ => (
-                "application/json",
-                Source::Text(file, Arc::new(l.session.redactor().clone())),
-            ),
-        };
-        up.submit(upload::Item {
-            class: c.class,
-            path: label,
-            content_type,
-            flow: c.flow,
-            step: c.step,
-            source,
-        });
+    for c in l.session.take_uploads() {
+        if let Some(item) = candidate_item(&l.session, l.debug.as_deref(), &c) {
+            enqueue(l, item);
+        }
     }
     journal_uploads(l, clock);
 }
 
-/// Records finished uploads as `artifact.uploaded` / `artifact.rejected`.
+/// The upload for a file the session found, or `None` when it is not one to upload. The bytes are
+/// read and redacted when the upload starts, or when the bundle is written (`upload::materialize`).
+pub(crate) fn candidate_item(
+    session: &Session,
+    debug: Option<&Path>,
+    c: &Candidate,
+) -> Option<upload::Item> {
+    let file = debug?.join(&c.rel);
+    let path = session.label(&c.rel);
+    let (content_type, source) = match c.class {
+        ArtifactClass::FailureScreenshot => {
+            let ext = file
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(str::to_ascii_lowercase);
+            let ct = match ext.as_deref() {
+                Some("png") => "image/png",
+                Some("jpg" | "jpeg") => "image/jpeg",
+                Some("webp") => "image/webp",
+                _ => return None,
+            };
+            (ct, Source::File(file))
+        }
+        // The window of the device log around the failed step (issue #75).
+        ArtifactClass::DeviceLogcat => {
+            let failure = c.failure?;
+            (
+                "text/plain",
+                Source::Logcat(upload::Logcat {
+                    path: file,
+                    failure,
+                    redactor: Arc::new(session.redactor().clone()),
+                }),
+            )
+        }
+        // The flow's commands carry resolved `inputText`: redacted like a log.
+        _ => (
+            "application/json",
+            Source::Text(file, Arc::new(session.redactor().clone())),
+        ),
+    };
+    Some(upload::Item {
+        class: c.class,
+        path,
+        content_type,
+        flow: c.flow,
+        step: c.step,
+        source,
+    })
+}
+
+/// Hands an artifact to the uploader when the run has a server, or keeps it for the offline
+/// bundle (issue #83). Without either, the artifact is not kept, as before.
+fn enqueue(l: &mut Live, item: upload::Item) {
+    if let Some(up) = l.uploader.as_ref() {
+        up.submit(item);
+    } else if let Some(bundle) = l.bundle.as_mut() {
+        bundle.push(item);
+    }
+}
+
+/// Journals the uploads that finished.
 fn journal_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
     let Some(up) = l.uploader.as_ref() else {
         return;
@@ -545,30 +574,22 @@ fn journal_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
     }
 }
 
-fn record(session: &mut Session, at: ClockSample, done: upload::Done) {
+/// The event an upload's outcome is journaled as: `artifact.uploaded` or `artifact.rejected`.
+pub(crate) fn artifact_body(done: upload::Done) -> EventBody {
     let class = done.class.as_str().to_owned();
     let path = done.path;
-    let body = match done.outcome {
+    match done.outcome {
         Outcome::Uploaded { artifact_id, size } => EventBody::ArtifactUploaded(ArtifactUploaded {
             class,
             path,
             artifact_id,
             size,
         }),
-        Outcome::Rejected(reason) => {
-            if reason == upload::NOT_REDACTABLE {
-                session.warn(
-                    at,
-                    "artifact_not_uploaded",
-                    &format!("{path} was not uploaded: it cannot be redacted reliably"),
-                );
-            }
-            EventBody::ArtifactRejected(ArtifactRejected {
-                class,
-                path,
-                reason,
-            })
-        }
+        Outcome::Rejected(reason) => EventBody::ArtifactRejected(ArtifactRejected {
+            class,
+            path,
+            reason,
+        }),
         Outcome::Failed(why) => {
             tracing::warn!(%path, %why, "artifact upload failed; the run is unaffected");
             EventBody::ArtifactRejected(ArtifactRejected {
@@ -577,31 +598,49 @@ fn record(session: &mut Session, at: ClockSample, done: upload::Done) {
                 reason: "upload_failed".into(),
             })
         }
-    };
-    session.artifact_result(at, done.flow, &body);
+    }
 }
 
-/// The run is over: queues the report and the log for upload. Their results are journaled by
-/// [`await_uploads`].
+fn record(session: &mut Session, at: ClockSample, done: upload::Done) {
+    let flow = done.flow;
+    if done.outcome == Outcome::Rejected(upload::NOT_REDACTABLE.into()) {
+        session.warn(
+            at,
+            "artifact_not_uploaded",
+            &format!(
+                "{} was not uploaded: it cannot be redacted reliably",
+                done.path
+            ),
+        );
+    }
+    let body = artifact_body(done);
+    session.artifact_result(at, flow, &body);
+}
+
+/// The run is over: queues the report and the log for upload (or for the bundle). Their results
+/// are journaled by [`await_uploads`].
 fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> ClockSample) {
     pump_uploads(l, clock);
-    let Some(up) = l.uploader.as_ref() else {
-        return;
-    };
     if let Some(bytes) = report {
         match upload::prepare_text(bytes, l.session.redactor()) {
-            Ok(text) => up.submit(upload::Item {
-                class: ArtifactClass::Junit,
-                path: l
+            Ok(text) => {
+                let path = l
                     .report
                     .as_ref()
                     .and_then(|p| p.file_name())
-                    .map_or_else(|| "report.xml".into(), |n| n.to_string_lossy().into_owned()),
-                content_type: "application/xml",
-                flow: None,
-                step: None,
-                source: Source::Bytes(text.into()),
-            }),
+                    .map_or_else(|| "report.xml".into(), |n| n.to_string_lossy().into_owned());
+                enqueue(
+                    l,
+                    upload::Item {
+                        class: ArtifactClass::Junit,
+                        path,
+                        content_type: "application/xml",
+                        flow: None,
+                        step: None,
+                        source: Source::Bytes(text.into()),
+                    },
+                );
+            }
             Err(reason) => record(
                 &mut l.session,
                 clock(),
@@ -614,22 +653,27 @@ fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> Cloc
             ),
         }
     }
-    if let Some(path) = l.html.clone()
-        && let Some(up) = l.uploader.as_ref()
-    {
+    if let Some(path) = l.html.clone() {
         match written_during(&path, l.started) {
-            Some(true) => up.submit(upload::Item {
-                class: ArtifactClass::HtmlReport,
-                path: path.file_name().map_or_else(
+            Some(true) => {
+                let label = path.file_name().map_or_else(
                     || "report.html".into(),
                     |n| n.to_string_lossy().into_owned(),
-                ),
-                content_type: "text/html",
-                flow: None,
-                step: None,
+                );
                 // Text, so it is redacted like a log (I6); one too big to redact is refused.
-                source: Source::Text(path, Arc::new(l.session.redactor().clone())),
-            }),
+                let redactor = Arc::new(l.session.redactor().clone());
+                enqueue(
+                    l,
+                    upload::Item {
+                        class: ArtifactClass::HtmlReport,
+                        path: label,
+                        content_type: "text/html",
+                        flow: None,
+                        step: None,
+                        source: Source::Text(path, redactor),
+                    },
+                );
+            }
             Some(false) => l.session.warn(
                 clock(),
                 "report_stale",
@@ -643,17 +687,45 @@ fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> Cloc
     }
     if let Some(log) = l.debug.as_ref().map(|d| d.join("maestro.log"))
         && log.is_file()
-        && let Some(up) = l.uploader.as_ref()
     {
-        up.submit(upload::Item {
-            class: ArtifactClass::MaestroLog,
-            path: "maestro.log".into(),
-            content_type: "text/plain",
-            flow: None,
-            step: None,
-            source: Source::Text(log, Arc::new(l.session.redactor().clone())),
-        });
+        let redactor = Arc::new(l.session.redactor().clone());
+        enqueue(
+            l,
+            upload::Item {
+                class: ArtifactClass::MaestroLog,
+                path: "maestro.log".into(),
+                content_type: "text/plain",
+                flow: None,
+                step: None,
+                source: Source::Text(log, redactor),
+            },
+        );
     }
+}
+
+/// Writes the offline bundle, when the run is offline and has a run directory.
+async fn write_offline_bundle(l: &mut Live) {
+    if let (Some(items), Some(run_dir)) = (l.bundle.take(), l.run_dir.clone()) {
+        write_bundle(items, &run_dir, l.agent_run_id, l.ci.clone()).await;
+    }
+}
+
+/// Writes the offline bundle and reports the outcome on stdout, where the supervisor reads it. A
+/// failure leaves the run as it is (I2).
+async fn write_bundle(items: Vec<upload::Item>, run_dir: &Path, agent_run_id: Uuid, ci: CiContext) {
+    let outcome = bundle::write(
+        run_dir,
+        &run_dir.join(bundle::JOURNAL),
+        items,
+        agent_run_id,
+        ci,
+    )
+    .await;
+    let line = match outcome {
+        Ok(written) => format!("bundle-written {}", written.path.display()),
+        Err(why) => format!("bundle-failed {why}"),
+    };
+    let _ = writeln!(io::stdout().lock(), "{line}");
 }
 
 /// Waits up to `budget` for every upload, then journals how each one ended.
@@ -866,6 +938,9 @@ async fn finalize(
         .end(clock(), l.dropped_bytes.max(output_bytes_dropped));
     write_job_summary(&l.session);
     flush(&mut l);
+    // An offline run keeps what it would have sent (issue #83). Written after the last flush, so
+    // the journal in the bundle holds every event, the run's end included.
+    write_offline_bundle(&mut l).await;
     if let Some(t) = l.journal.as_ref().and_then(Writer::truncation) {
         // Written before `finalized`, so the supervisor reads it with its end-of-run warnings
         // (issue #37). Last, because `run.ended` can be the event that crosses the cap. The reason

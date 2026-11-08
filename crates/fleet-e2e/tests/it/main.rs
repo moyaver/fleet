@@ -15,6 +15,7 @@ mod idp;
 mod m4_exit;
 mod m5_exit;
 mod network;
+mod publish;
 mod responsive;
 mod scenarios;
 mod support;
