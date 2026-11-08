@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The storage contract.
 
-use std::{io, ops::Range};
+use std::{collections::BTreeMap, io, ops::Range, time::Duration};
 
 use bytes::Bytes;
 use futures_util::stream::BoxStream;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{BlobError, BlobKey};
+use crate::{BlobError, BlobKey, key::StagingKey};
 
 /// A body in flight: chunks of bytes, or the I/O error that cut the stream short.
 pub type ByteStream<'a> = BoxStream<'a, io::Result<Bytes>>;
@@ -104,6 +104,43 @@ pub trait BlobStore: Send + Sync + std::fmt::Debug {
     /// Lists blobs for garbage collection, in no particular order. Objects that are not Fleet
     /// blobs (temp files, foreign keys in a shared bucket) are skipped.
     fn list(&self, scope: Scope) -> BoxStream<'_, Result<BlobInfo, BlobError>>;
+
+    /// A `PUT` URL the agent can send the bytes of a direct upload to, without Fleet's
+    /// credential: a `SigV4` presigned URL for `staging`, valid for `ttl`, that binds `headers`
+    /// (the agent must send exactly these). `Ok(None)` when the backend cannot presign, which is
+    /// every backend but S3; the caller then relays the upload through Fleet.
+    async fn presign_put(
+        &self,
+        staging: &StagingKey,
+        ttl: Duration,
+        headers: &BTreeMap<String, String>,
+    ) -> Result<Option<String>, BlobError> {
+        let _ = (staging, ttl, headers);
+        Ok(None)
+    }
+
+    /// The staged object of a direct upload, read as a whole, or `None` when nothing is staged.
+    async fn staged(&self, staging: &StagingKey) -> Result<Option<BlobRead>, BlobError> {
+        let _ = staging;
+        Ok(None)
+    }
+
+    /// Removes the staged object. Removing a missing one is not an error.
+    async fn delete_staged(&self, staging: &StagingKey) -> Result<(), BlobError> {
+        let _ = staging;
+        Ok(())
+    }
+
+    /// Removes staged objects whose artifact is not in `keep` and that were last written before
+    /// `older_than`; returns how many it removed.
+    async fn sweep_staged(
+        &self,
+        keep: &[Uuid],
+        older_than: OffsetDateTime,
+    ) -> Result<u64, BlobError> {
+        let _ = (keep, older_than);
+        Ok(0)
+    }
 }
 
 /// Validates a read range against the blob's size; the same rule for every backend.

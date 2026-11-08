@@ -8,6 +8,7 @@
 //!   `fsync`, rename.
 //! - [`S3`]: any S3-compatible store through `object_store`, path-style with a custom endpoint
 //!   (Garage is the reference, `SeaweedFS` the alternative). Nothing provider-specific (I8).
+//! - `testing` (feature `test-util`): Garage in Docker, the reference S3 store, for tests.
 //! - [`verify`]: pure checks on an uploaded artifact before it is stored: size, SHA-256, magic
 //!   bytes per artifact class, and archive safety (zip bombs, path traversal, links).
 //!
@@ -27,10 +28,12 @@ mod key;
 mod local;
 mod s3;
 mod store;
+#[cfg(feature = "test-util")]
+pub mod testing;
 pub mod verify;
 
 pub use error::BlobError;
-pub use key::{BlobKey, Sha256Digest};
+pub use key::{BlobKey, Sha256Digest, StagingKey};
 pub use local::LocalFs;
 pub use s3::{S3, S3Config};
 pub use store::{BlobInfo, BlobRead, BlobStore, ByteStream, PutOutcome, Scope};

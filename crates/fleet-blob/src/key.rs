@@ -113,6 +113,41 @@ impl BlobKey {
     }
 }
 
+/// Where a direct upload is staged before the server verifies it: one object per artifact,
+/// outside the content-addressed blobs (`uploads/<artifact>`). Nothing is served from it, and the
+/// server reads it once, at `complete`, into its spool file (PLAN §7.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StagingKey(Uuid);
+
+impl StagingKey {
+    /// The staging object of this artifact.
+    #[must_use]
+    pub fn new(artifact: Uuid) -> Self {
+        Self(artifact)
+    }
+
+    /// The artifact this staging object belongs to.
+    #[must_use]
+    pub fn artifact(&self) -> Uuid {
+        self.0
+    }
+
+    /// The backend-relative path: `uploads/<artifact>`.
+    pub(crate) fn path(&self) -> String {
+        format!("{STAGING_PREFIX}/{}", self.0.hyphenated())
+    }
+
+    /// Inverse of [`path`](Self::path); `None` for anything else.
+    pub(crate) fn from_path(path: &str) -> Option<Self> {
+        let id = path.strip_prefix(STAGING_PREFIX)?.strip_prefix('/')?;
+        let key = Self(Uuid::parse_str(id).ok()?);
+        (key.path() == path).then_some(key)
+    }
+}
+
+/// Object-key prefix of staged direct uploads.
+pub(crate) const STAGING_PREFIX: &str = "uploads";
+
 #[cfg(test)]
 mod tests {
     use super::Sha256Digest;
