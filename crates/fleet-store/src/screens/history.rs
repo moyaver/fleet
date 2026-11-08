@@ -213,6 +213,9 @@ const GROUP_EXAMPLES: i32 = 5;
 impl Store {
     /// The stats of the flow `flow` (its identity: repository path, else name) over
     /// `[from, to)`. `None` when the project has never run such a flow.
+    ///
+    /// Only runs whose trust is `trusted` count (research 06 T2): a pull request or untrusted
+    /// run stays in the history but cannot move these numbers.
     pub async fn flow_stats(
         &self,
         project_id: Uuid,
@@ -275,8 +278,10 @@ async fn totals(
                SELECT f.state, f.duration_ms,
                       f.finality IN ('verified', 'unverified_final') AS settled
                  FROM flow_executions f
+                 JOIN agent_runs r ON r.id = f.agent_run_id
                  LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
                 WHERE f.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2
+                  AND r.trust_level = 'trusted'
                   AND f.state NOT IN ('pending', 'running')
                   AND coalesce(f.ended_at, f.started_at) >= $3
                   AND coalesce(f.ended_at, f.started_at) < $4)
@@ -316,8 +321,10 @@ async fn chart_points(c: &mut sqlx::PgConnection, s: &Scope<'_>) -> Result<Vec<D
         "SELECT id AS flow_id, at AS \"at!\", duration_ms AS \"duration_ms!\", state AS \"state!\"
                FROM (SELECT f.id, coalesce(f.ended_at, f.started_at) AS at, f.duration_ms, f.state
                        FROM flow_executions f
+                       JOIN agent_runs r ON r.id = f.agent_run_id
                        LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
                       WHERE f.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2
+                        AND r.trust_level = 'trusted'
                         AND f.state IN ('passed', 'failed')
                         AND f.finality IN ('verified', 'unverified_final')
                         AND f.duration_ms IS NOT NULL
@@ -352,8 +359,10 @@ async fn failure_groups(
                         AS \"flow_ids!\"
                FROM failure_fingerprints ff
                JOIN flow_executions f ON f.id = ff.flow_execution_id
+               JOIN agent_runs r ON r.id = f.agent_run_id
                LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
               WHERE ff.project_id = $1 AND f.project_id = $1
+                AND r.trust_level = 'trusted'
                 AND f.state NOT IN ('pending', 'running')
                 AND coalesce(d.repo_path, f.flow_name) = $2
                 AND coalesce(f.ended_at, f.started_at) >= $3
@@ -406,7 +415,9 @@ pub(super) async fn classifiable_runs(
                                                 ORDER BY h.ended_at DESC, h.flow_execution_id DESC) AS n
                    FROM flaky_history h
                    JOIN flow_executions fe ON fe.id = h.flow_execution_id
+                   JOIN agent_runs ar ON ar.id = fe.agent_run_id
                   WHERE h.project_id = $1 AND h.flow = ANY($2)
+                    AND ar.trust_level = 'trusted'
                     AND h.ended_at < $3 AND h.ended_at >= $4) x
           WHERE n <= $5",
         project_id,
@@ -456,7 +467,7 @@ mod tests {
     use super::HistoryQuery;
     use crate::{
         Store,
-        auth::Publisher,
+        auth::{Publisher, TrustLevel},
         ingest::{
             Transport,
             tests::{Agent, Script, SuiteIds, publisher, suite_run_scripted},
@@ -549,6 +560,90 @@ mod tests {
         assert_eq!(
             (checkout.flakiness, checkout.excluded),
             (Flakiness::Confirmed, 0)
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_pr_failure_moves_neither_the_stats_nor_the_flakiness_verdict(pool: PgPool) {
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
+        let p = publisher(&store).await;
+        let pr = Publisher {
+            trust: TrustLevel::Pr,
+            ..p.clone()
+        };
+        let pass = [Script {
+            name: "checkout",
+            failure: None,
+            failed_step: None,
+        }];
+        let fail = [Script {
+            name: "checkout",
+            failure: Some(ASSERTION),
+            failed_step: None,
+        }];
+        // A passing trusted run, then the same conditions failing in a pull request.
+        run(&store, &p, "500", "abc", &pass).await;
+        run(&store, &pr, "501", "abc", &fail).await;
+        let now = OffsetDateTime::now_utc();
+        let (from, to) = (now - Duration::days(1), now + Duration::hours(1));
+        let stats = store
+            .flow_stats(p.project_id, "flows/checkout.yaml", from, to)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((stats.counts.passed, stats.counts.failed), (1, 0));
+        assert_eq!(stats.recent_failures.len(), 0);
+        let history = store
+            .history(
+                p.project_id,
+                &HistoryQuery {
+                    flow: None,
+                    branch: None,
+                    outcome: None,
+                    from,
+                    to,
+                    after: None,
+                    limit: 50,
+                },
+            )
+            .await
+            .unwrap();
+        // The pull request's run is still in the history, as its own entry.
+        assert_eq!(history.items.len(), 2);
+        assert_eq!(
+            flaky::classify(&history.runs, &FlakyConfig::default())[0].flakiness,
+            Flakiness::NotFlaky
+        );
+        // The same failure from a trusted run does count.
+        run(&store, &p, "502", "abc", &fail).await;
+        let stats = store
+            .flow_stats(p.project_id, "flows/checkout.yaml", from, to)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((stats.counts.passed, stats.counts.failed), (1, 1));
+        assert_eq!(stats.recent_failures.len(), 1);
+        let history = store
+            .history(
+                p.project_id,
+                &HistoryQuery {
+                    flow: None,
+                    branch: None,
+                    outcome: None,
+                    from,
+                    to,
+                    after: None,
+                    limit: 50,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            flaky::classify(&history.runs, &FlakyConfig::default())[0].flakiness,
+            Flakiness::Confirmed
         );
     }
 

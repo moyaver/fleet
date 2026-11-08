@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT flow AS \"flow!\", flow_execution_id AS \"run!\", commit_sha,\n                condition_fingerprint AS \"condition!\", state AS \"state!\",\n                outcome_source::text AS outcome_source, finality::text AS \"finality!\",\n                is_default_branch AS \"default_branch!\", ended_at AS \"ended_at!\",\n                failure_message\n           FROM (SELECT h.*, fe.failure_message, row_number() OVER (PARTITION BY h.flow\n                                                ORDER BY h.ended_at DESC, h.flow_execution_id DESC) AS n\n                   FROM flaky_history h\n                   JOIN flow_executions fe ON fe.id = h.flow_execution_id\n                  WHERE h.project_id = $1 AND h.flow = ANY($2)\n                    AND h.ended_at < $3 AND h.ended_at >= $4) x\n          WHERE n <= $5",
+  "query": "SELECT flow AS \"flow!\", flow_execution_id AS \"run!\", commit_sha,\n                condition_fingerprint AS \"condition!\", state AS \"state!\",\n                outcome_source::text AS outcome_source, finality::text AS \"finality!\",\n                is_default_branch AS \"default_branch!\", ended_at AS \"ended_at!\",\n                failure_message\n           FROM (SELECT h.*, fe.failure_message, row_number() OVER (PARTITION BY h.flow\n                                                ORDER BY h.ended_at DESC, h.flow_execution_id DESC) AS n\n                   FROM flaky_history h\n                   JOIN flow_executions fe ON fe.id = h.flow_execution_id\n                   JOIN agent_runs ar ON ar.id = fe.agent_run_id\n                  WHERE h.project_id = $1 AND h.flow = ANY($2)\n                    AND ar.trust_level = 'trusted'\n                    AND h.ended_at < $3 AND h.ended_at >= $4) x\n          WHERE n <= $5",
   "describe": {
     "columns": [
       {
@@ -126,5 +126,5 @@
       true
     ]
   },
-  "hash": "16826851e715c650e17f35ad7467debe44cc83434f7473b5670906f63e97e533"
+  "hash": "c3e3545d5c33ed7d2bdc2d16b6685c85a5861d0df0979b2ed27535eece5eb478"
 }

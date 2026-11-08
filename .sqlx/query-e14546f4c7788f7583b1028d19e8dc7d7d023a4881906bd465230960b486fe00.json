@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT ff.fingerprint, min(ff.step_kind) AS \"step_kind!\", min(ff.message) AS \"message!\",\n                    count(*) AS \"count!\",\n                    min(coalesce(f.ended_at, f.started_at)) AS \"first_at!\",\n                    max(coalesce(f.ended_at, f.started_at)) AS \"last_at!\",\n                    (array_agg(f.id ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC))[1:$5]\n                        AS \"flow_ids!\"\n               FROM failure_fingerprints ff\n               JOIN flow_executions f ON f.id = ff.flow_execution_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n              WHERE ff.project_id = $1 AND f.project_id = $1\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(d.repo_path, f.flow_name) = $2\n                AND coalesce(f.ended_at, f.started_at) >= $3\n                AND coalesce(f.ended_at, f.started_at) < $4\n              GROUP BY ff.fingerprint\n              ORDER BY max(coalesce(f.ended_at, f.started_at)) DESC, ff.fingerprint\n              LIMIT $6",
+  "query": "SELECT ff.fingerprint, min(ff.step_kind) AS \"step_kind!\", min(ff.message) AS \"message!\",\n                    count(*) AS \"count!\",\n                    min(coalesce(f.ended_at, f.started_at)) AS \"first_at!\",\n                    max(coalesce(f.ended_at, f.started_at)) AS \"last_at!\",\n                    (array_agg(f.id ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC))[1:$5]\n                        AS \"flow_ids!\"\n               FROM failure_fingerprints ff\n               JOIN flow_executions f ON f.id = ff.flow_execution_id\n               JOIN agent_runs r ON r.id = f.agent_run_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n              WHERE ff.project_id = $1 AND f.project_id = $1\n                AND r.trust_level = 'trusted'\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(d.repo_path, f.flow_name) = $2\n                AND coalesce(f.ended_at, f.started_at) >= $3\n                AND coalesce(f.ended_at, f.started_at) < $4\n              GROUP BY ff.fingerprint\n              ORDER BY max(coalesce(f.ended_at, f.started_at)) DESC, ff.fingerprint\n              LIMIT $6",
   "describe": {
     "columns": [
       {
@@ -71,5 +71,5 @@
       null
     ]
   },
-  "hash": "54479182896ba30a1405178884cfc321e27d0bb65d0fd9abab659d46a0497563"
+  "hash": "e14546f4c7788f7583b1028d19e8dc7d7d023a4881906bd465230960b486fe00"
 }
