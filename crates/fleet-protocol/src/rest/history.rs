@@ -164,6 +164,27 @@ pub struct HistoryEntryView {
     /// How to rerun this flow (issue #82). Absent from older servers: then there is no command.
     #[serde(default)]
     pub reproduction: ReproCommandView,
+    /// The flow's tags, from its header (issue #85). Empty when it has none or none is known.
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// The CI provider: `github_actions` or `generic`.
+    #[serde(default)]
+    pub ci_provider: Option<String>,
+    /// The runner the agent ran on.
+    #[serde(default)]
+    pub runner: Option<String>,
+    /// The device's serial.
+    #[serde(default)]
+    pub device: Option<String>,
+    /// The device's model (`ro.product.model`), as adb reported it (issue #85).
+    #[serde(default)]
+    pub device_model: Option<String>,
+    /// The device's OS version (`ro.build.version.release`), as adb reported it (issue #85).
+    #[serde(default)]
+    pub os_version: Option<String>,
+    /// The suite (one Maestro invocation) the execution ran in (issue #85).
+    #[serde(default)]
+    pub suite_id: Option<Uuid>,
 }
 
 /// A page of the history, newest first, with the flakiness of the flows on it.
@@ -427,4 +448,92 @@ pub struct CompareView {
     pub rows: Vec<CompareRowView>,
     /// A side has more than 5 000 flows: the rows are incomplete.
     pub truncated: bool,
+}
+
+/// One flow the project knows, whether it ran or not (screen E's catalog, issue #85).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct CatalogFlowView {
+    /// The flow's identity: its repository path when known, else its name.
+    pub flow: String,
+    /// The flow's name: its header's, else the one Maestro reported.
+    pub name: String,
+    /// The flow's tags, from its header.
+    pub tags: Vec<String>,
+    /// How many executions the project has recorded for it, ever. Zero is "never run".
+    pub executions: i64,
+    /// Its latest finished execution, ever; `None` while none has finished.
+    pub last: Option<CatalogLastRunView>,
+}
+
+/// A flow's latest finished execution, as the catalog shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct CatalogLastRunView {
+    /// The flow execution (screen D's address).
+    pub flow_id: Uuid,
+    /// `passed`, `failed`, `skipped`, `interrupted` or `unknown`.
+    pub state: String,
+    /// `provisional`, `verified`, `unverified_final`, `inferred`.
+    pub finality: String,
+    /// The winning claim's source; `None` while no claim exists.
+    pub outcome_source: Option<String>,
+    /// When it ended, or started when it never reported an end.
+    #[serde(with = "time::serde::rfc3339")]
+    pub at: OffsetDateTime,
+}
+
+/// A page of the flow catalog, sorted by flow identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct FlowCatalogPage {
+    /// The flows on this page.
+    pub items: Vec<CatalogFlowView>,
+    /// Pass this as `cursor` for the next page; `None` on the last one.
+    pub next_cursor: Option<String>,
+}
+
+/// One calendar day (UTC) of the project's trend over the filtered runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct TrendDayView {
+    /// The day, `YYYY-MM-DD`, in UTC.
+    pub day: String,
+    /// Settled passes that ended that day.
+    pub passed: i64,
+    /// Settled failures that ended that day.
+    pub failed: i64,
+    /// Runs that day which the flaky verdicts name as evidence.
+    pub flaky: i64,
+    /// Median duration of the day's settled runs that reported one, in milliseconds.
+    pub duration_p50_ms: Option<i64>,
+    /// 95th percentile of the same durations, in milliseconds.
+    pub duration_p95_ms: Option<i64>,
+}
+
+/// Screen E's project trend: pass, fail and flaky counts per day, and the durations of the
+/// settled runs over the window. Trusted runs only, filtered like the history (T2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct HistoryTrendView {
+    /// Start of the window, inclusive.
+    #[serde(with = "time::serde::rfc3339")]
+    pub from: OffsetDateTime,
+    /// End of the window, exclusive.
+    #[serde(with = "time::serde::rfc3339")]
+    pub to: OffsetDateTime,
+    /// The days that have at least one run, oldest first.
+    pub days: Vec<TrendDayView>,
+    /// Settled passes in the window.
+    pub passed: i64,
+    /// Settled failures in the window.
+    pub failed: i64,
+    /// Flaky evidence runs in the window.
+    pub flaky: i64,
+    /// Settled runs in the window that reported a duration.
+    pub duration_samples: i64,
+    /// Median duration over the window, in milliseconds.
+    pub duration_p50_ms: Option<i64>,
+    /// 95th percentile duration over the window, in milliseconds.
+    pub duration_p95_ms: Option<i64>,
 }

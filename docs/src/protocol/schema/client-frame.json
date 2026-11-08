@@ -53,6 +53,33 @@
       ],
       "type": "object"
     },
+    "CatalogFlow": {
+      "description": "One flow file of the workspace, as its header describes it.",
+      "properties": {
+        "name": {
+          "description": "The `name:` of its header, when it has one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "The flow's path, relative to the repository root, as the flow's runs name it.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "The `tags:` of its header.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
     "CiContext": {
       "description": "CI identity as claimed by the agent (research 06 §1).",
       "properties": {
@@ -254,6 +281,20 @@
             "null"
           ]
         },
+        "model": {
+          "description": "The device's model (`ro.product.model`), once read; carried on every sample after that.\nAbsent from older agents (issue #85).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "os_version": {
+          "description": "The device's OS version (`ro.build.version.release`), once read, as `model`. Absent from\nolder agents (issue #85).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "shard": {
           "description": "The shard the device was assigned to: the planner's shard for a plan run (`plan.assigned`,\nas the plan numbers it), otherwise the `shard_number` its `shard.assigned` event names\n(1-based). Absent from older agents.",
           "format": "uint32",
@@ -425,6 +466,24 @@
       ],
       "type": "object"
     },
+    "FlowCatalog": {
+      "description": "The flows a workspace holds, as the agent found them (issue #85). Bounded by the agent: at most\n[`MAX_CATALOG_FLOWS`] entries, and `truncated` says more were found and left out.",
+      "properties": {
+        "flows": {
+          "default": [],
+          "description": "The flows, sorted by path.",
+          "items": {
+            "$ref": "#/$defs/CatalogFlow"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "More flows than `flows` lists were found.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "Hello": {
       "description": "The handshake payload.",
       "properties": {
@@ -436,6 +495,10 @@
           "description": "Generated once per agent process (UUIDv7); owns the `seq` space.",
           "format": "uuid",
           "type": "string"
+        },
+        "catalog": {
+          "$ref": "#/$defs/FlowCatalog",
+          "description": "The flows the run's workspace holds, as the agent found them before Maestro ran (issue\n#85). Empty from older agents and when there is no workspace to read; the server then learns\nno flow it hasn't seen run."
         },
         "ci": {
           "$ref": "#/$defs/CiContext",
