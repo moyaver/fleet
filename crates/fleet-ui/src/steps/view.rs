@@ -4,7 +4,7 @@
 use leptos::prelude::*;
 
 use crate::components::display::{RowProvenance, StatusPill};
-use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_mark};
+use crate::steps::tree::{Key, Row, StepTree, TreeState, status_label, status_mark};
 
 fn key_of(name: &str) -> Option<Key> {
     Some(match name {
@@ -64,7 +64,7 @@ pub fn StepTreeView(
                     );
                     let number = row.number.clone().unwrap_or_default();
                     let unnumbered = row.number.is_none();
-                    let provenance = provenance_of(row.source);
+                    let provenance = row.provenance;
                     let item = view! {
                         <li
                             class="step-row flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 px-2 py-2 focus:outline-2 focus:outline-focus"
