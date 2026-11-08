@@ -100,6 +100,7 @@ async fn harness(issuer: &Issuer) -> Harness {
         c.oidc.issuers.push(OidcIssuer {
             issuer: url.clone(),
             audience: "fleet".into(),
+            jwks_hosts: Vec::new(),
         });
         c.projects[0].trust_policies = vec![TrustPolicyConfig {
             name: "acme-app".into(),

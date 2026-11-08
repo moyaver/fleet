@@ -58,6 +58,7 @@ async fn stack_with_login(idp: &FakeIdp) -> Stack {
             scopes: vec!["profile".into(), "email".into()],
             group_claims: vec!["groups".into()],
             session_ttl_minutes: 60,
+            jwks_hosts: Vec::new(),
             group_roles: vec![GroupRole {
                 group: "qa".into(),
                 role: Role::Viewer,

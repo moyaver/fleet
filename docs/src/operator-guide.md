@@ -61,7 +61,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `usercontent.signing_key` | — | HMAC key for signed links, at least 32 bytes (`FLEET_USERCONTENT__SIGNING_KEY_FILE`) |
 | `usercontent.link_ttl_seconds` | `300` | How long a signed link works (1 to 300) |
 | `usercontent.listen` | — | Also serve the usercontent origin on its own address |
-| `oidc.issuers` | GitHub, audience `fleet` | CI OIDC issuers accepted by `POST /api/v1/agent/token` |
+| `oidc.issuers` | GitHub, audience `fleet` | CI OIDC issuers accepted by `POST /api/v1/agent/token`. Each has an `audience` and optional `jwks_hosts`: the hosts, besides the issuer's own, that its discovery document's `jwks_uri` may name. A `jwks_uri` on any other host is refused and never fetched (research 06 T14) |
 | `projects[].trust_policies[]` | — | Who may publish with an OIDC token (repository and owner IDs, trusted refs, PR policy) |
 
 ## Browser sign-in

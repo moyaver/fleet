@@ -80,7 +80,7 @@ impl Jwks {
         })
     }
 
-    async fn fetch(&self, issuer: &str) -> Result<JwkSet, Refused> {
+    async fn fetch(&self, issuer: &str, jwks_hosts: &[String]) -> Result<JwkSet, Refused> {
         #[derive(Deserialize)]
         struct Discovery {
             jwks_uri: String,
@@ -99,6 +99,7 @@ impl Jwks {
             .json()
             .await
             .map_err(unavailable)?;
+        check_jwks_uri(issuer, &discovery.jwks_uri, jwks_hosts)?;
         self.client
             .get(&discovery.jwks_uri)
             .send()
@@ -111,7 +112,12 @@ impl Jwks {
     }
 
     /// The key for `kid`, refetching once when it is unknown or the cache is old.
-    pub(crate) async fn key(&self, issuer: &str, kid: &str) -> Result<DecodingKey, Refused> {
+    pub(crate) async fn key(
+        &self,
+        issuer: &str,
+        jwks_hosts: &[String],
+        kid: &str,
+    ) -> Result<DecodingKey, Refused> {
         let mut cache = self.cache.lock().await;
         let usable = cache
             .get(issuer)
@@ -127,7 +133,7 @@ impl Jwks {
                 if !may_fetch {
                     return Err(Refused::Invalid(format!("unknown key {kid}")));
                 }
-                let keys = self.fetch(issuer).await?;
+                let keys = self.fetch(issuer, jwks_hosts).await?;
                 let jwk = keys.find(kid).cloned();
                 cache.insert(
                     issuer.to_owned(),
@@ -175,6 +181,30 @@ pub(crate) struct OidcClaims {
     environment: Option<String>,
 }
 
+/// The host a discovery document's `jwks_uri` names must be the issuer's own, or one the operator
+/// listed for that issuer. Any other host is never fetched: a discovery document cannot point
+/// the server at an arbitrary address (research 06 T14).
+fn check_jwks_uri(issuer: &str, jwks_uri: &str, listed: &[String]) -> Result<(), Refused> {
+    let host = |u: &str| {
+        reqwest::Url::parse(u)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+    };
+    let Some(keys_host) = host(jwks_uri) else {
+        return Err(Refused::Unavailable(format!(
+            "jwks_uri {jwks_uri} names no host"
+        )));
+    };
+    if host(issuer).as_deref() == Some(keys_host.as_str())
+        || listed.iter().any(|h| h.eq_ignore_ascii_case(&keys_host))
+    {
+        return Ok(());
+    }
+    Err(Refused::Unavailable(format!(
+        "jwks_uri host {keys_host} is not the issuer's host and is not in its jwks_hosts"
+    )))
+}
+
 /// The `iss` of an unverified token, only to pick the configured issuer to verify against.
 fn peek_issuer(token: &str) -> Option<String> {
     let payload = token.split('.').nth(1)?;
@@ -204,7 +234,7 @@ pub(crate) async fn verify(
         .iter()
         .find(|i| i.issuer == iss)
         .ok_or_else(|| Refused::Invalid(format!("issuer {iss} is not accepted")))?;
-    let key = jwks.key(&issuer.issuer, &kid).await?;
+    let key = jwks.key(&issuer.issuer, &issuer.jwks_hosts, &kid).await?;
     let mut v = Validation::new(Algorithm::RS256);
     v.set_issuer(&[&issuer.issuer]);
     v.set_audience(&[&issuer.audience]);
@@ -474,6 +504,61 @@ mod tests {
     use super::{Jwks, Refused};
 
     #[tokio::test]
+    async fn a_jwks_uri_on_another_host_is_not_fetched_unless_listed() {
+        // `localhost` and `127.0.0.1` are different hosts to the check, though one machine
+        // serves both mocks.
+        let issuer = MockServer::start().await;
+        let keys = MockServer::start().await;
+        let keys_uri = format!("http://localhost:{}/keys", keys.address().port());
+        Mock::given(method("GET"))
+            .and(path("/.well-known/openid-configuration"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "jwks_uri": keys_uri })),
+            )
+            .mount(&issuer)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/keys"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "keys": [] })),
+            )
+            .expect(1)
+            .mount(&keys)
+            .await;
+        let jwks = Jwks::new().unwrap();
+        // Not listed: refused, and the key set is not requested.
+        let refused = jwks.fetch(&issuer.uri(), &[]).await;
+        assert!(
+            matches!(&refused, Err(Refused::Unavailable(m)) if m.contains("jwks_hosts")),
+            "{refused:?}"
+        );
+        // Listed (case does not matter): fetched once.
+        assert!(
+            jwks.fetch(&issuer.uri(), &["LOCALHOST".into()])
+                .await
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn the_keys_host_must_be_the_issuers_or_listed() {
+        use super::check_jwks_uri;
+        let iss = "https://login.example.net/tenant/v2.0";
+        assert!(check_jwks_uri(iss, "https://LOGIN.example.net/keys", &[]).is_ok());
+        assert!(check_jwks_uri(iss, "https://keys.example.org/k", &[]).is_err());
+        assert!(
+            check_jwks_uri(
+                iss,
+                "https://keys.example.org/k",
+                &["keys.example.org".into()]
+            )
+            .is_ok()
+        );
+        assert!(check_jwks_uri(iss, "not a url", &[]).is_err());
+    }
+
+    #[tokio::test]
     async fn a_redirected_discovery_document_is_not_followed() {
         let issuer = MockServer::start().await;
         let elsewhere = MockServer::start().await;
@@ -495,7 +580,7 @@ mod tests {
             .mount(&elsewhere)
             .await;
         let jwks = Jwks::new().unwrap();
-        let result = jwks.fetch(&issuer.uri()).await;
+        let result = jwks.fetch(&issuer.uri(), &[]).await;
         assert!(matches!(result, Err(Refused::Unavailable(_))), "{result:?}");
     }
 }

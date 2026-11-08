@@ -351,6 +351,7 @@ impl Issuer {
         c.oidc.issuers.push(OidcIssuer {
             issuer: self.url.clone(),
             audience: "fleet".into(),
+            jwks_hosts: Vec::new(),
         });
         c.projects[0].trust_policies = vec![TrustPolicyConfig {
             name: "acme".into(),
