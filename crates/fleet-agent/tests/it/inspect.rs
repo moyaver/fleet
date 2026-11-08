@@ -92,6 +92,47 @@ fn a_lost_device_is_labelled_as_infrastructure_and_an_assertion_is_not() {
     assert!(!fleet_agent::inspect::table(&fail).contains("device lost"));
 }
 
+/// Issue #145: the label needs the recorded evidence, not only the failure's text. The same
+/// device-killed run with its `commands.json` final (nothing cut short) names the lost device in
+/// the failure, but the agent recorded no cut-short warning, so the flow is not labelled.
+#[test]
+fn a_failure_that_names_a_lost_device_is_not_labelled_without_the_recorded_warning() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");
+    let dir = std::env::temp_dir().join(format!("fleet-inspect-final-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    copy_dir(&root.join("device-killed"), &dir);
+    let commands = dir.join("run/debug/slow/commands.json");
+    let text = fs::read_to_string(&commands).unwrap();
+    fs::write(&commands, text.replace("\"RUNNING\"", "\"COMPLETED\"")).unwrap();
+
+    let (inspection, _) = fleet_agent::inspect::inspect(&dir).unwrap();
+    let [flow] = inspection.flows.as_slice() else {
+        panic!("one flow");
+    };
+    assert_eq!(flow.outcome, "failed");
+    assert!(
+        flow.failure
+            .as_deref()
+            .is_some_and(|f| f.starts_with("maestro.android.DeviceServerDiedException")),
+        "the failure still names the device: {flow:?}"
+    );
+    assert_eq!(flow.infrastructure, None, "no cut-short warning, no label");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Copies a directory tree (the fixture's files, for a test that edits one of them).
+fn copy_dir(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap().flatten() {
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
 #[test]
 fn every_fixture_reconciles() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");

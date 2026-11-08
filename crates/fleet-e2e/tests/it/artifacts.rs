@@ -282,6 +282,20 @@ async fn a_lost_device_is_labelled_as_infrastructure_and_the_status_stays_failed
         detail["infrastructure"]["evidence"], "maestro.android.DeviceServerDiedException",
         "{detail}"
     );
+    // The label carries the recorded warning that the flow was cut short, and the failure's
+    // provenance (issue #145).
+    assert!(
+        detail["infrastructure"]["warning"]
+            .as_str()
+            .unwrap()
+            .ends_with("is incomplete: the flow was cut short"),
+        "{detail}"
+    );
+    assert_eq!(
+        detail["infrastructure"]["source"], "junit_final",
+        "{detail}"
+    );
+    assert_eq!(detail["infrastructure"]["finality"], "verified", "{detail}");
     assert!(
         detail["failure"]["message"]
             .as_str()
@@ -301,6 +315,14 @@ async fn a_lost_device_is_labelled_as_infrastructure_and_the_status_stays_failed
     assert_eq!(row["state"], "failed", "{row}");
     assert_eq!(
         row["infrastructure"]["evidence"], "maestro.android.DeviceServerDiedException",
+        "{row}"
+    );
+    assert_eq!(row["infrastructure"]["finality"], "verified", "{row}");
+    assert!(
+        row["infrastructure"]["warning"]
+            .as_str()
+            .unwrap()
+            .ends_with("is incomplete: the flow was cut short"),
         "{row}"
     );
 }

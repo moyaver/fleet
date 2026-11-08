@@ -274,9 +274,10 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
                         .map(|b| view! { <span data-testid="flaky-badge"><Badge tone=b.tone>{b.label}</Badge></span> })}
                     {r
                         .infrastructure
-                        .then(|| view! {
-                            <span data-testid="infrastructure-badge" title="The device was lost during this run: the failure is the device's, and it is excluded from flakiness">
-                                <Badge tone=Tone::Neutral>"infrastructure (device lost)"</Badge>
+                        .map(|provenance| view! {
+                            <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="infrastructure-badge" title="The device was lost during this run: the failure is the device's, and it is excluded from flakiness">
+                                <Badge tone=Tone::Neutral>"Failed · infrastructure (device lost)"</Badge>
+                                <RowProvenance provenance=provenance />
                             </span>
                         })}
                 </span>

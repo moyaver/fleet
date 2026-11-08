@@ -606,13 +606,21 @@ pub struct CrashView {
 }
 
 /// Why a failed flow is the device's, not the app's (issue #145): the device was lost during it.
-/// Evidence only: the flow stays failed, and flaky analysis leaves the failure out.
+/// Evidence only: the flow stays failed, and flaky analysis leaves the failure out. The label has
+/// the same provenance as the failure it sits on (invariants I3 and I4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct InfrastructureView {
     /// The lost-device exception the failure names, for example
     /// `maestro.android.DeviceServerDiedException`.
     pub evidence: String,
+    /// The recorded `agent.warning` that the flow's commands were cut short when the device went
+    /// (`commands_not_final`), in the agent's words.
+    pub warning: String,
+    /// The source that decided the failure, for example `junit_final`; `None` when none did.
+    pub source: Option<String>,
+    /// How settled the failure is: `provisional`, `verified`, `unverified_final` or `inferred`.
+    pub finality: String,
 }
 
 /// An earlier execution of the same flow (same file, or same name when no file is known).

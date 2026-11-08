@@ -36,6 +36,11 @@ pub enum Exclusion {
 /// `device-killed`): the failure is the device's, not the flow's.
 pub const DEVICE_LOST: &str = "maestro.android.DeviceServerDiedException";
 
+/// The agent's `agent.warning` code when a flow's `commands.json` is not final: the flow was cut
+/// short, which is what a lost device leaves behind (the recorded half of the device-loss
+/// evidence, issue #145).
+pub const CUT_SHORT: &str = "commands_not_final";
+
 /// The exclusion a stored run carries, judged from its outcome and failure message (ADR-0009).
 ///
 /// Only a failure can be excluded, and only one whose message names a lost device counts as

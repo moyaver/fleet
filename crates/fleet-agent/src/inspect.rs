@@ -58,7 +58,8 @@ pub struct FlowResult {
     /// Failure message (redacted).
     pub failure: Option<String>,
     /// Set when the device was lost during a failed flow, so the failure is the device's (issue
-    /// #145): the lost-device exception it names. The outcome stays `failed`.
+    /// #145): the lost-device exception it names. The outcome stays `failed`. The rule is the
+    /// dashboard's: the failure names the device and the agent recorded that the flow was cut short.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub infrastructure: Option<String>,
 }
@@ -183,11 +184,13 @@ pub(crate) fn flow_results(session: &Session) -> Vec<FlowResult> {
         .summary()
         .into_iter()
         .map(|(f, r)| {
-            // The same rule flaky analysis uses (ADR-0009): a failure that names a lost device.
+            // The same rule as the dashboard's (issue #145): a failure that names a lost device
+            // (the rule flaky analysis uses, ADR-0009), and a flow whose commands were cut short.
             let lost = match r.state {
                 FlowState::Ended(o) => exclusion_of(o, f.failure.as_deref()),
                 FlowState::Pending | FlowState::Running => None,
-            } == Some(Exclusion::Infrastructure);
+            } == Some(Exclusion::Infrastructure)
+                && f.cut_short.is_some();
             FlowResult {
                 shard: f.shard,
                 name: f.name,

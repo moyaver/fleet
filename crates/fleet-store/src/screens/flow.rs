@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen D: one flow execution with its claims, steps and failure.
 
-use fleet_core::flaky::{DEVICE_LOST, Exclusion, exclusion_of};
+use fleet_core::flaky::{CUT_SHORT, DEVICE_LOST, Exclusion, exclusion_of};
 use fleet_protocol::{
     event::FlowOutcome,
     live::FlowView,
@@ -85,6 +85,7 @@ impl Store {
         };
         let claims = claims_of(&mut tx, flow_id, &flow).await?;
         let steps = steps_of(&mut tx, flow_id).await?;
+        let cut_short = cut_short_warning(&mut tx, flow_id).await?;
         let previous = sqlx::query_as!(
             PreviousExecutionView,
             "SELECT id AS flow_id, pipeline_attempt_id, state, outcome_source::text AS outcome_source,
@@ -119,7 +120,13 @@ impl Store {
             (Some(package), Some(exception)) => Some(CrashView { package, exception }),
             _ => None,
         };
-        let infrastructure = infrastructure_of(&flow.state, flow.failure_message.as_deref());
+        let infrastructure = infrastructure_of(
+            &flow.state,
+            flow.outcome_source.as_deref(),
+            &flow.finality,
+            flow.failure_message.as_deref(),
+            cut_short.as_deref(),
+        );
         Ok(Some(FlowDetailView {
             started_at: head.started_at,
             ended_at: head.ended_at,
@@ -238,20 +245,57 @@ fn nest(flat: Vec<StepView>) -> Vec<StepView> {
     roots
 }
 
-/// The device loss that makes a failed flow's failure the device's (issue #145), judged by the rule
-/// flaky analysis uses. The flow stays failed: this only labels it. Screens D and E share it.
+/// The recorded warning that a flow's commands were cut short (`commands_not_final`), if the
+/// journal holds one. The journal is partitioned by its run's day, so the run's day is looked up
+/// with the run, which keeps the read to one partition.
+pub(super) async fn cut_short_warning(
+    c: &mut sqlx::PgConnection,
+    flow_id: Uuid,
+) -> Result<Option<String>> {
+    let message = sqlx::query_scalar!(
+        "SELECT e.data->>'message' AS \"message?\"
+           FROM agent_events e
+           JOIN agent_runs r ON r.id = e.agent_run_id AND r.run_day = e.run_day
+          WHERE e.flow_execution_id = $1 AND e.type = 'agent.warning' AND e.data->>'code' = $2
+          ORDER BY e.seq
+          LIMIT 1",
+        flow_id,
+        CUT_SHORT
+    )
+    .fetch_optional(c)
+    .await?;
+    Ok(message.flatten())
+}
+
+/// The device loss that makes a failed flow's failure the device's (issue #145). It needs both
+/// halves of the evidence, and the flow stays failed: this only labels it.
+///
+/// - The failure names the lost device (`DEVICE_LOST`), the same text rule flaky analysis
+///   applies (ADR-0009), so the label and the exclusion agree on what a device loss is.
+/// - The journal recorded that the flow's commands were cut short (`commands_not_final`), which
+///   is what the agent saw when the device stopped answering. Without it a text match alone is
+///   not enough to call the failure the device's.
+///
+/// The label carries the failure's source and finality, so it is as settled as the failure.
 pub(super) fn infrastructure_of(
     state: &str,
+    source: Option<&str>,
+    finality: &str,
     failure_message: Option<&str>,
+    cut_short: Option<&str>,
 ) -> Option<InfrastructureView> {
-    if state != "failed" {
+    if state != "failed"
+        || exclusion_of(FlowOutcome::Failed, failure_message) != Some(Exclusion::Infrastructure)
+    {
         return None;
     }
-    (exclusion_of(FlowOutcome::Failed, failure_message) == Some(Exclusion::Infrastructure)).then(
-        || InfrastructureView {
-            evidence: DEVICE_LOST.to_owned(),
-        },
-    )
+    let warning = cut_short?;
+    Some(InfrastructureView {
+        evidence: DEVICE_LOST.to_owned(),
+        warning: warning.to_owned(),
+        source: source.map(str::to_owned),
+        finality: finality.to_owned(),
+    })
 }
 
 /// Why a flow failed and where: the first failed step and the last good one before it.
@@ -272,4 +316,62 @@ fn failure_of(flow: &FlowView, steps: &[StepView]) -> Option<FailureView> {
         fingerprint: None,
         triage: None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DEATH: &str = "maestro.android.DeviceServerDiedException: Device server died";
+    const CUT: &str = "run/debug/slow/commands.json is incomplete: the flow was cut short";
+    const ASSERTION: &str = "Assertion is false: \"Done\" is visible";
+
+    #[test]
+    fn a_lost_device_is_labelled_with_its_recorded_warning_and_the_failures_provenance() {
+        let label = infrastructure_of(
+            "failed",
+            Some("junit_final"),
+            "verified",
+            Some(DEATH),
+            Some(CUT),
+        )
+        .expect("labelled");
+        assert_eq!(label.evidence, DEVICE_LOST);
+        assert_eq!(label.warning, CUT);
+        assert_eq!(label.source.as_deref(), Some("junit_final"));
+        assert_eq!(label.finality, "verified");
+    }
+
+    #[test]
+    fn a_failure_text_alone_is_not_the_recorded_evidence() {
+        assert_eq!(
+            infrastructure_of("failed", Some("junit_final"), "verified", Some(DEATH), None),
+            None,
+            "the agent recorded no cut-short warning"
+        );
+    }
+
+    #[test]
+    fn an_assertion_or_an_interrupted_flow_is_never_the_devices() {
+        assert_eq!(
+            infrastructure_of(
+                "failed",
+                Some("junit_final"),
+                "verified",
+                Some(ASSERTION),
+                Some(CUT)
+            ),
+            None,
+            "an assertion is the app's"
+        );
+        assert_eq!(
+            infrastructure_of("interrupted", None, "inferred", Some(DEATH), Some(CUT)),
+            None,
+            "an interrupted run is not a failed flow"
+        );
+        assert_eq!(
+            infrastructure_of("passed", Some("junit_final"), "verified", None, Some(CUT)),
+            None
+        );
+    }
 }

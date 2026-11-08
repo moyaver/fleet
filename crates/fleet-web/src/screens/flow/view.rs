@@ -40,6 +40,7 @@ use crate::{
         parts::{FactList, Fetched, Notice, PillView, loaded},
         triage::TriageControl,
     },
+    status::flow_provenance,
 };
 
 /// Whether the viewer is on a phone (under 720 px), where the steps start collapsed.
@@ -273,12 +274,28 @@ fn FailureBand(
                     <h3 id="fail-h" class="text-sm font-semibold text-fail">"Failure"</h3>
                     {infrastructure
                         .map(|i| {
+                            let provenance = flow_provenance(&i.finality, "failed", None);
                             view! {
                                 <p class="mt-2 text-sm" data-testid="infrastructure">
-                                    <span class="font-semibold">"Infrastructure, not the app: "</span>
-                                    "the device was lost during this flow ("
+                                    <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <span class="font-semibold" data-testid="infrastructure-label">
+                                            "Failed · infrastructure (device lost)"
+                                        </span>
+                                        <RowProvenance provenance=provenance />
+                                    </span>
+                                    " Evidence: the failure names "
                                     <span class="font-mono">{i.evidence}</span>
-                                    "). Excluded from flakiness."
+                                    " and the agent recorded "
+                                    <span class="font-mono">{i.warning}</span>
+                                    {i
+                                        .source
+                                        .map(|s| {
+                                            view! {
+                                                ", decided by "
+                                                <span class="font-mono">{s}</span>
+                                            }
+                                        })}
+                                    ". Excluded from flakiness."
                                 </p>
                             }
                         })}

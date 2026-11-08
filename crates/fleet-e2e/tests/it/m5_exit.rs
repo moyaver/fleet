@@ -536,15 +536,39 @@ async fn a_lost_device_is_labelled_on_the_flow_page_and_in_history() {
         .await;
     page.wait(
         "the infrastructure label",
-        &format!("{} === 1", count_of(&q("infrastructure"))),
+        &format!("{} === 1", count_of(&q("infrastructure-label"))),
     )
     .await;
 
+    // The label reads exactly as the issue words it, and it carries the evidence: the exception
+    // the failure names and the warning the agent recorded (issue #145).
+    assert_eq!(
+        page.texts(&q("infrastructure-label")).await,
+        ["Failed · infrastructure (device lost)"]
+    );
     let label = page.texts(&q("infrastructure")).await;
     assert!(
-        label[0].starts_with("Infrastructure, not the app: the device was lost during this flow")
+        label[0].contains("the failure names maestro.android.DeviceServerDiedException")
+            && label[0].contains(
+                "the agent recorded slow/commands.json is incomplete: the flow was cut short"
+            )
+            && label[0].contains("decided by junit_final")
             && label[0].ends_with("Excluded from flakiness."),
         "{label:?}"
+    );
+    // The device-killed run's failure is verified by the final report, so the label carries no
+    // provenance mark of its own: its group says so (issue #149).
+    assert_eq!(
+        page.eval(
+            &format!(
+                "return document.querySelectorAll('{} [role=img]').length;",
+                q("infrastructure")
+            ),
+            vec![],
+        )
+        .await,
+        json!(0),
+        "a verified label has no mark"
     );
     let failure = page.texts(&q("failure-message")).await;
     assert!(
@@ -577,7 +601,7 @@ async fn a_lost_device_is_labelled_on_the_flow_page_and_in_history() {
     .await;
     assert_eq!(
         page.texts(&q("infrastructure-badge")).await,
-        ["infrastructure (device lost)"]
+        ["Failed · infrastructure (device lost)"]
     );
 
     assert!(page.never_reloaded().await);

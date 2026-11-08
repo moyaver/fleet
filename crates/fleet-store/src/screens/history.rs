@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use fleet_core::{
     claims::Finality,
     fingerprint::ConditionFingerprint,
-    flaky::{HistoryRun, exclusion_of},
+    flaky::{CUT_SHORT, HistoryRun, exclusion_of},
 };
 use fleet_protocol::{
     event::FlowOutcome,
@@ -64,7 +64,7 @@ pub struct HistoryQuery<'a> {
 }
 
 /// One history row as the query reads it: an entry before its infrastructure label, which is
-/// judged from the state and the failure message (issue #145).
+/// judged from the state, the failure message and the journal's cut-short warning (issue #145).
 struct HistoryRow {
     flow_id: Uuid,
     flow: String,
@@ -82,12 +82,19 @@ struct HistoryRow {
     failure_fingerprint: Option<String>,
     condition_fingerprint: Option<String>,
     origin: String,
+    cut_short: Option<String>,
 }
 
 impl HistoryRow {
     fn into_entry(self) -> Result<HistoryEntryView> {
         Ok(HistoryEntryView {
-            infrastructure: infrastructure_of(&self.state, self.failure_message.as_deref()),
+            infrastructure: infrastructure_of(
+                &self.state,
+                self.outcome_source.as_deref(),
+                &self.finality,
+                self.failure_message.as_deref(),
+                self.cut_short.as_deref(),
+            ),
             origin: live::origin_of(&self.origin)?,
             flow_id: self.flow_id,
             flow: self.flow,
@@ -136,7 +143,14 @@ impl Store {
                     f.finality::text AS \"finality!\",
                     coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,
                     ff.fingerprint AS \"failure_fingerprint?\",
-                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin
+                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,
+                    CASE WHEN f.state = 'failed' THEN (
+                        SELECT e.data->>'message' FROM agent_events e
+                         WHERE e.run_day = r.run_day AND e.agent_run_id = r.id
+                           AND e.flow_execution_id = f.id AND e.type = 'agent.warning'
+                           AND e.data->>'code' = $10
+                         ORDER BY e.seq LIMIT 1
+                    ) END AS \"cut_short?\"
                FROM flow_executions f
                JOIN agent_runs r ON r.id = f.agent_run_id
                JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id
@@ -165,7 +179,8 @@ impl Store {
             query.outcome,
             after.map(|(at, _)| at),
             after.map(|(_, id)| id),
-            query.limit.saturating_add(1)
+            query.limit.saturating_add(1),
+            CUT_SHORT
         )
         .fetch_all(&mut *tx)
         .await?;
