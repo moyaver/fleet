@@ -23,8 +23,9 @@ pub(crate) mod derive;
 #[cfg(test)]
 pub(crate) mod tests;
 
-use std::collections::BTreeSet;
+use std::{borrow::Cow, collections::BTreeSet, sync::LazyLock};
 
+use fleet_core::redact::Redactor;
 use fleet_protocol::{
     event::EventBody,
     frame::{CiProvider, ErrorCode, Hello, ResumeOutcome},
@@ -430,6 +431,13 @@ impl Store {
         let mut sorted: Vec<&EventEnvelope> = events.iter().collect();
         sorted.sort_by_key(|e| e.seq);
         sorted.dedup_by_key(|e| e.seq);
+        let redacted: Vec<Option<EventEnvelope>> =
+            sorted.iter().map(|e| redact_log_text(e)).collect();
+        let sorted: Vec<&EventEnvelope> = sorted
+            .iter()
+            .zip(&redacted)
+            .map(|(e, r)| r.as_ref().unwrap_or(e))
+            .collect();
         match self.apply_sorted(run, &sorted, false).await {
             Err(ApplyError::Store(Error::Database(e))) if is_data_error(e.as_ref()) => {
                 tracing::warn!(agent_run_id = %run.agent_run_id, error = %e,
@@ -812,6 +820,52 @@ fn contains_nul(value: &serde_json::Value) -> bool {
         serde_json::Value::Object(values) => values
             .iter()
             .any(|(k, v)| k.contains('\0') || contains_nul(v)),
+        _ => false,
+    }
+}
+
+/// Token shapes only: the server has no known-secret set, so this is the second line of
+/// redaction behind the agent's (research 06 T6).
+static TOKEN_SHAPES: LazyLock<Redactor> = LazyLock::new(|| Redactor::new(std::iter::empty()));
+
+/// Event types whose text is Maestro console or log output.
+const LOG_TEXT_EVENTS: &[&str] = &[
+    "step.started",
+    "step.ended",
+    "flow.reported",
+    "flow.ended",
+    "app.crashed",
+];
+
+/// The event with token-shaped text replaced, when it has any: a log line that carries a token
+/// is stored redacted even when the agent sent it unredacted. Only [`LOG_TEXT_EVENTS`] are
+/// looked at, so other events are passed on untouched.
+fn redact_log_text(e: &EventEnvelope) -> Option<EventEnvelope> {
+    if !LOG_TEXT_EVENTS.contains(&e.kind.as_str()) {
+        return None;
+    }
+    let mut data = e.data.clone();
+    if !redact_json(&mut data) {
+        return None;
+    }
+    Some(EventEnvelope { data, ..e.clone() })
+}
+
+/// Redacts every string in `value`; `true` when one changed.
+fn redact_json(value: &mut serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::String(s) => {
+            if let Cow::Owned(redacted) = TOKEN_SHAPES.redact(s) {
+                *s = redacted;
+                true
+            } else {
+                false
+            }
+        }
+        serde_json::Value::Array(values) => {
+            values.iter_mut().fold(false, |c, v| redact_json(v) | c)
+        }
+        serde_json::Value::Object(map) => map.values_mut().fold(false, |c, v| redact_json(v) | c),
         _ => false,
     }
 }
