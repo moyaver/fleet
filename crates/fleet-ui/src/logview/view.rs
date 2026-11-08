@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Thin Leptos view over [`LogModel`]. All text goes in as text nodes, never `inner_html`;
+//! Thin Leptos view over [`LogModel`]. All text goes in as text nodes, never as raw HTML;
 //! colors are set through the CSSOM so the strict CSP (`style-src 'self'`) holds.
 
 use leptos::prelude::*;
