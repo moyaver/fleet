@@ -144,6 +144,7 @@ const PROTOCOL_EXTERNAL: &[&str] = &["serde", "serde_json", "uuid", "time", "sch
 pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
     let mut problems = Vec::new();
     walk(root, root, &mut problems)?;
+    problems.extend(workflow_problems(root)?);
     let host = String::from_utf8(output(root, "rustc", &["--print", "host-tuple"])?)?;
     problems.extend(dependency_problems(
         &metadata(root, host.trim())?,
@@ -157,6 +158,71 @@ pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
         eprintln!("lint: {p}");
     }
     bail!("{} lint problem(s)", problems.len())
+}
+
+/// Workflows that may use `pull_request_target`: none that checks out a pull request.
+const PULL_REQUEST_TARGET_OK: &[&str] = &[".github/workflows/cla.yml"];
+
+/// Research 06 T1 and T19: a fork pull request never reaches a self-hosted runner, and no workflow
+/// trusts a fork's code with secrets. `pull_request_target` is never used. A job that runs on a
+/// self-hosted runner in a workflow a pull request can start must pick its runner on the pull
+/// request's head repository being this one, so a fork gets a hosted runner (`ci.yml`'s
+/// `agent-macos`).
+fn workflow_problems(root: &Path) -> anyhow::Result<Vec<String>> {
+    let dir = root.join(".github/workflows");
+    let mut problems = Vec::new();
+    for entry in fs::read_dir(&dir).with_context(|| format!("reading {}", dir.display()))? {
+        let path = entry?.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yml") {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let text = fs::read_to_string(&path).with_context(|| format!("reading {name}"))?;
+        problems.extend(fork_runner_problems(
+            &format!(".github/workflows/{name}"),
+            &text,
+        ));
+    }
+    Ok(problems)
+}
+
+/// The fork rule for one workflow's text (see [`workflow_problems`]).
+fn fork_runner_problems(file: &str, text: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if text.contains("pull_request_target") {
+        // The one workflow allowed it never checks out a pull request's code (its header says so).
+        if !PULL_REQUEST_TARGET_OK.contains(&file) {
+            problems.push(format!(
+                "{file}: pull_request_target runs a fork's code with secrets"
+            ));
+        } else if text.contains("actions/checkout") {
+            problems.push(format!(
+                "{file}: pull_request_target checks out code, which a fork controls"
+            ));
+        }
+    }
+    let pull_request = text
+        .lines()
+        .any(|l| l.trim_start().starts_with("pull_request:"));
+    let runs_here = text
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#') && l.contains("self-hosted"));
+    for line in runs_here {
+        let guarded = line
+            .contains("github.event.pull_request.head.repo.full_name == github.repository")
+            && line.contains("fromJSON(");
+        if pull_request && !guarded {
+            problems.push(format!(
+                "{file}: a self-hosted runner in a workflow that pull requests start, not guarded on the head repository being this one: {}",
+                line.trim()
+            ));
+        }
+    }
+    problems
 }
 
 fn walk(root: &Path, dir: &Path, problems: &mut Vec<String>) -> anyhow::Result<()> {
@@ -358,6 +424,27 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn a_fork_pull_request_never_reaches_a_self_hosted_runner() {
+        let guarded = "    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('[\"self-hosted\"]') || 'macos-latest' }}";
+        let ci = format!("on:\n  pull_request:\n  push:\njobs:\n  a:\n{guarded}\n");
+        assert!(fork_runner_problems("ci.yml", &ci).is_empty());
+        let unguarded =
+            "on:\n  pull_request:\njobs:\n  a:\n    runs-on: [self-hosted, fleet-mac]\n";
+        assert_eq!(fork_runner_problems("x.yml", unguarded).len(), 1);
+        // A workflow that only runs on a schedule may use its own runner.
+        let nightly = "on:\n  schedule:\n    - cron: '21 2 * * *'\njobs:\n  a:\n    runs-on: [self-hosted, fleet-mac]\n";
+        assert!(fork_runner_problems("nightly.yml", nightly).is_empty());
+        let target = "on:\n  pull_request_target:\njobs:\n  a:\n    runs-on: ubuntu-latest\n";
+        assert_eq!(fork_runner_problems("t.yml", target).len(), 1);
+        assert!(fork_runner_problems(".github/workflows/cla.yml", target).is_empty());
+        let checkout = "on:\n  pull_request_target:\njobs:\n  a:\n    steps:\n      - uses: actions/checkout@v7\n";
+        assert_eq!(
+            fork_runner_problems(".github/workflows/cla.yml", checkout).len(),
+            1
+        );
+    }
 
     #[test]
     fn files() {
