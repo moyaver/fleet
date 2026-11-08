@@ -34,7 +34,7 @@ impl Store {
         let Some(head) = sqlx::query!(
             "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,
                     device_session_id, flow_name, flow_path, started_at, ended_at,
-                    crash_package, crash_exception
+                    crash_package, crash_exception, step_warnings
                FROM flow_executions WHERE id = $1 AND project_id = $2",
             flow_id,
             project_id
@@ -134,6 +134,7 @@ impl Store {
             failure,
             crash,
             infrastructure,
+            step_warnings: head.step_warnings,
             previous,
             artifacts,
         }))

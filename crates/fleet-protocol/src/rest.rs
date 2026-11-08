@@ -748,6 +748,12 @@ pub struct FlowDetailView {
     /// Set when the failure is the device's (the device was lost); the flow still reads as failed.
     #[serde(default)]
     pub infrastructure: Option<InfrastructureView>,
+    /// The step alignment warnings its final `commands.json` raised, by code: `steps_not_aligned`
+    /// (some steps could not be lined up with the file, so they stay provisional) and
+    /// `step_status_disagrees` (the log and the file disagree on a step's status). Empty when the
+    /// steps lined up.
+    #[serde(default)]
+    pub step_warnings: Vec<String>,
     /// Up to 10 earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousExecutionView>,
     /// Related artifacts that are available; [`ArtifactListView`] has their links.
