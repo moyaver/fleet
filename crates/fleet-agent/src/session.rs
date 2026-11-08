@@ -753,6 +753,15 @@ impl Session {
                 let Some(bytes) = contents else { return };
                 let (name, shard) = bundle::split_shard_suffix(&flow_dir);
                 let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
+                    // The log never started this flow, so the file settles nothing and creates no
+                    // flow (I3). The run says so, since no flow page could (issue #148).
+                    self.warn(
+                        at,
+                        "commands_flow_unnamed",
+                        &format!(
+                            "{rel} names no flow the log started, so its steps are not settled"
+                        ),
+                    );
                     return;
                 };
                 self.on_commands(at, rel, idx, bytes);
@@ -2360,7 +2369,7 @@ mod tests {
     #[test]
     fn every_captured_run_settles_each_flows_steps_from_its_final_commands_file() {
         let runs = captured_runs();
-        assert_eq!(runs.len(), 29, "every captured run is replayed");
+        assert_eq!(runs.len(), 35, "every captured run is replayed");
         let mut settled_flows = 0;
         for run in &runs {
             let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
@@ -2422,7 +2431,60 @@ mod tests {
             })
             .count();
         assert_eq!(settled_flows, final_files);
-        assert_eq!(final_files, 34, "the captured final files");
+        assert_eq!(final_files, 39, "the captured final files");
+    }
+
+    /// A commands file whose flow the log never named is warned on the run, once per file, and
+    /// settles nothing; a run whose files all find their flow warns nothing of the kind (issue #148).
+    /// The default-format runs are the ones whose log names no flow.
+    #[test]
+    fn every_captured_run_warns_each_commands_file_whose_flow_was_never_named() {
+        for run in captured_runs() {
+            let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
+            let mut s = fresh_session();
+            replay_log(&mut s, &run.log);
+            for line in run.stdout.lines() {
+                s.observe(at(), Observation::Stdout(line.to_owned()));
+            }
+            s.drain();
+            for (folder, bytes) in &run.commands {
+                file(
+                    &mut s,
+                    &format!("{folder}/commands.json"),
+                    Some(bytes.as_slice()),
+                );
+            }
+            let events = s.drain();
+            let unnamed: Vec<&EventEnvelope> = events
+                .iter()
+                .filter(|e| e.kind == "agent.warning" && e.data["code"] == "commands_flow_unnamed")
+                .collect();
+            let expected = if default_format {
+                run.commands.len()
+            } else {
+                0
+            };
+            assert_eq!(
+                unnamed.len(),
+                expected,
+                "{}: one warning per file",
+                run.name
+            );
+            assert!(
+                unnamed
+                    .iter()
+                    .all(|e| e.subject.flow_execution_id.is_none()),
+                "{}: the warning belongs to the run, not to a flow",
+                run.name
+            );
+            if default_format {
+                assert!(
+                    settled_steps(&events).is_empty(),
+                    "{}: nothing settles",
+                    run.name
+                );
+            }
+        }
     }
 
     /// `pair_steps`: the depth and kind rules, and the shapes of a missing or shifted step.
