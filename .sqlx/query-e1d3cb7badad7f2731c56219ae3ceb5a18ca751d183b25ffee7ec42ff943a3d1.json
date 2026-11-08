@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions SET cut_short = $2, rev = rev + 1\n                  WHERE id = $1 AND agent_run_id = $3 AND cut_short IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e1d3cb7badad7f2731c56219ae3ceb5a18ca751d183b25ffee7ec42ff943a3d1"
+}

@@ -2021,3 +2021,203 @@ async fn a_commands_file_the_log_never_named_is_kept_on_its_run_once(pool: PgPoo
     .unwrap();
     assert_eq!(flows, 0, "the file creates no flow");
 }
+
+/// The device-loss evidence of a failed flow: the failure names the lost device, and the agent's
+/// final `commands.json` was cut short (issue #145).
+const DEVICE_DEATH: &str = "maestro.android.DeviceServerDiedException: Device server died";
+const CUT_SHORT_MESSAGE: &str =
+    "run/debug/slow/commands.json is incomplete: the flow was cut short";
+
+/// A run whose flow `slow` lost its device: the flow starts, the agent warns that its commands were
+/// cut short, and the flow fails with the device's exception. Returns the flow's id.
+async fn device_lost_run(store: &Store, a: &mut Agent, p: &Publisher) -> Uuid {
+    let h = store
+        .open_run(p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let flow = Uuid::now_v7();
+    let flow_ref = FlowRef {
+        name: "slow".into(),
+        path: Some("flows/slow.yaml".into()),
+    };
+    let events = [
+        a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunStarted(RunStarted {
+                argv: vec!["maestro".into(), "test".into()],
+                agent_version: "0.0.0".into(),
+                evidence: None,
+            }),
+        ),
+        a.event(
+            ids.suite(),
+            SourceKind::Declared,
+            &EventBody::SuiteStarted(SuiteStarted {
+                shard_mode: ShardMode::None,
+                shards: 1,
+            }),
+        ),
+        a.event(
+            ids.shard(),
+            SourceKind::DebugLog,
+            &EventBody::ShardAssigned(ShardAssigned {
+                shard_number: 1,
+                device_serial: "emulator-5602".into(),
+                planned: vec![flow_ref.clone()],
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::DebugLog,
+            &EventBody::FlowStarted(FlowStarted {
+                flow: flow_ref,
+                shard_number: 1,
+                ordinal: 0,
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::ArtifactFile,
+            &EventBody::AgentWarning(AgentWarning {
+                code: "commands_not_final".into(),
+                message: CUT_SHORT_MESSAGE.into(),
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::DebugLog,
+            &EventBody::FlowEnded(FlowEnded {
+                outcome: FlowOutcome::Failed,
+                duration_ms: Some(4000),
+                failure: Some(FailureInfo {
+                    message: DEVICE_DEATH.into(),
+                }),
+                flow: None,
+            }),
+        ),
+    ];
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert!(
+        applied.rejected.is_empty(),
+        "every event is accepted: {:?}",
+        applied.rejected
+    );
+    flow
+}
+
+/// Issue #145: the cut-short fact is kept on the flow at ingest, so the device-loss label does not
+/// depend on the journal. The retention purge runs for real and drops the run's journal; the flow
+/// page and the history still label the failure, with the warning as its evidence.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_lost_device_label_survives_the_journal_being_purged(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("device-lost", "a");
+    let flow = device_lost_run(&store, &mut a, &p).await;
+
+    let before = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap()
+        .infrastructure
+        .expect("labelled before the purge");
+    assert_eq!(before.warning, CUT_SHORT_MESSAGE);
+
+    // Journal retention is 14 days. Thirty days from now every journal partition has expired.
+    let keep_journal_14_days = crate::retention::Retention {
+        raw_samples: None,
+        rollup_1m: None,
+        rollup_1h: None,
+        journal: Some(std::time::Duration::from_hours(14 * 24)),
+        steps: None,
+        audit: None,
+    };
+    let later = time::OffsetDateTime::now_utc() + time::Duration::days(30);
+    store
+        .drop_expired(later, &keep_journal_14_days)
+        .await
+        .unwrap();
+    let journal_left: i64 = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM agent_events WHERE agent_run_id = $1",
+        a.id
+    )
+    .fetch_one(store.pool())
+    .await
+    .unwrap();
+    assert_eq!(journal_left, 0, "the purge removed the run's journal");
+
+    let after = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap()
+        .infrastructure
+        .expect("still labelled after the purge");
+    assert_eq!(after.evidence, "maestro.android.DeviceServerDiedException");
+    assert_eq!(after.warning, CUT_SHORT_MESSAGE);
+
+    let now = time::OffsetDateTime::now_utc();
+    let history = store
+        .history(
+            p.project_id,
+            &crate::screens::HistoryQuery {
+                flow: None,
+                branch: None,
+                outcome: None,
+                from: now - time::Duration::days(1),
+                to: now + time::Duration::days(1),
+                after: None,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+    let entry = history
+        .items
+        .iter()
+        .find(|e| e.flow_id == flow)
+        .expect("the flow is in the history");
+    assert_eq!(
+        entry.infrastructure.as_ref().map(|i| i.warning.as_str()),
+        Some(CUT_SHORT_MESSAGE),
+        "the history labels it too, after the purge"
+    );
+}
+
+/// Issue #145: the migration that adds the cut-short fact backfills it from the journal, which
+/// still holds the warnings of the flows it is applied to. Here the column is dropped to look like
+/// the database before the migration, and the migration's own SQL runs over the kept journal.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_cut_short_migration_backfills_flows_from_the_journal(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("backfill", "a");
+    let flow = device_lost_run(&store, &mut a, &p).await;
+    sqlx::query("ALTER TABLE flow_executions DROP COLUMN cut_short")
+        .execute(store.pool())
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../../../../migrations/0028_flow_cut_short.sql"
+    ))
+    .execute(store.pool())
+    .await
+    .unwrap();
+    let kept: Option<String> =
+        sqlx::query_scalar("SELECT cut_short FROM flow_executions WHERE id = $1")
+            .bind(flow)
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+    assert_eq!(kept.as_deref(), Some(CUT_SHORT_MESSAGE));
+}

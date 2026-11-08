@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen D: one flow execution with its claims, steps and failure.
 
-use fleet_core::flaky::{CUT_SHORT, DEVICE_LOST, Exclusion, exclusion_of};
+use fleet_core::flaky::{DEVICE_LOST, Exclusion, exclusion_of};
 use fleet_protocol::{
     event::FlowOutcome,
     live::FlowView,
@@ -45,7 +45,7 @@ impl Store {
         let Some(head) = sqlx::query!(
             "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,
                     device_session_id, flow_name, flow_path, started_at, ended_at,
-                    crash_package, crash_exception, step_warnings
+                    crash_package, crash_exception, step_warnings, cut_short
                FROM flow_executions WHERE id = $1 AND project_id = $2",
             flow_id,
             project_id
@@ -96,7 +96,6 @@ impl Store {
         };
         let claims = claims_of(&mut tx, flow_id, &flow).await?;
         let steps = steps_of(&mut tx, flow_id).await?;
-        let cut_short = cut_short_warning(&mut tx, flow_id).await?;
         let previous = sqlx::query_as!(
             PreviousExecutionView,
             "SELECT id AS flow_id, pipeline_attempt_id, state, outcome_source::text AS outcome_source,
@@ -136,7 +135,7 @@ impl Store {
             flow.outcome_source.as_deref(),
             &flow.finality,
             flow.failure_message.as_deref(),
-            cut_short.as_deref(),
+            head.cut_short.as_deref(),
         );
         Ok(Some(FlowDetailView {
             started_at: head.started_at,
@@ -254,28 +253,6 @@ fn nest(flat: Vec<StepView>) -> Vec<StepView> {
     }
     roots.reverse();
     roots
-}
-
-/// The recorded warning that a flow's commands were cut short (`commands_not_final`), if the
-/// journal holds one. The journal is partitioned by its run's day, so the run's day is looked up
-/// with the run, which keeps the read to one partition.
-pub(super) async fn cut_short_warning(
-    c: &mut sqlx::PgConnection,
-    flow_id: Uuid,
-) -> Result<Option<String>> {
-    let message = sqlx::query_scalar!(
-        "SELECT e.data->>'message' AS \"message?\"
-           FROM agent_events e
-           JOIN agent_runs r ON r.id = e.agent_run_id AND r.run_day = e.run_day
-          WHERE e.flow_execution_id = $1 AND e.type = 'agent.warning' AND e.data->>'code' = $2
-          ORDER BY e.seq
-          LIMIT 1",
-        flow_id,
-        CUT_SHORT
-    )
-    .fetch_optional(c)
-    .await?;
-    Ok(message.flatten())
 }
 
 /// The device loss that makes a failed flow's failure the device's (issue #145). It needs both

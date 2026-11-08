@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT f.id AS flow_id, coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.flow_name AS name,\n                    f.pipeline_attempt_id AS attempt_id, pr.repository, pr.commit_sha, pr.git_ref,\n                    f.state, f.outcome_source::text AS outcome_source,\n                    f.finality::text AS \"finality!\",\n                    coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,\n                    ff.fingerprint AS \"failure_fingerprint?\",\n                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,\n                    CASE WHEN f.state = 'failed' THEN (\n                        SELECT e.data->>'message' FROM agent_events e\n                         WHERE e.run_day = r.run_day AND e.agent_run_id = r.id\n                           AND e.flow_execution_id = f.id AND e.type = 'agent.warning'\n                           AND e.data->>'code' = $10\n                         ORDER BY e.seq LIMIT 1\n                    ) END AS \"cut_short?\"\n               FROM flow_executions f\n               JOIN agent_runs r ON r.id = f.agent_run_id\n               JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n               JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n               LEFT JOIN failure_fingerprints ff ON ff.flow_execution_id = f.id\n               LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n              WHERE f.project_id = $1\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(f.ended_at, f.started_at) >= $2\n                AND coalesce(f.ended_at, f.started_at) < $3\n                AND ($4::text IS NULL\n                     OR strpos(lower(coalesce(d.repo_path, f.flow_name)), lower($4)) > 0\n                     OR strpos(lower(f.flow_name), lower($4)) > 0)\n                AND ($5::text IS NULL OR pr.git_ref IN ($5, 'refs/heads/' || $5))\n                AND ($6::text IS NULL OR f.state = $6)\n                AND ($7::timestamptz IS NULL\n                     OR (coalesce(f.ended_at, f.started_at), f.id) < ($7, $8))\n              ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC\n              LIMIT $9",
+  "query": "SELECT f.id AS flow_id, coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.flow_name AS name,\n                    f.pipeline_attempt_id AS attempt_id, pr.repository, pr.commit_sha, pr.git_ref,\n                    f.state, f.outcome_source::text AS outcome_source,\n                    f.finality::text AS \"finality!\",\n                    coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,\n                    ff.fingerprint AS \"failure_fingerprint?\",\n                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,\n                    f.cut_short AS \"cut_short?\"\n               FROM flow_executions f\n               JOIN agent_runs r ON r.id = f.agent_run_id\n               JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n               JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n               LEFT JOIN failure_fingerprints ff ON ff.flow_execution_id = f.id\n               LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n              WHERE f.project_id = $1\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(f.ended_at, f.started_at) >= $2\n                AND coalesce(f.ended_at, f.started_at) < $3\n                AND ($4::text IS NULL\n                     OR strpos(lower(coalesce(d.repo_path, f.flow_name)), lower($4)) > 0\n                     OR strpos(lower(f.flow_name), lower($4)) > 0)\n                AND ($5::text IS NULL OR pr.git_ref IN ($5, 'refs/heads/' || $5))\n                AND ($6::text IS NULL OR f.state = $6)\n                AND ($7::timestamptz IS NULL\n                     OR (coalesce(f.ended_at, f.started_at), f.id) < ($7, $8))\n              ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC\n              LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -158,7 +158,12 @@
         "ordinal": 16,
         "name": "cut_short?",
         "type_info": "Text",
-        "origin": "Expression"
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "cut_short"
+          }
+        }
       }
     ],
     "parameters": {
@@ -171,8 +176,7 @@
         "Text",
         "Timestamptz",
         "Uuid",
-        "Int8",
-        "Text"
+        "Int8"
       ]
     },
     "nullable": [
@@ -192,8 +196,8 @@
       false,
       null,
       false,
-      null
+      true
     ]
   },
-  "hash": "59658bcc72510f0dd599c4389bf943be585789329dfcf61f1460ec33e9de911d"
+  "hash": "03bd25c8c13ad8419197ad96dc7519851719c539b4432df0002b9b61c3e9fe5a"
 }

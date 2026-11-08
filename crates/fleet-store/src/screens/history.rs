@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use fleet_core::{
     claims::Finality,
     fingerprint::ConditionFingerprint,
-    flaky::{CUT_SHORT, HistoryRun, exclusion_of},
+    flaky::{HistoryRun, exclusion_of},
 };
 use fleet_protocol::{
     event::FlowOutcome,
@@ -144,13 +144,7 @@ impl Store {
                     coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,
                     ff.fingerprint AS \"failure_fingerprint?\",
                     encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,
-                    CASE WHEN f.state = 'failed' THEN (
-                        SELECT e.data->>'message' FROM agent_events e
-                         WHERE e.run_day = r.run_day AND e.agent_run_id = r.id
-                           AND e.flow_execution_id = f.id AND e.type = 'agent.warning'
-                           AND e.data->>'code' = $10
-                         ORDER BY e.seq LIMIT 1
-                    ) END AS \"cut_short?\"
+                    f.cut_short AS \"cut_short?\"
                FROM flow_executions f
                JOIN agent_runs r ON r.id = f.agent_run_id
                JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id
@@ -179,8 +173,7 @@ impl Store {
             query.outcome,
             after.map(|(at, _)| at),
             after.map(|(_, id)| id),
-            query.limit.saturating_add(1),
-            CUT_SHORT
+            query.limit.saturating_add(1)
         )
         .fetch_all(&mut *tx)
         .await?;
