@@ -59,17 +59,36 @@ async fn a_restart_loses_no_committed_event() {
     let (through, _) = c.events(events[..4].to_vec()).await;
     assert_eq!(through, 4);
 
-    h.restart().await;
+    // The client reads while the server drains: the server completes the close handshake only
+    // once the client reads its close frame, so reading after the restart would be too late.
+    let (frames, closed) = h
+        .restart_observed(async {
+            let mut frames = Vec::new();
+            loop {
+                match c.recv().await {
+                    Received::Frame(f) => frames.push(f),
+                    closed @ Received::Closed(_) => break (frames, closed),
+                }
+            }
+        })
+        .await;
     assert!(
         matches!(
-            c.recv().await,
-            Received::Frame(ServerFrame::Goaway {
+            frames.first(),
+            Some(ServerFrame::Goaway {
                 reason: GoawayReason::Shutdown,
                 ..
             })
         ),
-        "goaway before the restart"
+        "goaway before the restart: {frames:?}"
     );
+    assert_eq!(
+        closed.close_code(),
+        Some(CloseCode::Restart),
+        "1012 after the goaway"
+    );
+    // Reading again sends the client's close reply, which lets the server close the socket.
+    assert!(matches!(c.recv().await, Received::Closed(_)));
     let mut c = h.connect(None).await;
     let (committed, _, resume) = welcome(&c.hello(&agent, Some(1)).await);
     assert_eq!(

@@ -97,8 +97,16 @@ impl Harness {
 
     /// A new server process on the same database (a restart).
     pub(crate) async fn restart(&mut self) {
-        self.stop().await;
+        self.restart_observed(async {}).await;
+    }
+
+    /// A restart that runs `observe` while the old server drains its sockets. A client that
+    /// reads `goaway` and the close frame must do so during the drain: the server finishes the
+    /// close handshake only while the client reads (see `ws::close_handshake`).
+    pub(crate) async fn restart_observed<T>(&mut self, observe: impl Future<Output = T>) -> T {
+        let ((), observed) = tokio::join!(self.stop(), observe);
         self.server = Some(fleet_server::start(self.config.clone()).await.unwrap());
+        observed
     }
 
     pub(crate) async fn connect(&self, token: Option<&str>) -> Client {
