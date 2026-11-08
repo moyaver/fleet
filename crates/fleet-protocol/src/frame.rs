@@ -195,6 +195,14 @@ pub struct DeviceSample {
     /// with a reason when unknown). Empty from older agents.
     #[serde(default, skip_serializing_if = "DeviceUnavailable::is_empty")]
     pub unavailable: DeviceUnavailable,
+    /// The device's model (`ro.product.model`), once read; carried on every sample after that.
+    /// Absent from older agents (issue #85).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// The device's OS version (`ro.build.version.release`), once read, as `model`. Absent from
+    /// older agents (issue #85).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub os_version: Option<String>,
 }
 
 /// Why a device, host or process reading is unknown (PLAN §6.5). A reading that is set has no
@@ -488,6 +496,56 @@ pub struct Hello {
         schemars(schema_with = "crate::schema::rfc3339_option")
     )]
     pub started_at: Option<time::OffsetDateTime>,
+    /// The flows the run's workspace holds, as the agent found them before Maestro ran (issue
+    /// #85). Empty from older agents and when there is no workspace to read; the server then learns
+    /// no flow it hasn't seen run.
+    #[serde(default, skip_serializing_if = "FlowCatalog::is_empty")]
+    pub catalog: FlowCatalog,
+}
+
+/// The flows a workspace holds, as the agent found them (issue #85). Bounded by the agent: at most
+/// [`MAX_CATALOG_FLOWS`] entries, and `truncated` says more were found and left out.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct FlowCatalog {
+    /// The flows, sorted by path.
+    #[serde(default)]
+    pub flows: Vec<CatalogFlow>,
+    /// More flows than `flows` lists were found.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
+}
+
+impl FlowCatalog {
+    /// Whether the catalog says nothing: no flows and nothing left out.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.flows.is_empty() && !self.truncated
+    }
+}
+
+/// The most flows a catalog carries (issue #85). The agent stops at this many; the server refuses
+/// nothing below it.
+pub const MAX_CATALOG_FLOWS: usize = 500;
+/// The longest path a catalog flow may have, in bytes.
+pub const MAX_CATALOG_PATH_BYTES: usize = 512;
+/// The most tags a catalog flow may carry.
+pub const MAX_CATALOG_TAGS: usize = 16;
+/// The longest tag, in bytes.
+pub const MAX_CATALOG_TAG_BYTES: usize = 64;
+
+/// One flow file of the workspace, as its header describes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct CatalogFlow {
+    /// The flow's path, relative to the repository root, as the flow's runs name it.
+    pub path: String,
+    /// The `name:` of its header, when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The `tags:` of its header.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 /// A closed range of protocol versions.
@@ -865,5 +923,91 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn a_hello_without_a_catalog_is_an_older_agents_and_an_empty_catalog_is_not_sent() {
+        let mut hello = Hello {
+            protocol: ProtocolRange { min: 1, max: 1 },
+            agent: AgentInfo {
+                version: "0.0.0".into(),
+                os: "linux".into(),
+                arch: "x86_64".into(),
+            },
+            agent_run_id: Uuid::nil(),
+            previous_agent_run_id: None,
+            ci: CiContext {
+                provider: CiProvider::Generic,
+                repository: None,
+                run_id: None,
+                run_attempt: None,
+                job_key: "job".into(),
+                job_name: None,
+                sha: None,
+                git_ref: None,
+                runner: None,
+            },
+            resume: ResumeState {
+                next_seq: 1,
+                oldest_unacked_seq: None,
+            },
+            clock: ClockSample {
+                wall: time::OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            },
+            origin: RunOrigin::Live,
+            started_at: None,
+            catalog: FlowCatalog::default(),
+        };
+        let json = serde_json::to_value(&hello).unwrap();
+        assert!(
+            json.get("catalog").is_none(),
+            "an empty catalog is left out: {json}"
+        );
+        // An older agent's hello, which has no catalog, decodes with an empty one.
+        let decoded: Hello = serde_json::from_value(json).unwrap();
+        assert!(decoded.catalog.is_empty());
+        hello.catalog = FlowCatalog {
+            flows: vec![CatalogFlow {
+                path: "flows/login.yaml".into(),
+                name: Some("login".into()),
+                tags: vec!["smoke".into()],
+            }],
+            truncated: true,
+        };
+        let json = serde_json::to_value(&hello).unwrap();
+        let back: Hello = serde_json::from_value(json).unwrap();
+        assert_eq!(back.catalog, hello.catalog);
+    }
+
+    #[test]
+    fn a_device_sample_without_identity_fields_decodes_from_an_older_agent() {
+        let sample = DeviceSample {
+            model: Some("Pixel_8".into()),
+            os_version: None,
+            at: ClockSample {
+                wall: time::OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            },
+            device_session_id: Uuid::nil(),
+            adb_state: None,
+            boot_completed: None,
+            guest_cpu_pct: None,
+            guest_mem_available_bytes: None,
+            emu_cpu_pct: None,
+            emu_rss_bytes: None,
+            avd_name: None,
+            api_level: None,
+            foreground_activity: None,
+            shard: None,
+            unavailable: DeviceUnavailable::default(),
+        };
+        let json = serde_json::to_value(&sample).unwrap();
+        assert_eq!(json.get("model"), Some(&serde_json::json!("Pixel_8")));
+        assert!(json.get("os_version").is_none());
+        let mut older = json.clone();
+        older.as_object_mut().unwrap().remove("model");
+        let decoded: DeviceSample = serde_json::from_value(older).unwrap();
+        assert_eq!(decoded.model, None);
     }
 }
