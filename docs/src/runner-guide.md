@@ -68,6 +68,20 @@ On GitHub Actions, give the job `permissions: id-token: write` and leave `FLEET_
 
 Elsewhere, set `FLEET_TOKEN` to an API key (`fleet api-key create --project <slug> --name <ci>` on the server). Either way, a refused credential only turns telemetry off: Maestro runs and exits exactly as it would without the agent.
 
+## Offline runs and `publish`
+
+A run with no `FLEET_SERVER`, such as a fork pull request, is offline: it keeps everything locally, and when it ends it writes `fleet-bundle.tar.zst` into its run directory (`$RUN`). The bundle holds the run's journal (every event, as `journal.jsonl` records them) and each artifact the run would have uploaded: failure screenshots, `commands.json`, the hierarchy, the device log excerpt, the JUnit report, `maestro.log` and the HTML report. Each artifact is redacted exactly as a live upload is, so the bundle never holds a value the server would not have seen (I6). The bundle is written after Maestro has exited and never changes its output or exit status. If it cannot be written, the run prints one notice and is otherwise unchanged.
+
+Keep the bundle as a workflow artifact, then send it from a job that can reach the server:
+
+```bash
+FLEET_SERVER=https://fleet.example.com FLEET_TOKEN="$FLEET_TOKEN" fleet-agent publish fleet-bundle.tar.zst
+```
+
+`publish` also takes a Maestro output directory (a capture, or a saved debug directory, such as `…/artifacts`). It replays that directory through the same session a live run uses and uploads its files the same way. Either way it needs `FLEET_SERVER` and `FLEET_TOKEN`, or the CI OIDC variables, as a live run does, and it prints the run it created. The run gets a new agent run id; its CI identity is the bundle's (or, for a directory, the publishing job's).
+
+A published run is imported, not live. Its events keep their evidence kinds, except that live console output is recorded as debug-log evidence, because after the fact it is no longer live (I4). To read a bundle without publishing it, extract it (`tar --zstd -xf fleet-bundle.tar.zst -C dir`) and run `fleet-agent inspect dir`, which reports the journal's events and whether it is complete. A bundle whose journal reached its size cap says so, and the published run carries a `journal.gap` for the events the bundle does not hold; the run is not ended in that case.
+
 ## Proxies and certificates
 
 The agent trusts Mozilla's bundle, the system's certificate store and, with `FLEET_CA_FILE`, an extra PEM bundle (for TLS-inspecting corporate proxies). `wss://` connections go through `HTTPS_PROXY` (or `ALL_PROXY`), `ws://` through `HTTP_PROXY`, unless `NO_PROXY` matches the host (`host`, `.domain`, `domain` or `*`). The WebSocket opens an HTTP `CONNECT` tunnel; proxies are `http://`, optionally with `user:password@` (percent-encoded). The OIDC exchange uses the same proxies and certificates.

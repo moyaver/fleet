@@ -15,6 +15,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a flow whose device was lost during it (Maestro's `DeviceServerDiedException`) is labelled "Infrastructure, not the app" above Maestro's failure, and the label says the failure is excluded from flakiness; the flow stays failed. Its history row and `fleet-agent inspect` carry the same label (#145).
 - Failure triage: a maintainer marks a failure fingerprint Known (with the issue that tracks it) or Resolved, or clears it. The state shows on history rows, on the failure groups of a flow's stats and on the flow page's failure band. Every fingerprint records when it was first seen, and every change is audited (`PUT` and `DELETE /api/v1/projects/{project}/failures/{fingerprint}/triage`; migration 0020, #84).
 
+- Agent: an offline run (no `FLEET_SERVER`, such as a fork pull request) writes `fleet-bundle.tar.zst` to its run directory: its journal and the artifacts it would have uploaded, each redacted as a live upload is. The run's output and exit status are unchanged (#83).
+- Agent: `fleet-agent publish <bundle or Maestro output directory>` sends a finished run to the server as a new, imported run. Live console output is recorded as debug-log evidence, not as live (#83).
 - Agent: a Maestro HTML report the command asks for with `--format html --output <file>` is uploaded as an `html_report` artifact when the run wrote it (redacted like a log; not uploaded above 16 MiB). An upload that fails never changes the run's result (#43).
 - Server: the usercontent origin answers HTTP `Range` requests for artifacts: a single byte range is `206 Partial Content` with `Content-Range`, an unsatisfiable one is `416`, and every answer carries `Accept-Ranges: bytes` (#43).
 
