@@ -47,7 +47,7 @@ It never removes a flag.
 | any command with your own `--format` | no (yours is used) |
 | a flow path that doesn't exist or can't be read | no |
 
-Without the report, Fleet still follows the run from Maestro's session log, flow bundles and exit status; it just has no JUnit to reconcile against. Exit status 1 still counts as test failures when Fleet saw a flow fail in Maestro's output or flow bundles; if it saw none, the exit is classified as unknown (`other`) rather than as a Maestro error, which is reserved for a report that was expected and is missing. The agent logs its decision once, at info level (`junit report decision`).
+Without the report, Fleet still follows the run from Maestro's session log, flow bundles and exit status; it just has no JUnit to reconcile against. Maestro's default console names no flow, so a run with no `--format` takes its flow from the command: when the command names exactly one flow file, run alone (one device, one shard, no `-c`), the flow is that file's name, and its steps settle from its final `commands.json` (`maestro test login.yaml` runs `login`). A command that names a directory, several flows, or is sharded does not, and its commands file is warned as `commands_flow_unnamed` on the run, with no flow for it. Exit status 1 still counts as test failures when Fleet saw a flow fail in Maestro's output or flow bundles; if it saw none, the exit is classified as unknown (`other`) rather than as a Maestro error, which is reserved for a report that was expected and is missing. The agent logs its decision once, at info level (`junit report decision`).
 
 ## Configuration
 

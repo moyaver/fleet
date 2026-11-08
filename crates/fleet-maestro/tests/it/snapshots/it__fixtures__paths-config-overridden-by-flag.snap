@@ -20,7 +20,11 @@ expression: summary
         "shard": 1
       }
     ],
-    "steps": {},
+    "steps": {
+      "Completed": 2,
+      "Failed": 1,
+      "Running": 3
+    },
     "with_continuation": 0
   },
   "report": "absent",

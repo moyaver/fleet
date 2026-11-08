@@ -121,7 +121,7 @@ fn a_failure_that_names_a_lost_device_is_not_labelled_without_the_recorded_warni
 }
 
 /// Copies a directory tree (the fixture's files, for a test that edits one of them).
-fn copy_dir(from: &Path, to: &Path) {
+pub(super) fn copy_dir(from: &Path, to: &Path) {
     fs::create_dir_all(to).unwrap();
     for entry in fs::read_dir(from).unwrap().flatten() {
         let target = to.join(entry.file_name());

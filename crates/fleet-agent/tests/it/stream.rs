@@ -1284,3 +1284,72 @@ fn a_rate_limited_agent_waits_for_retry_after_and_the_run_keeps_maestros_status(
         "the run's events arrived once the server let the agent in"
     );
 }
+
+/// Issue #148, live: a single flow run with no `--format` settles its steps from its final commands
+/// file. The fake Maestro replays the captured `single-flow-no-format` run, with its session log and
+/// its flow folder where the fake reads them. The agent runs it as it runs any command: the command
+/// names the one flow file, so the flow starts at its first command line, and the steps the final
+/// file lists settle on the server.
+#[test]
+fn a_single_flow_run_without_a_format_settles_its_steps_on_the_server() {
+    let captured = fixture("single-flow-no-format");
+    let session = captured.join("state/maestro/tests/2026-11-04_022836");
+    let fake = std::env::temp_dir().join(format!("fleet-captured-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&fake);
+    let debug = fake.join("run/debug");
+    std::fs::create_dir_all(&debug).unwrap();
+    std::fs::copy(session.join("maestro.log"), debug.join("maestro.log")).unwrap();
+    super::inspect::copy_dir(&session.join("pass"), &debug.join("pass"));
+    std::fs::copy(captured.join("exit.json"), fake.join("exit.json")).unwrap();
+    std::fs::write(fake.join("stdout.bin"), b"").unwrap();
+    // The flow the command names: the agent classifies it on disk, and Maestro would read it.
+    let flow = fake.join("pass.yaml");
+    std::fs::write(&flow, "appId: com.android.settings\n---\n- launchApp\n").unwrap();
+
+    let srv = server(Mode::Normal);
+    let fake_dir = fake.display().to_string();
+    let (out, _, _run_dir) = run_agent_on(
+        "single-flow-no-format",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[flow.as_os_str()],
+        &[("FLEET_FAKE_FIXTURE", fake_dir.as_str())],
+        None,
+    );
+    assert_eq!(out.status.code(), Some(0), "the captured run passed");
+    let s = srv.state.lock().unwrap();
+    let started: Vec<&Value> = s
+        .committed
+        .values()
+        .filter(|e| e["type"] == "flow.started")
+        .collect();
+    assert_eq!(started.len(), 1, "the command's flow starts once");
+    assert_eq!(started[0]["data"]["flow"]["name"], "pass");
+    let flow_id = &started[0]["subject"]["flow_execution_id"];
+    let settled: Vec<&Value> = s
+        .committed
+        .values()
+        .filter(|e| e["type"] == "step.ended" && e["src"]["kind"] == "artifact_file")
+        .collect();
+    assert_eq!(settled.len(), 7, "every command of the final file settles");
+    assert!(
+        settled
+            .iter()
+            .all(|e| &e["subject"]["flow_execution_id"] == flow_id),
+        "the steps belong to the flow the command named"
+    );
+    assert!(
+        s.committed
+            .values()
+            .all(|e| e["data"]["code"] != "commands_flow_unnamed"),
+        "no file went unnamed"
+    );
+    let ended = s
+        .committed
+        .values()
+        .find(|e| e["type"] == "flow.ended")
+        .expect("the flow ends");
+    assert_eq!(ended["data"]["outcome"], "passed", "{ended}");
+    drop(s);
+    let _ = std::fs::remove_dir_all(&fake);
+}

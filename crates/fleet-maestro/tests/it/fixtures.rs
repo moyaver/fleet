@@ -58,7 +58,7 @@ fn parse_log(path: &Path) -> Value {
             Some(log::Event::FlowStarted { shard, name }) => {
                 flows.push(json!({ "shard": shard, "name": name }));
             }
-            Some(log::Event::Step { state, .. }) => {
+            Some(log::Event::Step { state, .. } | log::Event::CommandStep { state, .. }) => {
                 *step_ends.entry(format!("{state:?}")).or_default() += 1;
             }
             Some(log::Event::MaestroVersion { version }) => maestro_version = Some(version),

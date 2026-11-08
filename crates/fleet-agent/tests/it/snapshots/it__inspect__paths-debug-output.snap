@@ -3,16 +3,31 @@ source: crates/fleet-agent/tests/it/inspect.rs
 expression: result
 ---
 {
-  "flows": [],
-  "events": 8,
+  "flows": [
+    {
+      "shard": 1,
+      "name": "pass",
+      "path": "<REPO>/examples/flows/phase0/pass.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "artifact_file",
+      "conflict": false,
+      "steps": 7,
+      "failure": null
+    }
+  ],
+  "events": 30,
   "event_types": {
-    "agent.warning": 1,
+    "flow.ended": 1,
+    "flow.started": 1,
     "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
+    "step.ended": 14,
+    "step.started": 7,
     "suite.started": 1
   },
   "unrecognized_stdout": 0
