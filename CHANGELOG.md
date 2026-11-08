@@ -7,6 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Dashboard: a failed flow's page (screen D) and its row in the history (screen E) show the Maestro command that reruns that flow, selectable and copyable. The command is the run's own, with the flow's path last; env values and unrecognised flags are never shown, and the page names what was left out (#82).
+- Dashboard: an attempt's failed flows download as a plan manifest, from the flow page, the history rows of failed flows and the pipeline page. One shard per run with a failed flow; `fleet-agent run --plan` reruns exactly those flows. An attempt with no failed flow answers `404`, and one whose failed flow has no path answers `409` (#82).
+- Server: `GET /api/v1/projects/{project}/attempts/{attempt}/failed-flows` serves that manifest as an attachment. The screen D and history rows carry `reproduction` (`command`, `left_out`, `unavailable`) (#82).
+- Agent: `run.started` carries `reproduction`, the words of the run's `maestro test` command with its env values as `[REDACTED]` and its unknown flags named only, built from the redacted argv. Migration 0029 stores them on `agent_runs` (#82).
 - Dashboard: a failure's *First seen* date shows beside its triage state on the flow page and in the history (#84).
 - Dashboard: every live page (overview, pipeline, flow, runner and device) has one polite status region that reads run events out in batches, at most once every five seconds: a run starting or ending, a flow failing or being interrupted, a pipeline's verdict changing. Log lines and counts are never read out (#149).
 - Agent: each emulator's `qemu-system-*` process is matched to its serial by its console port, and its CPU and resident memory are sent with the device's samples (`emu_cpu_pct`, `emu_rss_bytes`, #39).
