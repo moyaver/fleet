@@ -10,7 +10,7 @@ use fleet_protocol::{
         AppCrashed, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
         FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed,
         ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
-        StepStatus, SuiteStarted,
+        StepStatus, StepTiming, SuiteStarted,
     },
     frame::{AgentInfo, CiContext, ProtocolRange, ResumeState},
     journal::{ClockSample, Provenance, SourceKind, StepRef, Subject},
@@ -1581,4 +1581,194 @@ async fn an_app_crash_is_shown_on_its_flow_and_changes_no_verdict(pool: PgPool) 
         Some("Assertion is false")
     );
     assert_eq!(flows(&store, a.id).await[0].1, "failed");
+}
+
+/// The step rows of a flow, by index: `(index, status, source, started, ended)`.
+async fn step_rows(
+    store: &Store,
+    flow: Uuid,
+) -> Vec<(
+    i32,
+    String,
+    String,
+    Option<OffsetDateTime>,
+    Option<OffsetDateTime>,
+)> {
+    sqlx::query_as(
+        "SELECT step_index, status, source::text, started_at, ended_at
+           FROM step_executions WHERE flow_execution_id = $1 ORDER BY step_index",
+    )
+    .bind(flow)
+    .fetch_all(store.pool())
+    .await
+    .unwrap()
+}
+
+/// The log's three steps of one flow (issue #148): each started and ended, all completed.
+fn logged_steps(a: &mut Agent, ids: &SuiteIds, flow: Uuid) -> Vec<EventEnvelope> {
+    let mut out = Vec::new();
+    for (index, description) in ["Launch app", "Tap on \"Apps\"", "Assert visible"]
+        .into_iter()
+        .enumerate()
+    {
+        let step = Subject {
+            step: Some(StepRef {
+                index: u32::try_from(index).unwrap(),
+            }),
+            ..ids.flow(flow)
+        };
+        out.push(a.event(
+            step.clone(),
+            SourceKind::DebugLog,
+            &EventBody::StepStarted(StepStarted {
+                description: description.into(),
+                depth: None,
+                parent: None,
+                attempt: None,
+            }),
+        ));
+        out.push(a.event(
+            step,
+            SourceKind::DebugLog,
+            &EventBody::StepEnded(StepEnded {
+                status: StepStatus::Completed,
+                timing: None,
+            }),
+        ));
+    }
+    out
+}
+
+/// A final `commands.json` settles the steps it covers and no others (issue #148): a covered row
+/// takes the file's status and timing, an uncovered one keeps the log's, and the file never creates
+/// a row. A log event that arrives after the settle does not undo it.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_final_file_settles_the_rows_it_covers_and_creates_none(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("settle", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let flow = Uuid::now_v7();
+    let flow_ref = FlowRef {
+        name: "settle".into(),
+        path: Some("flows/settle.yaml".into()),
+    };
+    let mut events = vec![
+        a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunStarted(RunStarted {
+                argv: vec!["maestro".into(), "test".into()],
+                agent_version: "0.0.0".into(),
+                evidence: None,
+            }),
+        ),
+        a.event(
+            ids.suite(),
+            SourceKind::Declared,
+            &EventBody::SuiteStarted(SuiteStarted {
+                shard_mode: ShardMode::None,
+                shards: 1,
+            }),
+        ),
+        a.event(
+            ids.shard(),
+            SourceKind::DebugLog,
+            &EventBody::ShardAssigned(ShardAssigned {
+                shard_number: 1,
+                device_serial: "emulator-5554".into(),
+                planned: vec![flow_ref.clone()],
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::DebugLog,
+            &EventBody::FlowStarted(FlowStarted {
+                flow: flow_ref,
+                shard_number: 1,
+                ordinal: 0,
+            }),
+        ),
+    ];
+    events.extend(logged_steps(&mut a, &ids, flow));
+    let step = |index: u32| Subject {
+        step: Some(StepRef { index }),
+        ..ids.flow(flow)
+    };
+    // Step 0 is covered with its timing; step 1 without; step 2 is not covered; step 9 was never
+    // reported, so it must not appear.
+    let started_ms: i64 = 1_793_751_910_644;
+    events.push(a.event(
+        step(0),
+        SourceKind::ArtifactFile,
+        &EventBody::StepEnded(StepEnded {
+            status: StepStatus::Failed,
+            timing: Some(StepTiming {
+                started_ms,
+                duration_ms: 4_250,
+            }),
+        }),
+    ));
+    events.push(a.event(
+        step(1),
+        SourceKind::ArtifactFile,
+        &EventBody::StepEnded(StepEnded {
+            status: StepStatus::Completed,
+            timing: None,
+        }),
+    ));
+    events.push(a.event(
+        step(9),
+        SourceKind::ArtifactFile,
+        &EventBody::StepEnded(StepEnded {
+            status: StepStatus::Completed,
+            timing: None,
+        }),
+    ));
+    // A late log end for the settled step must not undo the file's status.
+    events.push(a.event(
+        step(0),
+        SourceKind::DebugLog,
+        &EventBody::StepEnded(StepEnded {
+            status: StepStatus::Completed,
+            timing: None,
+        }),
+    ));
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert!(
+        applied.rejected.is_empty(),
+        "every event is accepted: {:?}",
+        applied.rejected
+    );
+
+    let rows = step_rows(&store, flow).await;
+    let start =
+        OffsetDateTime::from_unix_timestamp_nanos(i128::from(started_ms) * 1_000_000).unwrap();
+    assert_eq!(rows.len(), 3, "no row is created for step 9: {rows:?}");
+    let (index, status, source, from, to) = &rows[0];
+    assert_eq!(
+        (*index, status.as_str(), source.as_str()),
+        (0, "failed", "artifact_file"),
+        "covered, and the file's status wins over the late log end"
+    );
+    assert_eq!(*from, Some(start), "the file's start");
+    assert_eq!(
+        *to,
+        Some(start + time::Duration::milliseconds(4_250)),
+        "the file's length"
+    );
+    assert_eq!(rows[1].1, "completed");
+    assert_eq!(rows[1].2, "artifact_file");
+    assert_eq!(
+        rows[2].2, "debug_log",
+        "an uncovered step stays provisional"
+    );
 }
