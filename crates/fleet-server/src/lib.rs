@@ -106,7 +106,11 @@ pub async fn run(cli: Cli, env: Vec<(String, String)>) -> anyhow::Result<()> {
             action: ApiKeyAction::Create { project, name },
         } => {
             let store = connect(&config)?;
-            let project_id = store.upsert_project(&project, &project).await?;
+            // A project that exists keeps its name; only a new one takes its slug as its name.
+            let project_id = match store.project_id(&project).await? {
+                Some(id) => id,
+                None => store.upsert_project(&project, &project).await?,
+            };
             let (id, key) = store
                 .create_api_key(project_id, &name, TrustLevel::Trusted)
                 .await?;
