@@ -56,6 +56,24 @@ async fn the_token_endpoint_limits_one_client_ip_and_says_when_to_retry() {
 }
 
 #[tokio::test]
+async fn a_browser_sign_in_is_limited_per_client_ip_like_the_token_endpoint() {
+    // Browser sign-in shares the pre-auth IP limiter (research 06 T20/T21 and #35). This harness
+    // configures no login, so each request is answered 404; the limiter still counts it.
+    let h = Harness::start_with(tight_ip_limit).await;
+    let client = reqwest::Client::new();
+    let sign_in = format!("http://{}/api/v1/auth/login", h.addr());
+    for _ in 0..3 {
+        assert_eq!(
+            client.get(&sign_in).send().await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+    }
+    let refused = client.get(&sign_in).send().await.unwrap();
+    assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(retry_after(&refused), 60, "one request a minute");
+}
+
+#[tokio::test]
 async fn behind_a_trusted_proxy_each_forwarded_client_gets_its_own_bucket() {
     let h = Harness::start_with(|c| {
         tight_ip_limit(c);
