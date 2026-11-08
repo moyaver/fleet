@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Dashboard: screen E lists the flow catalog, every flow the project knows, including flows that have never run (shown as "Never run", never as a pass). The agent sends the workspace's flows with their header tags in `hello.catalog`, and a stored plan names its flows; migration 0031 stores the tags on `flow_definitions` (#85).
+- Dashboard: screen E filters on tag, device model, OS version, runner, device, CI provider, commit, failure fingerprint and suite, as well as flow, branch, outcome and window. Every filter is in the address, so a saved view is a link (#85, with #41).
+- Dashboard: screen E shows a project trend over the filtered trusted runs: passed, failed and flaky counts per UTC day, and the median and 95th-percentile duration per day and over the window (#85, with #41).
+- Protocol: `hello` carries `catalog` (the workspace's flows, bounded at 500, with `truncated`) and each device sample in `telemetry` carries `model` and `os_version`; both are optional, and PROTOCOL_VERSION stays 1 (#85).
+- Server: `GET /api/v1/projects/{project}/flows` (the flow catalog) and `GET /api/v1/projects/{project}/history/trend` (the trend); the history takes the new filters (#85).
 - Dashboard: a failed flow's page (screen D) and its row in the history (screen E) show the Maestro command that reruns that flow, selectable and copyable. The command is the run's own, with the flow's path last; env values and unrecognised flags are never shown, and the page names what was left out (#82).
 - Dashboard: an attempt's failed flows download as a plan manifest, from the flow page, the history rows of failed flows and the pipeline page. One shard per run with a failed flow; `fleet-agent run --plan` reruns exactly those flows. An attempt with no failed flow answers `404`, and one whose failed flow has no path answers `409` (#82).
 - Server: `GET /api/v1/projects/{project}/attempts/{attempt}/failed-flows` serves that manifest as an attachment. The screen D and history rows carry `reproduction` (`command`, `left_out`, `unavailable`) (#82).
