@@ -8,7 +8,7 @@
 
 use std::time::{Duration, Instant};
 
-use fleet_loadgen::Options;
+use fleet_loadgen::{Hold, HoldAt, Options};
 use serde_json::{Value, json};
 
 use crate::{
@@ -489,5 +489,209 @@ async fn the_phone_header_is_the_brand_mark_and_every_page_is_one_tap_away() {
         "the menu is the phone's"
     );
     browser.set_viewport_width(1440).await;
+    browser.quit().await;
+}
+
+/// Waits until the attempt has at least `flows` flow executions and a device on the server, and
+/// returns its snapshot.
+async fn snapshot_with_flows(stack: &Stack, attempt: &str, flows: usize) -> Value {
+    let deadline = Instant::now() + PATIENCE;
+    loop {
+        let s: Value = stack
+            .get(&format!("/api/v1/projects/app/attempts/{attempt}"))
+            .await;
+        if s["flows"].as_array().is_some_and(|f| f.len() >= flows)
+            && s["devices"].as_array().is_some_and(|d| !d.is_empty())
+        {
+            return s;
+        }
+        assert!(Instant::now() < deadline, "no {flows} flows yet: {s}");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// JS: how many requests the page has made for the REST resource at `path`.
+fn fetches_of(path: &str) -> String {
+    format!(
+        "performance.getEntriesByType('resource').filter(e => e.name.endsWith('{path}')).length"
+    )
+}
+
+#[tokio::test]
+async fn moving_between_the_live_pages_keeps_exactly_one_socket_open() {
+    // Issue #40: every page that follows a live feed shares the app's one socket. Walking the
+    // overview, a pipeline, a flow, a device and a runner, the page holds one socket and never a
+    // second one.
+    let stack = stack(|_| {}).await;
+    let hold = before_report();
+    let run = start_run(held_run_options(&stack, "one-socket", &hold));
+    let attempt = attempt_appears(&stack, "one-socket").await;
+    let snapshot = snapshot_with_flows(&stack, &attempt, 1).await;
+    let flow = snapshot["flows"][0]["id"].as_str().unwrap().to_owned();
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/", stack.addr()))
+        .await
+        .unwrap();
+    page.wait("the run on the overview", &count_of(&q("active-row")))
+        .await;
+    page.wait("the overview is live", &connection_is("live"))
+        .await;
+    assert_eq!(browser.sockets().await, (1, 1), "the overview's one socket");
+
+    // Each step follows a link the page shows, as a person would click it.
+    let steps = [
+        (
+            format!("a[href='/p/app/pipelines/{attempt}']"),
+            "pipeline",
+            format!("{} >= 1", count_of(&q("flow-row"))),
+        ),
+        (
+            format!("a[href^='/flows/{flow}']"),
+            "flow",
+            format!("{} === 1", count_of(&q("flow-page"))),
+        ),
+        (
+            "a[href^='/devices/']".to_owned(),
+            "device",
+            format!("{} === 1", count_of(&q("device-page"))),
+        ),
+        (
+            "a[href^='/workers/']".to_owned(),
+            "runner",
+            format!("{} === 1", count_of(&q("worker-page"))),
+        ),
+    ];
+    for (link, name, ready) in &steps {
+        // The link arrives with the data it leads from, so wait for it before the click.
+        let anchor = format!("document.querySelector(\"{link}\")");
+        page.wait(
+            &format!("the link to the {name} page"),
+            &format!("{anchor} !== null"),
+        )
+        .await;
+        page.eval(&format!("{anchor}.click(); return true;"), vec![])
+            .await;
+        page.wait(&format!("the {name} page"), ready).await;
+        page.wait(&format!("the {name} is live"), &connection_is("live"))
+            .await;
+        assert_eq!(
+            browser.sockets().await,
+            (1, 1),
+            "after the {name} page: one socket, still open"
+        );
+    }
+    hold.release();
+    run.await.unwrap();
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// JS: the live indicator shows this state.
+fn connection_is(state: &str) -> String {
+    format!("document.querySelector('[data-testid=connection]')?.dataset.state === '{state}'")
+}
+
+#[tokio::test]
+async fn the_runner_page_refetches_when_new_samples_arrive_and_never_reloads() {
+    // Issue #40: a runner's page follows the project's live socket. The agent's telemetry commits
+    // new host samples while the run goes on; the page sees the change without a reload.
+    let stack = stack(|_| {}).await;
+    let hold = Hold::new([HoldAt::AfterFlows(1), HoldAt::BeforeReport]);
+    let mut opts = held_run_options(&stack, "runner-live", &hold);
+    opts.flows = 4;
+    let run = start_run(opts);
+    let attempt = attempt_appears(&stack, "runner-live").await;
+    let snapshot = snapshot_with_flows(&stack, &attempt, 1).await;
+    let worker = worker_of(&stack, &snapshot).await;
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!(
+            "http://{}/workers/{worker}?project=app",
+            stack.addr()
+        ))
+        .await
+        .unwrap();
+    page.wait("the runner page", &count_of(&q("worker-page")))
+        .await;
+    page.mark_loaded().await;
+    page.wait("the runner page is live", &connection_is("live"))
+        .await;
+    let path = format!("/api/v1/projects/app/workers/{worker}");
+    let before = page
+        .eval(&format!("return {};", fetches_of(&path)), vec![])
+        .await;
+    // The rest of the run: its flows, and the samples its batches carry.
+    hold.release();
+    page.wait(
+        "the runner page to read its runner again",
+        &format!("{} > {before}", fetches_of(&path)),
+    )
+    .await;
+    assert!(
+        page.never_reloaded().await,
+        "the page updated itself; it was never reloaded"
+    );
+    hold.release();
+    run.await.unwrap();
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+#[tokio::test]
+async fn the_device_page_shows_its_new_flows_without_a_reload() {
+    // Issue #40: a device's page follows the project's live socket: the flows that run on it
+    // appear as the run goes on, and the page is never reloaded.
+    let stack = stack(|_| {}).await;
+    let hold = Hold::new([HoldAt::AfterFlows(1), HoldAt::BeforeReport]);
+    let mut opts = held_run_options(&stack, "device-live", &hold);
+    opts.flows = 6;
+    let run = start_run(opts);
+    let attempt = attempt_appears(&stack, "device-live").await;
+    let snapshot = snapshot_with_flows(&stack, &attempt, 1).await;
+    let device = snapshot["flows"][0]["device_session_id"]
+        .as_str()
+        .expect("the first flow ran on a device")
+        .to_owned();
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!(
+            "http://{}/devices/{device}?project=app",
+            stack.addr()
+        ))
+        .await
+        .unwrap();
+    page.wait("the device page", &count_of(&q("device-page")))
+        .await;
+    page.mark_loaded().await;
+    page.wait("the device page is live", &connection_is("live"))
+        .await;
+    let rows = count_of(&q("device-flow"));
+    let before = page.eval(&format!("return {rows};"), vec![]).await;
+    hold.release();
+    page.wait("the device's new flows", &format!("{rows} > {before}"))
+        .await;
+    assert!(
+        page.never_reloaded().await,
+        "the page updated itself; it was never reloaded"
+    );
+    hold.release();
+    run.await.unwrap();
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }

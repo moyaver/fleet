@@ -28,6 +28,11 @@ const CSP_RECORDER: &str = "window.__cspViolations = [];\
     document.addEventListener('securitypolicyviolation', e => \
     window.__cspViolations.push(e.violatedDirective + ' ' + e.blockedURI));";
 
+/// Records every WebSocket the page constructs, so a test can count the sockets it holds open.
+const SOCKET_RECORDER: &str = "window.__sockets = []; const NativeWebSocket = window.WebSocket;\
+    window.WebSocket = class extends NativeWebSocket {\
+    constructor(...args) { super(...args); window.__sockets.push(this); } };";
+
 /// chromedriver: `$CHROMEDRIVER`, then `target/tools/chromedriver` (`cargo xtask setup`), then
 /// `$CHROMEWEBDRIVER` (GitHub's runners), then `PATH`.
 fn driver_path() -> PathBuf {
@@ -114,13 +119,15 @@ impl Browser {
                 .await
             {
                 Ok(client) => {
-                    client
-                        .issue_cmd(Cdp {
-                            method: "Page.addScriptToEvaluateOnNewDocument",
-                            params: json!({ "source": CSP_RECORDER }),
-                        })
-                        .await
-                        .unwrap();
+                    for source in [CSP_RECORDER, SOCKET_RECORDER] {
+                        client
+                            .issue_cmd(Cdp {
+                                method: "Page.addScriptToEvaluateOnNewDocument",
+                                params: json!({ "source": source }),
+                            })
+                            .await
+                            .unwrap();
+                    }
                     return Self {
                         client,
                         _chromedriver: child,
@@ -131,6 +138,20 @@ impl Browser {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
         panic!("chromedriver should accept a session: {last:?}");
+    }
+
+    /// The `WebSockets` the page has constructed, and how many of them are open (connecting or open).
+    pub(crate) async fn sockets(&self) -> (usize, usize) {
+        let value = self
+            .client
+            .execute(
+                "const s = window.__sockets; return [s.length, s.filter(w => w.readyState <= 1).length];",
+                Vec::new(),
+            )
+            .await
+            .unwrap();
+        let counts: Vec<usize> = serde_json::from_value(value).unwrap();
+        (counts[0], counts[1])
     }
 
     /// Content-security-policy violations the page has reported so far.
