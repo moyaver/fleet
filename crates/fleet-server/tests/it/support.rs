@@ -309,6 +309,7 @@ impl Agent {
                 &EventBody::RunStarted(RunStarted {
                     argv: vec!["maestro".into()],
                     agent_version: "0.0.0".into(),
+                    reproduction: None,
                     evidence: None,
                 }),
             ),

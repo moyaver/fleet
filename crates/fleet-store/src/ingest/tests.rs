@@ -172,6 +172,7 @@ pub(crate) fn suite_run_scripted(
             &EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
+                reproduction: None,
                 evidence: None,
             }),
         ),
@@ -446,6 +447,7 @@ async fn run_started_persists_the_evidence_description(pool: PgPool) {
         &EventBody::RunStarted(RunStarted {
             argv: vec!["maestro".into(), "test".into()],
             agent_version: "0.0.0".into(),
+            reproduction: None,
             evidence: Some(evidence.clone()),
         }),
     );
@@ -470,6 +472,7 @@ async fn run_started_persists_the_evidence_description(pool: PgPool) {
         &EventBody::RunStarted(RunStarted {
             argv: vec!["maestro".into()],
             agent_version: "0.0.0".into(),
+            reproduction: None,
             evidence: None,
         }),
     );
@@ -1675,6 +1678,7 @@ async fn a_final_file_settles_the_rows_it_covers_and_creates_none(pool: PgPool) 
             &EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
+                reproduction: None,
                 evidence: None,
             }),
         ),
@@ -1904,6 +1908,7 @@ async fn a_flows_step_alignment_warnings_are_kept_once_each(pool: PgPool) {
             &EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
+                reproduction: None,
                 evidence: None,
             }),
         ),
