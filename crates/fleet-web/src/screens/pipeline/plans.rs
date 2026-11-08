@@ -124,6 +124,8 @@ pub fn batch_changes_plans(frames: &[LiveFrame], in_plan: impl Fn(Uuid) -> bool)
             EntityView::Job(_) | EntityView::Suite(_) | EntityView::Device(_) => false,
         }),
         LiveFrame::Subscribed { .. }
+        | LiveFrame::Unsubscribed
+        | LiveFrame::Samples { .. }
         | LiveFrame::Liveness { .. }
         | LiveFrame::Resync { .. }
         | LiveFrame::Error { .. } => false,

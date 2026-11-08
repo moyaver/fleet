@@ -829,13 +829,45 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "What the browser socket receives.",
+  "description": "A frame and the subscription it belongs to. A frame that answers no subscription (a request\nthe socket could not read) has no `sub`.",
   "oneOf": [
     {
       "description": "Subscribed to a project; deltas follow.",
       "properties": {
         "op": {
           "const": "subscribed",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "The project.",
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "project_id"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "The subscription was removed at the client's request; no frame of it follows.",
+      "properties": {
+        "op": {
+          "const": "unsubscribed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Telemetry was committed for a project: runners' host and device samples changed. Carries\nno state; a subscriber reads what it shows again.",
+      "properties": {
+        "op": {
+          "const": "samples",
           "type": "string"
         },
         "project_id": {
@@ -975,5 +1007,15 @@
       "type": "object"
     }
   ],
-  "title": "LiveFrame"
+  "properties": {
+    "sub": {
+      "description": "The subscription's key.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "Routed",
+  "type": "object"
 }

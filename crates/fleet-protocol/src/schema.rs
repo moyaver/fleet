@@ -12,7 +12,7 @@ use crate::{
     event::EventBody,
     frame::{BatchRequest, BatchResponse, ClientFrame, ServerFrame},
     journal::EventEnvelope,
-    live::{LiveFrame, LiveRequest},
+    live::{LiveRequest, Routed},
     plan::PlanManifest,
 };
 
@@ -41,7 +41,7 @@ pub fn documents() -> Vec<(&'static str, serde_json::Value)> {
         ("batch-response", root::<BatchResponse>()),
         ("event-envelope", root::<EventEnvelope>()),
         ("event-body", root::<EventBody>()),
-        ("live-frame", root::<LiveFrame>()),
+        ("live-frame", root::<Routed>()),
         ("live-request", root::<LiveRequest>()),
         ("upload-request", root::<UploadRequest>()),
         ("upload-grant", root::<UploadGrant>()),

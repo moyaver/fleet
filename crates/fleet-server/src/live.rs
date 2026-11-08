@@ -42,7 +42,7 @@ const ORDER_RETENTION: Duration = Duration::from_secs(3600).saturating_add(REORD
 struct Order {
     published: u64,
     last_publish: Instant,
-    pending: BTreeMap<u64, (Instant, Arc<str>)>,
+    pending: BTreeMap<u64, (Instant, Arc<LiveFrame>)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,7 +60,7 @@ struct RunLive {
 /// See the module docs.
 #[derive(Debug)]
 pub(crate) struct Hub {
-    channels: Mutex<HashMap<Uuid, broadcast::Sender<Arc<str>>>>,
+    channels: Mutex<HashMap<Uuid, broadcast::Sender<Arc<LiveFrame>>>>,
     order: Mutex<HashMap<Uuid, Order>>,
     runs: Mutex<HashMap<Uuid, RunLive>>,
     stale_after: Duration,
@@ -74,10 +74,6 @@ pub(crate) struct Hub {
     /// Test clock: when set, liveness reads this instant instead of the monotonic clock.
     #[cfg(test)]
     frozen_now: Mutex<Option<Instant>>,
-}
-
-fn json(frame: &LiveFrame) -> Arc<str> {
-    serde_json::to_string(frame).unwrap_or_default().into()
 }
 
 impl Hub {
@@ -150,11 +146,11 @@ impl Hub {
     }
 
     /// A project's channel. Subscribe before reading a snapshot, so nothing falls in between.
-    pub(crate) fn subscribe(&self, project: Uuid) -> broadcast::Receiver<Arc<str>> {
+    pub(crate) fn subscribe(&self, project: Uuid) -> broadcast::Receiver<Arc<LiveFrame>> {
         self.sender(project).subscribe()
     }
 
-    fn sender(&self, project: Uuid) -> broadcast::Sender<Arc<str>> {
+    fn sender(&self, project: Uuid) -> broadcast::Sender<Arc<LiveFrame>> {
         let mut c = self
             .channels
             .lock()
@@ -187,7 +183,7 @@ impl Hub {
     /// Broadcasts a committed change, in version order per attempt.
     pub(crate) async fn publish(&self, store: &Store, change: Change) {
         let frame = if change.entities.is_empty() {
-            json(&LiveFrame::Resync {
+            Arc::new(LiveFrame::Resync {
                 reason: ResyncReason::Lagged,
             })
         } else {
@@ -207,7 +203,7 @@ impl Hub {
             match load {
                 Ok(mut entities) => {
                     self.overlay(&mut entities);
-                    json(&LiveFrame::Delta {
+                    Arc::new(LiveFrame::Delta {
                         project_id: change.project_id,
                         attempt_id: change.pipeline_attempt_id,
                         version: change.version,
@@ -216,7 +212,7 @@ impl Hub {
                 }
                 Err(err) => {
                     tracing::warn!(error = %err, "loading a delta; subscribers will resync");
-                    json(&LiveFrame::Resync {
+                    Arc::new(LiveFrame::Resync {
                         reason: ResyncReason::Lagged,
                     })
                 }
@@ -244,7 +240,18 @@ impl Hub {
         self.send(change.project_id, ready);
     }
 
-    fn send(&self, project: Uuid, frames: Vec<Arc<str>>) {
+    /// Tells the project's subscribers that telemetry was committed: its runners' samples changed.
+    /// Called after the checkpoint commits, here and on the instance that wrote it.
+    pub(crate) fn publish_samples(&self, project: Uuid) {
+        self.send(
+            project,
+            vec![Arc::new(LiveFrame::Samples {
+                project_id: project,
+            })],
+        );
+    }
+
+    fn send(&self, project: Uuid, frames: Vec<Arc<LiveFrame>>) {
         if frames.is_empty() {
             return;
         }
@@ -257,7 +264,7 @@ impl Hub {
 
     /// Sends versions that waited too long for a predecessor (the gap makes clients resync).
     pub(crate) fn flush_stale(&self, projects: &HashMap<Uuid, Uuid>) {
-        let mut out: Vec<(Uuid, Vec<Arc<str>>)> = Vec::new();
+        let mut out: Vec<(Uuid, Vec<Arc<LiveFrame>>)> = Vec::new();
         {
             let mut order = self
                 .order
@@ -282,7 +289,7 @@ impl Hub {
 
     /// Asks every subscriber to re-snapshot: this instance may have missed changes made elsewhere.
     pub(crate) fn resync_all(&self) {
-        let frame = json(&LiveFrame::Resync {
+        let frame = Arc::new(LiveFrame::Resync {
             reason: ResyncReason::Lagged,
         });
         let channels: Vec<_> = self
@@ -388,7 +395,7 @@ impl Hub {
         for (project, attempt, run, liveness) in crossed {
             self.send(
                 project,
-                vec![json(&LiveFrame::Liveness {
+                vec![Arc::new(LiveFrame::Liveness {
                     attempt_id: attempt,
                     agent_run_id: run,
                     liveness,
@@ -483,6 +490,7 @@ pub(crate) async fn relay(state: AppState, mut notices: Notices) {
         };
         match received {
             Ok(LiveNotice::Change(change)) => state.publish(Some(change)),
+            Ok(LiveNotice::Samples(project)) => state.hub.publish_samples(project),
             Ok(LiveNotice::Reconnected) => state.hub.resync_all(),
             Err(err) => {
                 tracing::warn!(error = %err, "live listener lost; reconnecting");
@@ -516,7 +524,7 @@ async fn reconnect(state: &AppState) -> Option<Notices> {
 
 /// Takes the frames that can go out now: the contiguous run after `published`, or with `force`
 /// everything pending.
-fn drain(o: &mut Order, force: bool) -> Vec<Arc<str>> {
+fn drain(o: &mut Order, force: bool) -> Vec<Arc<LiveFrame>> {
     let mut out = Vec::new();
     while let Some(entry) = o.pending.first_entry() {
         if !force && *entry.key() != o.published + 1 {
@@ -531,6 +539,12 @@ fn drain(o: &mut Order, force: bool) -> Vec<Arc<str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn resync() -> Arc<LiveFrame> {
+        Arc::new(LiveFrame::Resync {
+            reason: ResyncReason::Lagged,
+        })
+    }
 
     #[test]
     fn inactive_attempt_orders_are_pruned_without_dropping_pending_frames() {
@@ -562,7 +576,7 @@ mod tests {
                 Order {
                     published: 1,
                     last_publish: Instant::now() - ORDER_RETENTION,
-                    pending: BTreeMap::from([(3, (Instant::now(), "three".into()))]),
+                    pending: BTreeMap::from([(3, (Instant::now(), resync()))]),
                 },
             );
         }
@@ -573,6 +587,15 @@ mod tests {
         assert!(orders[&pending].pending.contains_key(&3));
     }
 
+    fn delta(version: u64) -> Arc<LiveFrame> {
+        Arc::new(LiveFrame::Delta {
+            project_id: Uuid::nil(),
+            attempt_id: Uuid::nil(),
+            version,
+            entities: Vec::new(),
+        })
+    }
+
     #[test]
     fn versions_go_out_in_order() {
         let mut o = Order {
@@ -580,16 +603,12 @@ mod tests {
             last_publish: Instant::now(),
             pending: BTreeMap::new(),
         };
-        o.pending.insert(6, (Instant::now(), "six".into()));
+        o.pending.insert(6, (Instant::now(), delta(6)));
         assert!(drain(&mut o, false).is_empty(), "6 waits for 5");
-        o.pending.insert(5, (Instant::now(), "five".into()));
-        let out: Vec<String> = drain(&mut o, false)
-            .iter()
-            .map(ToString::to_string)
-            .collect();
-        assert_eq!(out, ["five", "six"]);
+        o.pending.insert(5, (Instant::now(), delta(5)));
+        assert_eq!(drain(&mut o, false), [delta(5), delta(6)]);
         assert_eq!(o.published, 6);
-        o.pending.insert(9, (Instant::now(), "nine".into()));
+        o.pending.insert(9, (Instant::now(), delta(9)));
         assert_eq!(drain(&mut o, true).len(), 1, "forced after the wait");
         assert_eq!(o.published, 9);
     }

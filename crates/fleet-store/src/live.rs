@@ -39,6 +39,8 @@ pub(crate) fn origin_of(stored: &str) -> Result<RunOrigin> {
 
 /// The Postgres channel that carries committed live changes between instances.
 const CHANNEL: &str = "fleet_live";
+/// The channel that announces committed telemetry: a project's samples changed.
+const SAMPLES_CHANNEL: &str = "fleet_samples";
 /// Postgres refuses notifications of 8000 bytes or more; a longer entity list is sent as none.
 const MAX_PAYLOAD: usize = 7_000;
 
@@ -65,6 +67,38 @@ pub(crate) async fn notify(
         .execute(tx)
         .await?;
     Ok(())
+}
+
+/// Announces the samples a telemetry checkpoint committed for `project`. Delivered only when `tx`
+/// commits, as [`notify`] is.
+pub(crate) async fn notify_samples(
+    tx: &mut PgConnection,
+    origin: Uuid,
+    project: Uuid,
+) -> std::result::Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_notify($1, $2)")
+        .bind(SAMPLES_CHANNEL)
+        .bind(serde_json::json!({ "origin": origin, "project": project }).to_string())
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
+/// The project a samples notice names, unless this instance sent it or it is malformed.
+fn decode_samples(payload: &str, origin: Uuid) -> Option<Uuid> {
+    #[derive(Deserialize)]
+    struct SamplesNotice {
+        origin: Uuid,
+        project: Uuid,
+    }
+    let notice: SamplesNotice = match serde_json::from_str(payload) {
+        Ok(notice) => notice,
+        Err(err) => {
+            tracing::warn!(error = %err, "ignoring a malformed samples notice");
+            return None;
+        }
+    };
+    (notice.origin != origin).then_some(notice.project)
 }
 
 fn payload(origin: Uuid, change: &Change) -> String {
@@ -105,6 +139,8 @@ fn decode(payload: &str, origin: Uuid) -> Option<Change> {
 pub enum LiveNotice {
     /// A change another instance committed.
     Change(Change),
+    /// Telemetry was committed for this project by another instance: its samples changed.
+    Samples(Uuid),
     /// The connection was lost and re-established: notices sent in the gap are gone, so
     /// subscribers must resync.
     Reconnected,
@@ -131,7 +167,11 @@ impl Notices {
             let Some(notification) = self.listener.try_recv().await? else {
                 return Ok(LiveNotice::Reconnected);
             };
-            if let Some(change) = decode(notification.payload(), self.origin) {
+            if notification.channel() == SAMPLES_CHANNEL {
+                if let Some(project) = decode_samples(notification.payload(), self.origin) {
+                    return Ok(LiveNotice::Samples(project));
+                }
+            } else if let Some(change) = decode(notification.payload(), self.origin) {
                 return Ok(LiveNotice::Change(change));
             }
         }
@@ -158,7 +198,7 @@ impl Store {
     /// Starts listening for the other instances' committed changes. Holds one pool connection.
     pub async fn notices(&self) -> Result<Notices> {
         let mut listener = PgListener::connect_with(self.pool()).await?;
-        listener.listen(CHANNEL).await?;
+        listener.listen_all([CHANNEL, SAMPLES_CHANNEL]).await?;
         Ok(Notices {
             listener,
             origin: self.origin(),
