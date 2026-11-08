@@ -31,14 +31,14 @@ use fleet_protocol::{
     PROTOCOL_VERSION,
     brand::WS_SUBPROTOCOL,
     event::{
-        AppCrashed, EventBody, ExitClass, FlowEnded, FlowOutcome, FlowRef, FlowReported,
+        AdbState, AppCrashed, EventBody, ExitClass, FlowEnded, FlowOutcome, FlowRef, FlowReported,
         FlowStarted, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
         RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
         SuiteStarted,
     },
     frame::{
-        AgentInfo, CiContext, CiProvider, ClientFrame, Hello, ProtocolRange, ResumeState, Sample,
-        ServerFrame, Telemetry,
+        AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, Hello, ProtocolRange,
+        ResumeState, Sample, ServerFrame, Telemetry,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -286,6 +286,31 @@ fn clock(t0: Instant) -> ClockSample {
 }
 
 /// One host sample with fixed readings; the newer optional host fields are left unreported.
+/// Every device the run's events name, reported in adb's `device` state, which is what an emulator
+/// that is up reads (issue #123: the overview's active emulators count comes from these samples).
+fn device_samples(events: &[EventEnvelope], t0: Instant) -> Vec<DeviceSample> {
+    let devices: std::collections::BTreeSet<Uuid> = events
+        .iter()
+        .filter_map(|e| e.subject.device_session_id)
+        .collect();
+    devices
+        .into_iter()
+        .map(|device_session_id| DeviceSample {
+            at: clock(t0),
+            device_session_id,
+            adb_state: Some(AdbState::Device),
+            boot_completed: None,
+            guest_cpu_pct: None,
+            guest_mem_available_bytes: None,
+            emu_cpu_pct: None,
+            emu_rss_bytes: None,
+            avd_name: None,
+            api_level: None,
+            foreground_activity: None,
+        })
+        .collect()
+}
+
 fn host_sample(t0: Instant) -> Sample {
     Sample {
         at: clock(t0),
@@ -753,7 +778,7 @@ async fn stream(
             tseq_from: tseq,
             tseq_to: tseq,
             dropped_since_last: 0,
-            devices: Vec::new(),
+            devices: device_samples(events, t0),
             samples: vec![host_sample(t0)],
         })))
         .await?;
