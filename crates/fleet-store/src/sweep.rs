@@ -193,13 +193,17 @@ async fn abandon(
     )
     .execute(&mut *tx)
     .await?;
-    // The flow may have finished: unknown, not interrupted (research 05 §6.5).
+    // The flow may have finished: unknown, not interrupted (research 05 §6.5). A flow the run's end
+    // already left unknown with no claim behind it gets the sweep's claim too, so it says why.
     let flows = sqlx::query_scalar!(
         "INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order,
                                   observed_at, detail)
          SELECT id, 'server_inferred', 'sweep:' || $1::uuid::text, 'unknown', $2, now(),
                 '{\"reason\": \"agent_abandoned\"}'
-           FROM flow_executions WHERE agent_run_id = $1 AND state IN ('pending', 'running')
+           FROM flow_executions
+          WHERE agent_run_id = $1
+            AND (state IN ('pending', 'running')
+                 OR (state = 'unknown' AND outcome_source IS NULL))
          ON CONFLICT DO NOTHING
          RETURNING flow_execution_id",
         run,
