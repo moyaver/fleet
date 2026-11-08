@@ -397,8 +397,8 @@ impl Usercontent {
              (set FLEET_USERCONTENT__SIGNING_KEY_FILE; `openssl rand -base64 48` makes one)"
         );
         anyhow::ensure!(
-            (1..=3600).contains(&self.link_ttl_seconds),
-            "usercontent.link_ttl_seconds must be between 1 and 3600"
+            (1..=300).contains(&self.link_ttl_seconds),
+            "usercontent.link_ttl_seconds must be between 1 and 300 (research 06 T15: links last at most five minutes)"
         );
         Ok(())
     }
@@ -1290,6 +1290,21 @@ mod tests {
             ]),
         );
         assert!(format!("{:#}", bad_scheme.unwrap_err()).contains("http"));
+    }
+
+    #[test]
+    fn a_signed_link_lives_at_most_five_minutes() {
+        let key = Secret::from("k".repeat(40).as_str());
+        let with_ttl = |link_ttl_seconds| Usercontent {
+            url: Some("https://fleet-usercontent.example.net".into()),
+            signing_key: Some(key.clone()),
+            link_ttl_seconds,
+            ..Usercontent::default()
+        };
+        let public = Some("https://fleet.example.com");
+        assert!(with_ttl(300).validate(public).is_ok());
+        assert!(with_ttl(301).validate(public).is_err());
+        assert!(with_ttl(0).validate(public).is_err());
     }
 
     #[test]
