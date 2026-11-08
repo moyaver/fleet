@@ -22,14 +22,18 @@ It never removes a flag.
 
 | Flags on `maestro test` | Session log | Flow bundles |
 |---|---|---|
-| none, with `--fleet-rewrite=off` | `$XDG_STATE_HOME/maestro/tests/<ts>/`, or `~/.maestro/tests/<ts>/` | the same directory |
+| none, with `--fleet-rewrite=off` | `$XDG_STATE_HOME/maestro/tests/<ts>/`, or `<home>/.maestro/tests/<ts>/` | the same directory |
 | `--test-output-dir T` | the state directory, `<ts>/` | `T/<ts>/` |
 | `--debug-output D` | `D/.maestro/tests/<ts>/` | the same directory |
 | `--debug-output D --test-output-dir T` | `D/.maestro/tests/<ts>/` | `T/<ts>/` |
 | `--flatten-debug-output --debug-output D` | `D/` | `D/` (`--test-output-dir` is ignored) |
-| `--flatten-debug-output` alone, with `--fleet-rewrite=off` | `~/` | `~/` |
+| `--flatten-debug-output` alone, with `--fleet-rewrite=off` | `<home>/` | `<home>/` |
+| `--flatten-debug-output --test-output-dir T` | `<home>/` | `<home>/` (`T` is ignored) |
+| `--flatten-debug-output --debug-output D --test-output-dir T` | `D/` | `D/` (`T` is ignored) |
+| `--config C` (or a `config.yaml` in a directory you pass), whose `testOutputDir: T` is set | the state directory, `<ts>/` | `T/<ts>/`, `T` relative to the working directory |
+| `--config C --test-output-dir T2` | the state directory, `<ts>/` | `T2/<ts>/`: the flag wins over the config |
 
-`<ts>` is the `yyyy-MM-dd_HHmmss` directory Maestro creates for the run; the agent takes the one created after it started the command. With no flags and rewriting on, the agent adds `--flatten-debug-output --debug-output <run dir>/artifacts`, so that row is the flattened one. Captured from Maestro 2.12.1 (`fixtures/maestro/2.12.1`): the first three rows, the fourth only with one path for both flags, and the flattened row. The other rows follow the same rules in Maestro's source and are not captured yet. With `--flatten-debug-output` alone and rewriting off, Maestro writes into your home directory, and the agent scans it for flow folders while the run goes.
+`<home>` is Maestro's `user.home`: the directory the JVM reports, which is your account's home unless `JAVA_OPTS` or `MAESTRO_OPTS` sets `-Duser.home`. Changing `$HOME` does not change it. `<ts>` is the `yyyy-MM-dd_HHmmss` directory Maestro creates for the run. The agent takes the one that its own Maestro process holds its `maestro.log` open in, so two runs in one tree never trade their steps. With no flags and rewriting on, the agent adds `--flatten-debug-output --debug-output <run dir>/artifacts`, so that row is the flattened one. Every row above is captured from Maestro 2.12.1 (`fixtures/maestro/2.12.1`, `paths-*`). A workspace config is read only from `--config` or from a `config.yaml` in a directory you pass, not from a single flow file beside it. A repeated `--flatten-debug-output` is a usage error in Maestro, so the agent never adds a second one. With `--flatten-debug-output` alone, Maestro writes into `<home>`: the agent looks there only for folders created since the run started, and it looks on a backoff, not on every poll.
 
 **Why the JUnit report is conditional.** In Maestro, `--format` isn't just reporting: asking for a report makes `maestro test` take its multi-flow path, the one it uses for several flows, and that path rejects `-c`/`--continuous`. Fleet must not change how your command runs, so it adds the report only when Maestro would take that path anyway:
 
@@ -92,7 +96,7 @@ Every outcome and reading says where it comes from, so you can tell a settled re
 | **Verified** | Confirmed by Maestro's final report. The result is settled. |
 | **Derived** | Computed from other measurements (a rollup), not a raw reading. |
 | **Inferred** | Fleet's explanation of something it did not see, such as a flow cut short by a signal. Never shown as passed. |
-| **Missing** | Nothing was received for this value. |
+| **Missing** | Nothing was received for this value. A step the log started and never ended is Missing when the flow's final `commands.json` does not list it either. |
 | **Stale** | No update within 25 seconds; the last known value, not a current one. |
 
 While a run is live, outcomes come from Maestro's log and console (**Provisional**). When Maestro writes its report, the report decides (**Verified**). If Maestro never writes one, the outcomes stay as Fleet saw them, and a run that ends abnormally never shows as passed.
