@@ -7,6 +7,12 @@
 //! Maestro log with ANSI and OSC sequences, the device logcat excerpt and a UI hierarchy, whose
 //! file names are hostile too (uploaded here over the artifact protocol, as an agent would).
 //!
+//! Screen G (the administration pages, issue #139) shows the user-controlled fields of the
+//! installation too: a project's name, a publisher policy's name, an API key's name, a person's
+//! display name (on a role binding and in the audit history), an identity-provider group, a refused
+//! event's message, a loss's reason, an agent's version and an audited change's recorded values.
+//! [`seed_administration`] writes them with the corpus.
+//!
 //! Every payload sets `window.__xss = 1` when it runs, so a screen fails when a payload ran, when
 //! an injected element or an `on*` attribute exists, when a script is not the app's own, when a
 //! hostile string is not shown as literal text, or when the page reported a CSP violation.
@@ -14,14 +20,23 @@
 use std::net::TcpListener;
 use std::time::Duration;
 
+use fleet_core::policy::Role;
 use fleet_loadgen::Options;
-use fleet_server::config::Secret;
+use fleet_server::config::{Secret, TrustPolicyConfig};
+use fleet_store::{
+    PoolOptions, Store,
+    auth::{AuditActor, TrustLevel},
+    sessions::GroupMapping,
+    testing,
+};
 use serde_json::{Value, json};
+use time::{Duration as TimeDuration, OffsetDateTime};
+use uuid::Uuid;
 
 use crate::{
     artifacts::temp,
     browser::Browser,
-    dashboard_ab::{Page, count_of, q, run_options, stack},
+    dashboard_ab::{Page, count_of, q, run_options, sign_in_session, stack},
     dashboard_cd::worker_of,
     dashboard_ef::attempt_of,
     m5_exit::sha256_hex,
@@ -87,7 +102,8 @@ fn corpus_run(stack: &Stack, run_id: &str, git_ref: &str) -> Options {
 }
 
 /// A stack whose dashboard is `http://127.0.0.1:<port>` and whose usercontent origin is
-/// `http://localhost:<port>`, as the flow page needs to fetch its log. Returns the port.
+/// `http://localhost:<port>`, as the flow page needs to fetch its log. Returns the port. The
+/// project's name and one publisher policy's name are corpus items, which Screen G shows.
 async fn corpus_stack() -> (Stack, u16) {
     let port = TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -101,9 +117,88 @@ async fn corpus_stack() -> (Stack, u16) {
         c.usercontent.signing_key = Some(Secret::from("0123456789abcdef0123456789abcdef-xss"));
         c.storage.path = temp("xss-blobs");
         c.artifacts.spool_dir = temp("xss-spool");
+        c.projects[0].name = LITERAL[0].into();
+        c.projects[0].trust_policies = vec![TrustPolicyConfig {
+            name: LITERAL[2].into(),
+            issuer: "https://token.actions.githubusercontent.com".into(),
+            audience: "fleet".into(),
+            repository_id: "1001".into(),
+            repository_owner_id: "2002".into(),
+            trusted_refs: Vec::new(),
+            allowed_events: Vec::new(),
+            pr_policy: "restricted".into(),
+            job_workflow_ref: None,
+            environment: None,
+        }];
     })
     .await;
     (stack, port)
+}
+
+/// A connection to the stack's database, to seed rows through the store.
+fn store_of(stack: &Stack) -> Store {
+    let url = stack.config.database.url.as_ref().unwrap().expose();
+    Store::connect_lazy(url, PoolOptions::default()).unwrap()
+}
+
+/// Screen G's user-controlled fields, written with the corpus: an API key's name, a person's
+/// display name (on a role binding and as the actor of an audited change), an identity-provider
+/// group, a refused event's message, a loss's reason, an agent's version, and the before, after and
+/// recorded details of the change. The project's name and a publisher policy's name are set by
+/// [`corpus_stack`]. The literal items among them must come out as text.
+async fn seed_administration(stack: &Stack, run: Uuid) {
+    let store = store_of(stack);
+    let project = store.project_id("app").await.unwrap().unwrap();
+    store
+        .create_api_key(
+            project,
+            LITERAL[1],
+            TrustLevel::Trusted,
+            OffsetDateTime::now_utc() + TimeDuration::days(90),
+        )
+        .await
+        .unwrap();
+    let person = store
+        .upsert_user("https://idp.example", "xss-person", None, Some(LITERAL[3]))
+        .await
+        .unwrap();
+    testing::seed_role_binding(&store, Some(project), person, "viewer")
+        .await
+        .unwrap();
+    store
+        .sync_group_mappings(
+            "https://idp.example",
+            &[GroupMapping {
+                project: Some(project),
+                group: LITERAL[4].into(),
+                role: Role::Viewer,
+            }],
+        )
+        .await
+        .unwrap();
+    testing::seed_ingest_rejection(&store, run, 1, "invalid", CORPUS[6])
+        .await
+        .unwrap();
+    testing::seed_ingest_gap(&store, run, "telemetry", 1, 2, CORPUS[7])
+        .await
+        .unwrap();
+    testing::seed_agent_version(&store, run, CORPUS[3])
+        .await
+        .unwrap();
+    store
+        .audit(
+            AuditActor::User(person),
+            Some(project),
+            "failure.triage",
+            json!({
+                "fingerprint": "xss",
+                "from": CORPUS[1],
+                "to": CORPUS[2],
+                "issue_url": CORPUS[0],
+            }),
+        )
+        .await
+        .unwrap();
 }
 
 /// `prefix` and each item, one per line.
@@ -396,6 +491,41 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
             shows: Vec::new(),
         },
         Screen {
+            name: "administration",
+            path: "/admin".into(),
+            ready: format!(
+                "{} >= 1 && document.body.textContent.includes({})",
+                count_of("[data-testid=admin-keys] tbody tr"),
+                serde_json::to_string(CORPUS[7]).unwrap(),
+            ),
+            shows: [
+                literal_shows(),
+                vec![
+                    CORPUS[0].to_owned(),
+                    CORPUS[1].to_owned(),
+                    CORPUS[2].to_owned(),
+                    CORPUS[3].to_owned(),
+                    CORPUS[6].to_owned(),
+                    CORPUS[7].to_owned(),
+                ],
+            ]
+            .concat(),
+        },
+        Screen {
+            name: "audit history",
+            path: "/admin/audit".into(),
+            ready: format!(
+                "document.body.textContent.includes({})",
+                serde_json::to_string(CORPUS[2]).unwrap(),
+            ),
+            shows: vec![
+                LITERAL[3].to_owned(),
+                CORPUS[0].to_owned(),
+                CORPUS[1].to_owned(),
+                CORPUS[2].to_owned(),
+            ],
+        },
+        Screen {
             name: "device",
             path: format!("/devices/{device}?project=app"),
             ready: format!(
@@ -409,7 +539,22 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
     ];
 
     let base = format!("http://127.0.0.1:{port}");
+    // Screen G is for global administrators: the browser signs in as one for the administration
+    // pages (and as one reads every other page, which is what the other screens expect).
+    seed_administration(
+        &stack,
+        ended_a["agent_runs"][0]["id"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap(),
+    )
+    .await;
     let browser = Browser::launch().await;
+    let admin = sign_in_session(&stack, "admin").await;
+    browser
+        .set_secure_cookie(&base, "__Host-fleet_session", &admin)
+        .await;
     let page = Page {
         client: &browser.client,
     };
