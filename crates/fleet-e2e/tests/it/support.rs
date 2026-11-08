@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     sync::{
-        Arc,
+        Arc, OnceLock,
         atomic::{AtomicU32, Ordering},
     },
 };
@@ -173,26 +173,31 @@ pub(crate) fn fixture(name: &str) -> PathBuf {
     repo().join("fixtures/maestro/2.12.1").join(name)
 }
 
-/// The workspace's `fleet-agent` binary, built if this test run didn't build it.
+/// The workspace's `fleet-agent` binary, built from this checkout before this test binary first
+/// uses it. A `fleet-agent` left in `target/` by an earlier build could be older than the code under
+/// test, so it is never run in place of a build. Cargo's own staleness check keeps the call cheap
+/// when the binary is current.
 pub(crate) fn agent_bin() -> PathBuf {
-    let exe = std::env::current_exe().unwrap();
-    // target/<profile>/deps/it-<hash> → target/<profile>/fleet-agent
-    let bin = exe
-        .parent()
-        .and_then(Path::parent)
-        .unwrap()
-        .join("fleet-agent");
-    if !bin.exists() {
-        let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-        let ok = Command::new(cargo)
-            .args(["build", "--locked", "-p", "fleet-agent"])
-            .current_dir(repo())
-            .status()
-            .unwrap()
-            .success();
-        assert!(ok, "building fleet-agent");
-    }
-    bin
+    static BUILT: OnceLock<PathBuf> = OnceLock::new();
+    BUILT
+        .get_or_init(|| {
+            let exe = std::env::current_exe().unwrap();
+            // target/<profile>/deps/it-<hash> → target/<profile>
+            let profile_dir = exe.parent().and_then(Path::parent).unwrap();
+            let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+            let mut build = Command::new(cargo);
+            build.args(["build", "--locked", "-p", "fleet-agent"]);
+            match profile_dir.file_name().and_then(|n| n.to_str()) {
+                Some("debug") | None => {}
+                Some(profile) => {
+                    build.args(["--profile", profile]);
+                }
+            }
+            let ok = build.current_dir(repo()).status().unwrap().success();
+            assert!(ok, "building fleet-agent");
+            profile_dir.join("fleet-agent")
+        })
+        .clone()
 }
 
 /// Runs `fleet-agent run -- maestro test flows/` with the fake Maestro replaying `fixture`, in a
