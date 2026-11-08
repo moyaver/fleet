@@ -24,6 +24,7 @@ use futures_util::{
     StreamExt, TryStreamExt,
     stream::{self, BoxStream},
 };
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::{
@@ -679,14 +680,36 @@ async fn garage_keeps_a_reused_presigned_url_to_the_declared_bytes_and_a_finishe
     );
 }
 
+/// Ends an upload's grant in the database now, as its lifetime running out would.
+async fn expire_grant(rig: &Rig, artifact: Uuid) {
+    let url = rig
+        .state
+        .config
+        .database
+        .url
+        .as_ref()
+        .expect("the rig has a database")
+        .expose();
+    let db = sqlx::PgPool::connect(url).await.unwrap();
+    sqlx::query(
+        "UPDATE artifacts SET grant_expires_at = now() - interval '1 second' WHERE id = $1",
+    )
+    .bind(artifact)
+    .execute(&db)
+    .await
+    .unwrap();
+    db.close().await;
+}
+
 #[tokio::test]
 async fn the_purge_removes_a_direct_upload_nobody_completed_once_its_grace_has_passed() {
     let garage = Garage::start().unwrap_or_else(|e| panic!("{e}"));
     let _ready = garage.ready_store().await.unwrap();
-    // A one-second grant: the grace period (two grant lifetimes) is two seconds of wall clock.
+    // A one-hour grant, so the presigned PUT below cannot expire however loaded the machine is.
+    // The grace period is two grant lifetimes, measured from the object's own upload time.
     let (rig, _dirs) = artifact_rig(|c| {
         garage_settings(&garage)(c);
-        c.artifacts.grant_ttl_seconds = 1;
+        c.artifacts.grant_ttl_seconds = 3_600;
     })
     .await;
     let run = run_with_failed_flow(&rig, "1013").await;
@@ -708,6 +731,7 @@ async fn the_purge_removes_a_direct_upload_nobody_completed_once_its_grace_has_p
         panic!("Garage presigns: {grant:?}");
     };
     let (name, value) = headers.iter().next().unwrap();
+    let before = OffsetDateTime::now_utc();
     let sent = reqwest::Client::new()
         .put(&url)
         .header(name, value)
@@ -715,6 +739,7 @@ async fn the_purge_removes_a_direct_upload_nobody_completed_once_its_grace_has_p
         .send()
         .await;
     assert!(sent.unwrap().status().is_success());
+    let after = OffsetDateTime::now_utc();
     let blobs = rig.state.blobs().await.unwrap();
     assert!(
         blobs
@@ -723,9 +748,12 @@ async fn the_purge_removes_a_direct_upload_nobody_completed_once_its_grace_has_p
             .unwrap()
             .is_some()
     );
+    // The grant runs out with nobody having completed the upload.
+    expire_grant(&rig, artifact).await;
 
-    // Within the grace the object is kept; past it, with no open grant, the purge removes it.
-    crate::artifacts::purge_spool(&rig.state).await;
+    // Within the grace the object is kept. Judged as of just before the upload: the object's
+    // time is stored to whole seconds, so it is at most a second older than `before`.
+    crate::artifacts::purge_spool_at(&rig.state, before).await;
     assert!(
         blobs
             .staged(&StagingKey::new(artifact))
@@ -733,8 +761,9 @@ async fn the_purge_removes_a_direct_upload_nobody_completed_once_its_grace_has_p
             .unwrap()
             .is_some()
     );
-    tokio::time::sleep(Duration::from_millis(2_200)).await;
-    crate::artifacts::purge_spool(&rig.state).await;
+    // Past it, with no open grant, the purge removes it.
+    let past_grace = after + time::Duration::seconds(2 * 3_600 + 1);
+    crate::artifacts::purge_spool_at(&rig.state, past_grace).await;
     assert!(
         blobs
             .staged(&StagingKey::new(artifact))

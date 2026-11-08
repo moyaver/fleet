@@ -5,7 +5,7 @@ use std::{
     collections::BTreeMap,
     io,
     path::{Path as FsPath, PathBuf},
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use axum::{
@@ -761,6 +761,12 @@ async fn finish(state: &AppState, project: Uuid, p: &PendingArtifact) -> Result<
 /// Deletes spool files and staged direct uploads nobody will complete: not an open grant, not
 /// awaiting `complete`, and older than two grant lifetimes.
 pub(crate) async fn purge_spool(state: &AppState) {
+    purge_spool_at(state, OffsetDateTime::now_utc()).await;
+}
+
+/// [`purge_spool`] as of `now`: what is older than the grace period at that instant goes. A test
+/// passes the instant it wants, so its own latency cannot spend the grace period.
+pub(crate) async fn purge_spool_at(state: &AppState, now: OffsetDateTime) {
     let keep = match state.store.open_uploads().await {
         Ok(ids) => ids,
         Err(e) => {
@@ -768,31 +774,29 @@ pub(crate) async fn purge_spool(state: &AppState) {
             return;
         }
     };
-    let grace = Duration::from_secs(state.config.artifacts.grant_ttl_seconds.saturating_mul(2));
+    let grace_secs = state.config.artifacts.grant_ttl_seconds.saturating_mul(2);
+    let older_than = now - time::Duration::seconds(i64::try_from(grace_secs).unwrap_or(i64::MAX));
     // A spool directory that does not exist yet (no relayed upload has arrived) holds nothing.
     if let Ok(mut entries) = tokio::fs::read_dir(&state.config.artifacts.spool_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if is_stale(&path, &keep, grace).await {
+            if is_stale(&path, &keep, older_than).await {
                 let _ = tokio::fs::remove_file(&path).await;
             }
         }
     }
     // Direct uploads staged in the object store: the same rule, applied there.
     match state.blobs().await {
-        Ok(blobs) => {
-            let older_than = OffsetDateTime::now_utc() - grace;
-            match blobs.sweep_staged(&keep, older_than).await {
-                Ok(0) => {}
-                Ok(removed) => tracing::info!(removed, "removed stale staged uploads"),
-                Err(e) => tracing::warn!(error = %e, "sweeping staged uploads"),
-            }
-        }
+        Ok(blobs) => match blobs.sweep_staged(&keep, older_than).await {
+            Ok(0) => {}
+            Ok(removed) => tracing::info!(removed, "removed stale staged uploads"),
+            Err(e) => tracing::warn!(error = %e, "sweeping staged uploads"),
+        },
         Err(e) => tracing::warn!(error = %format!("{e:#}"), "sweeping staged uploads"),
     }
 }
 
-async fn is_stale(path: &FsPath, keep: &[Uuid], grace: Duration) -> bool {
+async fn is_stale(path: &FsPath, keep: &[Uuid], older_than: OffsetDateTime) -> bool {
     let Some(id) = path
         .file_name()
         .and_then(|n| n.to_str())
@@ -806,5 +810,5 @@ async fn is_stale(path: &FsPath, keep: &[Uuid], grace: Duration) -> bool {
     tokio::fs::metadata(path)
         .await
         .and_then(|m| m.modified())
-        .is_ok_and(|t| SystemTime::now().duration_since(t).unwrap_or_default() > grace)
+        .is_ok_and(|t| OffsetDateTime::from(t) < older_than)
 }

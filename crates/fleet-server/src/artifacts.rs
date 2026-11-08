@@ -26,6 +26,8 @@ use axum::{
 use crate::state::AppState;
 
 pub(crate) use upload::purge_spool;
+#[cfg(test)]
+pub(crate) use upload::purge_spool_at;
 
 /// The agent upload routes (publisher credential).
 pub(crate) fn router() -> Router<AppState> {
