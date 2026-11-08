@@ -242,8 +242,50 @@ pub fn split_shard(msg: &str) -> (Option<u32>, &str) {
 /// Whether a console step is a `retry` block: Maestro describes it as `Retry 2 times`.
 #[must_use]
 pub fn is_retry_block(description: &str) -> bool {
+    counted(description, "Retry ")
+}
+
+/// The command kind (`commands.json`'s `command` key, for example `tapOnElement`) that a console
+/// step description names. Only the descriptions the 2.12.1 fixtures capture are known; any other
+/// description names no kind, so its step never lines up with a command (I3).
+#[must_use]
+pub fn command_kind(description: &str) -> Option<&'static str> {
+    let d = description;
+    Some(match d {
+        "Define variables" => "defineVariablesCommand",
+        "Apply configuration" => "applyConfigurationCommand",
+        "Press back" => "backPressCommand",
+        "Erase text" => "eraseTextCommand",
+        "Scroll vertically" => "scrollCommand",
+        "Stop recording" => "stopRecordingCommand",
+        _ if d.starts_with("Launch app ") => "launchAppCommand",
+        _ if d.starts_with("Assert that ") => "assertConditionCommand",
+        _ if d.starts_with("Tap on ") => "tapOnElement",
+        _ if d.starts_with("Input text ") => "inputTextCommand",
+        _ if d.starts_with("Take screenshot ") => "takeScreenshotCommand",
+        _ if d.starts_with("Start recording ") => "startRecordingCommand",
+        _ if d.starts_with("Press ") && d.ends_with(" key") => "pressKeyCommand",
+        _ if d.starts_with("Scrolling ") && d.contains(" until ") => "scrollUntilVisible",
+        _ if counted(d, "Repeat ") => "repeatCommand",
+        _ if counted(d, "Retry ") => "retryCommand",
+        _ if d.starts_with("Run flow when ") => "runFlowCommand",
+        _ if d.starts_with("Run ${") => "evalScriptCommand",
+        _ if d.starts_with("Run ") && is_yaml_path(d) => "runFlowCommand",
+        _ => return None,
+    })
+}
+
+/// Whether a `Run <path>` description names a `.yaml` flow file.
+fn is_yaml_path(description: &str) -> bool {
+    std::path::Path::new(description)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("yaml"))
+}
+
+/// `<prefix><n> times`, for `Repeat 2 times` and `Retry 1 times`.
+fn counted(description: &str, prefix: &str) -> bool {
     description
-        .strip_prefix("Retry ")
+        .strip_prefix(prefix)
         .and_then(|rest| rest.strip_suffix(" times"))
         .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }

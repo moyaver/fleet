@@ -124,6 +124,9 @@ pub struct CommandRecord {
     /// example `screenshots/step-005-….png`). `None` when the command carries no `artifacts[]`
     /// key at all.
     pub artifacts: Option<Vec<String>>,
+    /// Maestro's command kind: the one key of `command`, for example `tapOnElement`. `None` when
+    /// `command` holds no single key.
+    pub kind: Option<String>,
 }
 
 /// What a `commands.json` says.
@@ -151,6 +154,8 @@ const IN_FLIGHT_STATUSES: [&str; 2] = ["RUNNING", "PENDING"];
 
 #[derive(Deserialize)]
 struct RawCommand {
+    #[serde(default)]
+    command: serde_json::Value,
     metadata: RawMetadata,
 }
 
@@ -191,6 +196,7 @@ pub fn parse_commands(bytes: &[u8]) -> Commands {
                 .metadata
                 .artifacts
                 .map(|a| a.into_iter().map(|a| a.path).collect()),
+            kind: kind_of(&c.command),
         })
         .collect();
     let is = |set: &[&str], r: &CommandRecord| set.contains(&r.status.as_str());
@@ -202,6 +208,15 @@ pub fn parse_commands(bytes: &[u8]) -> Commands {
         Commands::Final(records)
     } else {
         Commands::Unverified(records)
+    }
+}
+
+/// The command kind of a `command` object: its only key, when it has exactly one.
+fn kind_of(command: &serde_json::Value) -> Option<String> {
+    let mut keys = command.as_object()?.keys();
+    match (keys.next(), keys.next()) {
+        (Some(key), None) => Some(key.clone()),
+        _ => None,
     }
 }
 

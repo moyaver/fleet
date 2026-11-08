@@ -258,3 +258,115 @@ fn the_html_report_a_command_names_is_the_file_maestro_wrote() {
         );
     }
 }
+
+/// Every `commands.json` under `dir`, at any depth.
+fn commands_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            commands_files(&p, out);
+        } else if p.file_name().is_some_and(|n| n == "commands.json") {
+            out.push(p);
+        }
+    }
+}
+
+/// Every flow's console steps, as the log started them: the RUNNING descriptions, in order, keyed
+/// by flow name and shard. Compared with the flow's `commands.json`, so the step-to-kind mapping
+/// is checked against what Maestro really wrote (issue #148).
+#[test]
+fn a_step_description_names_the_kind_of_the_command_it_runs() {
+    let mut names: Vec<_> = fs::read_dir(fixtures_root())
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .collect();
+    names.sort();
+    let mut checked = 0;
+    let mut unchecked = Vec::new();
+    for dir in names {
+        let Some(path) = session_log(&dir) else {
+            continue;
+        };
+        let mut a = log::Assembler::default();
+        let mut records: Vec<log::Record> = fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .filter_map(|l| a.push(l))
+            .collect();
+        records.extend(a.finish());
+        let mut running: BTreeMap<(String, u32), Vec<String>> = BTreeMap::new();
+        let mut current: BTreeMap<u32, String> = BTreeMap::new();
+        for r in &records {
+            match log::classify(r) {
+                Some(log::Event::FlowStarted { shard, name }) => {
+                    current.insert(shard.unwrap_or(1), name);
+                }
+                Some(log::Event::Step {
+                    shard,
+                    description,
+                    state: log::StepState::Running,
+                }) => {
+                    let shard = shard.unwrap_or(1);
+                    if let Some(name) = current.get(&shard) {
+                        running
+                            .entry((name.clone(), shard))
+                            .or_default()
+                            .push(description);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut files = Vec::new();
+        commands_files(&dir, &mut files);
+        for file in files {
+            let flow_dir = file
+                .parent()
+                .and_then(Path::file_name)
+                .unwrap()
+                .to_string_lossy();
+            let (name, shard) = bundle::split_shard_suffix(&flow_dir);
+            let bundle::Commands::Final(commands) =
+                bundle::parse_commands(&fs::read(&file).unwrap())
+            else {
+                continue;
+            };
+            let key = (name.to_owned(), shard.unwrap_or(1));
+            let Some(steps) = running.get(&key) else {
+                // Maestro's default log format (no machine pattern) has no console step lines.
+                let default_format = dir.file_name().is_some_and(|n| {
+                    n.to_string_lossy().starts_with("paths-") || n == "single-flow-no-format"
+                });
+                if !default_format {
+                    unchecked.push(format!("{}: {name} has no logged steps", dir.display()));
+                }
+                continue;
+            };
+            if steps.len() != commands.len() {
+                unchecked.push(format!(
+                    "{}: {name} logged {} steps for {} commands",
+                    dir.display(),
+                    steps.len(),
+                    commands.len()
+                ));
+                continue;
+            }
+            for (description, command) in steps.iter().zip(&commands) {
+                assert_eq!(
+                    log::command_kind(description),
+                    command.kind.as_deref(),
+                    "{}: {description:?} is command {}",
+                    dir.display(),
+                    command.sequence
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 200, "only {checked} steps were checked");
+    assert_eq!(unchecked, Vec::<String>::new());
+}
