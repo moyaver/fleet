@@ -151,6 +151,8 @@ This reads `journal.jsonl`, and says when it is truncated and which events are m
 
 `--json` prints the result as JSON; `--json --events` adds every journal event.
 
+A run with no server also writes `fleet-bundle.tar.zst` into its run directory: its journal and the artifacts it would have uploaded, redacted. `fleet-agent publish` sends it later; see [Offline runs and `publish`](runner-guide.md#offline-runs-and-publish).
+
 ## When the agent dies: `flush`
 
 If the runner kills the agent before everything reached the server, an `if: always()` step sends the spool:
