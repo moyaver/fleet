@@ -1,0 +1,13 @@
+09:23:11.133 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+09:23:11.153 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+09:23:11.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+09:23:11.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+09:23:11.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+09:23:11.683 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+09:23:11.689 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+09:23:14.115 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" COMPLETED
+09:23:14.125 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Network & internet" is visible RUNNING
+09:24:05.841 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Network & internet" is visible
+09:24:07.290 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+09:24:07.299 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+09:24:10.217 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Network & internet" is visible FAILED

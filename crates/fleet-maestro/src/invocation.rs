@@ -232,13 +232,24 @@ pub fn requested_report(inv: &Invocation) -> Option<String> {
     }
 }
 
-/// The HTML report the command asks Maestro for: `--format html` with an explicit `--output`.
-/// Without `--output` nothing is named (Maestro's default HTML name is not in a fixture yet), so
-/// nothing is uploaded.
+/// Where Maestro writes an HTML report (`--format html` or `html-detailed`) when there is no
+/// `--output`: `report.html` in its working directory, as captured in
+/// `fixtures/maestro/2.12.1/html-report-default-path`. Relative on purpose, like [`DEFAULT_REPORT`].
+pub const DEFAULT_HTML_REPORT: &str = "report.html";
+
+/// The HTML report the command asks Maestro for: `--format html` or `html-detailed`, written to
+/// its `--output`, or to [`DEFAULT_HTML_REPORT`] without one. Nothing is injected for it: the
+/// report is found where the command puts it.
 #[must_use]
 pub fn requested_html_report(inv: &Invocation) -> Option<String> {
     match inv.format.as_deref() {
-        Some(f) if f.eq_ignore_ascii_case("html") => inv.output.clone(),
+        Some(f) if f.eq_ignore_ascii_case("html") || f.eq_ignore_ascii_case("html-detailed") => {
+            Some(
+                inv.output
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_HTML_REPORT.to_owned()),
+            )
+        }
         _ => None,
     }
 }
@@ -614,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn an_html_report_is_named_only_by_an_explicit_output() {
+    fn an_html_report_is_named_by_its_output_or_by_maestros_default() {
         let html = |cmd: &str| requested_html_report(&parse(&argv(cmd)));
         assert_eq!(
             html("maestro test --format html --output out/r.html flows/").as_deref(),
@@ -624,10 +635,17 @@ mod tests {
             html("maestro test --format=HTML --output=r.html flows/").as_deref(),
             Some("r.html")
         );
-        assert_eq!(html("maestro test --format html flows/"), None);
         assert_eq!(
-            html("maestro test --format html-detailed --output r.html flows/"),
-            None
+            html("maestro test --format html flows/").as_deref(),
+            Some(DEFAULT_HTML_REPORT)
+        );
+        assert_eq!(
+            html("maestro test --format html-detailed --output r.html flows/").as_deref(),
+            Some("r.html")
+        );
+        assert_eq!(
+            html("maestro test --format html-detailed flows/").as_deref(),
+            Some(DEFAULT_HTML_REPORT)
         );
         assert_eq!(
             html("maestro test --format junit --output r.xml flows/"),

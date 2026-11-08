@@ -50,6 +50,12 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | `shard-all-2` | `MP` | `--device "A,B" test --shard-all 2 CANON suite` |
 | `sigint`, `sigterm`, `sigkill` | `MP --signal INT\|TERM\|KILL --signal-after-ms 30000` | `--device A test CANON slow.yaml` |
 | `device-killed` | `MP`, plus `adb -s B emu kill` after 35 s | `--device B test CANON slow.yaml` |
+| `html-report` | `MP` | `--device A test --format html --output {RUN}/report.html --flatten-debug-output --debug-output {RUN}/debug pass.yaml` |
+| `html-report-default-path` | `MP`, run from `{RUN}` (see [provenance](#provenance-of-the-html-scenarios-43)) | `--device A test --format html --flatten-debug-output --debug-output {RUN}/debug <REPO>/examples/flows/phase0/pass.yaml` |
+| `html-detailed` | `MP`, `--format html-detailed --output {RUN}/report.html` | `--device A test --format html-detailed --output {RUN}/report.html --flatten-debug-output --debug-output {RUN}/debug fail.yaml` |
+| `html-detailed-default-path` | `MP`, run from `{RUN}` | `--device A test --format html-detailed --flatten-debug-output --debug-output {RUN}/debug <REPO>/examples/flows/phase0/pass.yaml` |
+| `html-test-output-dir` | `MP`, run from `{RUN}` | `--device A test --format html --test-output-dir {RUN}/T <REPO>/examples/flows/phase0/fail.yaml` |
+| `html-no-debug-flags` | `MP`, run from `{RUN}` | `--device A test --format html <REPO>/examples/flows/phase0/fail.yaml` |
 
 ### Provenance of the 2.12.1 scenarios added for #77
 
@@ -66,6 +72,16 @@ Imports normalize paths and cut `device-logcat.txt` to 32 KiB head and tail, and
   - `adb shell am freeze com.android.settings` with Settings in the foreground, then `input tap`: Settings died (`ActivityTaskManager: Force removing ActivityRecord … app died`). No "isn't responding" dialog and no `am_anr` event.
   - Stopping the process with `SIGSTOP`: needs root, and `adb root` on this `google_apis_playstore` image returns `adbd cannot run as root in production builds`.
   - A reproducible ANR needs an app whose main thread blocks, such as a test APK that sleeps in a broadcast receiver or in `onCreate`. Adding such an app to the repo is the owner's call.
+
+### Provenance of the HTML scenarios (#43)
+
+Captured on 2026-11-08 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula, on a throwaway AVD `fleet-fixtures-43` created in a temporary `ANDROID_AVD_HOME` from the installed `google_apis_playstore` arm64 image (Android 17, build `CE2A.260420.051.A2`, API 37). It booted headless on port 5584 (serial `emulator-5584`), not 5586: adb kept the emulator offline for nine minutes on 5586, whose adb port (5587) is outside adb's recommended range. The AVD was deleted afterwards and the emulator was shut down; the owner's emulators were not used. `device.json` in each scenario records the device, the AVD configuration and these notes. "Run from `{RUN}`" means Maestro is started through `sh -c 'cd "$1" && shift && exec "$@"'` with `{RUN}` as its working directory, so a report written there lands in `run/`. Every scenario sets `MAESTRO_CLI_LOG_PATTERN_FILE` (`MP`). The flows did not pass on this image: `pass.yaml` failed on "Network & internet" or "Apps" in most runs, and the device's system server died during `html-detailed` (its `logs/crash-report.txt` is the Settings crash). Each `exit.json` and `stdout.bin` records the outcome as Maestro reported it, and the reports say FAILED.
+
+Findings:
+
+- **Where the report goes without `--output`:** Maestro 2.12.1 writes `report.html` in its working directory, for both `--format html` and `--format html-detailed`. It is one file, with no assets directory (`html-report-default-path`, `html-detailed-default-path`). It is not written into `--debug-output`, into `--test-output-dir` (`html-test-output-dir`: the flow bundles go into `T/<timestamp>/`, the report stays in the working directory), or into the session state directory (`html-no-debug-flags`: the session tree is `state/maestro/tests/<timestamp>/`).
+- **With `--output`:** the report is written to that path exactly, whatever the format; `html-report` and `html-detailed` hold it at `run/report.html`.
+- **Imports:** every report is well under the import limit (2.3 KB to 5.9 KB), so no `SKIPPED.txt` was needed. `device-logcat.txt` is cut to 32 KiB as usual.
 
 ## Capturing a new version
 

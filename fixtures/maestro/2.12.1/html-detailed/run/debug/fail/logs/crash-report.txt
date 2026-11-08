@@ -1,0 +1,2 @@
+11-08 09:18:40.775 E/AndroidRuntime( 6069): Process: com.android.settings, PID: 6069
+11-08 09:18:40.775 E/AndroidRuntime( 6069): DeadSystemException: The system died; earlier logs will point to the root cause

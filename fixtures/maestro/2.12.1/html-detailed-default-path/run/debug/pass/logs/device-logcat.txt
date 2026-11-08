@@ -1,0 +1,277 @@
+--------- beginning of main
+11-08 09:23:11.162 W/JobService( 7909): onNetworkChanged() not implemented in com.google.android.apps.miphone.aiai.common.superpacks.impl.AiAiPersistentDownloadJobService. Must override in a subclass.
+11-08 09:23:11.167 W/roid.apps.pulse( 8875): Method void bew.c(android.app.Activity) failed lock verification and will run slower.
+11-08 09:23:11.167 W/roid.apps.pulse( 8875): Common causes for lock verification issues are non-optimized dex code
+11-08 09:23:11.167 W/roid.apps.pulse( 8875): and incorrect proguard optimizations.
+11-08 09:23:11.168 I/Finsky  ( 7578): [66] Finished writing experiment flags into file [4dEVOh7DlClE42ly_19Hs7FqnnFOj9O0dm-zzWqGxeo], numFlags=2000.
+11-08 09:23:11.174 W/PackageInfo( 6269): Large parcel: size=16500 pkg=com.android.chrome uid=10168 serv=12944(91) prevAllowSquashing=false
+11-08 09:23:11.174 W/ParceledListSlice( 6269): Element #145 is 16500 bytes.
+11-08 09:23:11.177 I/Finsky  ( 7578): [66] Successfully applied new configurations for package com.google.android.finsky.regular.
+11-08 09:23:11.177 I/Finsky  ( 7578): [66] [EExp] Exporting experiments for package com.google.android.finsky.regular.
+11-08 09:23:11.177 I/Finsky  ( 7578): [66] [EExp] Exporting experiments for namespace com.google.android.finsky.regular.
+11-08 09:23:11.182 I/Finsky  ( 7578): [44] RECEIVER_BOOT_COMPLETED#logWorkEndAndFinishGoAsync: SUCCESS
+11-08 09:23:11.184 I/WM-WorkerWrapper( 7909): Worker result SUCCESS for Work [ id=e52ad747-ed2c-41ab-8f2d-cb51eb50a851, tags={ com.google.android.apps.miphone.aiai.chronicle.impl.packagemonitor.PackageMonitoringWorker,PackageMonitoringWorker } ]
+11-08 09:23:11.184 W/DroidguardProvider( 7605): droidguard took a lot of time : 17406 millis [CONTEXT service_id=257 ]
+11-08 09:23:11.212 I/Finsky  ( 7578): [57] SCH: Scheduling 1 system job(s)
+11-08 09:23:11.212 I/Finsky  ( 7578): [57] SCH: Scheduling system job Id: 9152, L: 10934, D: 12867259, C: false, I: false, N: 1
+11-08 09:23:11.213 D/nativeloader( 8633): Load libstats_jni.so using APEX ns com_android_os_statsd for caller /apex/com.android.os.statsd/javalib/framework-statsd.jar: ok
+11-08 09:23:11.217 I/AiAiAutofill( 7909): Connected AiAiAugmentedAutofillService.
+11-08 09:23:11.222 D/PowerNotificationWarningsGoogleImpl( 6619): Skip LotX intent registration for non-EU devices.
+11-08 09:23:11.237 W/PackageInfo( 6269): Large parcel: size=123824 pkg=com.google.android.gms uid=10219 serv=121552(423) prevAllowSquashing=false
+11-08 09:23:11.256 I/system_server( 6269): IncrementDisableThreadFlip blocked for 11.846ms
+11-08 09:23:11.260 D/ControlsListingControllerImpl( 6619): Unsubscribing callback
+11-08 09:23:11.260 D/ControlsListingControllerImpl( 6619): Subscribing callback, service count: 0
+11-08 09:23:11.263 I/Finsky  ( 7578): [52] WM::SCH: Logging work initialize for 37-14
+11-08 09:23:11.270 I/NetworkController( 6619): Subscriptions changed: old=[1], new=[]
+11-08 09:23:11.297 I/NullBinder( 7605): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:23:11.297 W/libbinder.Binder( 7605): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:23:11.302 W/ParceledListSlice( 6269): Element #149 is 123824 bytes.
+11-08 09:23:11.302 W/ParceledListSlice( 6269): Overly large reply size: 187184
+--------- beginning of system
+11-08 09:23:11.309 W/ActivityManager( 6269): Slow operation: 130ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+11-08 09:23:11.350 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+11-08 09:23:11.370 I/AiAiConvId( 7909): UpdateService connected
+11-08 09:23:11.371 D/CompatChangeReporter( 8875): Compat change id reported: 458413887; UID 10160; state: ENABLED
+11-08 09:23:11.474 W/ctxmgr  ( 7605): [WorkManager] Long workInfo: pkg=com.google.android.gms, lbl=Modulesdelayed_module_init, start=2026-11-08 09:22:54.360+0200, stop=2026-11-08 09:23:11.465+0200, durtn=17105ms [CONTEXT service_id=47 ]
+11-08 09:23:11.493 I/PackageManager( 6269): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:23:11.496 D/OomAdjuster( 6269): Not killing cached processes
+11-08 09:23:11.498 W/Looper  ( 6269): Slow dispatch took 205ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=null m=68
+11-08 09:23:11.508 I/cvzf    ( 8633): (REDACTED) #onReceive: %s
+11-08 09:23:11.508 W/ndroid.systemui( 6619): Suspending all threads took: 11.806ms
+11-08 09:23:11.515 I/ImsExternalCallTracker( 8452): handleVideoCapabilitiesChanged : isVideoCapable = false
+11-08 09:23:11.528 D/ImsExternalCallTracker( 8452): refreshCallPullState
+11-08 09:23:11.536 I/ImsFeatureBinderRepo( 8452): [0] registerForConnectionUpdates, type= MMTEL, conn= ListenerContainer{cb=com.android.ims.FeatureConnector$1@3d24d95}
+11-08 09:23:11.568 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:23:11.589 I/TrainerClient( 7909): Preparing to schedule training for population:aiai/playstore/smartselect/prod/train/en/all-non-url-email-cut-translate session_name:smartselect/prod/train/en/all-non-url-email-cut-translate
+11-08 09:23:11.593 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:23:11.602 D/InetDiagMessage( 6269): Destroyed live tcp sockets for uids={10152} in 36ms
+11-08 09:23:11.602 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:23:11.602 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:23:11.604 D/InetDiagMessage( 6269): Destroyed live tcp sockets for uids={10112} in 2ms
+11-08 09:23:11.613 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:23:11.613 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:23:11.613 D/InetDiagMessage( 6269): Destroyed live tcp sockets for uids={20112} in 9ms
+11-08 09:23:11.613 D/SatelliteAppTracker( 8452): packageName: com.google.android.networkstack.tethering, value: null
+11-08 09:23:11.614 W/PackageInfo( 6269): Large parcel: size=20928 pkg=com.google.android.youtube uid=10186 serv=14120(33) prevAllowSquashing=false
+11-08 09:23:11.614 D/SatelliteAppTracker( 8452): packageName: com.google.android.youtube, value: null
+11-08 09:23:11.614 D/SatelliteAppTracker( 8452): packageName: com.google.android.ext.services, value: null
+11-08 09:23:11.615 W/ApplicationInfo( 6269): Large ApplicationInfo parcel: size=19060 package=com.google.android.googlequicksearchbox sharedLibs=3 resDirs=1 overlayPaths=1
+11-08 09:23:11.618 W/PackageInfo( 6269): Large parcel: size=77264 pkg=com.google.android.googlequicksearchbox uid=10163 serv=57944(113) prevAllowSquashing=false
+11-08 09:23:11.619 D/SatelliteAppTracker( 8452): packageName: com.google.android.googlequicksearchbox, value: null
+11-08 09:23:11.621 D/CarrierConfigLoader( 8452): EVENT_CHECK_SYSTEM_UPDATE phoneId: 0
+11-08 09:23:11.623 D/TelephonyDebugService( 8452): TelephonyDebugService()
+11-08 09:23:11.625 D/SatelliteAppTracker( 8452): packageName: com.google.android.cellbroadcastservice, value: null
+11-08 09:23:11.627 D/SatelliteAppTracker( 8452): packageName: com.google.android.federatedcompute, value: null
+11-08 09:23:11.628 D/SatelliteAppTracker( 8452): packageName: dev.mobile.maestro.test, value: null
+11-08 09:23:11.629 I/ewim    ( 8633): Validating WorkManager process
+11-08 09:23:11.641 W/.gms.persistent( 7605): Suspending all threads took: 290.181ms
+11-08 09:23:11.653 I/Finsky  ( 7578): [64] SCH: Scheduling phonesky job Id: 37-13, CT: 1794122589598, Constraints: [{ L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }, { L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }]
+11-08 09:23:11.655 W/libbinder.Binder( 7605): Binder transaction to com.google.android.gms.phenotype.internal.IPhenotypeService, function: UNKNOWN_FUNCTION_NAME, code: 19, took 1523ms. Data bytes: 116368 Reply bytes: 4 Flags: 18
+11-08 09:23:11.658 I/ndroid.systemui( 6619): IncrementDisableThreadFlip blocked for 12.431ms
+11-08 09:23:11.663 I/Finsky  ( 7578): [48] [ContentSync] finished, scheduled=true
+11-08 09:23:11.688 I/Finsky  ( 7578): [65] SCH: Scheduling 0 system job(s)
+11-08 09:23:11.695 I/Finsky  ( 7578): [65] SCH: Scheduling phonesky job Id: 37-14, CT: 1794122590837, Constraints: [{ L: 0, D: 82800000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }, { L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }]
+11-08 09:23:11.696 I/adbd    (  484): adbd service requested 'sync:'
+11-08 09:23:11.696 W/Icing   ( 7706): Usage reports not received in time.: java.util.concurrent.TimeoutException: Timed out waiting for Task
+11-08 09:23:11.701 I/Finsky  ( 7578): [53] SCH: Scheduling 1 system job(s)
+11-08 09:23:11.701 I/Finsky  ( 7578): [53] SCH: Scheduling system job Id: 9152, L: 0, D: 12866770, C: false, I: false, N: 1
+11-08 09:23:11.720 I/DownloadManager( 7044): DownloadManager$3.onProgress():537 Downloading __KLP_delight__en-840 with size 25648446
+11-08 09:23:11.729 I/ewim    ( 8633): (REDACTED) Processes: %s, %s, %s, %s
+11-08 09:23:11.746 D/ApplicationLoaders( 8940): Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+11-08 09:23:11.750 D/ApplicationLoaders( 8940): Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+11-08 09:23:11.772 D/SatelliteAppTracker( 8452): packageName: com.android.htmlviewer, value: null
+11-08 09:23:11.785 D/WM-PackageManagerHelper( 8633): Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+11-08 09:23:11.785 D/WM-Schedulers( 8633): Created SystemJobScheduler and enabled SystemJobService
+11-08 09:23:11.788 W/chbox:googleapp( 7472): Suspending all threads took: 40.568ms
+11-08 09:23:11.792 I/Finsky  ( 7578): [2] SCH: job service start with id 9152.
+11-08 09:23:11.799 D/WM-ForceStopRunnable( 8633): Is default app process = true
+11-08 09:23:11.801 I/cfki    ( 7472): #getVoiceIntentProviderSearch: Creating voice search intent
+11-08 09:23:11.801 D/WM-ForceStopRunnable( 8633): Performing cleanup operations.
+11-08 09:23:11.803 D/SatelliteAppTracker( 8452): packageName: com.google.android.telecomui, value: null
+11-08 09:23:11.840 D/CarrierSvcBindHelper( 8452): mHandler: 0
+11-08 09:23:11.840 D/CarrierSvcBindHelper( 8452): Rebinding if necessary for phoneId: 0
+11-08 09:23:11.841 D/CarrierSvcBindHelper( 8452): No carrier app for: 0
+11-08 09:23:11.855 W/JobInfo ( 8875): Requested important-while-foreground flag for job1 is ignored and takes no effect
+11-08 09:23:11.856 D/ConnectivityService( 6269): requestNetwork for uid/pid:1000/6269 asUid: 10160 activeRequest: null callbackRequest: 122 [NetworkRequest [ REQUEST id=123, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOST|BLK
+11-08 09:23:11.857 D/SatelliteAppTracker( 8452): packageName: com.google.android.health.connect.backuprestore, value: null
+11-08 09:23:11.858 D/MultiSimSettingController( 8452): onSubscriptionsChanged
+11-08 09:23:11.859 I/Finsky  ( 7578): [62] SCH: Satisfied jobs for 9152 are: 1-1337, 37-14
+11-08 09:23:11.860 D/MultiSimSettingController( 8452): isReadyToReevaluate: subInfoInitialized=false, carrierConfigsLoaded=true, satelliteEnabledOrBeingEnabled=false
+11-08 09:23:11.861 D/MultiSimSettingController( 8452): notifySubscriptionInfoChanged
+11-08 09:23:11.869 I/Finsky  ( 7578): [107] SCH: Skip running other jobs while hygiene is running
+11-08 09:23:11.870 I/cfki    ( 7472): #getVoiceIntentProviderSearch: Creating voice search intent
+11-08 09:23:11.872 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10160, TargetPkg: com.google.android.apps.pulse
+11-08 09:23:11.873 W/PackageInfo( 6269): Large parcel: size=30924 pkg=com.google.android.apps.messaging uid=10158 serv=21756(57) prevAllowSquashing=false
+11-08 09:23:11.874 D/SatelliteAppTracker( 8452): packageName: com.google.android.apps.messaging, value: com.google.android.apps.messaging
+11-08 09:23:11.875 I/adbd    (  484): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 09:23:11.879 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10160, TargetPkg: com.google.android.apps.pulse
+11-08 09:23:11.881 D/ConnectivityService( 6269): Returning UNBLOCKED NetworkInfo to uid=10160
+11-08 09:23:11.882 D/SatelliteAppTracker( 8452): packageName: com.google.android.soundpicker, value: null
+11-08 09:23:11.888 D/SatelliteAppTracker( 8452): packageName: com.google.android.verifier, value: null
+11-08 09:23:11.889 D/MultiSimSettingController( 8452): notifySubscriptionInfoChanged
+11-08 09:23:11.890 I/Finsky  ( 7578): [2] onSubscriptionsChanged
+11-08 09:23:11.890 I/AS.AudioService( 6269): onSubscriptionsChanged()
+11-08 09:23:11.894 I/CallNotifier( 8452): onSubscriptionsChanged
+11-08 09:23:11.894 I/AS.AudioService( 6269): onSubscriptionsChanged()
+11-08 09:23:11.894 I/Finsky  ( 7578): [2] onSubscriptionsChanged
+11-08 09:23:11.897 I/Telephony( 8452): TelecomAccountRegistry: onSubscriptionsChanged - update accounts
+11-08 09:23:11.899 I/Finsky:background( 8342): [2] onSubscriptionsChanged
+11-08 09:23:11.900 I/Finsky:background( 8342): [2] onSubscriptionsChanged
+11-08 09:23:11.908 D/ConnectivityService( 6269): NetReassign [123 : null → 100] [c 0] [a 13] [i 10]
+11-08 09:23:11.911 D/SatelliteAppTracker( 8452): packageName: com.google.android.configupdater, value: null
+11-08 09:23:11.913 D/ConnectivityService( 6269): requestNetwork for uid/pid:10160/8875 activeRequest: null callbackRequest: 124 [NetworkRequest [ REQUEST id=125, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 10160 RequestorPkg: com.google.android.apps.pulse UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOST|NC|BLK
+11-08 09:23:11.913 I/HeadsetPhoneState( 7358): stopListenForPhoneState: no listener
+11-08 09:23:11.913 W/HeadsetPhoneState( 7358): startListenForPhoneState: no event to listen
+11-08 09:23:11.916 E/AppOps  ( 6269): attributionTag VCN not declared in manifest of android
+11-08 09:23:11.919 W/ApplicationInfo( 6269): Large ApplicationInfo parcel: size=19060 package=com.google.android.googlequicksearchbox sharedLibs=3 resDirs=1 overlayPaths=1
+11-08 09:23:11.920 D/WifiNetworkFactory( 6269): got request NetworkRequest [ REQUEST id=123, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]
+11-08 09:23:11.921 D/HttpFlagsLoader( 7472): Found application exporting HTTP flags: com.google.android.gms
+11-08 09:23:11.921 D/UntrustedWifiNetworkFactory( 6269): got request NetworkRequest [ REQUEST id=123, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]
+11-08 09:23:11.921 D/HttpFlagsLoader( 7472): HTTP flags file path: /data/user_de/0/com.google.android.gms/app_httpflags/flags.binarypb
+11-08 09:23:11.921 D/OemPaidWifiNetworkFactory( 6269): got request NetworkRequest [ REQUEST id=123, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]
+11-08 09:23:11.921 D/MultiInternetWifiNetworkFactory( 6269): got request NetworkRequest [ REQUEST id=123, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10160 RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]
+11-08 09:23:11.923 I/HttpFlagsLoader( 7472): HTTP flags log line (API): Using live production flag values 
+[... fleet fixtures import: 1913858 bytes cut ...]
+ cf.run(PG:373)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at ynm.b(PG:1)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at ynm.dispatchMessage(PG:1)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.282 W/GmsClient( 9474): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.285 E/libbinder.IPCThreadState( 8875): Binder transaction failure. id: 520542, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.285 D/ActivityThread( 8875): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.285 E/JavaBinder( 8875): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1400)
+11-08 09:24:12.285 W/GmsClient( 8875): IGmsServiceBroker.getService failed
+11-08 09:24:12.285 W/GmsClient( 8875): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at aoz.p(PG:188)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at df.run(PG:70)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.285 W/GmsClient( 8875): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.287 E/JavaBinder( 9315): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1272)
+11-08 09:24:12.296 I/NullBinder( 9616): NullBinder for com.google.android.gms.phenotype.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 10151, calling pid: 9474
+11-08 09:24:12.296 W/libbinder.Binder( 9616): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 46, flags: 16
+11-08 09:24:12.301 E/libbinder.IPCThreadState( 9474): Binder transaction failure. id: 520550, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.302 D/ActivityThread( 9474): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.302 E/JavaBinder( 9474): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1280)
+11-08 09:24:12.302 W/GmsClient( 9474): IGmsServiceBroker.getService failed
+11-08 09:24:12.302 W/GmsClient( 9474): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at bhqm.a(:com.google.android.gms@261136035@26.11.36 (260400-892401869):33)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at bhon.z(:com.google.android.gms@261136035@26.11.36 (260400-892401869):143)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at bgup.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):42)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at cwvx.mr(:com.google.android.gms@261136035@26.11.36 (260400-892401869):1)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at cwvx.dispatchMessage(:com.google.android.gms@261136035@26.11.36 (260400-892401869):5)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.302 W/GmsClient( 9474): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.326 I/DialerDataStoreReverseLookupSettings( 9474): com.android.dialer.reverselookup.settings.DataStoreReverseLookupSettings.isAapmEnabledByUser:145 Darpa is present
+11-08 09:24:12.327 I/DialerDataStoreReverseLookupSettings( 9474): com.android.dialer.reverselookup.settings.DataStoreReverseLookupSettings.isAapmEnabledByUser:145 Darpa is present
+11-08 09:24:12.328 I/DialerLogcatLoggingBindings( 9474): com.android.dialer.logging.logcat.LogcatLoggingBindings.logImpression:54 Impression: ANNOTATED_CALL_LOG_FORCE_REFRESH_NO_SYSTEM_CALL_LOG_NO_CHANGES_NEEDED
+11-08 09:24:12.340 W/GmsClient( 9315): IGmsServiceBroker.getService failed
+11-08 09:24:12.340 W/GmsClient( 9315): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at bcqb.v(PG:204)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at paj.run(PG:395)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at bdfz.b(PG:1)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at bdfz.dispatchMessage(PG:1)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.340 W/GmsClient( 9315): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.341 I/NullBinder( 9616): NullBinder for com.google.android.gms.usagereporting.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 10172, calling pid: 7044
+11-08 09:24:12.341 W/libbinder.Binder( 9616): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 46, flags: 18
+11-08 09:24:12.341 W/.android.dialer( 9474): Suspending all threads took: 7.573ms
+11-08 09:24:12.342 E/libbinder.IPCThreadState( 7044): Binder transaction failure. id: 520558, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.342 D/ActivityThread( 7044): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.342 E/JavaBinder( 7044): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 984)
+11-08 09:24:12.344 W/GmsClient( 7044): IGmsServiceBroker.getService failed
+11-08 09:24:12.344 W/GmsClient( 7044): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at jse.q(PG:195)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at bqq.run(PG:141)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.344 W/GmsClient( 7044): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.346 I/NullBinder( 9616): NullBinder for com.google.android.gms.phenotype.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 10172, calling pid: 7044
+11-08 09:24:12.346 W/libbinder.Binder( 9616): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 46, flags: 18
+11-08 09:24:12.347 E/libbinder.IPCThreadState( 7044): Binder transaction failure. id: 520566, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.347 D/ActivityThread( 7044): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.347 E/JavaBinder( 7044): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1308)
+11-08 09:24:12.347 W/GmsClient( 7044): IGmsServiceBroker.getService failed
+11-08 09:24:12.347 W/GmsClient( 7044): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at jse.q(PG:195)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at bqq.run(PG:141)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.347 W/GmsClient( 7044): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.383 I/ZipLPPopulator( 7909): Updated file group for group 'langpack-domain_en-US_3072_zipfile' from location: https://dl.google.com/android/voice/soda/en-US/v3072/soda-en-US-v3072.zip
+11-08 09:24:12.383 I/ZipLPPopulator( 7909): #addNewFileGroups complete
+11-08 09:24:12.395 I/MddLanguagePackDownload( 7909): MDD.downloadFileGroup(langpack-domain_en-US_3072_zipfile)
+11-08 09:24:12.400 I/DownloaderCallbacksTrig( 7909): Triggering callback on request of [en-US_v3072]: kgd
+11-08 09:24:12.450 I/HalDevMgr( 6269): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:24:12.463 W/Settings( 9474): Setting airplane_mode_on has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+11-08 09:24:12.463 I/DialerVoicemailStatusDataServiceImpl( 9474): com.android.dialer.voicemailstatus.dataservice.impl.VoicemailStatusDataServiceImpl.insertOrUpdateVoicemailStatus:259 merged status: # uin@1a918fc9
+11-08 09:24:12.486 I/NullBinder( 9616): NullBinder for com.google.android.gms.usagereporting.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 10151, calling pid: 9474
+11-08 09:24:12.486 W/libbinder.Binder( 9616): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 46, flags: 16
+11-08 09:24:12.518 E/libbinder.IPCThreadState( 9474): Binder transaction failure. id: 520632, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.518 D/ActivityThread( 9474): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.518 E/JavaBinder( 9474): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 960)
+11-08 09:24:12.521 I/NullBinder( 9616): NullBinder for com.google.android.gms.phenotype.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 10147, calling pid: 9027
+11-08 09:24:12.528 W/GmsClient( 9474): IGmsServiceBroker.getService failed
+11-08 09:24:12.528 W/GmsClient( 9474): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at ygx.s(PG:208)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at cf.run(PG:373)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at ynm.b(PG:1)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at ynm.dispatchMessage(PG:1)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.528 W/GmsClient( 9474): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.530 W/libbinder.Binder( 9616): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 46, flags: 18
+11-08 09:24:12.530 E/libbinder.IPCThreadState( 9027): Binder transaction failure. id: 520643, cmd: BR_FAILED_REPLY (29201), error: -28 (No space left on device - Binder buffer full. Too many or too large transactions.)
+11-08 09:24:12.530 D/ActivityThread( 9027): Too many transaction errors, throttling transaction error callback.
+11-08 09:24:12.530 E/JavaBinder( 9027): !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1300)
+11-08 09:24:12.531 W/GmsClient( 9027): IGmsServiceBroker.getService failed
+11-08 09:24:12.531 W/GmsClient( 9027): android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at com.google.android.gms.common.internal.P.a(dex-id-4d171ed04cfa251921230abea817b20b1a3c87be:29)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at com.google.android.gms.common.internal.l.f(dex-id-4d171ed04cfa251921230abea817b20b1a3c87be:1)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at com.google.android.gms.common.api.internal.x.run(dex-id-4d171ed04cfa251921230abea817b20b1a3c87be:56)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at com.google.android.gms.d.b.a.a.dispatchMessage(dex-id-4d171ed04cfa251921230abea817b20b1a3c87be:1)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:24:12.531 W/GmsClient( 9027): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:24:12.591 I/DialerVvmServiceSchedulerImpl( 9474): com.android.dialer.voicemail.service.impl.scheduler.VvmServiceSchedulerImpl.schedule:324 scheduling action: UPDATE_STATUS [CONTEXT enable_persistent_logger=true ]

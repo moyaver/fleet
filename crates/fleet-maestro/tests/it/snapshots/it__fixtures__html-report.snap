@@ -1,0 +1,59 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "pass": {
+      "commands": "final(6)",
+      "failure_screenshots": 1,
+      "flow": "pass",
+      "manifest": true,
+      "shard": null
+    }
+  },
+  "exit": 1,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "pass",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "maestro_version": "2.12.1",
+    "orphan_lines": 0,
+    "other": {},
+    "records": 38,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5584",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 5,
+      "Failed": 1,
+      "Running": 6
+    },
+    "with_continuation": 0
+  },
+  "report": "absent",
+  "stdout": {
+    "flow_results": [
+      {
+        "duration_ms": 80000,
+        "message": "Assertion is false: \"Apps\" is visible",
+        "name": "pass",
+        "passed": false,
+        "shard": null
+      }
+    ],
+    "other": [
+      "Summary { shard: None, count: 1, total: 1, all_passed: false }"
+    ],
+    "unrecognized": 0
+  }
+}

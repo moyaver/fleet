@@ -1,0 +1,31 @@
+MFLT1|1794122678109|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/state/maestro/tests/2026-11-08_092438
+MFLT1|1794122678111|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1794122678111|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1794122678112|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1794122678112|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1794122678112|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1794122678112|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1794122678113|main|INFO|MAESTRO|Java Version: 27
+MFLT1|1794122678169|pool-2-thread-1|DEBUG|io.micrometer.common.util.internal.logging.InternalLoggerFactory|Using SLF4J as the default logging framework
+MFLT1|1794122678334|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1794122678358|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1794122678385|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1794122678386|main|INFO|MAESTRO|---------------------
+MFLT1|1794122682317|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5584 using port 63215 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/fail.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1794122710360|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow fail
+MFLT1|1794122710438|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1794122711113|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2424, widthGrid=1080, heightGrid=2424)
+MFLT1|1794122711742|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1794122711764|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1794122711765|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794122711768|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794122711769|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" RUNNING
+MFLT1|1794122712396|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.android.settings
+MFLT1|1794122712397|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.android.settings app during launch
+MFLT1|1794122733072|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.android.settings" COMPLETED
+MFLT1|1794122733123|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible RUNNING
+MFLT1|1794122785546|DefaultDispatcher-worker-3|ERROR|maestro.orchestra.Orchestra|[Command execution] CommandFailed: Assertion is false: "Network & internet" is visible
+MFLT1|1794122795499|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Taking screenshot
+MFLT1|1794122795517|DefaultDispatcher-worker-1|TRACE|maestro.utils.ScreenshotUtils|Taking screenshot to output sink
+MFLT1|1794122803493|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Network & internet" is visible FAILED
+MFLT1|1794122808004|DefaultDispatcher-worker-3|INFO|maestro.cli.report.TestDebugReporter|Performing purge of logs older than 14 days from <CAPTURE>/run/T

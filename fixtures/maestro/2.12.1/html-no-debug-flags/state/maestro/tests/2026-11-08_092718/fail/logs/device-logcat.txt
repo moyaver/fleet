@@ -1,0 +1,268 @@
+--------- beginning of main
+11-08 09:29:18.761 I/SetConsentOperation( 7706): (REDACTED) SetConsentOperation executing for package %s key %s
+11-08 09:29:18.761 I/ProtoConsentDataManager( 7706): (REDACTED) setConsent: Storing consent for package=[%s], item=[%s]
+11-08 09:29:18.860 I/NearbyMediums(11067): WifiNetwork initialized with useWifiNetworkV2:true (provider non-null)
+11-08 09:29:18.874 D/CompatChangeReporter(11462): Compat change id reported: 333566037; UID 10157; state: ENABLED
+11-08 09:29:18.876 D/ApplicationLoaders(11462): Returning zygote-cached class loader: /system/framework/org.apache.http.legacy.jar
+11-08 09:29:18.876 D/ApplicationLoaders(11462): Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+11-08 09:29:18.876 D/ApplicationLoaders(11462): Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+11-08 09:29:18.888 I/SetConsentOperation( 7706): (REDACTED) SetConsentOperation executing for package %s key %s
+11-08 09:29:18.926 I/TetheringManager(11067): registerTetheringEventCallback:com.google.android.gms
+11-08 09:29:18.966 D/BluetoothAdapter(11067): isLeEnabled(): ON
+11-08 09:29:18.966 I/ProtoConsentDataManager( 7706): (REDACTED) setConsent: Storing consent for package=[%s], item=[%s]
+11-08 09:29:18.969 I/SetConsentOperation( 7706): SetConsentOperation success [CONTEXT service_id=460 ]
+11-08 09:29:18.979 I/SetConsentOperation( 7706): SetConsentOperation success [CONTEXT service_id=460 ]
+--------- beginning of system
+11-08 09:29:18.979 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:29:18.982 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+11-08 09:29:18.983 W/NearbyMediums(11067): Failed to retrieve default NfcAdapter, NFC is unsupported.
+11-08 09:29:18.992 I/SetConsentOperation( 7706): SetConsentOperation success [CONTEXT service_id=460 ]
+11-08 09:29:19.008 E/PeriodStatsTracker(11067): Reference counting corrupted in usage statistics.
+11-08 09:29:19.054 W/SystemServiceRegistry(11067): No service published for: wifiaware
+11-08 09:29:19.099 W/SystemServiceRegistry(11067): No service published for: wifiaware
+11-08 09:29:19.187 I/GoogleSignatureVerifier(11067): package info is not set correctly
+11-08 09:29:19.215 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:29:19.255 I/TetheringManager(11067): registerTetheringEventCallback:com.google.android.gms
+11-08 09:29:19.257 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:29:19.286 I/NearbyPresence(11067): (REDACTED) the count of deprecated key alias %s is %s
+11-08 09:29:19.286 I/NearbyPresence(11067): (REDACTED) the count of deprecated key alias %s is %s
+11-08 09:29:19.289 I/NearbyPresence(11067): (REDACTED) the count of deprecated key alias %s is %s
+11-08 09:29:19.295 I/Multidevice(11067): (REDACTED) [FeatureSettingsApiService] onGetService called from: %s
+11-08 09:29:19.302 I/PackageManager( 6269): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:29:19.333 I/NearbyPresence(11067): (REDACTED) %s: Start BleAdvertiseBluetoothProvider.
+11-08 09:29:19.364 W/MagicTether(11067): [HostEnablementUtils] Invalid account list. [CONTEXT service_id=276 ]
+11-08 09:29:19.366 I/MagicTether(11067): (REDACTED) [HostTetherRole] Nearby host is active: isNearbyActive: %s | isProxAuthActive: %s
+11-08 09:29:19.366 I/MagicTether(11067): (REDACTED) [TidepoolFeatureStatusManager] isInstantHotspotEnabled=%s
+11-08 09:29:19.368 I/MagicTether(11067): [LaunchUtils] No accounts found for enabling Instant Wifi. [CONTEXT service_id=276 ]
+11-08 09:29:19.373 I/MagicTether(11067): [TetherService] Stopping Nearby component. [CONTEXT service_id=276 ]
+11-08 09:29:19.374 I/MagicTether(11067): [LaunchUtils] No accounts found for enabling Instant Wifi. [CONTEXT service_id=276 ]
+11-08 09:29:19.374 I/MagicTether(11067): [HostTetherRole] Nearby host role already stopped [CONTEXT service_id=276 ]
+11-08 09:29:19.387 W/libbinder.Binder( 8039): Binder transaction to android.content.IContentProvider, function: UNKNOWN_FUNCTION_NAME, code: 21, took 2330ms. Data bytes: 480 Reply bytes: 388 Flags: 18
+11-08 09:29:19.396 I/MagicTether(11067): [LaunchUtils] No accounts found for enabling Instant Wifi. [CONTEXT service_id=276 ]
+11-08 09:29:19.396 I/MagicTether(11067): [TetherService] Stopping Nearby client role [CONTEXT service_id=276 ]
+11-08 09:29:19.396 I/MagicTether(11067): [ClientTetherRole] Client role already stopped [CONTEXT service_id=276 ]
+11-08 09:29:19.432 I/TetheringManager(11067): registerTetheringEventCallback caller:com.google.android.gms
+11-08 09:29:19.438 D/ConnectivityService( 6269): requestNetwork for uid/pid:10219/11067 activeRequest: null callbackRequest: 233 [NetworkRequest [ TRACK_DEFAULT id=234, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10219 RequestorUid: 10219 RequestorPkg: com.google.android.gms UnderlyingNetworks: Null] ], NetworkRequest [ REQUEST id=235, [ Transports: SATELLITE Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10219 RequestorUid: 10219 RequestorPkg: com.google.android.gms UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOSING|LOST|UNAVAIL|NC|LP|BLK
+11-08 09:29:19.482 I/NearbyPresence(11067): (REDACTED) %s verified [!=] new request %s does not equal to the old request %s
+11-08 09:29:19.482 I/NearbyPresence(11067): (REDACTED) %s verified [!=] new request %s does not equal to the old request %s
+11-08 09:29:19.483 I/NearbyPresence(11067): (REDACTED) %s verified [!=] new request %s does not equal to the old request %s
+11-08 09:29:19.484 E/AbstractGmsTracer(11067): Traced class shouldn't be obfuscated: dnoq [CONTEXT service_id=259 ]
+11-08 09:29:19.501 I/adbd    (  484): adbd service requested 'sync:'
+11-08 09:29:19.505 D/ConnectivityService( 6269): NetReassign [no changes] [c 56] [a 3] [i 2]
+11-08 09:29:19.591 I/NearbyMediums(11067): WifiNetwork defaultNetworkCallback onAvailable netId:100
+11-08 09:29:19.603 D/ConnectivityService( 6269): NetReassign [234 : null → 100] [c 0] [a 15] [i 21]
+11-08 09:29:19.604 E/WakeLock(11067): GmsAlarm:CMAlarm ** IS FORCE-RELEASED ON TIMEOUT ** [CONTEXT service_id=259 ]
+11-08 09:29:19.609 D/nativeloader(11067): Load /apex/com.google.android.gmssystem/priv-app/PrebuiltGmsCoreVic@CE2A.260420.051.A2/PrebuiltGmsCoreVic.apk!/lib/arm64-v8a/libdatastore_shared_counter.so using class loader ns clns-9 (caller=/apex/com.google.android.gmssystem/priv-app/PrebuiltGmsCoreVic@CE2A.260420.051.A2/PrebuiltGmsCoreVic.apk): ok
+11-08 09:29:19.633 D/ConnectivityService( 6269): NetReassign [no changes] [c 0] [a 28] [i 1]
+11-08 09:29:19.636 I/NearbyPresence(11067): (REDACTED) %s verified [!=] new request %s does not equal to the old request %s
+11-08 09:29:19.682 I/NearbyConnections(11067): GestureExchangeRegistrar is not enabled.
+11-08 09:29:19.684 D/BoundBrokerSvc(11067): onBind: Intent { act=com.google.android.gms.nearby.presence.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiServiceNoInstantApps }
+11-08 09:29:19.695 D/BoundBrokerSvc(11067): Loading bound service for intent: Intent { act=com.google.android.gms.nearby.presence.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiServiceNoInstantApps }
+11-08 09:29:19.755 I/NearbyPresence(11067): MdnsServerProviderController is not enabled or requested [CONTEXT service_id=317 ]
+11-08 09:29:19.755 I/NearbyPresence(11067): (REDACTED) BleAdvertiseProviderController: request.isRequested() %s
+11-08 09:29:19.756 I/NearbyPresence(11067): (REDACTED) %s: Overriding the broadcastV1 request to : %s
+11-08 09:29:19.757 I/NearbyPresence(11067): (REDACTED) %s: Enabling engine.
+11-08 09:29:19.763 I/adbd    (  484): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 09:29:19.845 W/Looper  ( 6619): Drained
+11-08 09:29:19.852 I/ServiceWatcher( 6269): [fused] connected to {com.google.android.gms/com.google.android.location.fused.FusedLocationService}
+11-08 09:29:19.853 I/NearbyPresence(11067): (REDACTED) %s verified [!=] new request %s does not equal to the old request %s
+11-08 09:29:19.854 I/NearbyPresence(11067): (REDACTED) %s verified [==] new request %s equals to the old request
+11-08 09:29:19.858 I/ChimeraSrvcProxy(11067): com.google.android.gms.location.gnssassistance.GnssAssistanceService returning NullBinder for action android.location.provider.action.GNSS_ASSISTANCE_PROVIDER
+11-08 09:29:19.875 I/NearbyMediums(11067): [WifiNetworkV2] networkCallback doAvailable netId:100 wifiStatusChangedCallbacks.size:0 freq:2437
+11-08 09:29:19.876 I/NearbyMediums(11067): WifiNetwork setTelephonyIsDataConnected:true
+11-08 09:29:19.892 I/ServiceWatcher( 6269): [GnssAssistanceProxy] connected to {com.google.android.gms/com.google.android.gms.location.gnssassistance.GnssAssistanceService}
+11-08 09:29:19.892 I/ServiceWatcher( 6269): [GeocoderProxy] connected to {com.google.android.gms/com.google.android.gms.location.geocode.GeocodeService}
+11-08 09:29:19.900 I/Finsky:background(11133): [60] AV::PV: Cannot patch com.google.android.gms:261136035 (aid: com.google.android.gms.apk , tid: 1000000001)
+11-08 09:29:19.915 I/ServiceWatcher( 6269): [network] connected to {com.google.android.gms/com.google.android.location.network.NetworkLocationService}
+11-08 09:29:19.916 I/LocationManagerService( 6269): network provider loaded extra attribution tags: [activity_recognition_provider, awareness_provider, current_semantic_location, fused_location_provider, geofencer_provider, gnss_location_provider, network_location_calibration, network_location_provider, wearable_flp_shim]
+11-08 09:29:19.927 I/LocationManagerService( 6269): fused provider loaded extra attribution tags: [activity_recognition_provider, awareness_provider, current_semantic_location, fused_location_provider, geofencer_provider, gnss_location_provider, network_location_calibration, network_location_provider, wearable_flp_shim]
+11-08 09:29:19.933 E/Finsky:background(11133): [60] AV::PV: Split source file not found
+11-08 09:29:19.958 I/Finsky:background(11133): [60] AV::PV: no source file found for package com.google.android.gms, artifact AdsDynamite_installtime, removing patch
+11-08 09:29:19.977 E/Finsky:background(11133): [60] AV::PV: Split source file not found
+11-08 09:29:19.977 I/Finsky:background(11133): [60] AV::PV: no source file found for package com.google.android.gms, artifact CronetDynamite_installtime, removing patch
+11-08 09:29:19.987 D/LocationManagerService( 6269): allowedPackages=null
+11-08 09:29:20.003 E/Finsky:background(11133): [60] AV::PV: Split source file not found
+11-08 09:29:20.003 I/Finsky:background(11133): [60] AV::PV: no source file found for package com.google.android.gms, artifact DynamiteLoader_installtime, removing patch
+11-08 09:29:20.006 I/ChimeraSrvcProxy(11067): com.google.android.location.internal.server.HardwareArProviderService returning NullBinder for action com.android.location.service.ActivityRecognitionProvider
+11-08 09:29:20.020 I/system_server( 6269): Background young concurrent mark compact GC freed 17MB AllocSpace bytes, 10(328KB) LOS objects, 37% free, 39MB/63MB, paused 28.156ms,104.621ms total 11.171s
+11-08 09:29:20.027 E/WifiChipAidlImpl( 6269): getUsableChannels failed with service-specific exception: android.os.ServiceSpecificException:  (code 4)
+11-08 09:29:20.030 I/NearbyMediums(11067): (REDACTED) Querying wifi usable channels failed with exception
+11-08 09:29:20.030 I/NearbyMediums(11067): java.lang.UnsupportedOperationException
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Parcel.createExceptionOrNull(Parcel.java:3404)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Parcel.createException(Parcel.java:3376)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Parcel.readException(Parcel.java:3359)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Parcel.readException(Parcel.java:3301)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.net.wifi.IWifiManager$Stub$Proxy.getUsableChannels(IWifiManager.java:6713)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.net.wifi.WifiManager.getUsableChannels(WifiManager.java:12106)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at dlha.y(:com.google.android.gms@261136035@26.11.36 (260400-892401869):21)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at dlha.q(:com.google.android.gms@261136035@26.11.36 (260400-892401869):16)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at dlha.m(:com.google.android.gms@261136035@26.11.36 (260400-892401869):24)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at dmaa.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):9)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at bikd.c(:com.google.android.gms@261136035@26.11.36 (260400-892401869):50)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at bikd.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):73)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at bipu.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):8)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:29:20.030 I/NearbyMediums(11067): Caused by: android.os.RemoteException: Remote stack trace:
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at com.android.server.wifi.WifiServiceImpl$$ExternalSyntheticBUOutline5.m(R8$$SyntheticClass:0)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at com.android.server.wifi.WifiServiceImpl.getUsableChannels(WifiServiceImpl.java:8533)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.net.wifi.IWifiManager$Stub.onTransact(IWifiManager.java:3337)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Binder.execTransactInternal(Binder.java:1369)
+11-08 09:29:20.030 I/NearbyMediums(11067): 	at android.os.Binder.execTransact(Binder.java:1323)
+11-08 09:29:20.030 I/NearbyMediums(11067): 
+11-08 09:29:20.040 I/NearbyMediums(11067): [DeviceCapabilities] Skip refreshing cached wifi channels because it is not supported (refreshCacheWifiChannelsRightAfterNetworkCallbackInvoked:true isWifiGetUsableChannelsSupported:false)
+11-08 09:29:20.085 W/NearbyPresence(11067): TidepoolIdentityProvider: Main Tidepool status toggle not enabled! Returned empty broadcast credentials. [CONTEXT service_id=317 ]
+11-08 09:29:20.087 W/NearbyPresence(11067): TidepoolIdentityProvider: Main Tidepool status toggle not enabled! Returned empty shared credentials. [CONTEXT service_id=317 ]
+11-08 09:29:20.087 I/NearbyPresence(11067): (REDACTED) %s: register with identity provider name %s broadcast size %s discover size %s
+11-08 09:29:20.104 I/ActivityManager( 6269): Force stopping com.android.settings appid=1000 user=0: from pid 11489
+11-08 09:29:20.110 E/Finsky:background(11133): [60] AV::PV: Split source file not found
+11-08 09:29:20.110 I/Finsky:background(11133): [60] AV::PV: no source file found for package com.google.android.gms, artifact DynamiteModulesA_installtime, removing patch
+11-08 09:29:20.128 I/Multidevice(11067): (REDACTED) [dfdl] accountsFlow.collect : it = %s
+11-08 09:29:20.146 I/Multidevice(11067): (REDACTED) [dffx] Device Name Updated to: %s
+11-08 09:29:20.153 I/ActivityManager( 6269): Killing 10515:com.android.settings/1000 (adj 0): stop com.android.settings due to from pid 11489
+11-08 09:29:20.165 I/NearbyPresence(11067): NetworkMonitorImpl started. [CONTEXT service_id=317 ]
+11-08 09:29:20.183 I/NearbyPresence(11067): (REDACTED) NetworkMonitorImpl onAvailable %s
+11-08 09:29:20.183 I/NearbyPresence(11067): (REDACTED) NetworkMonitorImpl onLinkPropertiesChanged %s
+11-08 09:29:20.193 I/Multidevice(11067): [FeatureSettingsApiService] Created API Stub. [CONTEXT service_i
+[... fleet fixtures import: 470624 bytes cut ...]
+dding payload case=16
+11-08 09:31:28.966 I/Finsky  (11148): [62] [PLUS] Adding payload case=18
+11-08 09:31:28.966 I/Finsky  (11148): [62] [PLUS] Adding payload case=19
+11-08 09:31:28.966 I/Finsky  (11148): [62] [PLUS] Adding payload case=20
+11-08 09:31:28.966 I/Finsky  (11148): [62] [PLUS] Adding payload case=21
+11-08 09:31:28.975 I/Finsky  (11148): [62] [PLUS] Adding payload case=24
+11-08 09:31:29.000 I/Finsky  (11148): [62] [PLUS] Adding payload case=34
+11-08 09:31:29.017 I/Fitness (11067): (REDACTED) FitCleanupIntentOperation received Intent %s
+11-08 09:31:29.098 W/Looper  ( 6269): Drained
+11-08 09:31:29.141 W/NearbyConnections(11067): getCheckboxconsent Execution/Timeout exception [CONTEXT service_id=54 ]
+11-08 09:31:29.141 W/NearbyConnections(11067): java.util.concurrent.TimeoutException: Timed out waiting for Task
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at flbm.o(:com.google.android.gms@261136035@26.11.36 (260400-892401869):53)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at dgqc.ar(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at dgqc.Q(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at dgpw.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at bikd.c(:com.google.android.gms@261136035@26.11.36 (260400-892401869):50)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at bikd.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):73)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at bipu.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):8)
+11-08 09:31:29.141 W/NearbyConnections(11067): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:31:29.163 W/libbinder.Binder(11067): Binder transaction to com.google.android.gms.phenotype.internal.IPhenotypeService, function: UNKNOWN_FUNCTION_NAME, code: 1, took 6268ms. Data bytes: 292 Reply bytes: 4 Flags: 18
+11-08 09:31:29.171 W/NearbyConnections(11067): getCheckboxconsent Execution/Timeout exception [CONTEXT service_id=54 ]
+11-08 09:31:29.171 W/NearbyConnections(11067): java.util.concurrent.TimeoutException: Timed out waiting for Task
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at flbm.o(:com.google.android.gms@261136035@26.11.36 (260400-892401869):53)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at dgqc.ar(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at dgqc.Q(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at dgpw.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at bikd.c(:com.google.android.gms@261136035@26.11.36 (260400-892401869):50)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at bikd.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):73)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at bipu.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):8)
+11-08 09:31:29.171 W/NearbyConnections(11067): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:31:29.216 I/Finsky  (11148): [62] [PLUS] Syncing for users with urgency above: HYGIENE
+11-08 09:31:29.261 W/libbinder.Binder(11067): Binder transaction to com.google.android.gms.scheduler.IGmsTaskScheduler, function: UNKNOWN_FUNCTION_NAME, code: 1, took 1110ms. Data bytes: 1896 Reply bytes: 0 Flags: 17
+11-08 09:31:29.264 W/NearbyConnections(11067): getCheckboxconsent Execution/Timeout exception [CONTEXT service_id=54 ]
+11-08 09:31:29.264 W/NearbyConnections(11067): java.util.concurrent.TimeoutException: Timed out waiting for Task
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at flbm.o(:com.google.android.gms@261136035@26.11.36 (260400-892401869):53)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at dgqc.ar(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at dgqc.Q(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at dgpw.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at bikd.c(:com.google.android.gms@261136035@26.11.36 (260400-892401869):50)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at bikd.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):73)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at bipu.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):8)
+11-08 09:31:29.264 W/NearbyConnections(11067): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:31:29.585 I/Finsky  (11148): [62] [PLUS] Syncing 1 train(s)
+11-08 09:31:29.659 I/Finsky  (11148): [62] [PLUS] Sending payloads for account: [2fKVkThB4QBVOwc88U06EJ4S6Yyqenathz2XlaLEUMg]
+11-08 09:31:29.920 I/HalDevMgr( 6269): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:31:29.951 I/SQLiteConnection(11067): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:31:29.983 W/android.vending(11148): Suspending all threads took: 18.440ms
+11-08 09:31:30.189 D/PickerSyncController( 7210):    Latest ID/Gen=null/0
+11-08 09:31:30.192 D/PickerSyncController( 7210):    Cached ID/Gen=null/-1
+11-08 09:31:30.215 D/CloseableReentrantLock( 7210): Successfully released lock com.android.providers.media.photopicker.sync.CloseableReentrantLock@502f7f3[Unlocked]. Lock Name = CLOUD_PROVIDER_LOCK. Threads that may be waiting to acquire this lock = []
+11-08 09:31:30.216 D/CloseableReentrantLock( 7210): Successfully released lock com.android.providers.media.photopicker.sync.CloseableReentrantLock@277ea25[Unlocked]. Lock Name = CLOUD_SYNC_LOCK. Threads that may be waiting to acquire this lock = []
+11-08 09:31:30.224 D/PickerSyncController( 7210): Error occurred, remaining retry count: 1
+11-08 09:31:30.224 D/PickerSyncController( 7210): com.android.providers.media.photopicker.util.exceptions.InvalidProviderSyncParamsException: Unexpected Latest Media Collection Info: ID/Gen/AccountName=null/0/null
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController.getSyncRequestParamsLocked(PickerSyncController.java:1687)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController.getSyncRequestParams(PickerSyncController.java:1644)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController.maybeEnableCloudMediaQueries(PickerSyncController.java:376)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController.lambda$tryEnablingCloudMediaQueries$0(PickerSyncController.java:297)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController.$r8$lambda$igHbLHRBgFxI5G0Bp5TN28PcQJ4(PickerSyncController.java:0)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at com.android.providers.media.photopicker.PickerSyncController$$ExternalSyntheticLambda1.run(R8$$SyntheticClass:0)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:31:30.224 D/PickerSyncController( 7210): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:31:30.226 D/PickerSyncController( 7210): Schedule enable cloud media query task.
+11-08 09:31:30.508 I/Finsky  (11148): [59] App not installed com.android.apex.cts.shim
+11-08 09:31:30.508 W/Finsky  (11148): [59] Frosting: Failed to get Frosting Creation Time for com.android.apex.cts.shim. Error: com.android.apex.cts.shim
+11-08 09:31:30.519 W/ChimeraUtils(11067): Module com.google.android.gms.fastpair_core missing resource null(0)
+11-08 09:31:30.555 I/Finsky  (11148): [2] [PLUS] Received response
+11-08 09:31:30.575 W/ChimeraUtils(11067): Module com.google.android.gms.fastpair_core missing resource null(0)
+11-08 09:31:30.623 I/DynamiteModule(11067): Considering local module com.google.android.gms.cronet_dynamite:0 and remote module com.google.android.gms.cronet_dynamite:4311
+11-08 09:31:30.624 I/DynamiteModule(11067): Selected remote version of com.google.android.gms.cronet_dynamite, version >= 4311
+11-08 09:31:30.791 I/Finsky  (11148): [54] SCH: jobFinished: 10-82. TimeElapsed: 21152ms.
+11-08 09:31:30.792 I/Finsky  (11148): [54] WM::SCH: Logging work end for 10-82
+11-08 09:31:30.871 I/adbd    (  484): adbd service requested 'shell,v2,raw:logcat -v time -d'
+11-08 09:31:30.882 I/Finsky  (11148): [56] [PLUS] Successfully updated PayloadValueStore
+11-08 09:31:30.912 I/Finsky  (11148): [59] App not installed com.android.hardware.thermal
+11-08 09:31:30.912 W/Finsky  (11148): [59] Frosting: Failed to get Frosting Creation Time for com.android.hardware.thermal. Error: com.android.hardware.thermal
+11-08 09:31:31.001 I/Finsky  (11148): [62] [PLUS] Sync complete, number synced: 1, number failed: 0
+11-08 09:31:31.063 E/Finsky  (11148): [62] [Counters] attempted to use a non-positive increment for: 3703
+11-08 09:31:31.109 I/Finsky  (11148): [2] SCH: Job 10-122 starting
+11-08 09:31:31.111 I/Finsky  (11148): [2] WM::SCH: Logging work start for 10-122
+11-08 09:31:31.140 D/BoundBrokerSvc( 7706): onBind: Intent { act=com.google.android.gms.checkin.START xflg=0x4 pkg=com.google.android.gms }
+11-08 09:31:31.170 D/BoundBrokerSvc( 7706): Loading bound service for intent: Intent { act=com.google.android.gms.checkin.START xflg=0x4 pkg=com.google.android.gms }
+11-08 09:31:31.205 I/Finsky  (11148): [62] [PLUS] Hygiene sync job success.
+11-08 09:31:31.206 I/Finsky  (11148): [62] SCH: jobFinished: 10-87. TimeElapsed: 19789ms.
+11-08 09:31:31.207 I/Finsky  (11148): [62] WM::SCH: Logging work end for 10-87
+11-08 09:31:31.364 I/Endpoint(11133): Created gRPC endpoint for service class com.google.frameworks.client.data.android.server.play.BackgroundProcessEndpointService
+11-08 09:31:31.392 I/Finsky  (11148): [2] SCH: Job 10-124 starting
+11-08 09:31:31.393 I/Finsky  (11148): [2] WM::SCH: Logging work start for 10-124
+11-08 09:31:31.521 I/Finsky  (11148): [62] SCH: jobFinished: 10-124. TimeElapsed: 128ms.
+11-08 09:31:31.532 I/Finsky  (11148): [62] WM::SCH: Logging work end for 10-124
+11-08 09:31:31.603 W/ActivityManager( 6269): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:31:31.658 I/Finsky  (11148): [2] SCH: Job 10-135 starting
+11-08 09:31:31.658 I/Finsky  (11148): [2] WM::SCH: Logging work start for 10-135
+11-08 09:31:31.661 I/Finsky  (11148): [2] SUHJ: self-update hygiene task started
+11-08 09:31:31.781 W/NearbyShared(11067): BTConnStateMgr:untrackable profile:26, the connection status change will not be able to dispatch to stateChangeListener!
+11-08 09:31:31.794 I/Finsky:background(11133): [106] SCH: Received scheduling request: Id: 47-15, Constraints: [{ L: 0, D: 12366672, C: CHARGING_NONE, I: IDLE_REQUIRED, N: NET_NONE, B: BATTERY_ANY }]
+11-08 09:31:31.841 D/BluetoothAdapter(11067): registerBluetoothConnectionCallback()
+11-08 09:31:31.885 W/GetConfigSnapshotOp(11067): Succeeded but not registered: com.google.android.libraries.performance.primes#com.android.vending [CONTEXT service_id=51 ]
+11-08 09:31:31.907 I/NearbyShared(11067): BTConnStateMgr: BluetoothConnectionCallback registered.
+11-08 09:31:31.931 D/SatelliteController( 8452): isInCarrierRoamingNbIotNtn: satellite is disabled
+11-08 09:31:31.931 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 09:31:31.932 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:31.932 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:31.932 D/SatelliteController( 8452): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:31:32.227 W/Looper  ( 6269): Slow dispatch took 108ms main app=system_server main=true group=FOREGROUND h=com.android.server.power.Notifier$NotifierHandler c=com.android.server.power.Notifier$$ExternalSyntheticLambda2@12caea3 m=0
+11-08 09:31:32.276 D/SatelliteController( 8452): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 09:31:32.277 I/Finsky:background(11133): [49] WM::SCH: Logging work initialize for 47-15
+11-08 09:31:32.318 W/android.vending(11148): Suspending all threads took: 19.738ms
+11-08 09:31:32.324 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: config: null
+11-08 09:31:32.324 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:32.324 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:32.324 D/SatelliteController( 8452): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 09:31:32.352 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 09:31:32.352 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:32.352 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:32.352 D/SatelliteController( 8452): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:31:32.384 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 09:31:32.384 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:32.384 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:32.384 D/SatelliteController( 8452): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:31:32.431 D/SatelliteController( 8452): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 09:31:32.431 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: config: null
+11-08 09:31:32.431 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:32.431 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:32.431 D/SatelliteController( 8452): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 09:31:32.431 D/SatelliteController( 8452): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 09:31:32.431 D/TelephonyConfigUpdateInstallReceiver( 8452): getConfigParser: domain=satellite
+11-08 09:31:32.431 V/SatelliteController( 8452): satelliteConfigParser is not ready
+11-08 09:31:32.431 D/SatelliteController( 8452): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:31:32.525 I/Finsky  (11148): [62] Created new item store.
+11-08 09:31:32.536 I/Finsky:background(11133): [57] SCH: Scheduling phonesky job Id: 47-15, CT: 1794123091811, Constraints: [{ L: 0, D: 12366672, C: CHARGING_NONE, I: IDLE_REQUIRED, N: NET_NONE, B: BATTERY_ANY }]

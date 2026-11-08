@@ -1,0 +1,38 @@
+{
+  "maestro": "2.12.1",
+  "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
+  "device": {
+    "avd": "fleet-fixtures-43",
+    "serial": "emulator-5584",
+    "system_image": "system-images;android-37.0;google_apis_playstore;arm64-v8a",
+    "api_level": "37",
+    "build": "CE2A.260420.051.A2",
+    "fingerprint": "google/sdk_gphone64_arm64/emu64a:17/CE2A.260420.051.A2/16418371:user/release-keys",
+    "sdk_int": "37",
+    "release": "17",
+    "security_patch": "2026-08-05",
+    "abi": "arm64-v8a",
+    "model": "sdk_gphone64_arm64"
+  },
+  "emulator": {
+    "version": "37.2.13.0 (build 16740729)",
+    "launch": "emulator -avd fleet-fixtures-43 -port 5584 -no-window -no-audio -no-snapshot -no-boot-anim",
+    "config_ini": {
+      "hw.gpu.enabled": "yes",
+      "hw.gpu.mode": "auto",
+      "hw.lcd.width": "1080",
+      "hw.lcd.height": "2424",
+      "hw.lcd.density": "420",
+      "hw.ramSize": "3072"
+    },
+    "avd_home": "temporary directory, deleted after capture",
+    "notes": [
+      "Port 5584 (adb 5585), not the 5586 first asked for: adb reported the emulator offline for 9 minutes on port 5586, whose adb port (5587) is outside adb's recommended range, and the emulator warned about it at boot.",
+      "avdmanager refused the Play image path, so the AVD was created from google_atd and its config.ini then points at system-images/android-37.0/google_apis_playstore/arm64-v8a (PlayStore.enabled=yes)."
+    ]
+  },
+  "host": {
+    "os": "macOS 26 (Darwin 25.6.0)",
+    "arch": "arm64"
+  }
+}

@@ -1,0 +1,36 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "fail",
+      "path": "<REPO>/examples/flows/phase0/fail.yaml",
+      "outcome": "failed",
+      "finality": "unverified_final",
+      "source": "live_console",
+      "conflict": false,
+      "steps": 4,
+      "failure": null
+    }
+  ],
+  "events": 18,
+  "event_types": {
+    "agent.warning": 1,
+    "app.crashed": 1,
+    "flow.ended": 1,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 3,
+    "step.started": 4,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

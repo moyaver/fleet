@@ -1,0 +1,247 @@
+--------- beginning of main
+11-08 09:10:42.576 W/ctxmgr  ( 1231): [WorkManager] Long workInfo: pkg=com.google.android.gms, lbl=ListenerInvokerRunner, start=2026-11-08 09:10:41.188+0200, stop=2026-11-08 09:10:42.215+0200, durtn=1027ms [CONTEXT service_id=47 ]
+11-08 09:10:42.725 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:10:42.751 W/libbinder.Binder(  643): Binder transaction to android.app.job.IJobScheduler, function: UNKNOWN_FUNCTION_NAME, code: 1, took 1565ms. Data bytes: 472 Reply bytes: 8 Flags: 18
+11-08 09:10:42.765 W/JobInfo ( 3764): Job 'com.google.android.partnersetup/.ClientIdJobService#8192' has a deadline with no functional constraints. The deadline won't improve job execution latency. Consider removing the deadline.
+11-08 09:10:42.769 W/JobInfo (  643): Job 'com.google.android.partnersetup/.ClientIdJobService#8192' has a deadline with no functional constraints. The deadline won't improve job execution latency. Consider removing the deadline.
+11-08 09:10:42.780 D/SharedPreferencesImpl( 1632): Time required to fsync /data/user_de/0/com.google.android.gms/shared_prefs/ChimeraConfigService.xml: [<1: 0, <2: 0, <4: 6, <8: 10, <16: 19, <32: 12, <64: 5, <128: 3, <256: 2, <512: 2, <1024: 2, <2048: 0, <4096: 0, <8192: 0, <16384: 0, >=16384: 0]
+11-08 09:10:42.792 W/JobService( 3551): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:10:42.816 W/JobService( 2299): onNetworkChanged() not implemented in com.google.android.apps.miphone.aiai.common.superpacks.impl.AiAiPersistentDownloadJobService. Must override in a subclass.
+--------- beginning of system
+11-08 09:10:43.005 W/Looper  (  904): Slow dispatch took 1666ms SysUiBg app=com.android.systemui main=false group=FOREGROUND h=android.os.Handler c=android.telephony.TelephonyCallback$IPhoneStateListenerStub$$ExternalSyntheticLambda58@bd6ebe6 m=0
+11-08 09:10:43.345 W/libbinder.Binder( 1231): Binder transaction to com.google.android.gms.http.IGoogleHttpService, function: UNKNOWN_FUNCTION_NAME, code: 1, took 2809ms. Data bytes: 196 Reply bytes: 8 Flags: 18
+11-08 09:10:43.424 W/Looper  (  904): Slow delivery took 1371ms SysUiBg app=com.android.systemui main=false group=FOREGROUND h=android.net.ConnectivityManager$CallbackHandler c=null m=6
+11-08 09:10:43.538 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+11-08 09:10:44.891 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:44.953 W/ActivityManager(  643): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:10:45.113 W/libbinder.Binder( 1632): Binder transaction to android.content.IContentProvider, function: UNKNOWN_FUNCTION_NAME, code: 1, took 1576ms. Data bytes: 572 Reply bytes: 176 Flags: 18
+11-08 09:10:45.144 I/PackageManager(  643): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:10:45.193 I/AutofillFlagChangeInten( 1632): onHandleIntent() [CONTEXT service_id=177 ]
+11-08 09:10:45.228 I/SyncIntentOperation( 1632): (REDACTED) Handling the intent: %s.
+11-08 09:10:45.237 I/HalDevMgr(  643): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:10:45.242 I/AdbWifiNetworkMonitor(  643): Wi-Fi network available
+11-08 09:10:45.243 I/AdbWifiNetworkMonitor(  643): Received the same Wi-Fi SSID. Ignoring.
+11-08 09:10:45.687 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:10:45.708 W/ActivityManager(  643): Skipping manifest association check for null package. SourceUid: -1, SourcePkg: null, TargetUid: 10219, TargetPkg: com.google.android.gms
+11-08 09:10:45.792 W/JobService( 3551): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:10:46.119 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:46.120 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:46.161 D/OomAdjuster(  643): Not killing cached processes
+11-08 09:10:46.330 I/MdiSyncModule( 1632): flag handling is skipping irrelevant intent.
+11-08 09:10:46.333 I/MS_Utils( 1632): version of com.google.android.apps.maps = 1068516954
+11-08 09:10:46.240 W/JobService( 2299): onNetworkChanged() not implemented in com.google.android.apps.miphone.aiai.common.superpacks.impl.AiAiPersistentDownloadJobService. Must override in a subclass.
+11-08 09:10:46.350 I/GmsSyncPolicyEngine( 1632): (REDACTED) Periodic sync %d disabled by policy, cancelled.
+11-08 09:10:46.355 I/GmsSyncPolicyEngine( 1632): (REDACTED) Periodic sync %d disabled by policy, cancelled.
+11-08 09:10:46.356 I/GmsSyncPolicyEngine( 1632): (REDACTED) Periodic sync %d disabled by policy, cancelled.
+11-08 09:10:46.356 I/SystemUpdate( 1632): [Installation,ReceiverIntentOperation] Received intent: Intent { act=com.google.gservices.intent.action.GSERVICES_CHANGED flg=0x1000010 xflg=0x4 pkg=com.google.android.gms cmp=com.google.android.gms/.chimera.GmsIntentOperationService (has extras) }.
+11-08 09:10:46.363 W/libbinder.Binder(  643): Binder transaction to android.content.IContentService, function: UNKNOWN_FUNCTION_NAME, code: 1, took 1216ms. Data bytes: 108 Reply bytes: 4 Flags: 18
+11-08 09:10:46.375 W/libbinder.Binder( 1632): Binder transaction to android.content.IBulkCursor, function: UNKNOWN_FUNCTION_NAME, code: 7, took 1251ms. Data bytes: 72 Reply bytes: 4 Flags: 18
+11-08 09:10:46.429 W/libbinder.Binder(  643): Binder transaction to android.content.pm.IPackageManager, function: UNKNOWN_FUNCTION_NAME, code: 1598246212, took 1326ms. Data bytes: 212 Reply bytes: 4 Flags: 16
+11-08 09:10:46.527 I/NullBinder( 1231): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:10:46.527 W/libbinder.Binder( 1231): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:10:46.558 W/Looper  (  904): Slow dispatch took 3060ms SysUiBg app=com.android.systemui main=false group=FOREGROUND h=android.net.ConnectivityManager$CallbackHandler c=null m=6
+11-08 09:10:46.561 I/SystemUpdate( 1632): [UUC,UucEnabler] Disabled UucNotificationReceiverService proxy service
+11-08 09:10:46.583 I/adbd    (  484): adbd service requested 'sync:'
+11-08 09:10:46.668 W/ApplicationInfo(  643): Large ApplicationInfo parcel: size=19060 package=com.google.android.googlequicksearchbox sharedLibs=3 resDirs=1 overlayPaths=1
+11-08 09:10:46.669 W/PackageInfo(  643): Large parcel: size=19324 pkg=com.google.android.googlequicksearchbox uid=10163 prevAllowSquashing=false
+11-08 09:10:46.704 W/DynamiteModule( 1632): Local module descriptor class for com.google.android.gms.vision.dynamite.ocr not found.
+11-08 09:10:46.712 I/SystemUpdate( 1632): [Execution,InstallationEventIntentOperation] Handling event of type 2.
+11-08 09:10:46.720 W/ProviderHelper( 1632): Unknown dynamite feature vision.dynamite.ocr
+11-08 09:10:46.741 I/DynamiteModule( 1632): Considering local module com.google.android.gms.vision.dynamite.ocr:0 and remote module com.google.android.gms.vision.dynamite.ocr:0
+11-08 09:10:46.744 I/NullBinder( 1231): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:10:46.752 W/libbinder.Binder( 1231): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:10:46.792 I/GmsDebugLogger( 1632): [89] vision.dynamite.ocr
+11-08 09:10:46.831 W/ProviderHelper( 1632): Ignoring optional dynamite feature vision.ocr
+11-08 09:10:46.937 W/DynamiteModule( 1632): Local module descriptor class for com.google.android.gms.vision.ocr not found.
+11-08 09:10:46.966 I/DynamiteModule( 1632): Considering local module com.google.android.gms.vision.ocr:0 and remote module com.google.android.gms.vision.ocr:0
+11-08 09:10:46.966 W/Vision  ( 1632): Error loading optional module com.google.android.gms.vision.ocr: bqkr: No acceptable module com.google.android.gms.vision.ocr found. Local version is 0 and remote version is 0.
+11-08 09:10:47.037 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/ns.db
+11-08 09:10:47.063 I/PhenotypeResourceReader( 1231): unable to find any Phenotype resource metadata for com.google.android.modulemetadata
+11-08 09:10:47.071 W/gle.android.gms( 1632): Suspending all threads took: 10.510ms
+11-08 09:10:47.127 I/GmsDebugLogger( 1632): [89] vision.ocr
+11-08 09:10:47.190 W/TextNativeHandle( 1632): Native handle not yet available. Reverting to no-op handle.
+11-08 09:10:47.191 I/adbd    (  484): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 09:10:47.193 W/DynamiteModule( 1632): Local module descriptor class for com.google.android.gms.vision.dynamite.ocr not found.
+11-08 09:10:47.291 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:10:47.291 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:10:47.334 I/GmsModuleFndr( 1632): Beginning GMS chimera module scan
+11-08 09:10:47.379 W/ProviderHelper( 1632): Unknown dynamite feature vision.dynamite.ocr
+11-08 09:10:47.380 I/DynamiteModule( 1632): Considering local module com.google.android.gms.vision.dynamite.ocr:0 and remote module com.google.android.gms.vision.dynamite.ocr:0
+11-08 09:10:47.386 W/ProviderHelper( 1632): Ignoring optional dynamite feature vision.ocr
+11-08 09:10:47.390 W/DynamiteModule( 1632): Local module descriptor class for com.google.android.gms.vision.ocr not found.
+11-08 09:10:47.390 I/DynamiteModule( 1632): Considering local module com.google.android.gms.vision.ocr:0 and remote module com.google.android.gms.vision.ocr:0
+11-08 09:10:47.391 W/Vision  ( 1632): Error loading optional module com.google.android.gms.vision.ocr: bqkr: No acceptable module com.google.android.gms.vision.ocr found. Local version is 0 and remote version is 0.
+11-08 09:10:47.402 I/OcrModelUpStIntentOp( 1632): Downloading text recognizer
+11-08 09:10:47.409 I/SystemUpdate( 1632): [Execution,InstallationIntentOperation] Received intent: Intent { act=com.google.android.gms.update.INSTALL_UPDATE cat=[targeted_intent_op_prefix:.update.execution.InstallationIntentOperation] xflg=0x4 cmp=com.google.android.gms/.chimera.GmsIntentOperationService (has extras) }.
+11-08 09:10:47.410 I/GmsDebugLogger( 1632): [89] vision.dynamite.ocr
+11-08 09:10:47.418 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:10:47.424 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:10:47.425 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={10164} in 69ms
+11-08 09:10:47.428 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:10:47.433 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:10:47.433 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={20164} in 8ms
+11-08 09:10:47.439 I/GCoreUlr( 1231): Unbound from all signal providers.
+11-08 09:10:47.447 I/SystemUpdate( 1632): [Execution,ExecutionManager] Start action execution: finished-execution
+11-08 09:10:47.449 I/SystemUpdate( 1632): [Execution,ExecutionManager] Action finished-execution executed for 0.02 seconds.
+11-08 09:10:47.580 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:47.581 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:47.603 I/GmsDebugLogger( 1632): [89] vision.ocr
+11-08 09:10:47.631 I/Icing   ( 1632): updateResources: need to parse cfmq{com.google.android.googlequicksearchbox}
+11-08 09:10:47.680 W/libbinder.Binder( 1231): Binder transaction to android.content.IContentProvider, function: UNKNOWN_FUNCTION_NAME, code: 1, took 5733ms. Data bytes: 376 Reply bytes: 80 Flags: 18
+11-08 09:10:47.759 I/GCoreUlr( 1231): Unbound from all signal providers.
+11-08 09:10:47.760 I/GCoreUlr( 1231): Stopping handler for UlrDispSvcFast
+11-08 09:10:47.766 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:47.816 I/GCoreUlr( 1231): DispatchingService ignoring Intent { act=android.net.wifi.WIFI_STATE_CHANGED flg=0x44000010 xflg=0x4 (has extras) } because ULR inactive
+11-08 09:10:47.844 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:10:47.875 I/ModuleSetResolution( 1632): Computing pending module set with APKs: [[AdsFdrDynamite.integ:253405700100000], [Cronetdynamite:261136260400], [Dynamiteloader:261136260000], [Dynamitemodulesa:261136260000], [Dynamitemodulesc:261136260000], [Googlecertificates:261136260000], [Mapsdynamite:261136260000], [Measurementdynamite:261136260000]]
+11-08 09:10:47.979 W/ndroid.verifier( 2212): Suspending all threads took: 5.075ms
+11-08 09:10:47.986 W/ctxmgr  ( 1231): [WorkManager] Long workInfo: pkg=com.google.android.gms, lbl=ListenerInvokerRunner, start=2026-11-08 09:10:43.352+0200, stop=2026-11-08 09:10:47.611+0200, durtn=4259ms [CONTEXT service_id=47 ]
+11-08 09:10:48.018 D/AppOpHistoryDbHelper(  643): getRecentlyUsedPackageNames sql: SELECT DISTINCT package_name FROM app_op_accesses WHERE access_time + (CASE WHEN access_duration = -1 THEN 0 ELSE access_duration END) >= ?  AND access_time <= ?  AND (op_flags & ? ) != 0 AND op_code IN  ( 0, 1, 25, 26, 27, 120, 136, 149, 150, 152, 170, 171, 172, 173 )
+11-08 09:10:48.094 W/libbinder.Binder( 1632): Binder transaction to android.content.IContentProvider, function: UNKNOWN_FUNCTION_NAME, code: 3, took 1633ms. Data bytes: 352 Reply bytes: 60 Flags: 18
+11-08 09:10:48.124 I/ActivityManager(  643): Force stopping com.android.settings appid=1000 user=0: from pid 5383
+11-08 09:10:48.171 D/AppOpHistoryQueryHelper(  643): No binding for In operator
+11-08 09:10:48.230 D/AppOpHistoryDbHelper(  643): Read 1 packages from app_op_history_short_interval.db
+11-08 09:10:48.281 I/ActivityManager(  643): Killing 3724:com.android.settings/1000 (adj 0): stop com.android.settings due to from pid 5383
+11-08 09:10:48.297 D/AppOpHistoryDbHelper(  643): getRecentlyUsedPackageNames sql: SELECT DISTINCT package_name FROM app_op_accesses WHERE access_time + (CASE WHEN access_duration = -1 THEN 0 ELSE access_duration END) >= ?  AND access_time <= ?  AND (op_flags & ? ) != 0 AND op_code IN  ( 4, 5, 6, 7, 8, 9, 11, 13, 14, 16, 18, 19, 20, 21, 23, 24, 43, 51, 52, 53, 54, 56, 57, 59, 60, 61, 62, 65, 66, 68, 69, 74, 75, 77, 79, 80, 81, 83, 85, 90, 92, 93, 95, 103, 105, 107, 110, 111, 112, 114, 116, 123, 127, 131, 133, 139, 151, 153, 163, 164, 169 )
+11-08 09:10:48.408 D/AppOpHistoryQueryHelper(  643): No binding for In operator
+11-08 09:10:48.513 D/WindowOnBackDispatcher(  643): setTopOnBackInvokedCallback (unwrapped): null
+11-08 09:10:48.537 D/CoreBackPreview(  643): Window{f4bcf03 u0 Application Not Responding: com.android.settings}: Setting back callback null
+11-08 09:10:48.554 I/HalDevMgr(  643): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:10:48.581 D/AppOpHistoryDbHelper(  643): Read 0 packages from app_op_history_long_interval.db
+11-08 09:10:48.758 W/ActivityTaskManager(  643): Force removing ActivityRecord{227624251 u0 com.android.settings/.SubSettings t7 f}}: app died, no saved state
+11-08 09:10:48.765 I/ModuleSetResolution( 1632): Pending container module APKs: []
+11-08 09:10:48.765 I/ModuleSetResolution( 1632): Pending non-container module APKs: []
+11-08 09:10:48.882 W/ActivityTaskManager(  643): Force removing ActivityRecord{263924324 u0 com.android.settings/.Settings t7 f}}: app died, no saved state
+11-08 09:10:48.884 W/TransitionChain(  643): Combining appDied into #14(CLOSE|R|0x0) from appDied
+11-08 09:10:48.897 W/UsageStatsService(  643): Unexpected activity event reported! (com.android.settings/com.andr
+[... fleet fixtures import: 357762 bytes cut ...]
+7.845 I/SpamListSync( 1632): Call spam module disabled. Skipping cleaning cache sip header table. [CONTEXT service_id=150 ]
+11-08 09:12:17.847 I/TelephonySpamChimeraSer( 1632): Syncing Call Spam List [CONTEXT service_id=150 ]
+11-08 09:12:17.997 I/SpamListSync( 1632): (REDACTED) SpamListSyncChimeraService.syncSpamList called with tag: %s, extras: %s
+11-08 09:12:18.269 I/SpamListSync( 1632): Call spam module disabled. Skipping spam list syncing. [CONTEXT service_id=150 ]
+11-08 09:12:18.363 I/HalDevMgr(  643): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): com.android.dialer.voicemail.service.impl.vvmclients.rest.RestVvmCarrierService.getMsisdn:349 Retrieved phone number in an unexpected format: +15551234567 [CONTEXT disable_client_error_logging=true ]
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): agdp: MEDIUM
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at a.dJ(PG:15)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at tqf.apply(PG:625)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at afhb.apply(PG:17)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at agqs.d(PG:3)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at agqt.run(PG:47)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at zob.run(PG:7)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at agkb.run(PG:44)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at ytk.run(PG:202)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at wag.run(PG:297)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:12:18.387 E/DialerRestVvmCarrierService( 2270): 	at zpc.run(PG:61)
+11-08 09:12:18.465 I/DialerVvmActivation( 2270): com.android.dialer.voicemail.service.impl.vvmclients.rest.VvmActivation.activate:73 activate
+11-08 09:12:18.499 I/DialerAndroidAutoStatusLookupImpl( 2270): com.android.dialer.androidautostatuslookup.impl.AndroidAutoStatusLookupImpl.isAndroidAutoConnected:97 Android Auto connected in 0 mode [CONTEXT ratelimit_period="1 MINUTES" skipped=7 ]
+11-08 09:12:18.516 I/AdbWifiNetworkMonitor(  643): Wi-Fi network available
+11-08 09:12:18.516 I/AdbWifiNetworkMonitor(  643): Received the same Wi-Fi SSID. Ignoring.
+11-08 09:12:18.564 I/DialerLogcatLoggingBindings( 2270): com.android.dialer.logging.logcat.LogcatLoggingBindings.logImpression:54 Impression: ANDROID_API_UNEXPECTED_PHONE_NUMBER_FORMAT
+11-08 09:12:18.576 W/JobService( 2270): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:12:18.636 W/JobService( 3551): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:12:18.677 W/JobService( 2299): onNetworkChanged() not implemented in com.google.android.apps.miphone.aiai.common.superpacks.impl.AiAiPersistentDownloadJobService. Must override in a subclass.
+11-08 09:12:18.769 W/DialerGbaCredentialProvider( 2270): com.android.dialer.voicemail.service.impl.vvmclients.rest.GbaCredentialProvider$1.onAuthenticationFailure:93 GBA failed with reason: 1 [CONTEXT disable_client_error_logging=true ]
+11-08 09:12:18.789 I/DialerSingletonScopedExternalsLogging( 2270): com.google.android.dialershared.externals.logging.SingletonScopedExternalsLogging.recordCallMethodInvocation:75 event: TELEPHONY_BOOTSTRAP_AUTHENTICATION_REQUEST, function parameters: [], return value: Default
+11-08 09:12:18.966 I/DialerVoicemailStatusDataServiceImpl( 2270): com.android.dialer.voicemailstatus.dataservice.impl.VoicemailStatusDataServiceImpl.insertOrUpdateVoicemailStatus:245 enter
+11-08 09:12:18.981 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:12:19.051 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:12:19.207 I/NullBinder( 1231): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:12:19.207 W/libbinder.Binder( 1231): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:12:19.212 W/Looper  (  904): Slow dispatch took 1632ms SysUiBg app=com.android.systemui main=false group=FOREGROUND h=android.net.ConnectivityManager$CallbackHandler c=null m=6
+11-08 09:12:19.291 W/Looper  (  904): Drained
+11-08 09:12:19.293 I/NullBinder( 1231): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:12:19.293 W/libbinder.Binder( 1231): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:12:19.309 D/WM-WorkConstraintsTrack( 2270): NetworkRequestConstraintController onCapabilitiesChanged callback
+11-08 09:12:19.615 W/Looper  (  643): Drained
+11-08 09:12:19.625 I/NetworkScheduler.Stats( 1231): (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+11-08 09:12:19.964 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:12:19.992 I/DialerLoggingConsentCheckerImpl( 2270): com.google.android.callingshared.logging.consent.impl.LoggingConsentCheckerImpl.getConsent:72 timer stop with success, timer present: false
+11-08 09:12:20.026 I/PhenotypeResourceReader( 1231): unable to find any Phenotype resource metadata for com.google.android.apps.wallpaper
+11-08 09:12:20.066 I/PhenotypeResourceReader( 1231): unable to find any Phenotype resource metadata for com.android.systemui
+11-08 09:12:20.277 I/RegisterSyncOperation( 1231): (REDACTED) Register sync called by %s, syncing since something changed
+11-08 09:12:20.427 I/gle.android.gms( 1632): WaitForGcToComplete blocked ProfileSaver on Background for 27.850s
+11-08 09:12:20.475 W/.gms.persistent( 1231): Suspending all threads took: 13.557ms
+11-08 09:12:20.618 D/SatelliteController( 1041): isInCarrierRoamingNbIotNtn: satellite is disabled
+11-08 09:12:20.619 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 09:12:20.620 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.631 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.637 D/SatelliteController( 1041): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:12:20.734 D/SatelliteController( 1041): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 09:12:20.734 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: config: null
+11-08 09:12:20.734 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.734 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.734 D/SatelliteController( 1041): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 09:12:20.753 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 09:12:20.753 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.753 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.753 D/SatelliteController( 1041): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:12:20.775 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 09:12:20.775 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.775 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.775 D/SatelliteController( 1041): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:12:20.775 D/SatelliteController( 1041): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 09:12:20.775 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: config: null
+11-08 09:12:20.776 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.776 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.776 D/SatelliteController( 1041): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 09:12:20.776 D/SatelliteController( 1041): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 09:12:20.776 D/TelephonyConfigUpdateInstallReceiver( 1041): getConfigParser: domain=satellite
+11-08 09:12:20.776 V/SatelliteController( 1041): satelliteConfigParser is not ready
+11-08 09:12:20.776 D/SatelliteController( 1041): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 09:12:20.901 D/ActivityManager(  643): freezing 1420 com.google.android.permissioncontroller
+11-08 09:12:21.091 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:12:21.092 D/InetDiagMessage(  643): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:12:21.092 D/InetDiagMessage(  643): Destroyed live tcp sockets for uids={10212} in 24ms
+11-08 09:12:21.139 I/HeterodyneSyncer( 1231): (REDACTED) Removed %d invalid users
+11-08 09:12:21.409 W/Settings( 2270): Setting airplane_mode_on has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+11-08 09:12:21.425 I/DialerVoicemailStatusDataServiceImpl( 2270): com.android.dialer.voicemailstatus.dataservice.impl.VoicemailStatusDataServiceImpl.insertOrUpdateVoicemailStatus:259 merged status: # uin@9774042b
+11-08 09:12:21.515 I/AdbWifiNetworkMonitor(  643): Wi-Fi network available
+11-08 09:12:21.515 I/AdbWifiNetworkMonitor(  643): Received the same Wi-Fi SSID. Ignoring.
+11-08 09:12:21.536 I/DialerInternalSemanticEventLogger( 2270): com.android.dialer.cui.impl.InternalSemanticEventLogger.handleError:296 CUI error: VVM_ACTIVATION_FAILED; uniqueCallId: null
+11-08 09:12:21.543 I/HalDevMgr(  643): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:12:21.637 I/DialerSessionCuiMetadataPopulator( 2270): com.android.dialer.logging.session.cuimetadata.SessionCuiMetadataPopulator.populate:19 sessionId: 419d1b7f-608a-4c06-ad8b-7c01fcb90543
+11-08 09:12:21.646 I/DialerTiktokTracingCuiMetadataPopulator( 2270): com.android.dialer.logging.tracing.cuimetadata.TiktokTracingCuiMetadataPopulator.populate:17 positiveTraceId: 1183870151990657475
+11-08 09:12:21.683 W/JobService( 2270): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:12:21.723 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:12:21.724 W/libbinder.IPCThreadState(  643): Sending oneway calls to frozen process.
+11-08 09:12:21.745 I/DialerInternalSemanticEventLogger( 2270): com.android.dialer.cui.impl.InternalSemanticEventLogger.logSemanticEvent:354 Logging failed CUI AutoActivatedVoicemail with result EXTERNAL_ERROR to GIL
+11-08 09:12:21.765 W/JobService( 2299): onNetworkChanged() not implemented in com.google.android.apps.miphone.aiai.common.superpacks.impl.AiAiPersistentDownloadJobService. Must override in a subclass.
+11-08 09:12:21.767 W/JobService( 3551): onNetworkChanged() not implemented in androidx.work.impl.background.systemjob.SystemJobService. Must override in a subclass.
+11-08 09:12:21.825 I/DialerLogcatLoggingBindings( 2270): com.android.dialer.logging.logcat.LogcatLoggingBindings.logImpression:54 Impression: VVM_CLIENT_ERROR_LOGGED
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): com.android.dialer.voicemail.service.impl.scheduler.VvmExecutorImpl.executeWorkOnCarrierService:486 Exception during vvm work for ComponentInfo{com.android.phone/com.android.services.telephony.TelephonyConnectionService}, 1, UserHandle{0} [CONTEXT enable_persistent_logger=true ]
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): tmt: VVM failure reason: 2
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at tur.onAuthenticationFailure(PG:93)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at android.telephony.TelephonyManager$19.lambda$onAuthenticationFailure$1(TelephonyManager.java:17993)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at android.telephony.TelephonyManager$19$$ExternalSyntheticLambda1.run(D8$$SyntheticClass:0)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at zob.run(PG:7)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at agkb.run(PG:44)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at ytk.run(PG:202)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at wag.run(PG:297)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:12:21.836 E/DialerVvmExecutorImpl( 2270): 	at zpc.run(PG:61)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): com.android.dialer.voicemail.service.impl.scheduler.VvmExecutorImpl.execute:316 Recoverable VVM error [GeneralFailureReason: UNSPECIFIED, OmtpFailureReason: OMTP_UNSPECIFIED, RestFailureReason: GBA_AUTHENTICATION_FAILURE_FEATURE_NOT_SUPPORTED] (phoneAccount ComponentInfo{com.android.phone/com.android.services.telephony.TelephonyConnectionService}, 1, UserHandle{0})
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): tmt: VVM failure reason: 2
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at tur.onAuthenticationFailure(PG:93)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at android.telephony.TelephonyManager$19.lambda$onAuthenticationFailure$1(TelephonyManager.java:17993)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at android.telephony.TelephonyManager$19$$ExternalSyntheticLambda1.run(D8$$SyntheticClass:0)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at zob.run(PG:7)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at agkb.run(PG:44)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at ytk.run(PG:202)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at wag.run(PG:297)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at java.lang.Thread.run(Thread.java:1572)
+11-08 09:12:21.876 W/DialerVvmExecutorImpl( 2270): 	at zpc.run(PG:61)
+11-08 09:12:21.876 I/DialerVoicemailStatusDataServiceImpl( 2270): com.android.dialer.voicemailstatus.dataservice.impl.VoicemailStatusDataServiceImpl.insertOrUpdateVoicemailStatus:245 enter
+11-08 09:12:21.899 D/WM-WorkConstraintsTrack( 2270): NetworkRequestConstraintController onCapabilitiesChanged callback
+11-08 09:12:21.932 D/OomAdjuster(  643): Not killing cached processes
+11-08 09:12:21.960 I/DialerLoggingConsentCheckerImpl( 2270): com.google.android.callingshared.logging.consent.impl.LoggingConsentCheckerImpl.getConsent:72 timer stop with success, timer present: false
+11-08 09:12:22.248 I/NullBinder( 1231): NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+11-08 09:12:22.248 W/libbinder.Binder( 1231): Large reply transaction of 1056768 bytes, interface descriptor , function: UNKNOWN_FUNCTION_NAME, code: 1, flags: 17
+11-08 09:12:22.382 W/.mobile.maestro( 5250): Suspending all threads took: 11.863ms
+11-08 09:12:22.436 W/.android.dialer( 2270): Suspending all threads took: 37.931ms
+11-08 09:12:22.436 I/NetworkScheduler.Stats( 1231): (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+11-08 09:12:22.492 I/TapAndPay( 1231): deviceSupportsHce has detected emulator [CONTEXT service_id=79 ]
+11-08 09:12:22.561 I/GmsDebugLogger( 1632): [56] TfliteDynamiteDynamite.integ_264010405100400_1.apk
+11-08 09:12:23.113 I/adbd    (  484): adbd service requested 'shell,v2,raw:logcat -v time -d'
+11-08 09:12:23.416 I/TapAndPay( 1231): NfcAdapter is null while obtaining CardEmulation instance. [CONTEXT service_id=79 ]
+11-08 09:12:23.702 I/HeterodyneSyncer( 1231): (REDACTED) Syncing with Heterodyne. Reason: %s

@@ -1,0 +1,35 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "pass",
+      "path": "<REPO>/examples/flows/phase0/pass.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "artifact_file",
+      "conflict": false,
+      "steps": 6,
+      "failure": "Assertion is false: \"Apps\" is visible"
+    }
+  ],
+  "events": 30,
+  "event_types": {
+    "artifact.registered": 2,
+    "flow.ended": 2,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 12,
+    "step.started": 6,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}
