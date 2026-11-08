@@ -175,7 +175,7 @@ impl SampleMetric {
 
 #[cfg(test)]
 mod tests {
-    use fleet_protocol::journal::ClockSample;
+    use fleet_protocol::{frame::SampleUnavailable, journal::ClockSample};
     use time::OffsetDateTime;
 
     use super::*;
@@ -200,6 +200,7 @@ mod tests {
             host_psi_cpu_pct: None,
             host_psi_memory_pct: None,
             host_psi_io_pct: None,
+            unavailable: SampleUnavailable::default(),
         }
     }
 

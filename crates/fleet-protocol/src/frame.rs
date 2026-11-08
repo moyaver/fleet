@@ -197,7 +197,8 @@ pub struct DeviceSample {
     pub unavailable: DeviceUnavailable,
 }
 
-/// Why a device reading is unknown (PLAN §6.5). A reading that is set has no reason.
+/// Why a device, host or process reading is unknown (PLAN §6.5). A reading that is set has no
+/// reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -222,6 +223,13 @@ pub enum Unavailable {
     /// This sample does not take the reading: a probe sample carries no activity, and the sample
     /// of a failed flow's activity carries no probe.
     NotSampled,
+    /// The platform's system information could not be read, so no host or process reading that
+    /// comes from it was taken.
+    NoSystemInfo,
+    /// The kernel has no pressure stall information (PSI) for the resource: macOS and Windows.
+    NoPsi,
+    /// The process is not known to this run yet (Maestro has not started), or it has exited.
+    NoProcess,
     /// A reason this build doesn't know.
     #[serde(other)]
     Other,
@@ -277,7 +285,82 @@ impl DeviceUnavailable {
     }
 }
 
+/// The reason each reading of a [`Sample`] is unknown. Each field is the reason for the reading of
+/// the same name; a reading that is set has `None` here (PLAN §6.5).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SampleUnavailable {
+    /// Why `host_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_cpu_pct: Option<Unavailable>,
+    /// Why `host_mem_used_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_mem_used_bytes: Option<Unavailable>,
+    /// Why `host_mem_total_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_mem_total_bytes: Option<Unavailable>,
+    /// Why `maestro_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maestro_cpu_pct: Option<Unavailable>,
+    /// Why `maestro_rss_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maestro_rss_bytes: Option<Unavailable>,
+    /// Why `agent_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_cpu_pct: Option<Unavailable>,
+    /// Why `agent_rss_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_rss_bytes: Option<Unavailable>,
+    /// Why `host_load_1m` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_load_1m: Option<Unavailable>,
+    /// Why `host_cpu_cores` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_cpu_cores: Option<Unavailable>,
+    /// Why `host_swap_used_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_swap_used_bytes: Option<Unavailable>,
+    /// Why `host_swap_total_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_swap_total_bytes: Option<Unavailable>,
+    /// Why `host_psi_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_psi_cpu_pct: Option<Unavailable>,
+    /// Why `host_psi_memory_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_psi_memory_pct: Option<Unavailable>,
+    /// Why `host_psi_io_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_psi_io_pct: Option<Unavailable>,
+}
+
+impl SampleUnavailable {
+    /// Whether no reading has a reason, so nothing needs sending.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.host_cpu_pct.is_none()
+            && self.host_mem_used_bytes.is_none()
+            && self.host_mem_total_bytes.is_none()
+            && self.maestro_cpu_pct.is_none()
+            && self.maestro_rss_bytes.is_none()
+            && self.agent_cpu_pct.is_none()
+            && self.agent_rss_bytes.is_none()
+            && self.host_load_1m.is_none()
+            && self.host_cpu_cores.is_none()
+            && self.host_swap_used_bytes.is_none()
+            && self.host_swap_total_bytes.is_none()
+            && self.host_psi_cpu_pct.is_none()
+            && self.host_psi_memory_pct.is_none()
+            && self.host_psi_io_pct.is_none()
+    }
+}
+
 /// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
+///
+/// Every reading carries its unit in its field name (`_pct` percent, `_bytes` bytes, `_cores`
+/// cores; the load average is a plain number), and its scope in its prefix: `host_` is the
+/// machine, `maestro_` the Maestro process of the run and `agent_` the agent itself (its
+/// supervisor and observer). A reading that is `None` has its reason in `unavailable`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Sample {
@@ -323,6 +406,10 @@ pub struct Sample {
     /// waited for I/O. Absent from older agents.
     #[serde(default)]
     pub host_psi_io_pct: Option<f32>,
+    /// Why each reading above is unknown, for every reading that is `None` (PLAN §6.5). Empty from
+    /// older agents.
+    #[serde(default, skip_serializing_if = "SampleUnavailable::is_empty")]
+    pub unavailable: SampleUnavailable,
 }
 
 /// Where a run's evidence came from (issue #83). A live run is observed as it happens; a published
@@ -627,6 +714,56 @@ mod tests {
         };
         let back: Sample = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
         assert_eq!(back, full);
+    }
+
+    #[test]
+    fn sample_readings_say_why_they_are_unknown() {
+        // A sample from an agent that predates reasons: none is invented, and none is sent.
+        let old: Sample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},"host_cpu_pct":12.5,
+                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"maestro_cpu_pct":null,
+                "maestro_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
+        )
+        .unwrap();
+        assert!(old.unavailable.is_empty());
+        assert!(
+            !serde_json::to_string(&old).unwrap().contains("unavailable"),
+            "nothing unset is sent"
+        );
+
+        // macOS has no PSI: each pressure reading says so, and the Maestro process readings say the
+        // process is not known yet. Absent readings stay absent, never zero.
+        let mac = Sample {
+            host_psi_cpu_pct: None,
+            host_psi_memory_pct: None,
+            host_psi_io_pct: None,
+            unavailable: SampleUnavailable {
+                host_psi_cpu_pct: Some(Unavailable::NoPsi),
+                host_psi_memory_pct: Some(Unavailable::NoPsi),
+                host_psi_io_pct: Some(Unavailable::NoPsi),
+                maestro_cpu_pct: Some(Unavailable::NoProcess),
+                maestro_rss_bytes: Some(Unavailable::NoProcess),
+                ..SampleUnavailable::default()
+            },
+            ..old
+        };
+        let wire = serde_json::to_value(&mac).unwrap();
+        assert_eq!(wire["unavailable"]["host_psi_cpu_pct"], "no_psi");
+        assert_eq!(wire["unavailable"]["maestro_rss_bytes"], "no_process");
+        assert!(
+            wire["unavailable"].get("host_cpu_pct").is_none(),
+            "a reading that has a value has no reason"
+        );
+        let back: Sample = serde_json::from_value(wire).unwrap();
+        assert_eq!(back, mac);
+
+        // A reason this build doesn't know decodes as `Other`, not as a failed frame.
+        let newer: Sample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},
+                "unavailable":{"host_load_1m":"brand_new_reason"}}"#,
+        )
+        .unwrap();
+        assert_eq!(newer.unavailable.host_load_1m, Some(Unavailable::Other));
     }
 
     #[test]

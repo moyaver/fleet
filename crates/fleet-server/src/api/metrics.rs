@@ -45,6 +45,9 @@ const REASON_PROBE_FAILED: &str = "the probe failed: adb did not answer it";
 const REASON_THROTTLED: &str = "throttled: the host is under pressure";
 const REASON_NO_BASELINE: &str = "the first probe only sets the CPU baseline";
 const REASON_NO_ADB_LIST: &str = "adb has not listed devices yet";
+const REASON_NO_SYSTEM_INFO: &str = "the platform's system information could not be read";
+const REASON_NO_PSI: &str = "the kernel has no pressure information (PSI), as on macOS";
+const REASON_NO_PROCESS: &str = "the process is not known to this run yet, or it has exited";
 const REASON_UNKNOWN_AGENT_REASON: &str = "the agent gave a reason this server does not know";
 
 /// Raw samples cover ranges up to this long.
@@ -459,6 +462,9 @@ fn unavailable_text(reason: Unavailable) -> &'static str {
         Unavailable::NoBaseline => REASON_NO_BASELINE,
         Unavailable::NoAdbList => REASON_NO_ADB_LIST,
         Unavailable::NotSampled => REASON_NOT_SAMPLED,
+        Unavailable::NoSystemInfo => REASON_NO_SYSTEM_INFO,
+        Unavailable::NoPsi => REASON_NO_PSI,
+        Unavailable::NoProcess => REASON_NO_PROCESS,
         Unavailable::Other => REASON_UNKNOWN_AGENT_REASON,
     }
 }

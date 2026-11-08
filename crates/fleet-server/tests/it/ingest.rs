@@ -8,7 +8,7 @@ use fleet_protocol::{
     event::{EventBody, JournalGap, RunSignal},
     frame::{
         BatchRequest, BatchResponse, ClientFrame, ErrorCode, GoawayReason, ResumeOutcome, Sample,
-        ServerFrame, Telemetry,
+        SampleUnavailable, ServerFrame, Telemetry,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
 };
@@ -112,6 +112,7 @@ async fn shutdown_sends_goaway_the_final_telemetry_ack_and_1012() {
                 host_psi_cpu_pct: None,
                 host_psi_memory_pct: None,
                 host_psi_io_pct: None,
+                unavailable: SampleUnavailable::default(),
             },
             Sample {
                 at: ClockSample {
@@ -132,6 +133,7 @@ async fn shutdown_sends_goaway_the_final_telemetry_ack_and_1012() {
                 host_psi_cpu_pct: None,
                 host_psi_memory_pct: None,
                 host_psi_io_pct: None,
+                unavailable: SampleUnavailable::default(),
             },
         ],
     }))
@@ -193,6 +195,7 @@ async fn telemetry_is_acked_after_its_checkpoint() {
             host_psi_cpu_pct: None,
             host_psi_memory_pct: None,
             host_psi_io_pct: None,
+            unavailable: SampleUnavailable::default(),
         }],
     }))
     .await;

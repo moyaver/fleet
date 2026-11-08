@@ -16,7 +16,7 @@ use fleet_protocol::{
     },
     frame::{
         AgentInfo, BatchRequest, BatchResponse, CiContext, CiProvider, ClientFrame, Hello,
-        ProtocolRange, ResumeState, RunOrigin, Sample, ServerFrame, Telemetry,
+        ProtocolRange, ResumeState, RunOrigin, Sample, SampleUnavailable, ServerFrame, Telemetry,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -660,5 +660,6 @@ pub(super) fn sample(at: OffsetDateTime, cpu: f32) -> Sample {
         host_psi_cpu_pct: None,
         host_psi_memory_pct: None,
         host_psi_io_pct: None,
+        unavailable: SampleUnavailable::default(),
     }
 }

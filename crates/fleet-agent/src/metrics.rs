@@ -8,7 +8,12 @@
 
 use std::time::{Duration, Instant};
 
-use fleet_protocol::{frame::Sample, journal::ClockSample};
+use std::path::Path;
+
+use fleet_protocol::{
+    frame::{Sample, SampleUnavailable, Unavailable},
+    journal::ClockSample,
+};
 use nix::sys::resource::{UsageWho, getrusage};
 use sysinfo::{LoadAvg, Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 
@@ -58,32 +63,53 @@ impl Sampler {
         }
     }
 
-    /// One sample.
+    /// One sample. Every reading that is unknown carries its reason (PLAN §6.5): a platform without
+    /// system information, a process this run does not know (or that exited), a probe that failed,
+    /// a first CPU sample with no baseline, or a kernel without pressure information.
     pub(crate) fn sample(&mut self, at: ClockSample) -> Sample {
-        let (agent_cpu_pct, agent_rss_bytes) = self.agent_usage();
-        let empty = Sample {
-            at,
-            host_cpu_pct: None,
-            host_mem_used_bytes: None,
-            host_mem_total_bytes: None,
-            maestro_cpu_pct: None,
-            maestro_rss_bytes: None,
-            agent_cpu_pct,
-            agent_rss_bytes,
-            host_load_1m: None,
-            host_cpu_cores: None,
-            host_swap_used_bytes: None,
-            host_swap_total_bytes: None,
-            host_psi_cpu_pct: None,
-            host_psi_memory_pct: None,
-            host_psi_io_pct: None,
-        };
+        let (agent_cpu, agent_rss) = self.agent_usage();
+        let (agent_cpu_pct, agent_cpu_why) = split(agent_cpu);
+        let (agent_rss_bytes, agent_rss_why) = split(agent_rss);
+        // The core count is read once at start, not from the system information.
+        let (host_cpu_cores, cores_why) = split(self.cpu_cores.ok_or(Unavailable::ProbeFailed));
         let Some(system) = self.system.as_mut() else {
-            return empty;
+            return Sample {
+                at,
+                host_cpu_pct: None,
+                host_mem_used_bytes: None,
+                host_mem_total_bytes: None,
+                maestro_cpu_pct: None,
+                maestro_rss_bytes: None,
+                agent_cpu_pct,
+                agent_rss_bytes,
+                host_load_1m: None,
+                host_cpu_cores,
+                host_swap_used_bytes: None,
+                host_swap_total_bytes: None,
+                host_psi_cpu_pct: None,
+                host_psi_memory_pct: None,
+                host_psi_io_pct: None,
+                unavailable: SampleUnavailable {
+                    host_cpu_pct: Some(Unavailable::NoSystemInfo),
+                    host_mem_used_bytes: Some(Unavailable::NoSystemInfo),
+                    host_mem_total_bytes: Some(Unavailable::NoSystemInfo),
+                    maestro_cpu_pct: Some(Unavailable::NoSystemInfo),
+                    maestro_rss_bytes: Some(Unavailable::NoSystemInfo),
+                    agent_cpu_pct: agent_cpu_why,
+                    agent_rss_bytes: agent_rss_why,
+                    host_load_1m: Some(Unavailable::NoSystemInfo),
+                    host_cpu_cores: cores_why,
+                    host_swap_used_bytes: Some(Unavailable::NoSystemInfo),
+                    host_swap_total_bytes: Some(Unavailable::NoSystemInfo),
+                    host_psi_cpu_pct: Some(Unavailable::NoSystemInfo),
+                    host_psi_memory_pct: Some(Unavailable::NoSystemInfo),
+                    host_psi_io_pct: Some(Unavailable::NoSystemInfo),
+                },
+            };
         };
         system.refresh_cpu_usage();
         system.refresh_memory();
-        let (maestro_cpu_pct, maestro_rss_bytes) = match self.maestro {
+        let maestro = match self.maestro {
             Some(pid) => {
                 system.refresh_processes_specifics(
                     ProcessesToUpdate::Some(&[pid]),
@@ -92,38 +118,67 @@ impl Sampler {
                 );
                 system
                     .process(pid)
-                    .map_or((None, None), |p| (Some(p.cpu_usage()), Some(p.memory())))
+                    .map(|p| (p.cpu_usage(), p.memory()))
+                    .ok_or(Unavailable::NoProcess)
             }
-            None => (None, None),
+            None => Err(Unavailable::NoProcess),
         };
         let total = system.total_memory();
+        let (maestro_cpu_pct, maestro_cpu_why) = split(maestro.map(|(cpu, _)| cpu));
+        let (maestro_rss_bytes, maestro_rss_why) = split(maestro.map(|(_, rss)| rss));
+        let (host_mem_used_bytes, mem_used_why) = split(nonzero(total, system.used_memory()));
+        let (host_mem_total_bytes, mem_total_why) = split(nonzero(total, total));
+        let (host_load_1m, load_why) = split(
+            System::load_average()
+                .map(|load| load_one(&load))
+                .map_err(|_| Unavailable::ProbeFailed),
+        );
+        let (host_psi_cpu_pct, psi_cpu_why) = split(read_psi("cpu"));
+        let (host_psi_memory_pct, psi_memory_why) = split(read_psi("memory"));
+        let (host_psi_io_pct, psi_io_why) = split(read_psi("io"));
         Sample {
+            at,
             host_cpu_pct: Some(system.global_cpu_usage()),
-            host_mem_used_bytes: (total > 0).then(|| system.used_memory()),
-            host_mem_total_bytes: (total > 0).then_some(total),
+            host_mem_used_bytes,
+            host_mem_total_bytes,
             maestro_cpu_pct,
             maestro_rss_bytes,
-            host_load_1m: System::load_average().ok().as_ref().map(load_one),
-            host_cpu_cores: self.cpu_cores,
+            agent_cpu_pct,
+            agent_rss_bytes,
+            host_load_1m,
+            host_cpu_cores,
             host_swap_used_bytes: Some(system.used_swap()),
             host_swap_total_bytes: Some(system.total_swap()),
-            host_psi_cpu_pct: read_psi("cpu"),
-            host_psi_memory_pct: read_psi("memory"),
-            host_psi_io_pct: read_psi("io"),
-            ..empty
+            host_psi_cpu_pct,
+            host_psi_memory_pct,
+            host_psi_io_pct,
+            unavailable: SampleUnavailable {
+                host_mem_used_bytes: mem_used_why,
+                host_mem_total_bytes: mem_total_why,
+                maestro_cpu_pct: maestro_cpu_why,
+                maestro_rss_bytes: maestro_rss_why,
+                agent_cpu_pct: agent_cpu_why,
+                agent_rss_bytes: agent_rss_why,
+                host_load_1m: load_why,
+                host_cpu_cores: cores_why,
+                host_psi_cpu_pct: psi_cpu_why,
+                host_psi_memory_pct: psi_memory_why,
+                host_psi_io_pct: psi_io_why,
+                ..SampleUnavailable::default()
+            },
         }
     }
 
     /// The agent's cost (observer plus supervisor): CPU since the previous sample as a percentage
     /// of one core (sum of both processes' CPU-time deltas, each against its own baseline), and
     /// the current resident memory of both. When the supervisor is gone or unknown, the numbers
-    /// cover the observer only.
-    fn agent_usage(&mut self) -> (Option<f32>, Option<u64>) {
+    /// cover the observer only. Each is either the value or its reason.
+    fn agent_usage(&mut self) -> (Result<f32, Unavailable>, Result<u64, Unavailable>) {
         let now = Instant::now();
         let own = getrusage(UsageWho::RUSAGE_SELF)
             .ok()
             .map(|u| tv(u.user_time()) + tv(u.system_time()));
-        let mut rss = None;
+        let mut rss = Err(Unavailable::NoSystemInfo);
         let mut supervisor_cpu = None;
         if let Some(system) = self.system.as_mut() {
             let own_pid = Pid::from_u32(std::process::id());
@@ -137,7 +192,9 @@ impl Sampler {
             let own_rss = system.process(own_pid).map(sysinfo::Process::memory);
             let sup = self.supervisor.and_then(|p| system.process(p));
             supervisor_cpu = sup.map(|p| Duration::from_millis(p.accumulated_cpu_time()));
-            rss = own_rss.map(|r| r + sup.map_or(0, sysinfo::Process::memory));
+            rss = own_rss
+                .map(|r| r + sup.map_or(0, sysinfo::Process::memory))
+                .ok_or(Unavailable::ProbeFailed);
         }
         let sup_delta = match (supervisor_cpu, self.last_supervisor) {
             (Some(cpu), Some(before)) => cpu.saturating_sub(before),
@@ -154,14 +211,32 @@ impl Sampler {
                 } else {
                     0.0
                 };
-                Some(p)
+                Ok(p)
             }
-            _ => None,
+            (Some(_), None) => Err(Unavailable::NoBaseline),
+            (None, _) => Err(Unavailable::ProbeFailed),
         };
         if let Some(cpu) = own {
             self.last_self = Some((now, cpu));
         }
         (pct, rss)
+    }
+}
+
+/// A reading's value, and the reason it is unknown when there is none.
+fn split<T>(reading: Result<T, Unavailable>) -> (Option<T>, Option<Unavailable>) {
+    match reading {
+        Ok(value) => (Some(value), None),
+        Err(why) => (None, Some(why)),
+    }
+}
+
+/// `value` when the system reports a total, else a failed probe.
+fn nonzero<T>(total: u64, value: T) -> Result<T, Unavailable> {
+    if total > 0 {
+        Ok(value)
+    } else {
+        Err(Unavailable::ProbeFailed)
     }
 }
 
@@ -175,9 +250,19 @@ fn load_one(load: &LoadAvg) -> f32 {
 }
 
 /// Linux pressure stall information for `resource` (`cpu`, `memory` or `io`): the `some` share of
-/// the last ten seconds. `None` where there is no PSI (macOS, or a kernel built without it).
-fn read_psi(resource: &str) -> Option<f32> {
-    parse_psi_some_avg10(&std::fs::read_to_string(format!("/proc/pressure/{resource}")).ok()?)
+/// the last ten seconds, or why there is none.
+fn read_psi(resource: &str) -> Result<f32, Unavailable> {
+    read_psi_file(Path::new(&format!("/proc/pressure/{resource}")))
+}
+
+/// [`read_psi`] for one file. A missing file means the kernel has no PSI ([`Unavailable::NoPsi`],
+/// as on macOS); a file that cannot be read or parsed is a failed probe.
+fn read_psi_file(path: &Path) -> Result<f32, Unavailable> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => parse_psi_some_avg10(&text).ok_or(Unavailable::ProbeFailed),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(Unavailable::NoPsi),
+        Err(_) => Err(Unavailable::ProbeFailed),
+    }
 }
 
 /// The `avg10` figure of the `some` line of a PSI file, for example
@@ -411,6 +496,201 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         let next = s.sample(at);
         assert!(next.agent_cpu_pct.is_some() && next.agent_rss_bytes.is_some());
+    }
+
+    /// Every reading of `s` that is unknown has a reason, and every known one has none (PLAN §6.5).
+    /// Returns the names of the readings that break that rule.
+    fn readings_without_matching_reason(s: &Sample) -> Vec<&'static str> {
+        let u = s.unavailable;
+        [
+            (
+                "host_cpu_pct",
+                s.host_cpu_pct.is_some(),
+                u.host_cpu_pct.is_some(),
+            ),
+            (
+                "host_mem_used_bytes",
+                s.host_mem_used_bytes.is_some(),
+                u.host_mem_used_bytes.is_some(),
+            ),
+            (
+                "host_mem_total_bytes",
+                s.host_mem_total_bytes.is_some(),
+                u.host_mem_total_bytes.is_some(),
+            ),
+            (
+                "maestro_cpu_pct",
+                s.maestro_cpu_pct.is_some(),
+                u.maestro_cpu_pct.is_some(),
+            ),
+            (
+                "maestro_rss_bytes",
+                s.maestro_rss_bytes.is_some(),
+                u.maestro_rss_bytes.is_some(),
+            ),
+            (
+                "agent_cpu_pct",
+                s.agent_cpu_pct.is_some(),
+                u.agent_cpu_pct.is_some(),
+            ),
+            (
+                "agent_rss_bytes",
+                s.agent_rss_bytes.is_some(),
+                u.agent_rss_bytes.is_some(),
+            ),
+            (
+                "host_load_1m",
+                s.host_load_1m.is_some(),
+                u.host_load_1m.is_some(),
+            ),
+            (
+                "host_cpu_cores",
+                s.host_cpu_cores.is_some(),
+                u.host_cpu_cores.is_some(),
+            ),
+            (
+                "host_swap_used_bytes",
+                s.host_swap_used_bytes.is_some(),
+                u.host_swap_used_bytes.is_some(),
+            ),
+            (
+                "host_swap_total_bytes",
+                s.host_swap_total_bytes.is_some(),
+                u.host_swap_total_bytes.is_some(),
+            ),
+            (
+                "host_psi_cpu_pct",
+                s.host_psi_cpu_pct.is_some(),
+                u.host_psi_cpu_pct.is_some(),
+            ),
+            (
+                "host_psi_memory_pct",
+                s.host_psi_memory_pct.is_some(),
+                u.host_psi_memory_pct.is_some(),
+            ),
+            (
+                "host_psi_io_pct",
+                s.host_psi_io_pct.is_some(),
+                u.host_psi_io_pct.is_some(),
+            ),
+        ]
+        .into_iter()
+        .filter(|(_, has_value, has_reason)| has_value == has_reason)
+        .map(|(name, _, _)| name)
+        .collect()
+    }
+
+    /// A sampler that found no system information at start, as on a platform sysinfo doesn't cover.
+    fn without_system(maestro: Option<Pid>) -> Sampler {
+        Sampler {
+            system: None,
+            maestro,
+            supervisor: None,
+            last_self: None,
+            last_supervisor: None,
+            cpu_cores: Some(8),
+        }
+    }
+
+    fn at() -> ClockSample {
+        ClockSample {
+            wall: OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }
+    }
+
+    /// The first sample of a run says why each reading is unknown, and a read that has a value has
+    /// no reason: on the real system and without it, with and without a Maestro process.
+    #[test]
+    fn every_unknown_reading_of_a_sample_has_its_reason() {
+        let mut real = Sampler::new(Some(std::process::id()), None);
+        let first = real.sample(at());
+        assert_eq!(
+            first.unavailable.agent_cpu_pct,
+            Some(Unavailable::NoBaseline),
+            "the first sample only sets the agent's CPU baseline"
+        );
+        assert_eq!(
+            readings_without_matching_reason(&first),
+            Vec::<&str>::new(),
+            "{first:?}"
+        );
+        assert_eq!(
+            readings_without_matching_reason(&real.sample(at())),
+            Vec::<&str>::new()
+        );
+
+        let mut unknown_maestro = Sampler::new(Some(u32::MAX - 1), None);
+        let s = unknown_maestro.sample(at());
+        assert_eq!(
+            (s.maestro_cpu_pct, s.maestro_rss_bytes),
+            (None, None),
+            "a pid the table does not hold is not a reading"
+        );
+        assert_eq!(
+            (
+                s.unavailable.maestro_cpu_pct,
+                s.unavailable.maestro_rss_bytes
+            ),
+            (Some(Unavailable::NoProcess), Some(Unavailable::NoProcess))
+        );
+        assert_eq!(readings_without_matching_reason(&s), Vec::<&str>::new());
+
+        let s = without_system(None).sample(at());
+        assert_eq!(
+            readings_without_matching_reason(&s),
+            Vec::<&str>::new(),
+            "{s:?}"
+        );
+    }
+
+    /// Without the platform's system information nothing from it is read, and each of those
+    /// readings says so. The core count is read at start, so it is still known.
+    #[test]
+    fn a_platform_without_system_information_says_so_for_each_reading() {
+        let s = without_system(None).sample(at());
+        assert_eq!(
+            (
+                s.host_cpu_pct,
+                s.host_mem_used_bytes,
+                s.host_swap_used_bytes
+            ),
+            (None, None, None)
+        );
+        assert_eq!(
+            (
+                s.unavailable.host_cpu_pct,
+                s.unavailable.host_mem_total_bytes,
+                s.unavailable.host_psi_io_pct,
+                s.unavailable.agent_rss_bytes,
+            ),
+            (
+                Some(Unavailable::NoSystemInfo),
+                Some(Unavailable::NoSystemInfo),
+                Some(Unavailable::NoSystemInfo),
+                Some(Unavailable::NoSystemInfo),
+            )
+        );
+        assert_eq!(s.host_cpu_cores, Some(8));
+        assert_eq!(s.unavailable.host_cpu_cores, None);
+    }
+
+    /// A kernel without PSI (no `/proc/pressure` file, as on macOS) says so; a file that cannot be
+    /// parsed is a failed probe. A file with a figure is the figure.
+    #[test]
+    fn psi_says_no_psi_for_a_missing_file_and_a_failed_probe_for_a_bad_one() {
+        let dir = std::env::temp_dir().join(format!("fleet-psi-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let good = dir.join("cpu");
+        std::fs::write(&good, "some avg10=1.25 avg60=0.00 avg300=0.00 total=9\n").expect("write");
+        let bad = dir.join("memory");
+        std::fs::write(&bad, "garbage\n").expect("write");
+        let missing = dir.join("io");
+
+        assert_eq!(read_psi_file(&good), Ok(1.25));
+        assert_eq!(read_psi_file(&bad), Err(Unavailable::ProbeFailed));
+        assert_eq!(read_psi_file(&missing), Err(Unavailable::NoPsi));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     const CALM: Pressure = Pressure {
