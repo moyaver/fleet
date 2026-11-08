@@ -35,7 +35,7 @@ pub fn ScreenshotViewerView(
     });
     view! {
         <section
-            class="rounded border border-border bg-surface p-2 text-fg"
+            class="border-y border-line py-2 text-fg"
             aria-label="Screenshots"
             on:keydown=move |ev: web_sys::KeyboardEvent| {
                 match ev.key().as_str() {
