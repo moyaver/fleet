@@ -225,11 +225,11 @@ async fn a_run_appears_on_the_overview_and_its_counts_move_without_a_reload() {
     )
     .await;
     let recent = q("recent-row");
-    // The finished job carries the provenance of its outcome (I4): the script's failing flow ends
-    // with a non-zero exit, which the agent observed.
+    // The finished job's outcome was observed by the agent (its exit status), a settled result: the
+    // row carries no mark of its own, and the section says what its values are once (issue #149).
     page.wait(
-        "a provenance on the finished job",
-        &format!("document.querySelector('{recent} [role=img]').getAttribute('aria-label') === 'Provenance: observed'"),
+        "the finished job is settled",
+        &format!("document.querySelector('{recent}') !== null && document.querySelectorAll('{recent} [aria-label^=\"Provenance: \"]').length === 0"),
     )
     .await;
     assert!(
@@ -392,8 +392,16 @@ async fn after_a_server_restart_the_page_resubscribes_and_keeps_updating() {
         ),
     )
     .await;
+    // The run has a failed flow, so its verdict reads Failed; it is still open, so it says so.
     assert!(
-        page.texts(&q("pipeline-result")).await[0].contains("Running"),
+        page.texts(&q("pipeline-result")).await[0].contains("Failed"),
+        "the verdict of the open run reads Failed"
+    );
+    assert!(
+        page.texts(&q("pipeline-header"))
+            .await
+            .concat()
+            .contains("running for"),
         "the run is still open"
     );
     // The run ends with the report's verdict.

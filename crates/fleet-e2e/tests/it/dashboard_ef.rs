@@ -624,6 +624,12 @@ async fn a_maintainer_marks_a_failure_known_and_the_state_shows_after_a_reload()
     .await;
     let shown = page.texts(&q("triage-link")).await;
     assert_eq!(shown, vec![link.to_owned()]);
+    // Every failure shows when its fingerprint was first seen (issue #84), on this page too.
+    let first_seen = page.texts(&q("triage-first-seen")).await;
+    assert!(
+        !first_seen.is_empty() && first_seen.iter().all(|t| t.starts_with("First seen 20")),
+        "history: {first_seen:?}"
+    );
     let server = stack.get("/api/v1/projects/app/history").await;
     let state = server["items"]
         .as_array()
@@ -655,6 +661,11 @@ async fn a_maintainer_marks_a_failure_known_and_the_state_shows_after_a_reload()
     )
     .await;
     assert_eq!(page.texts(&q("triage-link")).await, vec![link.to_owned()]);
+    let first_seen = page.texts(&q("triage-first-seen")).await;
+    assert!(
+        first_seen.len() == 1 && first_seen[0].starts_with("First seen 20"),
+        "screen D: {first_seen:?}"
+    );
 
     // A viewer sees the same state, and no controls to change it.
     let viewer = sign_in_session(&stack, "viewer").await;
