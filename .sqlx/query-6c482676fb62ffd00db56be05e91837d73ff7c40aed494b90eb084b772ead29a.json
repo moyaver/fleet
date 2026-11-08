@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO device_samples (ts, device_session_id, agent_run_id, project_id,\n                                         adb_state, boot_completed, guest_cpu_pct,\n                                         guest_mem_available_bytes, emu_cpu_pct, emu_rss_bytes,\n                                         avd_name, api_level, foreground_activity, shard,\n                                         unavailable)\n             SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],\n                                  $5::smallint[], $6::boolean[], $7::real[], $8::bigint[],\n                                  $9::real[], $10::bigint[], $11::text[], $12::smallint[],\n                                  $13::text[], $14::integer[], $15::jsonb[])\n             ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TimestamptzArray",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "Int2Array",
+        "BoolArray",
+        "Float4Array",
+        "Int8Array",
+        "Float4Array",
+        "Int8Array",
+        "TextArray",
+        "Int2Array",
+        "TextArray",
+        "Int4Array",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6c482676fb62ffd00db56be05e91837d73ff7c40aed494b90eb084b772ead29a"
+}

@@ -173,6 +173,8 @@ struct Shard {
     planned: Vec<String>,
     /// The device serial Maestro selected for the shard, from its log.
     serial: Option<String>,
+    /// The order in which shards selected their devices (1 is the first).
+    selected: u64,
 }
 
 /// Generates entity IDs: UUIDv7 live, deterministic in tests and `inspect`.
@@ -199,9 +201,24 @@ pub(crate) struct Session {
     out: Vec<EventEnvelope>,
     /// Files worth uploading that the observer hasn't taken yet.
     uploads: Vec<Candidate>,
-    /// Devices a flow failed on since the observer last took them: their serial and device session
-    /// (PLAN §6.5: the current activity is read on failure).
-    failed_devices: Vec<(String, Uuid)>,
+    /// Devices a flow failed on since the observer last took them (PLAN §6.5: the current activity
+    /// is read on failure).
+    failed_devices: Vec<DrivenDevice>,
+    /// How many shards have selected a device so far.
+    selections: u64,
+    /// The planner's shard this run executes, when it is a plan shard (`plan.assigned`).
+    plan_shard: Option<u32>,
+}
+
+/// A device Maestro selected for a shard: what the observer probes and names in its samples.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DrivenDevice {
+    /// The serial Maestro selected.
+    pub(crate) serial: String,
+    /// The device session of the shard that selected it.
+    pub(crate) device_session_id: Uuid,
+    /// The shard number (`shard.assigned` names it).
+    pub(crate) shard: u32,
 }
 
 /// A file the observer may upload (PLAN §6.6): what it is and which flow it is evidence for.
@@ -291,6 +308,8 @@ impl Session {
             seq: 0,
             sequence_aborted: false,
             failed_devices: Vec::new(),
+            selections: 0,
+            plan_shard: None,
             closed: false,
             signalled: false,
             maestro: None,
@@ -392,6 +411,7 @@ impl Session {
             Observation::Report(bytes) => self.on_report(at, bytes.as_deref()),
             Observation::Devices(list) => self.on_devices(at, list),
             Observation::Plan(plan) => {
+                self.plan_shard = Some(plan.shard_id);
                 let subject = self.suite_subject();
                 self.emit(
                     at,
@@ -467,9 +487,12 @@ impl Session {
                 flows,
             }) => {
                 let suite_execution_id = Some(self.suite_id);
+                self.selections += 1;
+                let selected = self.selections;
                 let s = self.shard(shard);
                 s.planned.clone_from(&flows);
                 s.serial = Some(serial.clone());
+                s.selected = selected;
                 let subject = Subject {
                     suite_execution_id,
                     shard_id: Some(s.id),
@@ -1389,26 +1412,47 @@ impl Session {
         let Some(serial) = &shard.serial else {
             return;
         };
-        let entry = (serial.clone(), shard.device_session_id);
+        let entry = DrivenDevice {
+            serial: serial.clone(),
+            device_session_id: shard.device_session_id,
+            shard: self.assigned_shard(shard.number),
+        };
         if !self.failed_devices.contains(&entry) {
             self.failed_devices.push(entry);
         }
     }
 
     /// The devices a flow failed on since the last call, each once, and forgets them.
-    pub(crate) fn take_failed_devices(&mut self) -> Vec<(String, Uuid)> {
+    pub(crate) fn take_failed_devices(&mut self) -> Vec<DrivenDevice> {
         std::mem::take(&mut self.failed_devices)
     }
 
-    /// The device each shard Maestro selected, once per serial (the first shard that selected
-    /// it), with the device session that shard's events name. Only these devices are probed.
-    pub(crate) fn driven_devices(&self) -> Vec<(String, Uuid)> {
-        let mut out: Vec<(String, Uuid)> = Vec::new();
-        for shard in &self.shards {
-            if let Some(serial) = &shard.serial
-                && !out.iter().any(|(s, _)| s == serial)
-            {
-                out.push((serial.clone(), shard.device_session_id));
+    /// The shard a device is assigned to: the planner's shard for a plan run, which is the one the
+    /// user asked for; otherwise the shard Maestro numbered the selection with.
+    fn assigned_shard(&self, maestro_shard: u32) -> u32 {
+        self.plan_shard.unwrap_or(maestro_shard)
+    }
+
+    /// The device each serial Maestro selected, with the device session and shard of the shard
+    /// that selected it last. A serial that a later shard selects again is a new device session
+    /// (the emulator came back as a new device), so the newest one is the one probed. Only these
+    /// devices are probed.
+    pub(crate) fn driven_devices(&self) -> Vec<DrivenDevice> {
+        let mut selected: Vec<&Shard> = self.shards.iter().filter(|s| s.serial.is_some()).collect();
+        selected.sort_by_key(|s| s.selected);
+        let mut out: Vec<DrivenDevice> = Vec::new();
+        for shard in selected {
+            let Some(serial) = &shard.serial else {
+                continue;
+            };
+            let driven = DrivenDevice {
+                serial: serial.clone(),
+                device_session_id: shard.device_session_id,
+                shard: self.assigned_shard(shard.number),
+            };
+            match out.iter_mut().find(|d| d.serial == *serial) {
+                Some(known) => *known = driven,
+                None => out.push(driven),
             }
         }
         out
@@ -1433,6 +1477,7 @@ impl Session {
                 device_session_id,
                 planned: Vec::new(),
                 serial: None,
+                selected: 0,
             });
         }
         let pos = self
@@ -1881,7 +1926,11 @@ mod tests {
         file(&mut s, "pass/commands.json", Some(FAILED));
         let failed = s.take_failed_devices();
         assert_eq!(failed.len(), 1, "{failed:?}");
-        assert_eq!(failed[0].0, "emulator-5584");
+        assert_eq!(
+            (failed[0].serial.as_str(), failed[0].shard),
+            ("emulator-5584", 1),
+            "named with its shard"
+        );
         assert!(s.take_failed_devices().is_empty(), "taken once");
     }
 
@@ -1914,9 +1963,10 @@ mod tests {
         );
         let driven = s.driven_devices();
         assert_eq!(driven.len(), 1);
-        assert_eq!(driven[0].0, "emulator-5584");
+        assert_eq!(driven[0].serial, "emulator-5584");
+        assert_eq!(driven[0].shard, 1);
         assert_eq!(
-            Some(driven[0].1),
+            Some(driven[0].device_session_id),
             s.shards.first().map(|sh| sh.device_session_id),
             "the samples belong to the device session the shard event names"
         );
@@ -1930,6 +1980,60 @@ mod tests {
             Some(fleet_protocol::event::AdbState::Absent),
             "gone from adb's list"
         );
+    }
+
+    /// A serial that a later shard selects again is a new device session: the samples follow the
+    /// newest session and shard, not the first one that selected the serial.
+    #[test]
+    fn a_serial_selected_again_is_driven_as_its_newest_session_and_shard() {
+        let mut s = session();
+        log_line(
+            &mut s,
+            "maestro.cli.command.TestCommand",
+            "[shard 1] Selected device emulator-5584 using port 54235 with execution plan ExecutionPlan(flowsToRun=[/a/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))",
+        );
+        let first = s.driven_devices();
+        log_line(
+            &mut s,
+            "maestro.cli.command.TestCommand",
+            "[shard 2] Selected device emulator-5584 using port 54235 with execution plan ExecutionPlan(flowsToRun=[/b/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))",
+        );
+        let second_session = s
+            .shards
+            .iter()
+            .find(|sh| sh.number == 2)
+            .map(|sh| sh.device_session_id)
+            .expect("shard 2 exists");
+        let driven = s.driven_devices();
+        assert_eq!(driven.len(), 1, "still one device");
+        assert_eq!(
+            (driven[0].shard, driven[0].device_session_id),
+            (2, second_session),
+            "the newest selection is the device session that is probed"
+        );
+        assert_ne!(first[0].device_session_id, second_session);
+    }
+
+    /// A plan run's device is assigned the planner's shard. Maestro numbers the one invocation of
+    /// a plan shard as shard 1, so that number is not the shard the user asked for.
+    #[test]
+    fn a_plan_run_names_its_devices_with_the_planners_shard() {
+        let mut s = session();
+        s.observe(
+            at(),
+            Observation::Plan(fleet_protocol::event::PlanAssigned {
+                plan_id: "p1".into(),
+                shard_id: 3,
+                flows: vec!["/a/pass.yaml".into()],
+            }),
+        );
+        log_line(
+            &mut s,
+            "maestro.cli.command.TestCommand",
+            "[shard 1] Selected device emulator-5584 using port 54235 with execution plan ExecutionPlan(flowsToRun=[/a/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))",
+        );
+        let shards: Vec<u32> = s.driven_devices().iter().map(|d| d.shard).collect();
+        assert_eq!(shards, [3]);
     }
 
     fn log_line(s: &mut Session, logger: &str, message: &str) {

@@ -37,8 +37,8 @@ use fleet_protocol::{
         SuiteStarted,
     },
     frame::{
-        AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, Hello, ProtocolRange,
-        ResumeState, RunOrigin, Sample, ServerFrame, Telemetry,
+        AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, DeviceUnavailable, Hello,
+        ProtocolRange, ResumeState, RunOrigin, Sample, ServerFrame, Telemetry, Unavailable,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -319,6 +319,19 @@ fn device_samples(events: &[EventEnvelope], t0: Instant) -> Vec<DeviceSample> {
             avd_name: None,
             api_level: None,
             foreground_activity: None,
+            shard: Some(1),
+            // The load generator sends no probe, so no reading of this sample was sampled.
+            unavailable: DeviceUnavailable {
+                adb_state: None,
+                boot_completed: Some(Unavailable::NotSampled),
+                guest_cpu_pct: Some(Unavailable::NotSampled),
+                guest_mem_available_bytes: Some(Unavailable::NotSampled),
+                emu_cpu_pct: Some(Unavailable::NotSampled),
+                emu_rss_bytes: Some(Unavailable::NotSampled),
+                avd_name: Some(Unavailable::NotSampled),
+                api_level: Some(Unavailable::NotSampled),
+                foreground_activity: Some(Unavailable::NotSampled),
+            },
         })
         .collect()
 }

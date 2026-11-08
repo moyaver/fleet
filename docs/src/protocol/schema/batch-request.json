@@ -253,12 +253,130 @@
             "integer",
             "null"
           ]
+        },
+        "shard": {
+          "description": "The shard the device was assigned to: the planner's shard for a plan run (`plan.assigned`,\nas the plan numbers it), otherwise the `shard_number` its `shard.assigned` event names\n(1-based). Absent from older agents.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unavailable": {
+          "$ref": "#/$defs/DeviceUnavailable",
+          "description": "Why each reading above is unknown, for every reading that is `None` (PLAN §6.5: availability\nwith a reason when unknown). Empty from older agents."
         }
       },
       "required": [
         "at",
         "device_session_id"
       ],
+      "type": "object"
+    },
+    "DeviceUnavailable": {
+      "description": "The reason each device reading is unknown. Each field is the reason for the reading of the\nsame name in [`DeviceSample`]; a reading that is set has `None` here.",
+      "properties": {
+        "adb_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `adb_state` is unknown."
+        },
+        "api_level": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `api_level` is unknown."
+        },
+        "avd_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `avd_name` is unknown."
+        },
+        "boot_completed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `boot_completed` is unknown."
+        },
+        "emu_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `emu_cpu_pct` is unknown."
+        },
+        "emu_rss_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `emu_rss_bytes` is unknown."
+        },
+        "foreground_activity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `foreground_activity` is unknown."
+        },
+        "guest_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `guest_cpu_pct` is unknown."
+        },
+        "guest_mem_available_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `guest_mem_available_bytes` is unknown."
+        }
+      },
       "type": "object"
     },
     "EventEnvelope": {
@@ -752,6 +870,56 @@
         "samples"
       ],
       "type": "object"
+    },
+    "Unavailable": {
+      "description": "Why a device reading is unknown (PLAN §6.5). A reading that is set has no reason.",
+      "oneOf": [
+        {
+          "const": "not_an_emulator",
+          "description": "The serial is not an emulator's (`emulator-<console port>`), so no emulator process is read.",
+          "type": "string"
+        },
+        {
+          "const": "no_emulator_process",
+          "description": "An emulator serial that no `qemu-system-*` process maps to (it exited, or the process table\ncould not be read), or a device session the agent no longer drives.",
+          "type": "string"
+        },
+        {
+          "const": "no_avd_name",
+          "description": "The emulator's command line names no AVD (`-avd` is optional).",
+          "type": "string"
+        },
+        {
+          "const": "probe_failed",
+          "description": "adb did not answer the read, or answered without it (an error, a timeout or a malformed\nreply).",
+          "type": "string"
+        },
+        {
+          "const": "throttled",
+          "description": "The host is under pressure, so the guest's CPU and memory are not read (PLAN §6.5).",
+          "type": "string"
+        },
+        {
+          "const": "no_baseline",
+          "description": "The first probe of a device only sets its CPU baseline; so does one after the guest's\ncounters went backwards.",
+          "type": "string"
+        },
+        {
+          "const": "no_adb_list",
+          "description": "adb's device list has not arrived yet.",
+          "type": "string"
+        },
+        {
+          "const": "not_sampled",
+          "description": "This sample does not take the reading: a probe sample carries no activity, and the sample\nof a failed flow's activity carries no probe.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "A reason this build doesn't know.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

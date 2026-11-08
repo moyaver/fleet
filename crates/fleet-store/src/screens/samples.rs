@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen C's metric samples: raw rows and the one-minute and one-hour aggregates.
 
-use fleet_protocol::rest::MetricResolution;
+use fleet_protocol::{frame::DeviceUnavailable, rest::MetricResolution};
+use sqlx::types::Json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -77,6 +78,37 @@ pub struct DeviceRow {
     pub guest_mem_available_bytes: Option<f64>,
 }
 
+/// A device session's newest sample, every reading as the agent sent it (PLAN §6.5 Devices). A
+/// reading the agent did not report is `None`, and `unavailable` says why. `adb_state` is the code
+/// of `device_samples.adb_state` (see `telemetry`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeviceLatest {
+    /// When it was taken.
+    pub at: OffsetDateTime,
+    /// The shard the device was assigned to; `None` from agents that predate it.
+    pub shard: Option<i32>,
+    /// adb's state code.
+    pub adb_state: Option<i16>,
+    /// Whether `sys.boot_completed` was set.
+    pub boot_completed: Option<bool>,
+    /// The guest's CPU, percent.
+    pub guest_cpu_pct: Option<f64>,
+    /// The guest's available memory, bytes.
+    pub guest_mem_available_bytes: Option<f64>,
+    /// The emulator process's CPU, percent of one core.
+    pub emu_cpu_pct: Option<f64>,
+    /// The emulator process's resident memory, bytes.
+    pub emu_rss_bytes: Option<f64>,
+    /// The AVD name.
+    pub avd_name: Option<String>,
+    /// The API level.
+    pub api_level: Option<i16>,
+    /// The resumed activity, on a sample taken after a failed flow.
+    pub foreground_activity: Option<String>,
+    /// Why each unknown reading is unknown; `None` from agents that predate it.
+    pub unavailable: Option<Json<DeviceUnavailable>>,
+}
+
 /// Samples read for a range.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Samples<T> {
@@ -94,6 +126,31 @@ fn capped<T>(mut rows: Vec<T>) -> Samples<T> {
 }
 
 impl Store {
+    /// A device session's newest sample. `None` when it has none yet.
+    pub async fn device_latest(
+        &self,
+        project_id: Uuid,
+        device_id: Uuid,
+    ) -> Result<Option<DeviceLatest>> {
+        let row = sqlx::query_as!(
+            DeviceLatest,
+            "SELECT ts AS \"at!\", shard, adb_state, boot_completed,
+                    guest_cpu_pct::float8 AS guest_cpu_pct,
+                    guest_mem_available_bytes::float8 AS guest_mem_available_bytes,
+                    emu_cpu_pct::float8 AS emu_cpu_pct, emu_rss_bytes::float8 AS emu_rss_bytes,
+                    avd_name, api_level, foreground_activity,
+                    unavailable AS \"unavailable: Json<DeviceUnavailable>\"
+               FROM device_samples
+              WHERE project_id = $1 AND device_session_id = $2
+              ORDER BY ts DESC LIMIT 1",
+            project_id,
+            device_id
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        Ok(row)
+    }
+
     /// A worker's host samples in `[from, to)`, from the raw table or an aggregate. `None` when
     /// the worker doesn't exist in the project.
     pub async fn host_samples(

@@ -1,0 +1,141 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ts AS \"at!\", shard, adb_state, boot_completed,\n                    guest_cpu_pct::float8 AS guest_cpu_pct,\n                    guest_mem_available_bytes::float8 AS guest_mem_available_bytes,\n                    emu_cpu_pct::float8 AS emu_cpu_pct, emu_rss_bytes::float8 AS emu_rss_bytes,\n                    avd_name, api_level, foreground_activity,\n                    unavailable AS \"unavailable: Json<DeviceUnavailable>\"\n               FROM device_samples\n              WHERE project_id = $1 AND device_session_id = $2\n              ORDER BY ts DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "ts"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "shard",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "shard"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "adb_state",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "adb_state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "boot_completed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "boot_completed"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "guest_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "guest_mem_available_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "emu_cpu_pct",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "emu_rss_bytes",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "avd_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "avd_name"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "api_level",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "api_level"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "foreground_activity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "foreground_activity"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "unavailable: Json<DeviceUnavailable>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "device_samples",
+            "name": "unavailable"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "902259c9c0f6a65f1185911b0f8749a5786fc955a0a41bf54e429546d46c2e5c"
+}
