@@ -140,6 +140,7 @@ pub fn main() -> ! {
 
 fn write_out(text: &str) -> i32 {
     use std::io::Write as _;
+    let text = crate::ci::neutralize_workflow_commands(text);
     i32::from(std::io::stdout().lock().write_all(text.as_bytes()).is_err())
 }
 
@@ -148,7 +149,12 @@ fn report(result: anyhow::Result<String>) -> i32 {
     match result {
         Ok(msg) => write_out(&format!("{msg}\n")),
         Err(e) => {
-            let _ = writeln!(std::io::stderr().lock(), "[fleet-agent] {e:#}");
+            let line = format!("[fleet-agent] {e:#}");
+            let _ = writeln!(
+                std::io::stderr().lock(),
+                "{}",
+                crate::ci::neutralize_workflow_commands(&line)
+            );
             1
         }
     }
@@ -168,10 +174,16 @@ fn inspect(dir: &std::path::Path, json: bool, with_events: bool) -> i32 {
             } else {
                 crate::inspect::table(&result)
             };
+            let text = crate::ci::neutralize_workflow_commands(&text);
             i32::from(out.write_all(text.as_bytes()).is_err())
         }
         Err(e) => {
-            let _ = writeln!(std::io::stderr().lock(), "[fleet-agent] inspect: {e:#}");
+            let line = format!("[fleet-agent] inspect: {e:#}");
+            let _ = writeln!(
+                std::io::stderr().lock(),
+                "{}",
+                crate::ci::neutralize_workflow_commands(&line)
+            );
             1
         }
     }

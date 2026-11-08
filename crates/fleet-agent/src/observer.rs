@@ -942,9 +942,11 @@ fn write_job_summary(session: &Session) {
     let Some(path) = std::env::var_os("GITHUB_STEP_SUMMARY").filter(|p| !p.is_empty()) else {
         return;
     };
-    let server = server_url().map(|url| format!("{}/", crate::net::http_base(&url)));
-    let text =
-        crate::inspect::job_summary(&crate::inspect::flow_results(session), server.as_deref());
+    let dashboard = server_url().map(|url| format!("{}/", crate::net::http_base(&url)));
+    // Markdown, but a runner still reads a line that starts with `::` in a log (T13).
+    let summary =
+        crate::inspect::job_summary(&crate::inspect::flow_results(session), dashboard.as_deref());
+    let text = crate::ci::neutralize_workflow_commands(&summary);
     let written = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
