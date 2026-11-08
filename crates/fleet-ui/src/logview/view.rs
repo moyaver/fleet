@@ -128,7 +128,7 @@ pub fn LogViewer(
     };
 
     view! {
-        <section class="rounded border border-border bg-surface" aria-label=label>
+        <section class="border-y border-line" aria-label=label>
             <div class="flex items-center gap-2 border-b border-border p-2">
                 <input
                     type="search"

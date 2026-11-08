@@ -64,6 +64,21 @@ pub fn ProvenanceBadge(
     }
 }
 
+/// A row's provenance: its mark only when the value is an exception (see
+/// [`Provenance::marks_a_row`]). A settled value renders nothing here; its group says it once.
+#[component]
+pub fn RowProvenance(
+    /// What to show.
+    #[prop(into)]
+    provenance: Signal<Provenance>,
+) -> impl IntoView {
+    move || {
+        let p = provenance.get();
+        p.marks_a_row()
+            .then(|| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })
+    }
+}
+
 /// A group's provenance, said once in its heading, caption or section line: the label, then
 /// the sentence that says which values it covers. Rows mark only the exceptions.
 #[component]

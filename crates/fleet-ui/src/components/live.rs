@@ -119,3 +119,19 @@ pub fn LiveIndicator(
         </span>
     }
 }
+
+/// A page's one status region for run-level events (issue #149): polite, so it waits for the
+/// reader to be idle, and silent until its text changes. The text is set by the page's batcher,
+/// which reads out at most once per few seconds; the live indicator above never announces.
+#[component]
+pub fn Announcements(
+    /// The batch to read out, empty when nothing is new.
+    #[prop(into)]
+    text: Signal<String>,
+) -> impl IntoView {
+    view! {
+        <p class="sr-only" role="status" aria-live="polite" data-testid="announcements">
+            {move || text.get()}
+        </p>
+    }
+}

@@ -41,6 +41,17 @@ pub struct Badge {
 }
 
 impl Provenance {
+    /// Whether a row or a single value carries this provenance's own mark. Settled results do not
+    /// (issue #149): Verified, Observed and Derived are said once by the page, section or caption
+    /// they belong to. Only the exceptions (Provisional, Inferred, Missing and Stale) are marked.
+    #[must_use]
+    pub const fn marks_a_row(self) -> bool {
+        matches!(
+            self,
+            Self::Provisional | Self::Inferred | Self::Missing | Self::Stale
+        )
+    }
+
     /// The label for this provenance.
     #[must_use]
     pub const fn badge(self) -> Badge {
@@ -140,6 +151,31 @@ mod tests {
             assert!(a.badge().aria_label.starts_with("Provenance: "));
             assert!(a.badge().glyph.starts_with("pg-"));
         }
+    }
+
+    #[test]
+    fn only_the_exceptions_carry_a_mark_on_a_row() {
+        let marked: Vec<Provenance> = [
+            Provenance::Observed,
+            Provenance::Provisional,
+            Provenance::Final,
+            Provenance::Derived,
+            Provenance::Inferred,
+            Provenance::Missing,
+            Provenance::Stale,
+        ]
+        .into_iter()
+        .filter(|p| p.marks_a_row())
+        .collect();
+        assert_eq!(
+            marked,
+            [
+                Provenance::Provisional,
+                Provenance::Inferred,
+                Provenance::Missing,
+                Provenance::Stale
+            ]
+        );
     }
 
     #[test]
