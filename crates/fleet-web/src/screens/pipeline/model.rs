@@ -262,7 +262,8 @@ fn accounted_for(flows: &[&FlowView], planned: Option<i64>) -> bool {
             && i64::try_from(flows.len()).is_ok_and(|seen| seen >= total)
             && flows.iter().all(|f| {
                 f.state == "passed"
-                    && flow_provenance(&f.finality, &f.state, None) == Provenance::Final
+                    && flow_provenance(&f.finality, &f.state, f.outcome_source.as_deref(), None)
+                        == Provenance::Final
             })
     })
 }
@@ -306,7 +307,7 @@ pub fn failures(state: &AttemptState, project: &str) -> Vec<FailureRow> {
             name: f.name.clone(),
             state: flow_state_pill(&f.state),
             message: f.failure_message.clone(),
-            provenance: flow_provenance(&f.finality, &f.state, None),
+            provenance: flow_provenance(&f.finality, &f.state, f.outcome_source.as_deref(), None),
             href: flow_href(project, f.id),
         })
         .collect();
@@ -404,7 +405,7 @@ mod tests {
             name: f.name.clone(),
             state: flow_state_pill(&f.state),
             message: f.failure_message.clone(),
-            provenance: flow_provenance(&f.finality, &f.state, None),
+            provenance: flow_provenance(&f.finality, &f.state, f.outcome_source.as_deref(), None),
             href: flow_href("app", f.id),
         }
     }

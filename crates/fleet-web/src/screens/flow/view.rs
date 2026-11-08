@@ -274,7 +274,7 @@ fn FailureBand(
                     <h3 id="fail-h" class="text-sm font-semibold text-fail">"Failure"</h3>
                     {infrastructure
                         .map(|i| {
-                            let provenance = flow_provenance(&i.finality, "failed", None);
+                            let provenance = flow_provenance(&i.finality, "failed", None, None);
                             view! {
                                 <p class="mt-2 text-sm" data-testid="infrastructure">
                                     <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1">

@@ -59,6 +59,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Runner guide: a "Hardening a runner" section for the steps the repository can document (research 06 T18, T19, #140). The immutable-releases setting and ephemeral runners for `fleet-mac` are the owner's to set.
 
 ### Fixed
+- Dashboard: a flow the log started whose run ended with no verdict for it is Unknown with the Missing provenance, not Running. The run's end re-resolves its started flows, and an ended agent run counts as the end of its evidence, as a closed suite does (`fleet-core` `resolve`, `flow_provenance`).
 
 - Agent: a live run follows Maestro's files for two more layouts, which the captured fixtures now cover: a workspace config's `testOutputDir` (read from `--config`, or from a `config.yaml` in a directory the command names, and overridden by `--test-output-dir`), and `--flatten-debug-output` with `--test-output-dir` or with `--debug-output` and `--test-output-dir`. `--flatten-debug-output` alone writes into Maestro's `user.home`, which the agent now reads as the JVM does (`-Duser.home` in `JAVA_OPTS` or `MAESTRO_OPTS`, else the account's home), not from `$HOME` (#148).
 - Agent: a command that already has `--flatten-debug-output` is never given a second one. Maestro rejects a repeated flag with exit 2 (captured: `paths-flatten-repeated`), so the run failed before it started.

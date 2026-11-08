@@ -2221,3 +2221,174 @@ async fn the_cut_short_migration_backfills_flows_from_the_journal(pool: PgPool) 
             .unwrap();
     assert_eq!(kept.as_deref(), Some(CUT_SHORT_MESSAGE));
 }
+
+/// How a test run ends after it starts its one flow.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ending {
+    /// The run is still going.
+    Open,
+    /// The agent run ended (its `run.ended`), with nothing else.
+    RunOnly,
+    /// The way a real run ends: the process exits, the report is absent (which closes the suite), and
+    /// the agent run ends.
+    Full,
+}
+
+/// A run that starts one flow, which no event ever ends, and then ends as `ending` says. Returns the
+/// flow's id.
+async fn run_with_an_open_flow(
+    store: &Store,
+    a: &mut Agent,
+    p: &Publisher,
+    ending: Ending,
+) -> Uuid {
+    let h = store
+        .open_run(p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let flow = Uuid::now_v7();
+    let flow_ref = FlowRef {
+        name: "open".into(),
+        path: Some("flows/open.yaml".into()),
+    };
+    let mut events = vec![
+        a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunStarted(RunStarted {
+                argv: vec!["maestro".into(), "test".into()],
+                agent_version: "0.0.0".into(),
+                evidence: None,
+            }),
+        ),
+        a.event(
+            ids.suite(),
+            SourceKind::Declared,
+            &EventBody::SuiteStarted(SuiteStarted {
+                shard_mode: ShardMode::None,
+                shards: 1,
+            }),
+        ),
+        a.event(
+            ids.shard(),
+            SourceKind::DebugLog,
+            &EventBody::ShardAssigned(ShardAssigned {
+                shard_number: 1,
+                device_serial: "emulator-5554".into(),
+                planned: vec![flow_ref.clone()],
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::DebugLog,
+            &EventBody::FlowStarted(FlowStarted {
+                flow: flow_ref,
+                shard_number: 1,
+                ordinal: 0,
+            }),
+        ),
+    ];
+    if ending == Ending::Full {
+        events.push(a.event(
+            ids.suite(),
+            SourceKind::ProcessExit,
+            &EventBody::ProcessExited(ProcessExited {
+                code: Some(0),
+                signal: None,
+                class: ExitClass::Passed,
+            }),
+        ));
+        events.push(a.event(
+            ids.suite(),
+            SourceKind::JunitFinal,
+            &EventBody::ReportParsed(ReportParsed {
+                status: ReportStatus::Absent,
+                suites: 0,
+                tests: 0,
+                failures: 0,
+            }),
+        ));
+    }
+    if ending != Ending::Open {
+        events.push(a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunEnded(RunEnded {
+                interrupted: false,
+                output_bytes_dropped: 0,
+            }),
+        ));
+    }
+    // The flow starts in one batch and the run ends in a later one, as a live run sends them: the
+    // ending must re-resolve the flow that was already running.
+    let ending_events = events.split_off(4);
+    for batch in [events, ending_events] {
+        if batch.is_empty() {
+            continue;
+        }
+        let applied = store.apply_batch(&h, &batch).await.unwrap();
+        assert!(
+            applied.rejected.is_empty(),
+            "every event is accepted: {:?}",
+            applied.rejected
+        );
+    }
+    flow
+}
+
+/// Issue #148 follow-up: a flow that started and never got a verdict, in a run that has ended, is
+/// unknown and inferred with no source: not running, and nothing claims it passed or failed (I3).
+/// The run ends the way a real one does: the process exits, its report is absent, the agent run ends.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_flow_open_when_its_run_ends_has_no_verdict_and_is_not_running(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("open-at-end", "a");
+    let flow = run_with_an_open_flow(&store, &mut a, &p, Ending::Full).await;
+    let detail = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(detail.flow.state, "unknown", "{:?}", detail.flow);
+    assert_eq!(detail.flow.finality, "inferred");
+    assert_eq!(detail.flow.outcome_source, None, "no source decided it");
+    assert_eq!(detail.failure, None, "nothing failed");
+}
+
+/// The run-end rule does not wait for the report: once the agent run has ended, an open flow is no
+/// longer running even when its suite never closed. While the run is still going, the flow runs.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_agent_run_ending_alone_leaves_an_open_flow_unknown(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut ended = Agent::new("run-ended-only", "a");
+    let flow = run_with_an_open_flow(&store, &mut ended, &p, Ending::RunOnly).await;
+    let mut live = Agent::new("still-running", "b");
+    let open = run_with_an_open_flow(&store, &mut live, &p, Ending::Open).await;
+    let after = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(after.flow.state, "unknown", "{:?}", after.flow);
+    assert_eq!(after.flow.finality, "inferred");
+    let during = store
+        .flow_detail(p.project_id, open)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        during.flow.state, "running",
+        "a run still going keeps its flow running"
+    );
+    assert_eq!(during.flow.finality, "provisional");
+}

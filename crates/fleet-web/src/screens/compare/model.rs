@@ -160,7 +160,7 @@ fn cell(f: &CompareFlowView, ctx: &Ctx) -> SideCell {
         href: crate::paths::flow_href(&ctx.project, f.flow_id),
         state: flow_state_pill(&f.state),
         failed: f.state == "failed",
-        provenance: flow_provenance(&f.finality, &f.state, None),
+        provenance: flow_provenance(&f.finality, &f.state, f.outcome_source.as_deref(), None),
         finality_note: finality_note(&f.finality),
         duration: f.duration_ms.map(format_duration),
         failure_fingerprint: f.failure_fingerprint.clone(),

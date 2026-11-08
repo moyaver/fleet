@@ -1028,7 +1028,12 @@ fn FlowRow(
     let mark = move || {
         let f = flow.get();
         row_mark(
-            flow_provenance(&f.finality, &f.state, liveness()),
+            flow_provenance(
+                &f.finality,
+                &f.state,
+                f.outcome_source.as_deref(),
+                liveness(),
+            ),
             settled.get(),
         )
     };

@@ -1021,6 +1021,15 @@ impl<'a> Ctx<'a> {
         )
         .execute(&mut *tx)
         .await?;
+        // The run's started flows may now have no verdict to come: re-resolve them (their state is
+        // then unknown, not running, if no claim came).
+        let started = sqlx::query_scalar!(
+            "SELECT id FROM flow_executions WHERE agent_run_id = $1 AND started",
+            self.run.agent_run_id
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        self.resolve.extend(started);
         let released = sqlx::query_scalar!(
             "UPDATE device_sessions SET state = 'released', rev = rev + 1
               WHERE agent_run_id = $1 AND state <> 'released'
