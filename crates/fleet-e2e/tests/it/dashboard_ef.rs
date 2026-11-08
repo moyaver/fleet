@@ -548,6 +548,10 @@ async fn history_discards_an_inflight_page_after_filters_change() {
 /// Failure triage (issue #84) in the browser: a maintainer marks the failure known with its issue,
 /// the state shows on the history after a reload, and a viewer sees it without the controls.
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one browser journey, read top to bottom"
+)]
 async fn a_maintainer_marks_a_failure_known_and_the_state_shows_after_a_reload() {
     let stack = stack_without_host_telemetry().await;
     run(&stack, "triage-1", "abc1234def5678", 1, 2, "x86_64").await;
@@ -647,9 +651,7 @@ async fn a_maintainer_marks_a_failure_known_and_the_state_shows_after_a_reload()
         .unwrap();
     page.wait(
         "the failure's state on screen D",
-        &format!(
-            "document.querySelector('[data-testid=failure] [data-testid=triage-state]')?.dataset.state === 'known'"
-        ),
+        "document.querySelector('[data-testid=failure] [data-testid=triage-state]')?.dataset.state === 'known'",
     )
     .await;
     assert_eq!(page.texts(&q("triage-link")).await, vec![link.to_owned()]);
