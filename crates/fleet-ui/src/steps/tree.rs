@@ -34,13 +34,16 @@ pub struct StepExec {
 }
 
 /// The provenance a step row shows. A value read from the live log is provisional, and it is stale
-/// once its run has gone quiet: the same rule as the flow's own badge (`flow_provenance`). Every
-/// other source keeps its own provenance (see [`provenance_of`]).
+/// once its run has gone quiet: the same rule as the flow's own badge (`flow_provenance`). A step
+/// the final commands file settles as unknown is Missing: the file says nothing about it, and the
+/// log never ended it (issue #148). Every other source keeps its own provenance (see
+/// [`provenance_of`]).
 #[must_use]
-pub fn row_provenance(source: SourceKind, quiet: bool) -> Provenance {
-    match provenance_of(source) {
-        Provenance::Provisional if quiet => Provenance::Stale,
-        other => other,
+pub fn row_provenance(source: SourceKind, status: StepStatus, quiet: bool) -> Provenance {
+    match (provenance_of(source), source, status) {
+        (_, SourceKind::ArtifactFile, StepStatus::Unknown) => Provenance::Missing,
+        (Provenance::Provisional, _, _) if quiet => Provenance::Stale,
+        (other, _, _) => other,
     }
 }
 
@@ -273,7 +276,7 @@ impl TreeState {
                     focused: self.focused.as_deref() == Some(e.id.as_str()),
                     status: e.status,
                     source: e.source,
-                    provenance: row_provenance(e.source, e.quiet),
+                    provenance: row_provenance(e.source, e.status, e.quiet),
                     duration: e.duration_ms.map(format_duration),
                     attempt: (total > 1).then(|| format!("attempt {} of {total}", e.attempt)),
                 })
@@ -553,20 +556,30 @@ mod tests {
     #[test]
     fn a_live_value_is_stale_once_its_run_has_gone_quiet_and_settled_ones_are_not() {
         assert_eq!(
-            row_provenance(SourceKind::LiveConsole, false),
+            row_provenance(SourceKind::LiveConsole, StepStatus::Completed, false),
             Provenance::Provisional
         );
         assert_eq!(
-            row_provenance(SourceKind::DebugLog, true),
+            row_provenance(SourceKind::DebugLog, StepStatus::Completed, true),
             Provenance::Stale
         );
         assert_eq!(
-            row_provenance(SourceKind::ArtifactFile, true),
+            row_provenance(SourceKind::ArtifactFile, StepStatus::Completed, true),
             Provenance::Final,
             "a settled step is not a live value"
         );
         assert_eq!(
-            row_provenance(SourceKind::ServerInferred, true),
+            row_provenance(SourceKind::ArtifactFile, StepStatus::Unknown, false),
+            Provenance::Missing,
+            "a step the final file leaves unknown is missing"
+        );
+        assert_eq!(
+            row_provenance(SourceKind::DebugLog, StepStatus::Unknown, false),
+            Provenance::Provisional,
+            "a log's unknown status is not the file's verdict"
+        );
+        assert_eq!(
+            row_provenance(SourceKind::ServerInferred, StepStatus::Unknown, true),
             Provenance::Inferred
         );
     }

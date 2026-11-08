@@ -588,7 +588,7 @@ fn steps(
     // log keeps the whole section provisional (issue #148). With no steps it says how the flow ended.
     let weakest = execs
         .iter()
-        .map(|e| row_provenance(e.source, e.quiet))
+        .map(|e| row_provenance(e.source, e.status, e.quiet))
         .min_by_key(|p| provenance_rank(*p));
     let n = flat.len() - setup.len();
     let open = matches!(view.flow.state.as_str(), "running" | "pending");

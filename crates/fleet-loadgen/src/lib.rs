@@ -98,6 +98,9 @@ pub struct Options {
     /// The final `commands.json` files line up with none of their flows' steps, so every step stays
     /// provisional, read from the live log (issue #148).
     pub unaligned: bool,
+    /// Each flow has one more step: the log opened it and never ended it, and the final
+    /// `commands.json` does not list it. The file settles it as unknown, so it is Missing (issue #148).
+    pub missing_step: bool,
 }
 
 impl Default for Options {
@@ -123,6 +126,7 @@ impl Default for Options {
             hold: None,
             corpus: Vec::new(),
             unaligned: false,
+            missing_step: false,
         }
     }
 }
@@ -513,6 +517,30 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     SourceKind::ArtifactFile,
                     &EventBody::StepEnded(StepEnded {
                         status: status(s),
+                        timing: None,
+                    }),
+                );
+            }
+            if opts.missing_step {
+                let open = Subject {
+                    step: Some(StepRef { index: steps }),
+                    ..flow.clone()
+                };
+                push(
+                    open.clone(),
+                    SourceKind::DebugLog,
+                    &EventBody::StepStarted(StepStarted {
+                        description: "Assert that \"Ghost\" is visible".to_owned(),
+                        depth: None,
+                        parent: None,
+                        attempt: None,
+                    }),
+                );
+                push(
+                    open,
+                    SourceKind::ArtifactFile,
+                    &EventBody::StepEnded(StepEnded {
+                        status: StepStatus::Unknown,
                         timing: None,
                     }),
                 );

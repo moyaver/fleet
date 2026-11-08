@@ -6,6 +6,8 @@
 //! Every outcome is a claim with a provenance; [`fleet_core::claims::resolve`] decides what a
 //! flow's outcome is (invariants I3, I4). Every text that leaves goes through the redactor (I6).
 
+use std::collections::HashSet;
+
 use fleet_core::{
     claims::{self, Claim, Resolution},
     reconcile::{self, FlowKey},
@@ -950,6 +952,12 @@ impl Session {
             }
             settled.push((log_index, status, step_timing(c)));
         }
+        // A step the log started and never ended, that the final file does not list either, is
+        // Missing: no end record from either source (issue #148). That holds only when the file
+        // lines up with the log everywhere else: every command paired, and no other step left
+        // unpaired. Otherwise the alignment is in doubt, and the steps stay as the log left them.
+        let paired: HashSet<usize> = settled.iter().map(|(i, _, _)| *i).collect();
+        let missing = unlisted_open_steps(&f.logged, &paired, cmds.len());
         let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
         for (index, status, timing) in &settled {
             let mut subject = self.flow_subject_at(idx);
@@ -967,7 +975,24 @@ impl Session {
                 }),
             );
         }
-        if settled.len() < logged_count || settled.len() < cmds.len() {
+        for index in &missing {
+            let mut subject = self.flow_subject_at(idx);
+            subject.step = Some(StepRef {
+                index: u32::try_from(*index).unwrap_or(u32::MAX),
+            });
+            self.emit(
+                at,
+                subject,
+                SourceKind::ArtifactFile,
+                Some(parser.clone()),
+                &EventBody::StepEnded(StepEnded {
+                    status: StepStatus::Unknown,
+                    timing: None,
+                }),
+            );
+        }
+        let unsettled = settled.len() + missing.len();
+        if unsettled < logged_count || settled.len() < cmds.len() {
             let subject = self.flow_subject_at(idx);
             let message = format!(
                 "{rel} has {} commands and the log reported {logged_count} steps; {} lined up by depth and command kind and settled, the rest stay provisional",
@@ -1583,6 +1608,27 @@ fn command_status(status: &str) -> Option<StepStatus> {
 /// on the step count, settles none. ponytail: a quadratic table; Hirschberg's algorithm if a real
 /// flow ever gets this long.
 const MAX_ALIGNMENT_CELLS: usize = 4_000_000;
+
+/// The steps the log opened and never ended, which the final file does not list (issue #148). Only
+/// when the file lines up with the log everywhere else: every command is paired (`commands` of them),
+/// and no step the log ended is left unpaired. Otherwise the alignment is in doubt, and none is
+/// returned. `paired` holds the log indices that pair with a command.
+fn unlisted_open_steps(
+    logged: &[LoggedStep],
+    paired: &HashSet<usize>,
+    commands: usize,
+) -> Vec<usize> {
+    let unpaired = |i: usize| !paired.contains(&i);
+    let ended_unpaired = (0..logged.len())
+        .filter(|i| logged[*i].status.is_some() && unpaired(*i))
+        .count();
+    if ended_unpaired > 0 || paired.len() != commands {
+        return Vec::new();
+    }
+    (0..logged.len())
+        .filter(|i| logged[*i].status.is_none() && unpaired(*i))
+        .collect()
+}
 
 /// Pairs each step the log reported with the command that is the same step: the same depth and
 /// command kind (issue #148). A step with no known kind pairs with nothing.
@@ -2576,6 +2622,91 @@ mod tests {
                 .iter()
                 .any(|e| e.kind == "agent.warning" && e.data["code"] == "steps_not_aligned"),
             "the reason is warned"
+        );
+    }
+
+    /// A step the log started and never ended, which the final file does not list either, is
+    /// Missing: no end record from either source (issue #148). The captured `pass` file is real. The
+    /// open step is one more RUNNING line at the end of its log.
+    #[test]
+    fn a_step_the_log_left_open_and_the_final_file_does_not_list_is_missing() {
+        let run = captured("pass");
+        let (folder, commands) = &run.commands[0];
+        let log = format!(
+            "{}\n02:24:18.600 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Ghost\" is visible RUNNING",
+            run.log.trim_end()
+        );
+        let mut s = fresh_session();
+        replay_log(&mut s, &log);
+        s.drain();
+        file(
+            &mut s,
+            &format!("{folder}/commands.json"),
+            Some(commands.as_slice()),
+        );
+        let events = s.drain();
+        let bundle::Commands::Final(records) = bundle::parse_commands(commands) else {
+            panic!("the captured pass file is final");
+        };
+        let missing: Vec<(u32, StepEnded)> = settled_steps(&events)
+            .into_iter()
+            .filter(|(_, _, body)| body.status == StepStatus::Unknown)
+            .map(|(_, index, body)| (index, body))
+            .collect();
+        assert_eq!(
+            missing,
+            [(
+                u32::try_from(records.len()).unwrap(),
+                StepEnded {
+                    status: StepStatus::Unknown,
+                    timing: None,
+                }
+            )],
+            "the open step is Missing, and no other step is"
+        );
+        assert!(
+            events.iter().all(|e| e.data["code"] != "steps_not_aligned"),
+            "the alignment is clear, so nothing is warned"
+        );
+    }
+
+    /// A step the log left open is not Missing while the file is unaligned: the alignment is in
+    /// doubt, so the step stays as the log left it (issue #148).
+    #[test]
+    fn an_open_step_stays_open_while_the_file_does_not_line_up() {
+        let run = captured("pass");
+        let (folder, commands) = &run.commands[0];
+        // The file has one command the log never reported: its steps no longer line up.
+        let log = run
+            .log
+            .lines()
+            .filter(|l| !l.contains("Apply configuration"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let log = format!(
+            "{log}\n02:24:18.600 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Ghost\" is visible RUNNING"
+        );
+        let mut s = fresh_session();
+        replay_log(&mut s, &log);
+        s.drain();
+        file(
+            &mut s,
+            &format!("{folder}/commands.json"),
+            Some(commands.as_slice()),
+        );
+        let events = s.drain();
+        assert!(
+            settled_steps(&events)
+                .iter()
+                .all(|(_, _, body)| body.status != StepStatus::Unknown),
+            "no step is marked Missing: {:?}",
+            settled_steps(&events)
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.kind == "agent.warning" && e.data["code"] == "steps_not_aligned"),
+            "the misalignment is warned"
         );
     }
 

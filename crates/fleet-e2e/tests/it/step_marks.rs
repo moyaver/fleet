@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Each exception mark on a step row (issues #148, #149): a value still read from the live log is
-//! Stale once its run has gone quiet, and Inferred once the server abandons the run, and every open
-//! row of the flow says so. Settled rows carry no mark (`dashboard_cd`), and Provisional rows are
-//! covered by `dashboard_cd::steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so`.
-//! Missing has no step row today: nothing in the pipeline records a step as having no value.
+//! Stale once its run has gone quiet, Inferred once the server abandons the run, and Missing when
+//! the flow ended with a final commands file that does not list the step the log opened. Every such
+//! row says so. Settled rows carry no mark (`dashboard_cd`), and Provisional rows are covered by
+//! `dashboard_cd::steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so`.
 
 use crate::{
     browser::Browser,
@@ -108,6 +108,66 @@ async fn an_abandoned_runs_open_steps_are_inferred_and_each_row_says_so() {
     assert!(
         statuses.as_array().unwrap().iter().all(|s| s == "Unknown"),
         "an inferred step was never observed to end, got {statuses}"
+    );
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// A step the log opened and never ended, which the flow's final commands file does not list, is
+/// Missing: no end record from either source. Its row says so, and the settled rows carry no mark
+/// (issue #148).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_step_the_log_left_open_and_the_final_file_does_not_list_is_missing() {
+    let stack = stack(|_| {}).await;
+    let opts = fleet_loadgen::Options {
+        pace: std::time::Duration::ZERO,
+        missing_step: true,
+        ..run_options(&stack, "missing-steps")
+    };
+    fleet_loadgen::run(opts).await.unwrap();
+    let flow = first_flow(&stack).await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/flows/{flow}?project=app", stack.addr()))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the steps, the open one among them",
+        &format!("{} >= 3", count_of("[role=treeitem]")),
+    )
+    .await;
+    page.wait(
+        "the open step to be missing",
+        "document.querySelectorAll('[role=treeitem] [role=img][aria-label=\"Provenance: missing\"]').length === 1",
+    )
+    .await;
+    let rows = page
+        .eval(
+            "return Array.from(document.querySelectorAll('[role=treeitem]')).map(e => [e.getAttribute('data-status'), e.querySelector('[role=img]')?.getAttribute('aria-label') ?? null]);",
+            vec![],
+        )
+        .await;
+    let rows = rows.as_array().unwrap();
+    let missing: Vec<_> = rows
+        .iter()
+        .filter(|r| r[1] == serde_json::json!("Provenance: missing"))
+        .collect();
+    assert_eq!(missing.len(), 1, "one step is missing, got {rows:?}");
+    assert_eq!(
+        missing[0][0],
+        serde_json::json!("Unknown"),
+        "a missing step has no status, got {rows:?}"
+    );
+    assert!(
+        rows.iter()
+            .filter(|r| r[1] != serde_json::json!("Provenance: missing"))
+            .all(|r| r[1].is_null()),
+        "the settled steps carry no mark, got {rows:?}"
     );
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
