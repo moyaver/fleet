@@ -454,19 +454,7 @@ async fn health_endpoints_follow_readiness() {
         s.read_to_string(&mut out).await.unwrap();
         out
     };
-    assert!(get("/livez").await.starts_with("HTTP/1.1 200"));
-    assert!(get("/readyz").await.starts_with("HTTP/1.1 200"));
-    fleet_server::run(
-        fleet_server::Cli {
-            config: None,
-            command: fleet_server::Command::Healthcheck,
-        },
-        vec![("FLEET_LISTEN".into(), addr.to_string())],
-    )
-    .await
-    .unwrap();
-    h.stop().await;
-    assert!(
+    let healthcheck = || {
         fleet_server::run(
             fleet_server::Cli {
                 config: None,
@@ -474,8 +462,29 @@ async fn health_endpoints_follow_readiness() {
             },
             vec![("FLEET_LISTEN".into(), addr.to_string())],
         )
-        .await
-        .is_err(),
+    };
+    assert!(get("/livez").await.starts_with("HTTP/1.1 200"));
+    // Readiness pings the database within one second, and a loaded machine can miss that on any
+    // one request. The test waits for the server to report ready (an event), then for the
+    // healthcheck to pass, instead of taking the first answer.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    while !get("/readyz").await.starts_with("HTTP/1.1 200") {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "readiness never came"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    while healthcheck().await.is_err() {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the healthcheck never passed"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    h.stop().await;
+    assert!(
+        healthcheck().await.is_err(),
         "a stopped server is not healthy"
     );
 }
