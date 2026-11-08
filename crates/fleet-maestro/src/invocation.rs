@@ -10,7 +10,10 @@
 //! report format is asked for, and that path rejects `-c`/`--continuous`. So a single flow, or a
 //! continuous run, is never given `--format` (issue #28).
 
-use std::path::Path;
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use fleet_protocol::event::{EvidenceSources, ReportReason, ReportSource, ShardMode};
 
@@ -252,6 +255,79 @@ pub fn requested_html_report(inv: &Invocation) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// A directory Maestro writes one run's files into.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputRoot {
+    /// The directory itself: `--flatten-debug-output` puts the session log and the flow folders
+    /// straight into it.
+    Flat(PathBuf),
+    /// A `yyyy-MM-dd_HHmmss` directory that Maestro creates inside this one for the run.
+    Stamped(PathBuf),
+}
+
+/// Where one `maestro test` command writes its session `maestro.log` and its per-flow bundles.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputLayout {
+    /// The directory that holds the session `maestro.log`.
+    pub log: OutputRoot,
+    /// The directory that holds the per-flow folders (`commands.json`, `manifest.json`, …).
+    pub bundles: OutputRoot,
+}
+
+/// Maestro's state directory for test runs: `$XDG_STATE_HOME/maestro/tests` when that variable is
+/// set (and not empty), else `~/.maestro/tests` (research 01 §4.1). `None` when neither is known.
+#[must_use]
+pub fn state_tests_dir(xdg_state_home: Option<&OsStr>, home: Option<&Path>) -> Option<PathBuf> {
+    match (xdg_state_home.filter(|v| !v.is_empty()), home) {
+        (Some(state), _) => Some(PathBuf::from(state).join("maestro").join("tests")),
+        (None, Some(home)) => Some(home.join(".maestro").join("tests")),
+        (None, None) => None,
+    }
+}
+
+/// Where Maestro writes the session log and the flow bundles for a parsed `maestro test` command.
+///
+/// The rules are Maestro 2.12.1's (`TestDebugReporter.kt` L187-226, research 01 §4.1), and the
+/// captured fixtures agree with them: `paths-*`, `html-test-output-dir` and `html-no-debug-flags`
+/// (see `fixtures/maestro/2.12.1`).
+///
+/// - `--flatten-debug-output` writes both into `--debug-output`, or into the home directory without
+///   one. `--test-output-dir` is ignored.
+/// - Otherwise the log goes into a stamped directory under `<debug>/.maestro/tests`, or under the
+///   state directory without `--debug-output`. The bundles go into a stamped directory under
+///   `--test-output-dir` when given, else beside the log.
+///
+/// `None` when the directory is needed and unknown (no home, no state directory).
+#[must_use]
+pub fn output_layout(
+    inv: &Invocation,
+    state_tests: Option<&Path>,
+    home: Option<&Path>,
+) -> Option<OutputLayout> {
+    if inv.flatten {
+        let dir = match inv.debug_output.as_deref() {
+            Some(debug) => PathBuf::from(debug),
+            None => home?.to_path_buf(),
+        };
+        return Some(OutputLayout {
+            log: OutputRoot::Flat(dir.clone()),
+            bundles: OutputRoot::Flat(dir),
+        });
+    }
+    let log_base = match inv.debug_output.as_deref() {
+        Some(debug) => PathBuf::from(debug).join(".maestro").join("tests"),
+        None => state_tests?.to_path_buf(),
+    };
+    let bundles = match inv.test_output_dir.as_deref() {
+        Some(test) => OutputRoot::Stamped(PathBuf::from(test)),
+        None => OutputRoot::Stamped(log_base.clone()),
+    };
+    Some(OutputLayout {
+        log: OutputRoot::Stamped(log_base),
+        bundles,
+    })
 }
 
 fn user_format(inv: &Invocation) -> UserFormat {
@@ -694,5 +770,120 @@ mod tests {
         );
         assert_eq!(p.evidence.report.reason, ReportReason::RewriteDisabled);
         assert!(!p.evidence.maestro_log, "the user's own log pattern");
+    }
+
+    /// Where Maestro writes for each flag combination (research 01 §4.1; the captured fixtures in
+    /// `fixtures/maestro/2.12.1` are the runtime proof for the rows they cover).
+    #[test]
+    fn the_layout_follows_maestros_rules_for_each_flag_combination() {
+        let state = Path::new("/state/maestro/tests");
+        let home = Path::new("/home/me");
+        let layout = |cmd: &str| {
+            output_layout(&parse(&argv(cmd)), Some(state), Some(home)).expect("a layout")
+        };
+        let stamped = |p: &str| OutputRoot::Stamped(PathBuf::from(p));
+        let flat = |p: &str| OutputRoot::Flat(PathBuf::from(p));
+
+        // paths-none, single-flow-no-format, html-no-debug-flags: the state directory, log and bundles.
+        assert_eq!(
+            layout("maestro test flows/"),
+            OutputLayout {
+                log: stamped("/state/maestro/tests"),
+                bundles: stamped("/state/maestro/tests"),
+            }
+        );
+        // paths-test-output-dir, html-test-output-dir: the log stays in the state directory.
+        assert_eq!(
+            layout("maestro test --test-output-dir T flows/"),
+            OutputLayout {
+                log: stamped("/state/maestro/tests"),
+                bundles: stamped("T"),
+            }
+        );
+        // paths-debug-output: the debug directory's own tree, for the log and the bundles.
+        assert_eq!(
+            layout("maestro test --debug-output D flows/"),
+            OutputLayout {
+                log: stamped("D/.maestro/tests"),
+                bundles: stamped("D/.maestro/tests"),
+            }
+        );
+        // paths-debug-and-test-output-same: two subtrees even when the paths are equal.
+        assert_eq!(
+            layout("maestro test --debug-output X --test-output-dir X flows/"),
+            OutputLayout {
+                log: stamped("X/.maestro/tests"),
+                bundles: stamped("X"),
+            }
+        );
+        // The same with a different test output directory (the rule is per flag).
+        assert_eq!(
+            layout("maestro test --debug-output D --test-output-dir T flows/"),
+            OutputLayout {
+                log: stamped("D/.maestro/tests"),
+                bundles: stamped("T"),
+            }
+        );
+        // html-report-default-path, the flattened debug directory: one flat directory for both.
+        assert_eq!(
+            layout(
+                "maestro test --format html --flatten-debug-output --debug-output R/debug f.yaml"
+            ),
+            OutputLayout {
+                log: flat("R/debug"),
+                bundles: flat("R/debug"),
+            }
+        );
+        // The agent's own injection is this same layout; `--test-output-dir` is ignored under flatten.
+        assert_eq!(
+            layout(
+                "maestro test --flatten-debug-output --debug-output R --test-output-dir T flows/"
+            ),
+            OutputLayout {
+                log: flat("R"),
+                bundles: flat("R"),
+            }
+        );
+        // `--flatten-debug-output` alone writes into the home directory (user.home).
+        assert_eq!(
+            layout("maestro test --flatten-debug-output flows/"),
+            OutputLayout {
+                log: flat("/home/me"),
+                bundles: flat("/home/me"),
+            }
+        );
+        assert_eq!(
+            output_layout(
+                &parse(&argv("maestro test --flatten-debug-output flows/")),
+                Some(state),
+                None
+            ),
+            None,
+            "no home, no directory"
+        );
+        assert_eq!(
+            output_layout(&parse(&argv("maestro test flows/")), None, Some(home)),
+            None,
+            "no state directory"
+        );
+    }
+
+    #[test]
+    fn the_state_directory_is_xdg_or_the_home_directory() {
+        let xdg = OsStr::new("/xdg");
+        assert_eq!(
+            state_tests_dir(Some(xdg), Some(Path::new("/home/me"))),
+            Some(PathBuf::from("/xdg/maestro/tests"))
+        );
+        assert_eq!(
+            state_tests_dir(Some(OsStr::new("")), Some(Path::new("/home/me"))),
+            Some(PathBuf::from("/home/me/.maestro/tests")),
+            "an empty XDG_STATE_HOME is not set"
+        );
+        assert_eq!(
+            state_tests_dir(None, Some(Path::new("/home/me"))),
+            Some(PathBuf::from("/home/me/.maestro/tests"))
+        );
+        assert_eq!(state_tests_dir(None, None), None);
     }
 }
