@@ -9,16 +9,17 @@ expression: result
       "name": "pass",
       "path": "<CAPTURE>/run/flows/pass.yaml",
       "outcome": "failed",
-      "finality": "unverified_final",
-      "source": "live_console",
+      "finality": "verified",
+      "source": "artifact_file",
       "conflict": false,
       "steps": 3,
       "failure": "Package com.android.settings is not installed"
     }
   ],
-  "events": 15,
+  "events": 21,
   "event_types": {
-    "flow.ended": 1,
+    "artifact.registered": 2,
+    "flow.ended": 2,
     "flow.started": 1,
     "maestro.detected": 1,
     "process.exited": 1,
@@ -26,7 +27,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 3,
+    "step.ended": 6,
     "step.started": 3,
     "suite.started": 1
   },

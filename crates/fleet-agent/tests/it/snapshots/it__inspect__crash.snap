@@ -10,17 +10,18 @@ expression: result
       "path": "<REPO>/examples/flows/phase0/crash.yaml",
       "outcome": "failed",
       "finality": "verified",
-      "source": "artifact_file",
+      "source": "junit_final",
       "conflict": false,
       "steps": 5,
       "failure": "Assertion is false: \"Fleet never shows this\" is visible"
     }
   ],
-  "events": 28,
+  "events": 29,
   "event_types": {
     "app.crashed": 1,
     "artifact.registered": 2,
     "flow.ended": 2,
+    "flow.reported": 1,
     "flow.started": 1,
     "maestro.detected": 1,
     "process.exited": 1,
