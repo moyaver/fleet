@@ -13,6 +13,7 @@
 //!   ([`prepare_text`]), and a text that can't be redacted reliably is not uploaded at all.
 
 use std::{
+    collections::BTreeMap,
     io::{self, BufRead as _},
     path::PathBuf,
     sync::{
@@ -268,6 +269,8 @@ enum Step {
     Retry(String),
     /// Rate limited: try again after at least this long, as the server asked.
     Limited(String, Duration),
+    /// The direct upload failed: send this file through Fleet instead, at once.
+    Relay(String),
 }
 
 /// The bytes an item uploads, exactly as they leave the host (I6): text is read and redacted, a
@@ -318,7 +321,10 @@ impl Inner {
             content_type: item.content_type.to_owned(),
             size,
             sha256,
+            // Ask for a direct upload; the server relays it when it cannot presign (PLAN §7.6).
+            direct: true,
         };
+        let mut request = request;
         let mut why = String::new();
         let mut server_wait = Duration::ZERO;
         for attempt in 0..ATTEMPTS {
@@ -333,6 +339,11 @@ impl Inner {
                 Step::Limited(reason, wait) => {
                     why = reason;
                     server_wait = wait;
+                }
+                // Fail open to the relayed path: the same file, through Fleet, from now on.
+                Step::Relay(reason) => {
+                    request.direct = false;
+                    why = reason;
                 }
             }
         }
@@ -399,6 +410,60 @@ impl Inner {
                 self.send_and_complete(item, request, artifact_id, &token, &put, &complete)
                     .await
             }
+            UploadGrant::Presigned {
+                artifact_id,
+                url,
+                headers,
+                complete_url,
+                ..
+            } => {
+                let Some(complete) = self.url(&complete_url) else {
+                    return Step::Done(Outcome::Failed("the grant names another server".into()));
+                };
+                match self.put_direct(item, request, &url, &headers).await {
+                    Ok(()) => {
+                        self.complete_step(request, artifact_id, &token, &complete)
+                            .await
+                    }
+                    Err(reason) => Step::Relay(reason),
+                }
+            }
+        }
+    }
+
+    /// `PUT`s the bytes to the presigned URL with exactly the headers it was signed for. No
+    /// credential goes with them: the URL is the object store's, and carries its own signature.
+    async fn put_direct(
+        &self,
+        item: &Item,
+        request: &UploadRequest,
+        url: &str,
+        headers: &BTreeMap<String, String>,
+    ) -> Result<(), String> {
+        let parsed = reqwest::Url::parse(url).map_err(|e| format!("direct upload URL: {e}"))?;
+        if !matches!(parsed.scheme(), "http" | "https") {
+            return Err("direct upload URL is not http(s)".into());
+        }
+        let mut put = self
+            .client
+            .put(url)
+            // Required by S3 for a PUT with a known length: a chunked body is refused.
+            .header(reqwest::header::CONTENT_LENGTH, request.size)
+            .body(body(&item.source, Arc::clone(&self.limiter)));
+        for (name, value) in headers {
+            put = put.header(name.as_str(), value.as_str());
+        }
+        let res = put
+            .send()
+            .await
+            .map_err(|e| format!("sending the bytes directly: {e}"))?;
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "the object store refused the direct upload: {}",
+                res.status()
+            ))
         }
     }
 
@@ -432,6 +497,18 @@ impl Inner {
                 other => return other.step("sending the bytes", res).await,
             }
         }
+        self.complete_step(request, artifact_id, token, complete)
+            .await
+    }
+
+    /// `POST`s the completion and reads the result.
+    async fn complete_step(
+        &self,
+        request: &UploadRequest,
+        artifact_id: Uuid,
+        token: &str,
+        complete: &str,
+    ) -> Step {
         let res = match self.client.post(complete).bearer_auth(token).send().await {
             Ok(r) => r,
             Err(e) => return Step::Retry(format!("completing the upload: {e}")),
@@ -749,7 +826,7 @@ pub(crate) fn prepare_text(bytes: &[u8], redactor: &Redactor) -> Result<Vec<u8>,
 mod tests {
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
-        matchers::{method, path},
+        matchers::{body_partial_json, header, header_exists, method, path},
     };
 
     use super::*;
@@ -912,6 +989,156 @@ mod tests {
         }
         assert_eq!(seen[1].headers.get("content-length").unwrap(), "5");
         assert_eq!(seen.len(), 3);
+    }
+
+    /// The signed checksum header of a grant for `hello`: base64 of its SHA-256.
+    const HELLO_SHA_B64: &str = "LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
+
+    fn presigned(artifact: Uuid, url: &str) -> serde_json::Value {
+        serde_json::json!({
+            "disposition": "presigned",
+            "artifact_id": artifact,
+            "url": url,
+            "headers": {"x-amz-checksum-sha256": HELLO_SHA_B64},
+            "complete_url": format!("/api/v1/agent/artifacts/{artifact}/complete"),
+            "expires_at": "2030-01-01T00:00:00Z",
+            "size": 5,
+        })
+    }
+
+    /// Mounts the completion that answers `available`.
+    async fn accepting_completion(server: &MockServer, artifact: Uuid) {
+        Mock::given(method("POST"))
+            .and(path(format!("/api/v1/agent/artifacts/{artifact}/complete")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({"status": "available", "artifact_id": artifact}),
+                ),
+            )
+            .mount(server)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn a_direct_grant_puts_the_bytes_to_the_object_store_without_the_credential() {
+        let server = MockServer::start().await;
+        let artifact = Uuid::now_v7();
+        let object = format!("{}/object/{artifact}", server.uri());
+        Mock::given(method("POST"))
+            .and(path("/api/v1/agent/artifacts"))
+            .and(body_partial_json(serde_json::json!({"direct": true})))
+            .respond_with(ResponseTemplate::new(201).set_body_json(presigned(artifact, &object)))
+            .mount(&server)
+            .await;
+        // A PUT carrying Fleet's credential would be a leak: that mock must never be reached.
+        Mock::given(method("PUT"))
+            .and(path(format!("/object/{artifact}")))
+            .and(header_exists("authorization"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path(format!("/object/{artifact}")))
+            .and(header("x-amz-checksum-sha256", HELLO_SHA_B64))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(1)
+            .mount(&server)
+            .await;
+        accepting_completion(&server, artifact).await;
+        let up = Uploader::new(config(&server)).unwrap();
+
+        up.submit(item(b"hello"));
+        let done = run(&up).await;
+
+        assert_eq!(
+            done[0].outcome,
+            Outcome::Uploaded {
+                artifact_id: artifact,
+                size: 5
+            }
+        );
+        let seen = server.received_requests().await.unwrap();
+        assert_eq!(
+            seen.len(),
+            3,
+            "grant, direct PUT, completion; no relayed PUT"
+        );
+        let put = &seen[1];
+        assert_eq!(put.body, b"hello", "the bytes, whole");
+        assert_eq!(put.headers.get("content-length").unwrap(), "5");
+        assert!(put.headers.get("authorization").is_none());
+        assert_eq!(
+            seen[2]
+                .headers
+                .get("authorization")
+                .map(|v| v.to_str().unwrap()),
+            Some("Bearer mf_agent_secret"),
+            "completion is Fleet's call, with the credential"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_or_unreachable_direct_upload_falls_back_to_the_relayed_path() {
+        let cases = [
+            ("the store refuses the PUT", "refuse"),
+            ("the store is unreachable", "unreachable"),
+            ("the grant names something other than http(s)", "ftp"),
+        ];
+        for (what, mode) in cases {
+            let server = MockServer::start().await;
+            let artifact = Uuid::now_v7();
+            let object = match mode {
+                "refuse" => format!("{}/object/{artifact}", server.uri()),
+                "unreachable" => "http://127.0.0.1:9/object".to_owned(),
+                _ => "ftp://files.example.org/object".to_owned(),
+            };
+            Mock::given(method("POST"))
+                .and(path("/api/v1/agent/artifacts"))
+                .and(body_partial_json(serde_json::json!({"direct": true})))
+                .respond_with(
+                    ResponseTemplate::new(201).set_body_json(presigned(artifact, &object)),
+                )
+                .mount(&server)
+                .await;
+            if mode == "refuse" {
+                Mock::given(method("PUT"))
+                    .and(path(format!("/object/{artifact}")))
+                    .respond_with(ResponseTemplate::new(403))
+                    .expect(1)
+                    .mount(&server)
+                    .await;
+            }
+            // The relayed request asks without `direct`, which the field then omits.
+            Mock::given(method("POST"))
+                .and(path("/api/v1/agent/artifacts"))
+                .and(|req: &wiremock::Request| {
+                    !String::from_utf8_lossy(&req.body).contains("direct")
+                })
+                .respond_with(ResponseTemplate::new(201).set_body_json(grant(artifact)))
+                .mount(&server)
+                .await;
+            Mock::given(method("PUT"))
+                .and(path(format!("/api/v1/agent/artifacts/{artifact}/content")))
+                .respond_with(ResponseTemplate::new(204))
+                .expect(1)
+                .mount(&server)
+                .await;
+            accepting_completion(&server, artifact).await;
+            let up = Uploader::new(config(&server)).unwrap();
+
+            up.submit(item(b"hello"));
+            let done = run(&up).await;
+
+            assert_eq!(
+                done[0].outcome,
+                Outcome::Uploaded {
+                    artifact_id: artifact,
+                    size: 5
+                },
+                "{what}"
+            );
+        }
     }
 
     #[tokio::test]

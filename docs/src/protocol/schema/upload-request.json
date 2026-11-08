@@ -15,6 +15,10 @@
       "description": "The declared `Content-Type`; see [`ArtifactClass::content_types`]. The server serves what\nthe bytes are, not what is declared.",
       "type": "string"
     },
+    "direct": {
+      "description": "Whether the agent can send the bytes straight to the object store (see the module docs).\nAbsent from agents that predate direct upload, which then get [`UploadGrant::Upload`].",
+      "type": "boolean"
+    },
     "flow_execution_id": {
       "description": "The flow execution it is evidence for, if any. It must belong to the same run.",
       "format": "uuid",

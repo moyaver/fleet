@@ -97,6 +97,56 @@
       "type": "object"
     },
     {
+      "description": "Send the bytes straight to the object store: `PUT` them to `url` with exactly `headers`\nand **no** bearer credential, then call `complete_url` with the credential as usual. The\nURL is absolute and names the object store; it is short-lived and accepts bytes that\nmatch the signed headers, which bind the content's SHA-256.",
+      "properties": {
+        "artifact_id": {
+          "description": "The artifact being uploaded.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "complete_url": {
+          "description": "Where to `POST` once the bytes are sent (relative to the server's address).",
+          "type": "string"
+        },
+        "disposition": {
+          "const": "presigned",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The grant is void after this.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Headers the `PUT` must carry, exactly as signed (for example `x-amz-checksum-sha256`).",
+          "type": "object"
+        },
+        "size": {
+          "description": "The bytes to send, exactly.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "The presigned `PUT` URL, absolute.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "disposition",
+        "artifact_id",
+        "url",
+        "headers",
+        "complete_url",
+        "expires_at",
+        "size"
+      ],
+      "type": "object"
+    },
+    {
       "description": "The project already has these bytes for this class: nothing to send.",
       "properties": {
         "artifact_id": {
