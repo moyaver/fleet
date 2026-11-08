@@ -78,6 +78,8 @@ fn magic_bytes_must_match_the_class() {
         (Junit, SCREENSHOT, Some(Kind::Png)),
         (Junit, html, Some(Kind::Html)),
         (Junit, b"just text", None),
+        // An SVG with an XML prolog is XML to the sniffer: it must still be refused (no SVG).
+        (Junit, b"<?xml version=\"1.0\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>", None),
         (HtmlReport, SCREENSHOT, Some(Kind::Png)),
         (HtmlReport, b"plain text, not a page", None),
         (Bundle, SCREENSHOT, Some(Kind::Png)),
