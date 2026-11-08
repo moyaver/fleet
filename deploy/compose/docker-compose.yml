@@ -38,7 +38,9 @@ services:
       # Uploaded files are served from a second site (invariant I7); see the Caddyfile.
       FLEET_USERCONTENT__URL: https://${FLEET_USERCONTENT_DOMAIN:-usercontent.localhost}
       FLEET_USERCONTENT__SIGNING_KEY_FILE: /run/secrets/usercontent_key
-      # Agents upload through Fleet into Garage, which stays internal.
+      # Agents upload through Fleet into Garage, which stays internal. To let agents upload
+      # straight to Garage, publish its S3 API at a reachable TLS host and set
+      # FLEET_STORAGE__S3__PUBLIC_ENDPOINT to that URL (operator guide: Direct upload).
       FLEET_STORAGE__BACKEND: s3
       FLEET_STORAGE__S3__ENDPOINT: http://garage:3900
       FLEET_STORAGE__S3__BUCKET: fleet-artifacts
