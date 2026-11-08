@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,\n                    device_session_id, flow_name, flow_path, started_at, ended_at,\n                    crash_package, crash_exception\n               FROM flow_executions WHERE id = $1 AND project_id = $2",
+  "query": "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,\n                    device_session_id, flow_name, flow_path, started_at, ended_at,\n                    crash_package, crash_exception, step_warnings\n               FROM flow_executions WHERE id = $1 AND project_id = $2",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,17 @@
             "name": "crash_exception"
           }
         }
+      },
+      {
+        "ordinal": 11,
+        "name": "step_warnings",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "step_warnings"
+          }
+        }
       }
     ],
     "parameters": {
@@ -142,8 +153,9 @@
       true,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "bdcbadb3fcbfb1e2cc27f967bf38287b5707980adbf0c690761254924b7b8a30"
+  "hash": "c8085876ac2d91094bef8113428b52164837b777995c9b776383d0c9971db161"
 }

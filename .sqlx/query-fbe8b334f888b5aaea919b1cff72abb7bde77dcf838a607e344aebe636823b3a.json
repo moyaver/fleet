@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_executions\n                SET step_warnings = array_append(step_warnings, $2),\n                    rev = rev + 1\n              WHERE id = $1 AND agent_run_id = $3 AND NOT ($2 = ANY(step_warnings))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fbe8b334f888b5aaea919b1cff72abb7bde77dcf838a607e344aebe636823b3a"
+}

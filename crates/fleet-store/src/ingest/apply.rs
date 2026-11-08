@@ -11,8 +11,8 @@ use std::collections::BTreeSet;
 use fleet_core::claims::Claim;
 use fleet_protocol::{
     event::{
-        AdbState, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef,
-        FlowReported, JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed,
+        AdbState, AgentWarning, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome,
+        FlowRef, FlowReported, JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed,
         RunEnded, RunSignal, RunStarted, ShardAssigned, StepEnded, StepStarted, StepTiming,
         SuiteStarted,
     },
@@ -65,6 +65,9 @@ pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
         .and_then(|v| v.as_str().map(str::to_owned))
         .unwrap_or_default()
 }
+
+/// The `agent.warning` codes a flow keeps for its page: the step alignment warnings (issue #148).
+const STEP_WARNINGS: [&str; 2] = ["steps_not_aligned", "step_status_disagrees"];
 
 /// What one batch touched, so derivation and broadcasts cover exactly that.
 #[derive(Debug, Clone)]
@@ -179,11 +182,11 @@ impl<'a> Ctx<'a> {
             EventBody::DeviceStateObserved(b) => self.device_state(tx, e, &b).await,
             EventBody::JournalGap(b) => self.journal_gap(tx, &b).await,
             EventBody::MaestroDetected(b) => self.maestro_detected(tx, &b).await,
+            EventBody::AgentWarning(b) => self.agent_warning(tx, e, &b).await,
             // Kept in the journal; projected by later milestones (artifacts: M5).
             EventBody::ArtifactRegistered(_)
             | EventBody::ArtifactUploaded(_)
             | EventBody::ArtifactRejected(_)
-            | EventBody::AgentWarning(_)
             | EventBody::ParserUnrecognized(_) => Ok(Effect::Applied),
         }
     }
@@ -476,6 +479,40 @@ impl<'a> Ctx<'a> {
                 format!("flow execution {id} was never declared"),
             )),
         })
+    }
+
+    /// Keeps the step alignment warnings a flow's final `commands.json` raised, so its page says how
+    /// far its steps are verified (issue #148). The flow's verdict never depends on them (I3). Other
+    /// warnings stay in the journal.
+    async fn agent_warning(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &AgentWarning,
+    ) -> Result<Effect, sqlx::Error> {
+        if !STEP_WARNINGS.contains(&b.code.as_str()) || e.subject.flow_execution_id.is_none() {
+            return Ok(Effect::Applied);
+        }
+        let flow = match self.owned_flow(tx, e).await? {
+            Ok(f) => f,
+            Err(effect) => return Ok(effect),
+        };
+        let rows = sqlx::query!(
+            "UPDATE flow_executions
+                SET step_warnings = array_append(step_warnings, $2),
+                    rev = rev + 1
+              WHERE id = $1 AND agent_run_id = $3 AND NOT ($2 = ANY(step_warnings))",
+            flow,
+            b.code,
+            self.run.agent_run_id
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if rows > 0 {
+            self.changed.insert(EntityRef::Flow(flow));
+        }
+        Ok(Effect::Applied)
     }
 
     /// Records the app's crash on its flow. Evidence only (I3): no claim, and the flow's state,

@@ -1875,3 +1875,98 @@ async fn a_published_run_keeps_the_day_it_started_and_says_it_was_published(pool
     );
     assert_eq!(origin, "live");
 }
+
+/// The alignment warnings a flow's file raised stay on the flow, once per code, for its page
+/// (issue #148). Other warnings are journalled only, and the flow's verdict is unchanged (I3).
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_flows_step_alignment_warnings_are_kept_once_each(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("warnings", "a");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let ids = SuiteIds::new();
+    let flow = Uuid::now_v7();
+    let flow_ref = FlowRef {
+        name: "warnings".into(),
+        path: Some("flows/warnings.yaml".into()),
+    };
+    let mut events = vec![
+        a.event(
+            Subject::default(),
+            SourceKind::AgentObserved,
+            &EventBody::RunStarted(RunStarted {
+                argv: vec!["maestro".into(), "test".into()],
+                agent_version: "0.0.0".into(),
+                evidence: None,
+            }),
+        ),
+        a.event(
+            ids.suite(),
+            SourceKind::Declared,
+            &EventBody::SuiteStarted(SuiteStarted {
+                shard_mode: ShardMode::None,
+                shards: 1,
+            }),
+        ),
+        a.event(
+            ids.shard(),
+            SourceKind::DebugLog,
+            &EventBody::ShardAssigned(ShardAssigned {
+                shard_number: 1,
+                device_serial: "emulator-5554".into(),
+                planned: vec![flow_ref.clone()],
+            }),
+        ),
+        a.event(
+            ids.flow(flow),
+            SourceKind::DebugLog,
+            &EventBody::FlowStarted(FlowStarted {
+                flow: flow_ref,
+                shard_number: 1,
+                ordinal: 0,
+            }),
+        ),
+    ];
+    events.extend(logged_steps(&mut a, &ids, flow));
+    let warn = |a: &mut Agent, code: &str| {
+        a.event(
+            ids.flow(flow),
+            SourceKind::ArtifactFile,
+            &EventBody::AgentWarning(AgentWarning {
+                code: code.into(),
+                message: "warned".into(),
+            }),
+        )
+    };
+    events.push(warn(&mut a, "steps_not_aligned"));
+    events.push(warn(&mut a, "step_status_disagrees"));
+    events.push(warn(&mut a, "step_status_disagrees"));
+    events.push(warn(&mut a, "commands_not_final"));
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert!(
+        applied.rejected.is_empty(),
+        "every event is accepted: {:?}",
+        applied.rejected
+    );
+
+    let detail = store
+        .flow_detail(p.project_id, flow)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        detail.step_warnings,
+        ["steps_not_aligned", "step_status_disagrees"]
+    );
+    assert_eq!(
+        detail.flow.state, "running",
+        "no verdict comes from a warning"
+    );
+}
