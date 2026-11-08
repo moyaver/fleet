@@ -430,3 +430,103 @@ async fn only_a_role_that_reads_artifacts_gets_links() {
     let publisher = rig.app.get(&path).authorization_bearer(&rig.key).await;
     assert_eq!(publisher.status_code(), 401);
 }
+
+/// GET a link's path on `host` with a `Range` header (and optionally `If-Range`).
+async fn open_ranged(
+    rig: &Rig,
+    host: &str,
+    link: &str,
+    range: &str,
+    if_range: bool,
+) -> TestResponse {
+    let url = url::Url::parse(link).unwrap();
+    let req = rig
+        .app
+        .get(url.path())
+        .add_header("host", host)
+        .add_header("range", range);
+    if if_range {
+        req.add_header("if-range", "\"any\"").await
+    } else {
+        req.await
+    }
+}
+
+#[tokio::test]
+async fn a_byte_range_is_206_and_a_range_the_blob_cannot_give_is_416() {
+    let (rig, run) = rig_with_usercontent().await;
+    let id = store(&rig, &run, "html_report", "index.html", "text/html", HTML).await;
+    let link = link_of(&rig, &run, id).await;
+    let size = HTML.len();
+
+    // Ranges are advertised on every answer, whether or not the request had one.
+    let whole = open(&rig, UC_HOST, &link).await;
+    assert_eq!(whole.status_code(), 200);
+    assert_eq!(header(&whole, "accept-ranges"), "bytes");
+    assert_eq!(whole.as_bytes().as_ref(), HTML);
+
+    let cases: [(&str, std::ops::Range<usize>); 4] = [
+        ("bytes=0-9", 0..10),
+        ("bytes=10-", 10..size),
+        ("bytes=-5", size - 5..size),
+        ("bytes=5-999999", 5..size),
+    ];
+    for (range, bytes) in cases {
+        let res = open_ranged(&rig, UC_HOST, &link, range, false).await;
+        assert_eq!(res.status_code(), 206, "{range}");
+        assert_eq!(res.as_bytes().as_ref(), &HTML[bytes.clone()], "{range}");
+        assert_eq!(
+            header(&res, "content-range"),
+            format!("bytes {}-{}/{size}", bytes.start, bytes.end - 1),
+            "{range}"
+        );
+        assert_eq!(
+            header(&res, "content-length"),
+            (bytes.end - bytes.start).to_string(),
+            "{range}"
+        );
+        // Still the sandbox, nosniff and the same type, on a partial answer.
+        assert!(
+            header(&res, "content-security-policy").starts_with("sandbox;"),
+            "{range}"
+        );
+        assert_eq!(header(&res, "x-content-type-options"), "nosniff", "{range}");
+        assert_eq!(header(&res, "content-type"), "text/html; charset=utf-8");
+    }
+
+    for range in [
+        format!("bytes={size}-"),
+        format!("bytes={}-{}", size + 10, size + 20),
+        "bytes=-0".to_owned(),
+    ] {
+        let res = open_ranged(&rig, UC_HOST, &link, &range, false).await;
+        assert_eq!(res.status_code(), 416, "{range}");
+        assert_eq!(
+            header(&res, "content-range"),
+            format!("bytes */{size}"),
+            "{range}"
+        );
+        assert!(
+            header(&res, "content-security-policy").starts_with("sandbox;"),
+            "{range}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_range_this_origin_does_not_implement_is_ignored_and_the_whole_blob_is_sent() {
+    let (rig, run) = rig_with_usercontent().await;
+    let id = store(&rig, &run, "html_report", "index.html", "text/html", HTML).await;
+    let link = link_of(&rig, &run, id).await;
+
+    for range in ["items=0-1", "bytes=0-1,5-6", "bytes=9-3"] {
+        let res = open_ranged(&rig, UC_HOST, &link, range, false).await;
+        assert_eq!(res.status_code(), 200, "{range}");
+        assert_eq!(res.as_bytes().as_ref(), HTML, "{range}");
+        assert!(res.headers().get("content-range").is_none(), "{range}");
+    }
+    // If-Range names a validator this origin does not keep: the whole blob is the safe answer.
+    let res = open_ranged(&rig, UC_HOST, &link, "bytes=0-9", true).await;
+    assert_eq!(res.status_code(), 200);
+    assert_eq!(res.as_bytes().as_ref(), HTML);
+}

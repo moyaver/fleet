@@ -15,13 +15,13 @@
 //! [`router`] is mounted by `Host` on the main listener ([`dispatch`]) and, with
 //! `usercontent.listen`, on a listener of its own. Nothing else is routed here.
 
-use std::convert::Infallible;
+use std::{convert::Infallible, ops::Range};
 
 use axum::{
     Router,
     body::Body,
     extract::{Path, Request, State},
-    http::{HeaderName, HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -83,6 +83,7 @@ pub(crate) fn router(state: &AppState) -> Router {
             HeaderValue::from_static("private, max-age=300"),
         ),
         (header::VARY, HeaderValue::from_static("Origin")),
+        (header::ACCEPT_RANGES, HeaderValue::from_static("bytes")),
     ];
     // The dashboard's own scripts may fetch an artifact (the log viewer); nobody else's.
     if let Some(origin) = origin.and_then(|o| HeaderValue::try_from(o).ok()) {
@@ -136,6 +137,7 @@ async fn serve(
         String,
         String,
     )>,
+    headers: HeaderMap,
 ) -> Response {
     // No `Cookie` header is ever read: this origin has no session, and a link works the same
     // with or without one.
@@ -171,11 +173,23 @@ async fn serve(
     ) else {
         return refuse(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
     };
+    let size = u64::try_from(servable.size_bytes).unwrap_or(0);
+    let wanted = match ask(
+        headers.get(header::RANGE).and_then(|v| v.to_str().ok()),
+        headers.contains_key(header::IF_RANGE),
+        size,
+    ) {
+        Ask::Whole => None,
+        Ask::Part(range) => Some(range),
+        Ask::Unsatisfiable => return unsatisfiable(size),
+    };
+    let partial = wanted.is_some();
     let blob = match blobs
-        .get(&BlobKey::new(granted.project, digest), None)
+        .get(&BlobKey::new(granted.project, digest), wanted)
         .await
     {
         Ok(b) => b,
+        Err(BlobError::RangeNotSatisfiable { size }) => return unsatisfiable(size),
         Err(BlobError::NotFound) => return refuse(StatusCode::NOT_FOUND, "not found"),
         Err(e) => {
             tracing::error!(error = %e, "reading a blob");
@@ -186,18 +200,98 @@ async fn serve(
         t @ ("text/plain" | "text/html" | "application/xml") => format!("{t}; charset=utf-8"),
         t => t.to_owned(),
     };
-    (
-        [
-            (header::CONTENT_TYPE, content_type),
-            (header::CONTENT_LENGTH, blob.size.to_string()),
-            (
-                header::CONTENT_DISPOSITION,
-                disposition(servable.class, &servable.content_type, &servable.name),
+    let length = blob.range.end - blob.range.start;
+    let mut response = Response::builder()
+        .status(if partial {
+            StatusCode::PARTIAL_CONTENT
+        } else {
+            StatusCode::OK
+        })
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CONTENT_LENGTH, length.to_string())
+        .header(
+            header::CONTENT_DISPOSITION,
+            disposition(servable.class, &servable.content_type, &servable.name),
+        );
+    if partial {
+        response = response.header(
+            header::CONTENT_RANGE,
+            format!(
+                "bytes {}-{}/{}",
+                blob.range.start,
+                blob.range.end - 1,
+                blob.size
             ),
-        ],
-        Body::from_stream(blob.body),
+        );
+    }
+    response
+        .body(Body::from_stream(blob.body))
+        .unwrap_or_else(|_| refuse(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))
+}
+
+/// A `416` for a range the blob cannot give, with the size it has.
+fn unsatisfiable(size: u64) -> Response {
+    (
+        StatusCode::RANGE_NOT_SATISFIABLE,
+        [(header::CONTENT_RANGE, format!("bytes */{size}"))],
     )
         .into_response()
+}
+
+/// What a request's `Range` header asks for, of a blob of a known size (RFC 9110 §14).
+#[derive(Debug, PartialEq, Eq)]
+enum Ask {
+    /// The whole blob: no `Range`, or one this server ignores (another unit, several ranges, a
+    /// malformed range, or an `If-Range`, which needs a validator this origin does not keep).
+    Whole,
+    /// One byte range, clamped to the blob's end.
+    Part(Range<u64>),
+    /// Not satisfiable: a `416`.
+    Unsatisfiable,
+}
+
+/// Reads a single `bytes=` range. Anything this does not implement is ignored, which HTTP allows.
+fn ask(range: Option<&str>, if_range: bool, size: u64) -> Ask {
+    let Some(spec) = range.and_then(|r| r.trim().strip_prefix("bytes=")) else {
+        return Ask::Whole;
+    };
+    if if_range || spec.contains(',') {
+        return Ask::Whole;
+    }
+    let Some((first, last)) = spec.split_once('-') else {
+        return Ask::Whole;
+    };
+    let (first, last) = (first.trim(), last.trim());
+    match (first.is_empty(), last.is_empty()) {
+        // `-N`: the last N bytes.
+        (true, false) => match last.parse::<u64>() {
+            Ok(n) if n > 0 && size > 0 => Ask::Part(size.saturating_sub(n)..size),
+            Ok(_) => Ask::Unsatisfiable,
+            Err(_) => Ask::Whole,
+        },
+        // `N-` or `N-M`.
+        (false, _) => {
+            let Ok(start) = first.parse::<u64>() else {
+                return Ask::Whole;
+            };
+            let end = if last.is_empty() {
+                size
+            } else {
+                match last.parse::<u64>() {
+                    // Syntactically invalid when the last byte is before the first.
+                    Ok(end) if end < start => return Ask::Whole,
+                    Ok(end) => end.saturating_add(1),
+                    Err(_) => return Ask::Whole,
+                }
+            };
+            if start >= size {
+                Ask::Unsatisfiable
+            } else {
+                Ask::Part(start..end.min(size))
+            }
+        }
+        _ => Ask::Whole,
+    }
 }
 
 /// Images and HTML (which is sandboxed) are shown; everything else is saved.
@@ -227,4 +321,52 @@ fn disposition(class: ArtifactClass, content_type: &str, name: &str) -> String {
         })
         .collect();
     format!("{kind}; filename=\"{ascii}\"; filename*=UTF-8''{encoded}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Ask, ask};
+
+    #[test]
+    fn a_single_range_is_read_and_clamped_to_the_blob() {
+        assert_eq!(ask(Some("bytes=0-99"), false, 1000), Ask::Part(0..100));
+        assert_eq!(ask(Some("bytes=500-"), false, 1000), Ask::Part(500..1000));
+        assert_eq!(
+            ask(Some("bytes=900-5000"), false, 1000),
+            Ask::Part(900..1000)
+        );
+        assert_eq!(ask(Some("bytes=-100"), false, 1000), Ask::Part(900..1000));
+        // A suffix longer than the blob is the whole blob.
+        assert_eq!(ask(Some("bytes=-5000"), false, 1000), Ask::Part(0..1000));
+        assert_eq!(ask(Some(" bytes=7-7 "), false, 1000), Ask::Part(7..8));
+    }
+
+    #[test]
+    fn a_range_the_blob_cannot_give_is_416() {
+        assert_eq!(ask(Some("bytes=1000-"), false, 1000), Ask::Unsatisfiable);
+        assert_eq!(
+            ask(Some("bytes=5000-6000"), false, 1000),
+            Ask::Unsatisfiable
+        );
+        assert_eq!(ask(Some("bytes=-0"), false, 1000), Ask::Unsatisfiable);
+        assert_eq!(ask(Some("bytes=0-0"), false, 0), Ask::Unsatisfiable);
+        assert_eq!(ask(Some("bytes=-10"), false, 0), Ask::Unsatisfiable);
+    }
+
+    #[test]
+    fn what_is_not_implemented_is_ignored_and_the_whole_blob_is_sent() {
+        for header in [
+            None,
+            Some("items=0-1"),
+            Some("bytes=0-1,5-6"),
+            Some("bytes=-"),
+            Some("bytes=a-b"),
+            Some("bytes=9-3"),
+            Some("bytes=3"),
+        ] {
+            assert_eq!(ask(header, false, 1000), Ask::Whole, "{header:?}");
+        }
+        // With If-Range there is no validator to compare, so the whole blob is the safe answer.
+        assert_eq!(ask(Some("bytes=0-9"), true, 1000), Ask::Whole);
+    }
 }

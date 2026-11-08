@@ -215,6 +215,7 @@ What the origin guarantees, on every response:
 - A link names one artifact of one project until one moment (`/u/<project>/<artifact>/<expires>/<signature>/<file name>`; the signature is an HMAC-SHA256 under your key). A changed, expired or foreign link gets 403, 410 or 404. Rotating the key invalidates every link.
 - `Content-Security-Policy: sandbox; default-src 'none'; …`: HTML reports get an opaque origin and no scripts. `X-Content-Type-Options: nosniff`, and the `Content-Type` is what the verified bytes are, not what the uploader said.
 - Images and (sandboxed) HTML are `Content-Disposition: inline`; everything else is `attachment`.
+- HTTP `Range` requests: a single `bytes=` range is answered `206 Partial Content` with a `Content-Range`, and a range the file cannot give is `416` with `Content-Range: bytes */<size>`. Several ranges, another unit, a malformed range or an `If-Range` header get the whole file (`200`), which HTTP allows. Every answer carries `Accept-Ranges: bytes`.
 - No cookie is read or set, and nothing but `/u/…` links is served: the API, the dashboard and the agent routes answer 404 on this host.
 - `Cross-Origin-Resource-Policy: cross-origin` (the dashboard embeds screenshots; the link is the access control), and `Access-Control-Allow-Origin` and `frame-ancestors` allow only `api.public_url`.
 

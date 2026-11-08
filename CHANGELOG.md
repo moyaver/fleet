@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a flow whose device was lost during it (Maestro's `DeviceServerDiedException`) is labelled "Infrastructure, not the app" above Maestro's failure, and the label says the failure is excluded from flakiness; the flow stays failed. Its history row and `fleet-agent inspect` carry the same label (#145).
 
 - Agent: a Maestro HTML report the command asks for with `--format html --output <file>` is uploaded as an `html_report` artifact when the run wrote it (redacted like a log; not uploaded above 16 MiB). An upload that fails never changes the run's result (#43).
+- Server: the usercontent origin answers HTTP `Range` requests for artifacts: a single byte range is `206 Partial Content` with `Content-Range`, an unsatisfiable one is `416`, and every answer carries `Accept-Ranges: bytes` (#43).
 
 ### Fixed
 
