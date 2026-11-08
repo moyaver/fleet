@@ -23,7 +23,7 @@ use tokio_tungstenite::tungstenite::{
 
 /// How the mock server behaves.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Mode {
+pub(super) enum Mode {
     /// Acks every batch.
     Normal,
     /// Closes the first connection after it receives this many events, without acking them.
@@ -39,16 +39,16 @@ enum Mode {
 }
 
 #[derive(Default)]
-struct State {
+pub(super) struct State {
     /// When each event type first arrived.
     first_seen: BTreeMap<String, Instant>,
     /// Committed events by seq (dedup: a resent seq replaces nothing).
-    committed: BTreeMap<u64, Value>,
+    pub(super) committed: BTreeMap<u64, Value>,
     connections: u32,
     /// When each connection was accepted, and each refusal sent.
     accepted: Vec<Instant>,
     refusals: Vec<Instant>,
-    hellos: Vec<Value>,
+    pub(super) hellos: Vec<Value>,
     /// Created once the agent has been sent its welcome, to release the fake Maestro's exit.
     gate: Option<PathBuf>,
     duplicates: u32,
@@ -56,12 +56,12 @@ struct State {
     raw: String,
 }
 
-struct Server {
-    addr: SocketAddr,
-    state: Arc<Mutex<State>>,
+pub(super) struct Server {
+    pub(super) addr: SocketAddr,
+    pub(super) state: Arc<Mutex<State>>,
 }
 
-fn server(mode: Mode) -> Server {
+pub(super) fn server(mode: Mode) -> Server {
     let state = Arc::new(Mutex::new(State::default()));
     let (tx, rx) = std::sync::mpsc::channel();
     let st = Arc::clone(&state);
@@ -288,7 +288,7 @@ fn run_agent_on(
     (out, t.elapsed(), run_dir)
 }
 
-fn types(state: &State) -> BTreeMap<String, usize> {
+pub(super) fn types(state: &State) -> BTreeMap<String, usize> {
     let mut m = BTreeMap::new();
     for e in state.committed.values() {
         *m.entry(e["type"].as_str().unwrap().to_owned()).or_default() += 1;

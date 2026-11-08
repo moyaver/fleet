@@ -27,7 +27,7 @@ const FIXTURES: &[&str] = &[
 ];
 
 /// `fleet-agent inspect --json` flows as (name, outcome, finality, source), sorted.
-fn inspected(name: &str) -> Vec<(String, String, String, String)> {
+pub(crate) fn inspected(name: &str) -> Vec<(String, String, String, String)> {
     let out = Command::new(agent_bin())
         .args(["inspect", "--json"])
         .arg(fixture(name))

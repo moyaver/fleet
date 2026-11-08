@@ -32,7 +32,7 @@ use uuid::Uuid;
 
 use crate::{
     journal::{self, Truncation},
-    session::{Observation, Session},
+    session::{IdGen, Observation, Session},
 };
 
 /// One flow in the result.
@@ -95,30 +95,20 @@ pub struct JournalStatus {
 /// `journal.jsonl`, or when a file it should read cannot be read.
 pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
     let journal = read_journal(dir)?;
-    let replay = if dir.join("events.jsonl").exists() {
-        Replay::from_capture(dir)?
-    } else if let (Some(journal), None) = (&journal, saved_log(dir)) {
+    if !dir.join("events.jsonl").exists()
+        && let (Some(journal), None) = (&journal, saved_log(dir))
+    {
         return Ok(from_journal(journal));
-    } else {
-        Replay::from_saved_run(dir)?
-    };
+    }
     let mut counter: u128 = 0;
     let ids = Box::new(move || {
         counter += 1;
         Uuid::from_u128(counter)
     });
-    let t0 = replay.start;
-    let at = |ms: u64| ClockSample {
-        wall: t0 + time::Duration::milliseconds(i64::try_from(ms).unwrap_or(i64::MAX)),
-        mono_ms: ms,
-    };
-    let mut session = Session::new(&replay.argv, None, replay.redactor, ids, at(0));
-    let mut last = 0;
-    for (ms, obs) in replay.timeline {
-        last = ms;
-        session.observe(at(ms), obs);
-    }
-    session.end(at(last), 0);
+    let mut replayed = replay(dir, ids)?;
+    let end = replayed.at(replayed.last_ms);
+    replayed.session.end(end, 0);
+    let mut session = replayed.session;
     let events = session.drain();
     let mut event_types = std::collections::BTreeMap::new();
     for e in &events {
@@ -132,6 +122,58 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
         journal: journal.as_ref().map(journal_status),
     };
     Ok((inspection, events))
+}
+
+/// A saved run fed through a live session. The session is not ended: the caller ends it, after
+/// whatever it still has to add (publish uploads its artifacts first).
+pub(crate) struct Replayed {
+    /// The session that has seen every observation.
+    pub(crate) session: Session,
+    /// The time of the last observation, in milliseconds since the run started.
+    pub(crate) last_ms: u64,
+    /// Maestro's debug output directory: the upload candidates are relative to it.
+    pub(crate) debug: Option<PathBuf>,
+    start: OffsetDateTime,
+}
+
+impl Replayed {
+    /// The clock of the run `ms` milliseconds after it started.
+    pub(crate) fn at(&self, ms: u64) -> ClockSample {
+        clock_at(self.start, ms)
+    }
+}
+
+fn clock_at(start: OffsetDateTime, ms: u64) -> ClockSample {
+    ClockSample {
+        wall: start + time::Duration::milliseconds(i64::try_from(ms).unwrap_or(i64::MAX)),
+        mono_ms: ms,
+    }
+}
+
+/// Feeds the saved run in `dir` through a session, in the order the observer would have seen it:
+/// a capture's recorded timeline, or a saved debug directory's files in file order.
+///
+/// # Errors
+/// As [`inspect`]: the directory has no run to read, or a file it should read cannot be read.
+pub(crate) fn replay(dir: &Path, ids: IdGen) -> anyhow::Result<Replayed> {
+    let source = if dir.join("events.jsonl").exists() {
+        Replay::from_capture(dir)?
+    } else {
+        Replay::from_saved_run(dir)?
+    };
+    let start = source.start;
+    let mut session = Session::new(&source.argv, None, source.redactor, ids, clock_at(start, 0));
+    let mut last_ms = 0;
+    for (ms, obs) in source.timeline {
+        last_ms = ms;
+        session.observe(clock_at(start, ms), obs);
+    }
+    Ok(Replayed {
+        session,
+        last_ms,
+        debug: source.debug,
+        start,
+    })
 }
 
 /// Every flow execution the session saw, resolved, in the order first seen.
@@ -341,6 +383,7 @@ struct Replay {
     redactor: Redactor,
     start: OffsetDateTime,
     timeline: Vec<(u64, Observation)>,
+    debug: Option<PathBuf>,
 }
 
 impl Replay {
@@ -416,6 +459,7 @@ impl Replay {
             redactor,
             start,
             timeline,
+            debug: debug_rel.map(|d| dir.join(d)),
         })
     }
 
@@ -474,6 +518,7 @@ impl Replay {
             redactor: Redactor::new([]),
             start: OffsetDateTime::UNIX_EPOCH,
             timeline,
+            debug: Some(debug),
         })
     }
 }

@@ -4,6 +4,7 @@
 //! streams it to the Fleet server. See PLAN §6 and research 02.
 
 mod adb;
+mod bundle;
 mod ci;
 pub mod cli;
 mod commands;
@@ -17,6 +18,7 @@ mod net;
 mod observer;
 mod outbox;
 mod prepare;
+mod publish;
 mod session;
 mod supervisor;
 mod transport;

@@ -5,6 +5,7 @@
     reason = "test helpers: an unexpected error should fail the test right there"
 )]
 
+mod bundle;
 mod html_report;
 mod inspect;
 mod stream;
