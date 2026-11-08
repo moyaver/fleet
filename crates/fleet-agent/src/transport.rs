@@ -131,6 +131,14 @@ pub(crate) async fn run(
         tracing::warn!(reason, "telemetry disabled; configure a secure OIDC URL");
         return End::Refused(reason.into());
     }
+    if cfg.token.is_none() && cfg.oidc.is_none() {
+        // Never an unauthenticated connection: the hello would carry the run's CI facts to a
+        // server that refuses them anyway (research 06 T1).
+        tracing::warn!(
+            "no FLEET_TOKEN and no OIDC token request: running offline, nothing is sent"
+        );
+        return End::Refused("no credential".into());
+    }
     share(&shared, cfg.token.as_ref());
     loop {
         if cfg.token.is_none()
@@ -743,7 +751,7 @@ mod tests {
             format!("ws://{addr}"),
             Uuid::now_v7(),
             crate::ci::context(|_| None),
-            |_| None,
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
         );
         let (_tx, rx) = mpsc::channel(1);
         let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
@@ -833,7 +841,7 @@ mod tests {
             format!("ws://{addr}"),
             Uuid::now_v7(),
             crate::ci::context(|_| None),
-            |_| None,
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
         );
         let (_tx, rx) = mpsc::channel(1);
         let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {

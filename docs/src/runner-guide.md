@@ -64,7 +64,7 @@ After Maestro exits, the agent keeps reading its output until the CI log has tak
 
 ## Credentials
 
-On GitHub Actions, give the job `permissions: id-token: write` and leave `FLEET_TOKEN` unset: the agent asks the runner for an OIDC token (audience `FLEET_OIDC_AUDIENCE`, default `fleet`) and exchanges it at `POST /api/v1/agent/token` for a short-lived agent token. The server decides the project and the trust level from the token's verified claims (repository and owner IDs, event, ref) and its trust policies; the job key comes from the verified `check_run_id`. Fork pull requests get no OIDC token and run offline.
+On GitHub Actions, give the job `permissions: id-token: write` and leave `FLEET_TOKEN` unset: the agent asks the runner for an OIDC token (audience `FLEET_OIDC_AUDIENCE`, default `fleet`) and exchanges it at `POST /api/v1/agent/token` for a short-lived agent token. The server decides the project and the trust level from the token's verified claims (repository and owner IDs, event, ref) and its trust policies; the job key comes from the verified `check_run_id`. Fork pull requests get no OIDC token and run offline: with neither a `FLEET_TOKEN` (an empty one counts as none) nor an OIDC request, the agent connects to nothing and sends nothing, and Maestro runs as it would without the agent.
 
 Elsewhere, set `FLEET_TOKEN` to an API key (`fleet api-key create --project <slug> --name <ci>` on the server). Either way, a refused credential only turns telemetry off: Maestro runs and exits exactly as it would without the agent.
 
