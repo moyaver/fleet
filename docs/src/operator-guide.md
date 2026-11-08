@@ -223,11 +223,67 @@ The dashboard's own policy names this origin, and only this one, in `img-src` (s
 
 Without `usercontent.url` artifacts are stored but cannot be opened (the flow page says so). Fleet routes by the `Host` header on its main listener, so a proxy that sends both hostnames to `fleet:8080` is enough ([`deploy/compose/Caddyfile`](https://github.com/moyaver/fleet/blob/main/deploy/compose/Caddyfile)); `usercontent.listen` serves the origin on a separate port instead.
 
-## Shutdown and upgrades
+## Shutdown
 
 On SIGTERM the server stops accepting connections, finishes each agent's in-flight batch, sends `goaway`, writes the last telemetry checkpoint and closes sockets with 1012; agents reconnect and resume where the server says. All state is in Postgres, so a restart loses nothing that was acknowledged. Give the container a stop grace period of 30 s.
 
-Back up first ([Backup and restore](#backup-and-restore)), then upgrade the server (migrations run, or run `fleet migrate`), then the agents.
+## Upgrades
+
+Upgrade the server first, then the agents. Read the [CHANGELOG](https://github.com/moyaver/fleet/blob/main/CHANGELOG.md) from your version to the new one for steps that need action before you start.
+
+### Before you upgrade
+
+1. **Back up** the database and the blob store, with the configuration and secrets ([Backup and restore](#backup-and-restore)). The backup is the only way back once the schema has moved; see [Rollback](#rollback).
+2. **Pin the image by tag.** Set `FLEET_IMAGE` in the Compose `.env` to the release (for example `ghcr.io/moyaver/fleet:0.1.0-alpha.3`); do not follow `latest` across upgrades.
+
+### Upgrade the server
+
+In the Compose reference deployment, change `FLEET_IMAGE` to the new tag, then:
+
+```bash
+cd deploy/compose
+docker compose pull && docker compose up -d
+docker compose ps        # the fleet service is healthy when `fleet healthcheck` passes
+```
+
+On start the server applies the pending migrations (`database.migrate = "auto"`, the default), creates the next days' partitions, and serves. Migrations run under Postgres's advisory lock, so instances that start together are safe.
+
+To run migrations yourself, set `FLEET_DATABASE__MIGRATE=manual`. Then `serve` refuses an outdated schema and you apply the migrations as their own step, before the new server starts:
+
+```bash
+docker compose run --rm fleet migrate
+```
+
+A server refuses a database whose schema is newer than its own, so an old image cannot run against a migrated database.
+
+### Migrations
+
+- Every migration is a plain `NNNN_name.sql` file, and every one runs in its own transaction. A failed migration leaves the schema as it was.
+- **Migrations are forward-only.** There are no down migrations. The schema never moves back: rolling back is a restore ([Rollback](#rollback)).
+- **Applied migrations are never edited.** sqlx stores a checksum of each applied migration and the server refuses to start when an applied file no longer matches it. A fix is a new migration.
+- Each release's migrations are the previous release's plus new files: upgrading from `v0.1.0-alpha.1` applies `0015` to `0020`, in order.
+
+### Agents and server versions
+
+- Agents and the server negotiate one wire protocol, `PROTOCOL_VERSION` (`1` in every release so far). An agent's `hello` names the range it speaks, and the server accepts the connection only when its own version is in that range. Otherwise it answers `reject` with `unsupported_protocol`, which is fatal for that run: the agent stops reporting to Fleet, and Maestro is unaffected.
+- Within one protocol version, changes are additive optional fields. Neither side rejects a field it does not know, and a frame an agent cannot decode is dropped, so a newer agent and an older server (or the reverse) keep working on the same version.
+- A change that is not additive bumps the protocol version. Then the server must be upgraded before the agents that need the new version, which is why the server goes first. Agents still on the old version are refused until they are upgraded.
+
+### Rollback
+
+The schema does not move back, and the previous release refuses the upgraded schema (it does not know migrations `0018`–`0020`). Rolling back is therefore a restore:
+
+1. Stop the new server: `docker compose stop fleet`.
+2. Set `FLEET_IMAGE` back to the previous tag and restore the backup taken before the upgrade, as in [Restore](#restore): a new stack under its own Compose project name, so the upgraded volumes stay intact until you have checked the rollback.
+3. Start the previous image and check the runs you know are there.
+
+Everything recorded after the backup is lost from the database. Agents hold unacknowledged events in their spool and resend what the restored server asks for (its `committed_through`), for as long as the spool still has it. Agents can stay on their version: while the protocol version is unchanged they work with either server.
+
+### Rehearse the upgrade
+
+Operators can rehearse on a copy: restore the latest backup into a stack under its own Compose project name (see [Restore](#restore)), set `FLEET_IMAGE` there to the new tag, and check that the server starts, that `SELECT count(*) FROM artifacts` matches the source, and that a run you know lists in the dashboard.
+
+Maintainers can rehearse the migrations without a deployment: `cargo xtask upgrade-rehearsal` exports the `migrations/` of every release tag from git (fetch the tags first, `git fetch --tags`), seeds rows under each release's schema, migrates to the current tree, and checks that every row is unchanged, that the current read paths return the seeded runs, flows and artifacts, and that the release's own migrator refuses the upgraded schema. It takes a few seconds once Postgres 18 is up (`DATABASE_URL`, or a throwaway container). It is not part of `cargo xtask ci`, because CI's checkout does not fetch tags. The test is `crates/fleet-store/tests/upgrade.rs`.
 
 ## Backup and restore
 

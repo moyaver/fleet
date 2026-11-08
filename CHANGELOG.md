@@ -18,6 +18,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Agent: a Maestro HTML report the command asks for with `--format html --output <file>` is uploaded as an `html_report` artifact when the run wrote it (redacted like a log; not uploaded above 16 MiB). An upload that fails never changes the run's result (#43).
 - Server: the usercontent origin answers HTTP `Range` requests for artifacts: a single byte range is `206 Partial Content` with `Content-Range`, an unsatisfiable one is `416`, and every answer carries `Accept-Ranges: bytes` (#43).
 
+- Docs: the operator guide's Upgrades section covers backups before an upgrade, forward-only migrations and their checksums, agent and server protocol versions, rollback by restore, and how to rehearse an upgrade.
+- Tooling: `cargo xtask upgrade-rehearsal` exports each release tag's migrations from git, seeds rows under each release's schema, migrates to the current tree and checks that the rows and the current read paths survive (`crates/fleet-store/tests/upgrade.rs`).
+
 ### Fixed
 
 - Dashboard: a flow's step rows stay Provisional after the flow is Verified. Its steps are now settled from its final `commands.json` once the flow ends. Each step row takes the file's result and timing and is Verified; a step the file does not list stays Provisional, and the Steps section shows its weakest row's provenance (#148). `step.ended` carries the file's start and duration as an optional `timing` (protocol additive change; schema regenerated).
