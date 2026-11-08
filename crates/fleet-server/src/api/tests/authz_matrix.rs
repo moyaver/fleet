@@ -197,7 +197,7 @@ fn concrete(template: &str, ids: &Ids) -> String {
         let Some(len) = path[start..].find('}') else {
             break;
         };
-        path.replace_range(start..start + len + 1, "0");
+        path.replace_range(start..=start + len, "0");
     }
     if path.contains("/agent/artifacts/") {
         path = path.replace("/0/", &format!("/{}/", Uuid::nil()));

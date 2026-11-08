@@ -72,6 +72,10 @@ async fn send(socket: &mut WebSocket, frame: &LiveFrame) -> bool {
     socket.send(Message::Text(text.into())).await.is_ok()
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the socket loop is one select over the hub, the client and shutdown, and the sign-in recheck"
+)]
 async fn session(
     state: AppState,
     principal: Principal,
