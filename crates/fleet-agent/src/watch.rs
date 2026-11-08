@@ -64,6 +64,12 @@ pub(crate) fn holds_open(pid: u32, file: &Path) -> Option<bool> {
             .stderr(Stdio::null())
             .output()
             .ok()?;
+        // A live process always lists at least its working directory. No listing (lsof fails, as it
+        // does for a process it cannot inspect at that moment) says nothing about the file, so it is
+        // unknown, not "not held": a candidate that is not known to be another run's is still taken.
+        if !out.status.success() || out.stdout.is_empty() {
+            return None;
+        }
         // Names of the open files come as `n<path>` lines.
         return Some(
             String::from_utf8_lossy(&out.stdout)
@@ -478,6 +484,21 @@ mod tests {
             }
             std::thread::yield_now();
         }
+    }
+
+    /// A process that cannot be listed says nothing about its files: the candidate is not
+    /// rejected for it. (`lsof` lists nothing for a process it cannot inspect, and exits 1.)
+    #[test]
+    fn a_process_that_cannot_be_listed_leaves_the_question_open() {
+        let d = tmp("unlisted");
+        let file = d.join("maestro.log");
+        std::fs::write(&file, b"x").unwrap();
+        // No process has this id (pid_t is signed; this one is never allocated).
+        assert_eq!(holds_open(u32::MAX, &file), None);
+        assert_eq!(
+            choose(std::slice::from_ref(&d), Some(u32::MAX)),
+            Some(d.clone())
+        );
     }
 
     #[test]
