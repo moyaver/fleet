@@ -27,6 +27,7 @@ use crate::{
         EvidenceLink, FailureGroup, FlakyFlow, HistoryRow, HistoryTable, StatsPanel, filter_spec,
     },
     screens::parts::PillView,
+    screens::triage::TriageControl,
 };
 
 /// A small control on a row: the stats buttons and the copy button.
@@ -288,7 +289,8 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
                 {match r.failure {
                     Some(f) => view! {
                         <span class="block font-mono text-[13px] leading-[1.45]">{f.message.unwrap_or_default()}</span>
-                        <FailureFingerprint fingerprint=f.fingerprint />
+                        <FailureFingerprint fingerprint=f.fingerprint.clone() />
+                        <TriageControl project=f.project fingerprint=f.fingerprint triage=f.triage />
                     }
                         .into_any(),
                     None => view! { <span class="text-muted">"None"</span> }.into_any(),
@@ -451,7 +453,8 @@ fn FailureGroups(groups: Vec<FailureGroup>) -> impl IntoView {
                         view! {
                             <li data-testid="failure-group">
                                 <p class="font-mono text-[13px] leading-[1.45]">{g.message}</p>
-                                <FailureFingerprint fingerprint=g.fingerprint />
+                                <FailureFingerprint fingerprint=g.fingerprint.clone() />
+                                <TriageControl project=g.project fingerprint=g.fingerprint triage=g.triage />
                                 <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                                     <span class="chip chip-fail">{g.count}</span>
                                     <span class="text-muted">{format!("last {}", g.last_seen)}</span>

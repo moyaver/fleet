@@ -11,7 +11,10 @@ use std::collections::HashMap;
 use fleet_protocol::{
     event::StepStatus,
     live::AgentRunView,
-    rest::{ClaimView, CrashView, FlowDetailView, InfrastructureView, StepView},
+    rest::{
+        ClaimView, CrashView, FlowDetailView, InfrastructureView, StepView,
+        history::FailureTriageView,
+    },
 };
 use fleet_ui::{
     charts::format::format_duration,
@@ -116,6 +119,10 @@ pub struct FailureDetails {
     pub total_steps: usize,
     /// Set when the device was lost during the flow, so the failure is the device's (issue #145).
     pub infrastructure: Option<InfrastructureView>,
+    /// The failure's fingerprint, when the failure is final (issue #84).
+    pub fingerprint: Option<String>,
+    /// What was recorded about that fingerprint.
+    pub triage: Option<FailureTriageView>,
 }
 
 /// Whether the flow failed, and the details when it did.
@@ -124,7 +131,7 @@ pub enum Failure {
     /// It has not failed.
     NotFailed,
     /// It failed; what is known.
-    Failed(FailureDetails),
+    Failed(Box<FailureDetails>),
 }
 
 /// The step tree and what to say about it.
@@ -490,7 +497,7 @@ fn failure(view: &FlowDetailView, flat: &[&StepView], numbering: &Numbering) -> 
         return Failure::NotFailed;
     }
     let f = view.failure.as_ref();
-    Failure::Failed(FailureDetails {
+    Failure::Failed(Box::new(FailureDetails {
         message: f
             .and_then(|f| f.message.clone())
             .or_else(|| view.flow.failure_message.clone()),
@@ -502,7 +509,9 @@ fn failure(view: &FlowDetailView, flat: &[&StepView], numbering: &Numbering) -> 
             .and_then(|i| step_ref(flat, numbering, i)),
         total_steps: numbering.top_level,
         infrastructure: view.infrastructure.clone(),
-    })
+        fingerprint: f.and_then(|f| f.fingerprint.clone()),
+        triage: f.and_then(|f| f.triage.clone()),
+    }))
 }
 
 /// The setup commands as one exec, first in the list: the worst of their statuses, and their

@@ -7,7 +7,8 @@
 //! the server doesn't have (no duration samples, no percentile) reads as unavailable, never as 0.
 
 use fleet_protocol::rest::history::{
-    Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView, HistoryEntryView, HistoryPage,
+    FailureTriageView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
+    HistoryEntryView, HistoryPage,
 };
 use fleet_ui::{
     charts::{
@@ -158,6 +159,10 @@ pub struct FailureCell {
     pub fingerprint: String,
     /// The failure message, redacted.
     pub message: Option<String>,
+    /// The project the failure belongs to, for its triage control.
+    pub project: String,
+    /// What was recorded about the fingerprint (issue #84).
+    pub triage: Option<FailureTriageView>,
 }
 
 /// One finished flow execution.
@@ -267,6 +272,8 @@ fn row(
         failure: e.failure_fingerprint.as_ref().map(|f| FailureCell {
             fingerprint: f.clone(),
             message: e.failure_message.clone(),
+            project: ctx.project.clone(),
+            triage: e.triage.clone(),
         }),
         condition: e
             .condition_fingerprint
@@ -368,6 +375,10 @@ pub struct Tile {
 pub struct FailureGroup {
     /// The failure fingerprint.
     pub fingerprint: String,
+    /// The project the failures belong to, for their triage control.
+    pub project: String,
+    /// What was recorded about the fingerprint (issue #84).
+    pub triage: Option<FailureTriageView>,
     /// The failing step's description, when a step failed.
     pub step: Option<String>,
     /// The failure message with volatile parts replaced.
@@ -481,6 +492,8 @@ impl StatsPanel {
                 .iter()
                 .map(|g| FailureGroup {
                     fingerprint: g.fingerprint.clone(),
+                    project: ctx.project.clone(),
+                    triage: g.triage.clone(),
                     step: Some(g.step_kind.clone()).filter(|s| !s.is_empty()),
                     message: g.message.clone(),
                     count: if g.count == 1 {
@@ -636,7 +649,9 @@ mod tests {
             failed.failure,
             Some(FailureCell {
                 fingerprint: "v1:0123456789abcdef".to_owned(),
-                message: Some("Element not found: Sign in".to_owned())
+                message: Some("Element not found: Sign in".to_owned()),
+                project: "shop".to_owned(),
+                triage: None,
             })
         );
         assert_eq!(failed.condition.as_deref(), Some("474c43fe"));

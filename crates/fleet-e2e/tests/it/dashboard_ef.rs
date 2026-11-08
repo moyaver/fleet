@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 
 use crate::{
     browser::Browser,
-    dashboard_ab::{PATIENCE, Page, count_of, has_text, q, stack},
+    dashboard_ab::{PATIENCE, Page, count_of, has_text, q, sign_in_session, stack},
     support::Stack,
 };
 
@@ -541,6 +541,135 @@ async fn history_discards_an_inflight_page_after_filters_change() {
         .eval(&format!("return {};", count_of(&q("history-row"))), vec![])
         .await;
     assert_eq!(after, before, "old page must not be appended to new filter");
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// Failure triage (issue #84) in the browser: a maintainer marks the failure known with its issue,
+/// the state shows on the history after a reload, and a viewer sees it without the controls.
+#[tokio::test]
+async fn a_maintainer_marks_a_failure_known_and_the_state_shows_after_a_reload() {
+    let stack = stack_without_host_telemetry().await;
+    run(&stack, "triage-1", "abc1234def5678", 1, 2, "x86_64").await;
+    run(&stack, "triage-2", "abc1234def5678", 0, 2, "x86_64").await;
+    let history = history_until(&stack, |h| {
+        h["items"].as_array().is_some_and(|i| i.len() == 4)
+    })
+    .await;
+    let fingerprint = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|i| i["failure_fingerprint"].as_str())
+        .expect("the failed execution has a fingerprint")
+        .to_owned();
+    let link = "https://github.com/moyaver/fleet/issues/84";
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    let origin = format!("http://{}", stack.addr());
+    let maintainer = sign_in_session(&stack, "maintainer").await;
+    browser
+        .set_secure_cookie(&origin, "__Host-fleet_session", &maintainer)
+        .await;
+    browser
+        .client
+        .goto(&format!("{origin}/history?project=app"))
+        .await
+        .unwrap();
+    page.wait(
+        "four history rows",
+        &format!("{} === 4", count_of(&q("history-row"))),
+    )
+    .await;
+    page.wait(
+        "the triage control",
+        &format!("{} > 0", count_of("[data-testid=triage-select]")),
+    )
+    .await;
+    choose(&page, "[data-testid=triage-select]", "known").await;
+    page.eval(
+        "const el = document.querySelector('[data-testid=triage-link-input]');\
+         el.value = arguments[0]; el.dispatchEvent(new Event('input', { bubbles: true }));",
+        vec![json!(link)],
+    )
+    .await;
+    page.eval(
+        "document.querySelector('[data-testid=triage] button').click();",
+        vec![],
+    )
+    .await;
+    page.wait(
+        "the saved state",
+        "document.querySelector('[data-testid=triage-state]').dataset.state === 'known'",
+    )
+    .await;
+
+    // A reload reads the state back from the server, on every failure of that fingerprint.
+    browser
+        .client
+        .goto(&format!("{origin}/history?project=app"))
+        .await
+        .unwrap();
+    page.wait(
+        "the known state after a reload",
+        "document.querySelectorAll('[data-testid=triage-state][data-state=known]').length > 0",
+    )
+    .await;
+    let shown = page.texts(&q("triage-link")).await;
+    assert_eq!(shown, vec![link.to_owned()]);
+    let server = stack.get("/api/v1/projects/app/history").await;
+    let state = server["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["failure_fingerprint"] == fingerprint.as_str())
+        .unwrap()["triage"]["state"]
+        .clone();
+    assert_eq!(state, json!("known"));
+
+    // Screen D shows the same failure's state on the flow's own page.
+    let flow = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["failure_fingerprint"] == fingerprint.as_str())
+        .unwrap()["flow_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    browser
+        .client
+        .goto(&format!("{origin}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.wait(
+        "the failure's state on screen D",
+        &format!(
+            "document.querySelector('[data-testid=failure] [data-testid=triage-state]')?.dataset.state === 'known'"
+        ),
+    )
+    .await;
+    assert_eq!(page.texts(&q("triage-link")).await, vec![link.to_owned()]);
+
+    // A viewer sees the same state, and no controls to change it.
+    let viewer = sign_in_session(&stack, "viewer").await;
+    browser
+        .set_secure_cookie(&origin, "__Host-fleet_session", &viewer)
+        .await;
+    browser
+        .client
+        .goto(&format!("{origin}/history?project=app"))
+        .await
+        .unwrap();
+    page.wait(
+        "the state for a viewer",
+        "document.querySelectorAll('[data-testid=triage-state][data-state=known]').length > 0",
+    )
+    .await;
+    assert_eq!(page.count(&q("triage-select")).await, 0);
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }
