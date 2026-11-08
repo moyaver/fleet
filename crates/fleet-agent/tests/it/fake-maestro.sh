@@ -8,10 +8,12 @@ FIX="$FLEET_FAKE_FIXTURE"
 [ -n "$FLEET_FAKE_ARGV_LOG" ] && printf '%s\n' "$@" > "$FLEET_FAKE_ARGV_LOG"
 DEBUG=""
 OUT=""
+FORMAT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --debug-output) DEBUG="$2"; shift ;;
     --output) OUT="$2"; shift ;;
+    --format) FORMAT="$2"; shift ;;
   esac
   shift
 done
@@ -53,6 +55,12 @@ else
   sleep "${FLEET_FAKE_LINGER:-0.6}"
   cat "$FIX/stdout.bin"
 fi
-[ -n "$OUT" ] && [ -f "$FIX/run/report.xml" ] && cp "$FIX/run/report.xml" "$OUT"
+# `--format html` writes the file named by `--output`: the test's own HTML ($FLEET_FAKE_HTML), not
+# a Maestro fixture (none is captured yet). Otherwise the fixture's JUnit report is written.
+if [ -n "$OUT" ] && [ "$FORMAT" = html ]; then
+  [ -n "$FLEET_FAKE_HTML" ] && cp "$FLEET_FAKE_HTML" "$OUT"
+elif [ -n "$OUT" ] && [ -f "$FIX/run/report.xml" ]; then
+  cp "$FIX/run/report.xml" "$OUT"
+fi
 code=$(sed -n 's/.*"code": *\([0-9][0-9]*\).*/\1/p' "$FIX/exit.json")
 exit "${code:-1}"

@@ -136,6 +136,8 @@ struct Live {
     tailer: Option<LogTailer>,
     scanner: Option<BundleScanner>,
     report: Option<PathBuf>,
+    /// The HTML report the command asked for with `--format html --output`, if any (issue #43).
+    html: Option<PathBuf>,
     /// When Maestro was spawned: a report older than this (less [`MTIME_TOLERANCE`]) is not ours.
     started: SystemTime,
     pgid: Option<u32>,
@@ -424,6 +426,10 @@ fn start(
             .map(|d| LogTailer::new(d.join("maestro.log"))),
         scanner: debug.map(BundleScanner::new),
         report: report.map(PathBuf::from),
+        html: fleet_maestro::invocation::requested_html_report(&fleet_maestro::invocation::parse(
+            argv,
+        ))
+        .map(PathBuf::from),
         started,
         pgid: group,
         stdout: Lines::default(),
@@ -608,6 +614,33 @@ fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> Cloc
             ),
         }
     }
+    if let Some(path) = l.html.clone()
+        && let Some(up) = l.uploader.as_ref()
+    {
+        match written_during(&path, l.started) {
+            Some(true) => up.submit(upload::Item {
+                class: ArtifactClass::HtmlReport,
+                path: path.file_name().map_or_else(
+                    || "report.html".into(),
+                    |n| n.to_string_lossy().into_owned(),
+                ),
+                content_type: "text/html",
+                flow: None,
+                step: None,
+                // Text, so it is redacted like a log (I6); one too big to redact is refused.
+                source: Source::Text(path, Arc::new(l.session.redactor().clone())),
+            }),
+            Some(false) => l.session.warn(
+                clock(),
+                "report_stale",
+                &format!(
+                    "{} was last written before this run started; ignored",
+                    path.display()
+                ),
+            ),
+            None => {}
+        }
+    }
     if let Some(log) = l.debug.as_ref().map(|d| d.join("maestro.log"))
         && log.is_file()
         && let Some(up) = l.uploader.as_ref()
@@ -711,6 +744,17 @@ fn read_report(path: &Path, started: SystemTime) -> ReportRead {
         // Unknown mtime: can't prove it stale, and the report parser still validates it.
         _ => ReportRead::Fresh(bytes),
     }
+}
+
+/// Whether `path` was written during this run (I3: a file an earlier run left is not this run's
+/// evidence). `None` when there is no such file.
+fn written_during(path: &Path, started: SystemTime) -> Option<bool> {
+    let modified = std::fs::metadata(path).ok()?.modified();
+    Some(match modified {
+        Ok(m) => m + MTIME_TOLERANCE >= started,
+        // Unknown mtime: can't prove it stale.
+        Err(_) => true,
+    })
 }
 
 /// Appends the job summary to `$GITHUB_STEP_SUMMARY`, when the job has one. A file that cannot be
@@ -887,5 +931,32 @@ mod tests {
             read_report(&dir.join("none.xml"), started),
             ReportRead::Missing
         );
+    }
+
+    #[test]
+    fn an_html_report_is_found_and_counts_only_if_this_run_wrote_it() {
+        let dir = std::env::temp_dir().join(format!("fleet-html-{}", Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let started = SystemTime::now() - Duration::from_secs(60);
+        let p = dir.join("r.html");
+        assert_eq!(
+            written_during(&p, started),
+            None,
+            "not written: nothing to upload"
+        );
+        File::create(&p)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(3600))
+            .unwrap();
+        assert_eq!(
+            written_during(&p, started),
+            Some(false),
+            "an earlier run's file"
+        );
+        File::create(&p)
+            .unwrap()
+            .set_modified(SystemTime::now())
+            .unwrap();
+        assert_eq!(written_during(&p, started), Some(true));
     }
 }
