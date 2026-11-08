@@ -10,6 +10,7 @@
 //!
 //! Screens E and F (history and compare) read the models in [`history`].
 
+pub mod admin;
 pub mod history;
 
 use serde::{Deserialize, Serialize};
