@@ -49,6 +49,8 @@ pub(crate) struct Config {
     pub(crate) origin: RunOrigin,
     /// When the run started, as its recorded events say (a publish only; see `Hello::started_at`).
     pub(crate) started_at: Option<OffsetDateTime>,
+    /// How long the server may send nothing before the connection is given up for a new one.
+    pub(crate) silence_timeout: Duration,
 }
 
 impl Config {
@@ -74,6 +76,7 @@ impl Config {
             ci,
             origin: RunOrigin::Live,
             started_at: None,
+            silence_timeout: SILENCE_TIMEOUT,
         }
     }
 }
@@ -532,7 +535,7 @@ async fn connection(
     let mut ping = tokio::time::interval(PING_INTERVAL);
     let mut last_frame = tokio::time::Instant::now();
     loop {
-        if last_frame.elapsed() >= SILENCE_TIMEOUT {
+        if last_frame.elapsed() >= cfg.silence_timeout {
             return Err("server stopped sending frames".into());
         }
         // Send what the window allows.
@@ -776,16 +779,19 @@ mod tests {
             ))
             .await
             .unwrap();
-            let second = tokio::time::timeout(Duration::from_secs(35), listener.accept()).await;
+            // A failure guard only: a passing run reconnects after the silence timeout above.
+            let second = tokio::time::timeout(Duration::from_secs(60), listener.accept()).await;
             drop(ws);
             assert!(second.is_ok(), "agent did not reconnect to silent server");
         });
-        let cfg = Config::from_env(
+        let mut cfg = Config::from_env(
             format!("ws://{addr}"),
             Uuid::now_v7(),
             crate::ci::context(|_| None),
             |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
         );
+        // The silence that ends the first connection is the test's own, not the production 30 s.
+        cfg.silence_timeout = Duration::from_millis(500);
         let (_tx, rx) = mpsc::channel(1);
         let agent = tokio::spawn(run(cfg, Arc::new(Shared::default()), rx, || ClockSample {
             wall: time::OffsetDateTime::UNIX_EPOCH,
