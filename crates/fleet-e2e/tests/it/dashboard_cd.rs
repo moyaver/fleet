@@ -404,3 +404,46 @@ async fn a_flow_page_follows_its_run_live_from_provisional_to_verified() {
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }
+
+/// A finished run's failed flow (issue #148): its steps were settled from the final `commands.json`,
+/// so the steps section reads verified, and the failed step is in the tree as failed.
+#[tokio::test]
+async fn a_failed_flows_steps_are_verified_once_its_run_has_ended() {
+    let stack = stack(|_| {}).await;
+    let snapshot = finished_run(&stack, "steps-settle").await;
+    let id = flow_named(&snapshot, "flow-0-0")["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/flows/{id}?project=app", stack.addr()))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the steps",
+        &format!("{} >= 2", count_of("[role=treeitem]")),
+    )
+    .await;
+    let section_badge =
+        "document.querySelector('.flow-steps .card-h [role=img]')?.getAttribute('aria-label')";
+    page.wait(
+        "the steps section is verified",
+        &format!("{section_badge} === 'Provenance: verified'"),
+    )
+    .await;
+    let failed = page
+        .eval(
+            "return Array.from(document.querySelectorAll('[role=treeitem]')).some(e => e.textContent.includes('Failed'));",
+            vec![],
+        )
+        .await;
+    assert_eq!(failed, Value::Bool(true), "the failed step is in the tree");
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
