@@ -307,21 +307,11 @@ struct Header {
 fn read_header(path: &Path) -> anyhow::Result<Header> {
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("reading flow {}", path.display()))?;
-    let header = contents.split("\n---").next().unwrap_or_default();
-    let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(header)
+    let header = fleet_maestro::workspace::flow_header(&contents)
         .with_context(|| format!("reading the header of {}", path.display()))?;
     Ok(Header {
-        name: yaml
-            .get("name")
-            .and_then(serde_yaml_ng::Value::as_str)
-            .map(str::to_owned),
-        tags: yaml
-            .get("tags")
-            .and_then(serde_yaml_ng::Value::as_sequence)
-            .into_iter()
-            .flatten()
-            .filter_map(|t| t.as_str().map(str::to_owned))
-            .collect(),
+        name: header.name,
+        tags: header.tags,
     })
 }
 
