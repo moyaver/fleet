@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT details AS \"details!: serde_json::Value\" FROM audit_events\n                WHERE project_id = $1 AND action = $2 ORDER BY at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "details!: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "details"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "94f84a8ad83760b915ab198a35433699a8915ad2daa945aaf0e8d5f548eb3203"
+}

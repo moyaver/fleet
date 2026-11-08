@@ -278,6 +278,19 @@ impl Store {
         Ok(None)
     }
 
+    /// The audit details of one action in a project, oldest first.
+    pub async fn audited(&self, project_id: Uuid, action: &str) -> Result<Vec<serde_json::Value>> {
+        let rows = sqlx::query_scalar!(
+            r#"SELECT details AS "details!: serde_json::Value" FROM audit_events
+                WHERE project_id = $1 AND action = $2 ORDER BY at, id"#,
+            project_id,
+            action
+        )
+        .fetch_all(self.pool())
+        .await?;
+        Ok(rows)
+    }
+
     /// Records an audit event.
     pub async fn audit(
         &self,

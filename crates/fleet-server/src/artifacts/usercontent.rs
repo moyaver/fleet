@@ -27,9 +27,11 @@ use axum::{
 };
 use fleet_blob::{BlobError, BlobKey, Sha256Digest};
 use fleet_protocol::artifact::ArtifactClass;
+use fleet_store::auth::AuditActor;
 use time::OffsetDateTime;
 use tower::ServiceExt as _;
 use tower_http::set_header::SetResponseHeaderLayer;
+use uuid::Uuid;
 
 use super::links::Refusal;
 use crate::state::AppState;
@@ -184,6 +186,21 @@ async fn serve(
         Ask::Unsatisfiable => return unsatisfiable(size),
     };
     let partial = wanted.is_some();
+    // Media and reports are audited (research 06 T7). The link names no user, so the actor is the
+    // system and the link's artifact is the target. A refused audit write refuses the read: an
+    // untracked read of a screenshot is not allowed.
+    if is_audited(servable.class)
+        && !audit_read(
+            &state,
+            granted.project,
+            granted.artifact,
+            servable.class,
+            partial,
+        )
+        .await
+    {
+        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
+    }
     let blob = match blobs
         .get(&BlobKey::new(granted.project, digest), wanted)
         .await
@@ -292,6 +309,49 @@ fn ask(range: Option<&str>, if_range: bool, size: u64) -> Ask {
         }
         _ => Ask::Whole,
     }
+}
+
+/// Writes the audit row for a read of an artifact through a signed link (research 06 T7). The
+/// link names no user, so the actor is the system and the artifact is the target. `false` when the
+/// row cannot be written: the read is then refused, so no untracked read is served.
+async fn audit_read(
+    state: &AppState,
+    project: Uuid,
+    artifact: Uuid,
+    class: ArtifactClass,
+    partial: bool,
+) -> bool {
+    let details = serde_json::json!({
+        "via": "signed_link",
+        "artifact_id": artifact,
+        "class": class.as_str(),
+        "partial": partial,
+    });
+    match state
+        .store
+        .audit(
+            AuditActor::System,
+            Some(project),
+            "artifact.fetched",
+            details,
+        )
+        .await
+    {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::error!(error = %e, "auditing an artifact read");
+            false
+        }
+    }
+}
+
+/// Classes whose every read through a signed link is audited (research 06 T7): screenshots,
+/// which may show PII, and the reports. Text evidence is redacted before it is exported.
+const fn is_audited(class: ArtifactClass) -> bool {
+    matches!(
+        class,
+        ArtifactClass::FailureScreenshot | ArtifactClass::Junit | ArtifactClass::HtmlReport
+    )
 }
 
 /// Images and HTML (which is sandboxed) are shown; everything else is saved.
