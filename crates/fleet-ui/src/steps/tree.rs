@@ -28,6 +28,20 @@ pub struct StepExec {
     pub duration_ms: Option<u64>,
     /// One-based attempt number; above 1 for retries of the same step.
     pub attempt: u32,
+    /// The flow is still running, but its agent has gone quiet (stale or disconnected): a value
+    /// still read from the live log is the last one known, so it shows as stale (issue #148).
+    pub quiet: bool,
+}
+
+/// The provenance a step row shows. A value read from the live log is provisional, and it is stale
+/// once its run has gone quiet: the same rule as the flow's own badge (`flow_provenance`). Every
+/// other source keeps its own provenance (see [`provenance_of`]).
+#[must_use]
+pub fn row_provenance(source: SourceKind, quiet: bool) -> Provenance {
+    match provenance_of(source) {
+        Provenance::Provisional if quiet => Provenance::Stale,
+        other => other,
+    }
 }
 
 /// A step tree.
@@ -167,6 +181,8 @@ pub struct Row {
     pub status: StepStatus,
     /// Provenance of the status.
     pub source: SourceKind,
+    /// The provenance the row shows (see [`row_provenance`]): its mark is shown only for an exception.
+    pub provenance: Provenance,
     /// Duration text, or `None` while unknown.
     pub duration: Option<String>,
     /// For retries: `attempt 2 of 3`.
@@ -257,6 +273,7 @@ impl TreeState {
                     focused: self.focused.as_deref() == Some(e.id.as_str()),
                     status: e.status,
                     source: e.source,
+                    provenance: row_provenance(e.source, e.quiet),
                     duration: e.duration_ms.map(format_duration),
                     attempt: (total > 1).then(|| format!("attempt {} of {total}", e.attempt)),
                 })
@@ -376,6 +393,7 @@ mod tests {
             source: SourceKind::LiveConsole,
             duration_ms: None,
             attempt: 1,
+            quiet: false,
         }
     }
 
@@ -530,6 +548,27 @@ mod tests {
         ];
         let labels: HashSet<_> = all.into_iter().map(status_label).collect();
         assert_eq!(labels.len(), all.len());
+    }
+
+    #[test]
+    fn a_live_value_is_stale_once_its_run_has_gone_quiet_and_settled_ones_are_not() {
+        assert_eq!(
+            row_provenance(SourceKind::LiveConsole, false),
+            Provenance::Provisional
+        );
+        assert_eq!(
+            row_provenance(SourceKind::DebugLog, true),
+            Provenance::Stale
+        );
+        assert_eq!(
+            row_provenance(SourceKind::ArtifactFile, true),
+            Provenance::Final,
+            "a settled step is not a live value"
+        );
+        assert_eq!(
+            row_provenance(SourceKind::ServerInferred, true),
+            Provenance::Inferred
+        );
     }
 
     #[test]

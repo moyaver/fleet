@@ -22,7 +22,7 @@ use fleet_ui::{
     components::live::LiveState,
     mark::Mark,
     provenance::Provenance,
-    steps::tree::{StepExec, StepTree, format_duration as step_duration, provenance_of},
+    steps::tree::{StepExec, StepTree, format_duration as step_duration, row_provenance},
 };
 
 use crate::{
@@ -523,7 +523,7 @@ fn failure(view: &FlowDetailView, flat: &[&StepView], numbering: &Numbering) -> 
 
 /// The setup commands as one exec, first in the list: the worst of their statuses, and their
 /// durations summed when all of them are known.
-fn setup_exec(setup: &[&StepView]) -> Option<StepExec> {
+fn setup_exec(setup: &[&StepView], quiet: bool) -> Option<StepExec> {
     let first = setup.first()?;
     let statuses: Vec<StepStatus> = setup.iter().map(|s| step_status(&s.status)).collect();
     let status = [
@@ -550,6 +550,7 @@ fn setup_exec(setup: &[&StepView]) -> Option<StepExec> {
         source: parse_source(&first.source),
         duration_ms: durations.map(|d| d.iter().sum()),
         attempt: 1,
+        quiet,
     })
 }
 
@@ -560,7 +561,16 @@ fn steps(
     settled: bool,
 ) -> StepsSection {
     let setup: Vec<&StepView> = flat.iter().copied().filter(|s| is_setup(s)).collect();
-    let mut execs: Vec<StepExec> = setup_exec(&setup).into_iter().collect();
+    // A flow still running whose agent has gone quiet: a value read from the live log is stale.
+    let quiet = view.flow.state == "running"
+        && matches!(
+            view.agent_run.liveness,
+            Some(
+                fleet_protocol::live::Liveness::Stale
+                    | fleet_protocol::live::Liveness::Disconnected
+            )
+        );
+    let mut execs: Vec<StepExec> = setup_exec(&setup, quiet).into_iter().collect();
     execs.extend(flat.iter().filter(|s| !is_setup(s)).map(|s| StepExec {
         id: s.index.to_string(),
         parent: s.parent_index.map(|p| p.to_string()),
@@ -571,13 +581,14 @@ fn steps(
         duration_ms: s.duration_ms.and_then(|d| u64::try_from(d).ok()),
         // Unknown attempts count as the first, which is what a step outside a retry is.
         attempt: s.attempt.and_then(|a| u32::try_from(a).ok()).unwrap_or(1),
+        quiet,
     }));
     let tree = StepTree::build(&execs);
     // The section says how its steps are known by its weakest row, so one step still read from the
     // log keeps the whole section provisional (issue #148). With no steps it says how the flow ended.
     let weakest = execs
         .iter()
-        .map(|e| provenance_of(e.source))
+        .map(|e| row_provenance(e.source, e.quiet))
         .min_by_key(|p| provenance_rank(*p));
     let n = flat.len() - setup.len();
     let open = matches!(view.flow.state.as_str(), "running" | "pending");
