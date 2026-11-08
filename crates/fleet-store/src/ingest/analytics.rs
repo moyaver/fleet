@@ -174,7 +174,7 @@ mod tests {
     use fleet_core::fingerprint::FailureFacts;
     use fleet_protocol::{
         event::{EventBody, MaestroBuild, RunEnded},
-        frame::{Hello, Sample, Telemetry},
+        frame::{Hello, Sample, SampleUnavailable, Telemetry},
         journal::{ClockSample, SourceKind, Subject},
     };
     use sqlx::PgPool;
@@ -246,6 +246,7 @@ mod tests {
                 host_psi_cpu_pct: None,
                 host_psi_memory_pct: None,
                 host_psi_io_pct: None,
+                unavailable: SampleUnavailable::default(),
             };
             store
                 .store_telemetry(&[TelemetryBatch {

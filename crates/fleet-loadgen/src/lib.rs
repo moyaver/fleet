@@ -38,7 +38,8 @@ use fleet_protocol::{
     },
     frame::{
         AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, DeviceUnavailable, Hello,
-        ProtocolRange, ResumeState, RunOrigin, Sample, ServerFrame, Telemetry, Unavailable,
+        ProtocolRange, ResumeState, RunOrigin, Sample, SampleUnavailable, ServerFrame, Telemetry,
+        Unavailable,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -353,6 +354,7 @@ fn host_sample(t0: Instant) -> Sample {
         host_psi_cpu_pct: None,
         host_psi_memory_pct: None,
         host_psi_io_pct: None,
+        unavailable: SampleUnavailable::default(),
     }
 }
 

@@ -575,7 +575,7 @@
       ]
     },
     "Sample": {
-      "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).",
+      "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).\n\nEvery reading carries its unit in its field name (`_pct` percent, `_bytes` bytes, `_cores`\ncores; the load average is a plain number), and its scope in its prefix: `host_` is the\nmachine, `maestro_` the Maestro process of the run and `agent_` the agent itself (its\nsupervisor and observer). A reading that is `None` has its reason in `unavailable`.",
       "properties": {
         "agent_cpu_pct": {
           "description": "The agent itself (supervisor + observer): CPU percent of one core since the last sample\n(invariant I10).",
@@ -706,11 +706,175 @@
             "integer",
             "null"
           ]
+        },
+        "unavailable": {
+          "$ref": "#/$defs/SampleUnavailable",
+          "description": "Why each reading above is unknown, for every reading that is `None` (PLAN §6.5). Empty from\nolder agents."
         }
       },
       "required": [
         "at"
       ],
+      "type": "object"
+    },
+    "SampleUnavailable": {
+      "description": "The reason each reading of a [`Sample`] is unknown. Each field is the reason for the reading of\nthe same name; a reading that is set has `None` here (PLAN §6.5).",
+      "properties": {
+        "agent_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `agent_cpu_pct` is unknown."
+        },
+        "agent_rss_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `agent_rss_bytes` is unknown."
+        },
+        "host_cpu_cores": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_cpu_cores` is unknown."
+        },
+        "host_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_cpu_pct` is unknown."
+        },
+        "host_load_1m": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_load_1m` is unknown."
+        },
+        "host_mem_total_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_mem_total_bytes` is unknown."
+        },
+        "host_mem_used_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_mem_used_bytes` is unknown."
+        },
+        "host_psi_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_psi_cpu_pct` is unknown."
+        },
+        "host_psi_io_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_psi_io_pct` is unknown."
+        },
+        "host_psi_memory_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_psi_memory_pct` is unknown."
+        },
+        "host_swap_total_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_swap_total_bytes` is unknown."
+        },
+        "host_swap_used_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `host_swap_used_bytes` is unknown."
+        },
+        "maestro_cpu_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `maestro_cpu_pct` is unknown."
+        },
+        "maestro_rss_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why `maestro_rss_bytes` is unknown."
+        }
+      },
       "type": "object"
     },
     "SourceKind": {
@@ -872,7 +1036,7 @@
       "type": "object"
     },
     "Unavailable": {
-      "description": "Why a device reading is unknown (PLAN §6.5). A reading that is set has no reason.",
+      "description": "Why a device, host or process reading is unknown (PLAN §6.5). A reading that is set has no\nreason.",
       "oneOf": [
         {
           "const": "not_an_emulator",
@@ -912,6 +1076,21 @@
         {
           "const": "not_sampled",
           "description": "This sample does not take the reading: a probe sample carries no activity, and the sample\nof a failed flow's activity carries no probe.",
+          "type": "string"
+        },
+        {
+          "const": "no_system_info",
+          "description": "The platform's system information could not be read, so no host or process reading that\ncomes from it was taken.",
+          "type": "string"
+        },
+        {
+          "const": "no_psi",
+          "description": "The kernel has no pressure stall information (PSI) for the resource: macOS and Windows.",
+          "type": "string"
+        },
+        {
+          "const": "no_process",
+          "description": "The process is not known to this run yet (Maestro has not started), or it has exited.",
           "type": "string"
         },
         {
