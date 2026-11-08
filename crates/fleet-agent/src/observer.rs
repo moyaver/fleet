@@ -190,10 +190,6 @@ struct Live {
 }
 
 /// Observes the run until it ends, and returns the Maestro version its session log named, if any.
-#[expect(
-    clippy::too_many_lines,
-    reason = "one select loop over the observer's frames, which owns the run's state"
-)]
 async fn observe() -> io::Result<Option<String>> {
     let (frames_tx, mut frames) = mpsc::channel::<Frame>(1024);
     std::thread::spawn(move || {
@@ -290,58 +286,73 @@ async fn observe() -> io::Result<Option<String>> {
             }
             _ = sample.tick() => {
                 if let Some(l) = live.as_mut() {
-                    // Host and process metrics are taken when due: every 5 s, or every 15 s while the
-                    // host is under pressure (PLAN §6.5). Device probes keep their own interval.
-                    let now = Instant::now();
-                    let host = if l.throttle.due(now) {
-                        let s = l.sampler.sample(clock());
-                        l.throttle.observe(now, Pressure::from(&s));
-                        l.tseq += 1;
-                        l.emulators.refresh();
-                        Some(s)
-                    } else {
-                        None
-                    };
-                    let driven = l.session.driven_devices();
-                    let finished = l.probes.take();
-                    l.pending_devices.extend(
-                        finished.into_iter().map(|d| with_emulator(d, &driven, &l.emulators)),
-                    );
-                    if l.telemetry.is_some() {
-                        let at = clock();
-                        let targets: Vec<Target> = driven
-                            .iter()
-                            .map(|d| Target {
-                                adb_state: l.session.adb_state(&d.serial),
-                                serial: d.serial.clone(),
-                                device_session_id: d.device_session_id,
-                                shard: d.shard,
-                            })
-                            .collect();
-                        l.probes.start_due(now, &at, &targets, !l.throttle.throttled());
-                        // A flow that failed on a device since the last tick: read its activity now.
-                        let failed: Vec<Target> = l
-                            .session
-                            .take_failed_devices()
-                            .into_iter()
-                            .map(|d| Target {
-                                adb_state: l.session.adb_state(&d.serial),
-                                serial: d.serial,
-                                device_session_id: d.device_session_id,
-                                shard: d.shard,
-                            })
-                            .collect();
-                        l.probes.request_activity(&at, &failed);
-                    }
-                    // Device samples wait for the next host sample's frame.
-                    if let Some(s) = host {
-                        let devices = std::mem::take(&mut l.pending_devices);
-                        if let Some(t) = &l.telemetry {
-                            let _ = t.try_send(Telemetry { tseq_from: l.tseq, tseq_to: l.tseq, dropped_since_last: 0, samples: vec![s], devices });
-                        }
-                    }
+                    sample_tick(l, Instant::now(), &clock);
                 }
             }
+        }
+    }
+}
+
+/// One sampling tick of a live run: the host and process sample when one is due, the probes
+/// started and finished since the last tick, and the device samples queued with their emulator
+/// readings. The loop runs it on every sampling interval.
+fn sample_tick(l: &mut Live, now: Instant, clock: &impl Fn() -> ClockSample) {
+    // Host and process metrics are taken when due: every 5 s, or every 15 s while the
+    // host is under pressure (PLAN §6.5). Device probes keep their own interval.
+    let host = if l.throttle.due(now) {
+        let s = l.sampler.sample(clock());
+        l.throttle.observe(now, Pressure::from(&s));
+        l.tseq += 1;
+        l.emulators.refresh();
+        Some(s)
+    } else {
+        None
+    };
+    let driven = l.session.driven_devices();
+    let finished = l.probes.take();
+    l.pending_devices.extend(
+        finished
+            .into_iter()
+            .map(|d| with_emulator(d, &driven, &l.emulators)),
+    );
+    if l.telemetry.is_some() {
+        let at = clock();
+        let targets: Vec<Target> = driven
+            .iter()
+            .map(|d| Target {
+                adb_state: l.session.adb_state(&d.serial),
+                serial: d.serial.clone(),
+                device_session_id: d.device_session_id,
+                shard: d.shard,
+            })
+            .collect();
+        l.probes
+            .start_due(now, &at, &targets, !l.throttle.throttled());
+        // A flow that failed on a device since the last tick: read its activity now.
+        let failed: Vec<Target> = l
+            .session
+            .take_failed_devices()
+            .into_iter()
+            .map(|d| Target {
+                adb_state: l.session.adb_state(&d.serial),
+                serial: d.serial,
+                device_session_id: d.device_session_id,
+                shard: d.shard,
+            })
+            .collect();
+        l.probes.request_activity(&at, &failed);
+    }
+    // Device samples wait for the next host sample's frame.
+    if let Some(s) = host {
+        let devices = std::mem::take(&mut l.pending_devices);
+        if let Some(t) = &l.telemetry {
+            let _ = t.try_send(Telemetry {
+                tseq_from: l.tseq,
+                tseq_to: l.tseq,
+                dropped_since_last: 0,
+                samples: vec![s],
+                devices,
+            });
         }
     }
 }
@@ -1080,6 +1091,7 @@ mod tests {
     use fleet_protocol::frame::DeviceUnavailable;
 
     use super::*;
+    use crate::device::{API_LEVEL, PROBE};
 
     fn report_with_age(dir: &Path, age: Duration) -> PathBuf {
         let p = dir.join("report.xml");
@@ -1153,6 +1165,82 @@ mod tests {
             shard: Some(1),
             unavailable: DeviceUnavailable::default(),
         }
+    }
+
+    /// The sampling tick queues an emulator's device sample with its process's readings: the probe
+    /// reads the device over adb, `with_emulator` adds the qemu process's CPU, memory and AVD name,
+    /// and the next host sample's frame carries the sample to the server.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_sampling_tick_sends_an_emulators_sample_with_its_process_readings() {
+        const FIRST: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/probe.raw");
+        const API: &[u8] = include_bytes!("../../../fixtures/adb/android-37.1/api-level.raw");
+        fn clock() -> ClockSample {
+            ClockSample {
+                wall: OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            }
+        }
+        let _emulator = crate::emulator::fake::qemu(5593, Some("Probe_Device"));
+        let (addr, _) = crate::adb::fake::devices(
+            "emulator-5593",
+            vec![(PROBE, &FIRST[4..]), (API_LEVEL, &API[4..])],
+        )
+        .await;
+        let mut l = start(
+            &["maestro".into(), "test".into()],
+            std::process::id(),
+            None,
+            None,
+            None,
+            None,
+            SystemTime::now(),
+            clock(),
+            clock,
+            1 << 20,
+        );
+        l.probes = Probes::with_timeout(addr, Duration::from_secs(5));
+        let (tx, mut frames) = mpsc::channel(8);
+        l.telemetry = Some(tx);
+        // Maestro selects the emulator for its shard, so the session drives it.
+        l.session.observe(
+            clock(),
+            Observation::Log(fleet_maestro::log::Record {
+                unix_ms: None,
+                level: "INFO".into(),
+                logger: "maestro.cli.command.TestCommand".into(),
+                message: "[shard 1] Selected device emulator-5593 using port 5593 with execution plan ExecutionPlan(flowsToRun=[/a/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true))".into(),
+                continuation: Vec::new(),
+            }),
+        );
+
+        let now = Instant::now();
+        // The first tick starts the probe; its host sample goes out with no device samples yet.
+        sample_tick(&mut l, now, &clock);
+        l.probes.finished_one().await;
+        // The next tick takes the finished probe and sends it with the host sample.
+        sample_tick(&mut l, now + SAMPLE, &clock);
+
+        assert!(frames.try_recv().is_ok_and(|f| f.devices.is_empty()));
+        let frame = frames.try_recv().expect("the second host sample's frame");
+        let [sample] = frame.devices.as_slice() else {
+            panic!("one device sample, got {:?}", frame.devices);
+        };
+        assert_eq!(sample.avd_name.as_deref(), Some("Probe_Device"));
+        assert!(
+            sample.emu_cpu_pct.is_some(),
+            "the emulator process was read"
+        );
+        assert!(sample.emu_rss_bytes.is_some_and(|b| b > 0));
+        assert_eq!(
+            (
+                sample.unavailable.emu_cpu_pct,
+                sample.unavailable.emu_rss_bytes,
+                sample.unavailable.avd_name,
+            ),
+            (None, None, None),
+            "every emulator reading is set, so none has a reason"
+        );
     }
 
     /// An emulator serial gets its process's CPU, memory and AVD name, and a physical device gets
