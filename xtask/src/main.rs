@@ -114,6 +114,11 @@ fn ci(root: &Path) -> anyhow::Result<()> {
          -p fleet-protocol -p fleet-core -p fleet-ui -p fleet-web -- -D warnings",
     )?;
     lint::run(root)?;
+    // The composite action's install step, with curl, gh and tar stubbed (research 06 T18).
+    sh(
+        root,
+        "bash examples/github-actions/fleet-agent/test-install.sh",
+    )?;
     sh(root, "cargo deny --locked check")?;
     // The browser tests drive the built dashboard with chromedriver (PLAN §13).
     tools::install(root)?;
