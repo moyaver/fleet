@@ -16,7 +16,7 @@ expression: result
       "failure": "Assertion is false: \"Fleet never shows this\" is visible"
     }
   ],
-  "events": 23,
+  "events": 28,
   "event_types": {
     "app.crashed": 1,
     "artifact.registered": 2,
@@ -28,7 +28,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 5,
+    "step.ended": 10,
     "step.started": 5,
     "suite.started": 1
   },

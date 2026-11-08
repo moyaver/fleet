@@ -234,6 +234,7 @@ pub(crate) fn suite_run_scripted(
                 SourceKind::LiveConsole,
                 &EventBody::StepEnded(StepEnded {
                     status: StepStatus::Failed,
+                    timing: None,
                 }),
             ));
         }

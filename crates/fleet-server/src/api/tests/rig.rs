@@ -531,7 +531,10 @@ impl Agent {
         self.push(
             subject,
             SourceKind::DebugLog,
-            &EventBody::StepEnded(StepEnded { status }),
+            &EventBody::StepEnded(StepEnded {
+                status,
+                timing: None,
+            }),
         );
     }
 
@@ -555,7 +558,10 @@ impl Agent {
         self.push(
             subject,
             SourceKind::DebugLog,
-            &EventBody::StepEnded(StepEnded { status }),
+            &EventBody::StepEnded(StepEnded {
+                status,
+                timing: None,
+            }),
         );
     }
 

@@ -409,6 +409,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     SourceKind::DebugLog,
                     &EventBody::StepEnded(StepEnded {
                         status: StepStatus::Completed,
+                        timing: None,
                     }),
                 );
             }
