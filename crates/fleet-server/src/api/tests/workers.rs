@@ -10,6 +10,9 @@ use super::rig::{Agent, rig, rig_with, sample, telemetry};
 #[tokio::test]
 async fn a_worker_is_online_while_its_agent_talks_stale_when_silent_and_disconnected_when_gone() {
     let rig = rig_with(|c| c.liveness.stale_after_ms = 1500).await;
+    // Liveness reads the hub's clock. Frozen, the time a request takes cannot make the agent
+    // stale; the test moves the clock past the threshold itself.
+    rig.state.hub.freeze_clock();
     let mut agent = Agent::new("300", "build", "runner-a");
     let mut socket = rig.connect(&agent).await;
     agent.started();
@@ -28,6 +31,9 @@ async fn a_worker_is_online_while_its_agent_talks_stale_when_silent_and_disconne
     assert_eq!(worker["active_runs"], 1);
 
     // Nothing is heard for longer than the stale threshold: stale, still connected.
+    rig.state
+        .hub
+        .advance_clock(std::time::Duration::from_millis(1600));
     let overview = rig
         .until("/api/v1/projects/app/overview", |o| {
             o["worker_counts"]["stale"] == 1
