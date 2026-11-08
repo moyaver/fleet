@@ -51,6 +51,13 @@ jobs:
       # The browser tests use the runner's preinstalled Chrome; xtask fetches the matching
       # chromedriver and the Tailwind CLI into target/tools.
       - run: cargo xtask ci
+      # The claim lattice's property tests at the case count the owner's runs use (#46). Only these
+      # run here: a generator that rejects too often, or a filter, aborts at this count and not at
+      # the default one.
+      - name: Claim property tests at 20000 cases
+        env:
+          PROPTEST_CASES: "20000"
+        run: cargo nextest run --locked -p fleet-core -E 'test(claims::tests)'
       # Uses DATABASE_URL (this job's Postgres 18); the test creates its own databases.
       - run: cargo xtask upgrade-rehearsal
 
