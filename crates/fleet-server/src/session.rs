@@ -190,6 +190,51 @@ pub(crate) async fn checked_session(
     Ok(Some(active))
 }
 
+/// The signed-in session of an administration write (Screen G). A browser form has no header to
+/// set, so its CSRF token travels in the body (`body_token`, the form's `csrf` field); an API
+/// client sends `X-CSRF-Token`. Either must equal the session's token, from the dashboard's own
+/// origin. The refusal is the status and what to say: `401` with no session, `403` for a wrong or
+/// missing token or a foreign origin, `500` if the session can't be read.
+pub(crate) async fn write_session(
+    state: &AppState,
+    headers: &HeaderMap,
+    body_token: Option<&str>,
+) -> Result<Active, (StatusCode, &'static str)> {
+    let active = match active(state, headers).await {
+        Ok(Some(a)) => a,
+        Ok(None) => return Err((StatusCode::UNAUTHORIZED, "not signed in")),
+        Err(e) => {
+            tracing::error!(error = %e, "reading a session");
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, "internal error"));
+        }
+    };
+    let given = headers
+        .get(CSRF_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .or(body_token)
+        .unwrap_or_default();
+    if !same_secret(given, &active.data.csrf) || !write_origin_ok(state, headers) {
+        tracing::warn!("an administration write failed the CSRF check");
+        return Err((
+            StatusCode::FORBIDDEN,
+            "missing or wrong CSRF token, or a foreign origin",
+        ));
+    }
+    Ok(active)
+}
+
+/// Whether an administration write comes from the dashboard's own origin. The browser's Fetch
+/// Metadata says so when it sends `Sec-Fetch-Site` (`same-origin`, or `none` for a request the user
+/// made): that holds whatever the referrer policy is. A dashboard page under `no-referrer` sends
+/// `Origin: null` on its forms, so the `Origin` check alone would refuse its own form. Without
+/// Fetch Metadata, the `Origin` check decides.
+fn write_origin_ok(state: &AppState, headers: &HeaderMap) -> bool {
+    match headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()) {
+        Some(site) => matches!(site, "same-origin" | "none"),
+        None => same_origin(state, headers),
+    }
+}
+
 /// A signed-in session (for logout), CSRF-checked.
 #[derive(Debug)]
 pub(crate) struct SignedIn(pub(crate) Active);

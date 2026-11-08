@@ -77,10 +77,18 @@ enum Class {
     /// publishers are refused as unauthenticated, and every other signed-in caller without a
     /// global administrator grant is `403`, project admins included. Only a global admin reads.
     Admin,
+    /// Screen G's writes (every non-GET route under `/api/v1/admin/`): as `Admin`, for anyone who
+    /// is not a global administrator. A global administrator gets past the check and is refused
+    /// the empty body or the path, which the matrix sends bare: nothing is written.
+    AdminWrite,
 }
 
 /// The class of a route as the router names it, or `None` for a route nobody has classified yet.
-fn class_of(route: &str) -> Option<Class> {
+/// The method decides for Screen G: a GET reads, and any other method on `/api/v1/admin/` writes.
+fn class_of(route: &str, method: &str) -> Option<Class> {
+    if route.starts_with("/api/v1/admin/") && method != "get" {
+        return Some(Class::AdminWrite);
+    }
     Some(match route {
         "/api/v1/projects" => Class::ProjectList,
         "/api/v1/live" => Class::Live,
@@ -205,7 +213,7 @@ fn every_route_has_a_row() {
     assert!(routes.len() >= 30, "found only {} routes", routes.len());
     let unclassified: Vec<_> = routes
         .iter()
-        .filter(|(path, _)| class_of(path).is_none())
+        .filter(|(path, method)| class_of(path, method).is_none())
         .map(|(path, method)| format!("{method} {path}"))
         .collect();
     assert!(
@@ -461,6 +469,19 @@ fn check(class: Class, who: Who, status: u16, body: &Value, anonymous: u16) -> R
                 "403 expected: only a global admin may read Screen G",
             ),
         },
+        Class::AdminWrite => match who {
+            Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),
+            // Past the role check, the bare request is malformed or names no row: refused, not
+            // forbidden, and nothing was written.
+            Who::GlobalAdmin => want(
+                (400..500).contains(&status) && status != 401 && status != 403,
+                "a refused body or path, not an authorization refusal",
+            ),
+            _ => want(
+                status == 403,
+                "403 expected: only a global admin may change Screen G",
+            ),
+        },
     }
 }
 
@@ -556,7 +577,8 @@ async fn every_rest_and_live_route_answers_every_principal_as_its_class_allows()
     let mut failures = Vec::new();
 
     for (path, method) in derived_routes() {
-        let class = class_of(&path).expect("every route has a row (every_route_has_a_row)");
+        let class =
+            class_of(&path, &method).expect("every route has a row (every_route_has_a_row)");
         let target = concrete(&path, &ids);
         if path == "/api/v1/agent/ws" {
             for who in WHO {
@@ -574,8 +596,9 @@ async fn every_rest_and_live_route_answers_every_principal_as_its_class_allows()
             }
             continue;
         }
-        // Only triage is checked past its CSRF check; the logout row checks the refusal without it.
-        let csrf = class == Class::ProjectTriage;
+        // Triage and Screen G's writes are checked past their CSRF check; the logout row checks the
+        // refusal without it.
+        let csrf = matches!(class, Class::ProjectTriage | Class::AdminWrite);
         // The anonymous answer is the baseline for role-independent routes.
         let anonymous = request(&rig, &cookies, Who::Anonymous, &method, &target, csrf)
             .await
