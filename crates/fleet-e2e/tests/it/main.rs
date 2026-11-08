@@ -7,6 +7,7 @@
 
 mod artifacts;
 mod browser;
+mod catalog;
 mod dashboard_ab;
 mod dashboard_cd;
 mod dashboard_ef;
