@@ -192,35 +192,18 @@ mod tests {
         );
     }
 
-    /// A real process named like an emulator, with a console port: a copy of `sh` that runs a
-    /// sleep and carries the flags after its script. The scan must find it and map its serial.
+    /// A real process named like an emulator, with a console port: the scan must find it and map its
+    /// serial.
     #[cfg(unix)]
     #[test]
     fn a_scan_finds_a_qemu_named_process_and_maps_its_serial() {
-        let dir = std::env::temp_dir().join(format!("fleet-emu-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).expect("temp dir");
-        let program = dir.join("qemu-system-test");
-        std::fs::copy("/bin/sh", &program).expect("copy sh");
-        let mut child = std::process::Command::new(&program)
-            .args([
-                "-c",
-                "sleep 30",
-                "x",
-                "-port",
-                "5599",
-                "-avd",
-                "Test_Device",
-            ])
-            .spawn()
-            .expect("the copy should run");
+        let _emulator = fake::qemu(5599, Some("Test_Device"));
         let mut emulators = Emulators::new();
         emulators.rescan();
         emulators.refresh();
-        let found = emulators.reading("emulator-5599");
-        let _ = child.kill();
-        let _ = child.wait();
-        let _ = std::fs::remove_dir_all(&dir);
-        let found = found.expect("the qemu-named process maps to its serial");
+        let found = emulators
+            .reading("emulator-5599")
+            .expect("the qemu-named process maps to its serial");
         assert_eq!(found.avd.as_deref(), Some("Test_Device"));
         assert!(found.rss_bytes.is_some_and(|b| b > 0));
     }
@@ -228,5 +211,47 @@ mod tests {
     #[test]
     fn an_unmapped_serial_has_no_reading() {
         assert_eq!(Emulators::new().reading("emulator-5554"), None);
+    }
+}
+
+/// Fake emulator processes for tests in this crate.
+#[cfg(all(test, unix))]
+pub(crate) mod fake {
+    use std::{path::PathBuf, process::Child};
+
+    /// A running fake emulator; it is killed and its directory removed when dropped.
+    pub(crate) struct FakeEmulator {
+        child: Child,
+        dir: PathBuf,
+    }
+
+    impl Drop for FakeEmulator {
+        fn drop(&mut self) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// A process named `qemu-system-test` whose command line names console port `port` and, when
+    /// given, AVD `avd`: a copy of `sh` that sleeps, with the flags after its script. Its serial is
+    /// `emulator-<port>`.
+    pub(crate) fn qemu(port: u16, avd: Option<&str>) -> FakeEmulator {
+        let dir = std::env::temp_dir().join(format!("fleet-emu-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let program = dir.join("qemu-system-test");
+        std::fs::copy("/bin/sh", &program).expect("copy sh");
+        let mut args = vec!["-c".to_owned(), "sleep 30".to_owned(), "x".to_owned()];
+        args.extend(["-port".to_owned(), port.to_string()]);
+        args.extend(
+            avd.map(|a| ["-avd".to_owned(), a.to_owned()])
+                .into_iter()
+                .flatten(),
+        );
+        let child = std::process::Command::new(&program)
+            .args(&args)
+            .spawn()
+            .expect("the copy should run");
+        FakeEmulator { child, dir }
     }
 }

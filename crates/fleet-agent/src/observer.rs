@@ -25,7 +25,7 @@ use fleet_maestro::{ReportState, stdout::strip_ansi};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{ArtifactRejected, ArtifactUploaded, EventBody, EvidenceSources},
-    frame::{CiContext, DeviceSample, Telemetry},
+    frame::{CiContext, DeviceSample, Telemetry, Unavailable},
     journal::ClockSample,
 };
 use time::OffsetDateTime;
@@ -41,7 +41,7 @@ use crate::{
     layout,
     metrics::{Pressure, SAMPLE, Sampler, Throttle},
     outbox::{Budget, Outbox},
-    session::{Candidate, Observation, Session},
+    session::{Candidate, DrivenDevice, Observation, Session},
     transport::{self, Shared},
     upload::{self, Outcome, Source, Uploader},
     watch::{self, BundleScanner, Located, LogTailer},
@@ -311,10 +311,11 @@ async fn observe() -> io::Result<Option<String>> {
                         let at = clock();
                         let targets: Vec<Target> = driven
                             .iter()
-                            .map(|(serial, device_session_id)| Target {
-                                adb_state: l.session.adb_state(serial),
-                                serial: serial.clone(),
-                                device_session_id: *device_session_id,
+                            .map(|d| Target {
+                                adb_state: l.session.adb_state(&d.serial),
+                                serial: d.serial.clone(),
+                                device_session_id: d.device_session_id,
+                                shard: d.shard,
                             })
                             .collect();
                         l.probes.start_due(now, &at, &targets, !l.throttle.throttled());
@@ -323,10 +324,11 @@ async fn observe() -> io::Result<Option<String>> {
                             .session
                             .take_failed_devices()
                             .into_iter()
-                            .map(|(serial, device_session_id)| Target {
-                                adb_state: l.session.adb_state(&serial),
-                                serial,
-                                device_session_id,
+                            .map(|d| Target {
+                                adb_state: l.session.adb_state(&d.serial),
+                                serial: d.serial,
+                                device_session_id: d.device_session_id,
+                                shard: d.shard,
                             })
                             .collect();
                         l.probes.request_activity(&at, &failed);
@@ -512,21 +514,49 @@ fn start(
 }
 
 /// Adds the emulator process's readings to a device sample: CPU, resident memory and the AVD name,
-/// when a process maps to the sample's serial (PLAN §6.5). A physical device keeps them unknown.
+/// from the `qemu-system-*` process that maps to the sample's serial (PLAN §6.5). Every emulator
+/// reading the sample lacks has its reason: a physical device is `not_an_emulator`, and an emulator
+/// with no process (or none readable) is `no_emulator_process`.
 fn with_emulator(
     mut sample: DeviceSample,
-    driven: &[(String, Uuid)],
+    driven: &[DrivenDevice],
     emulators: &Emulators,
 ) -> DeviceSample {
-    let serial = driven
+    let Some(serial) = driven
         .iter()
-        .find(|(_, id)| *id == sample.device_session_id)
-        .map(|(serial, _)| serial);
-    if let Some(reading) = serial.and_then(|s| emulators.reading(s)) {
-        sample.emu_cpu_pct = reading.cpu_pct;
-        sample.emu_rss_bytes = reading.rss_bytes;
-        sample.avd_name = reading.avd;
+        .find(|d| d.device_session_id == sample.device_session_id)
+        .map(|d| d.serial.as_str())
+    else {
+        // The session is no longer driven, so no process can be named for it.
+        sample.unavailable.emu_cpu_pct = Some(Unavailable::NoEmulatorProcess);
+        sample.unavailable.emu_rss_bytes = Some(Unavailable::NoEmulatorProcess);
+        sample.unavailable.avd_name = Some(Unavailable::NoEmulatorProcess);
+        return sample;
+    };
+    if !serial.starts_with("emulator-") {
+        sample.unavailable.emu_cpu_pct = Some(Unavailable::NotAnEmulator);
+        sample.unavailable.emu_rss_bytes = Some(Unavailable::NotAnEmulator);
+        sample.unavailable.avd_name = Some(Unavailable::NotAnEmulator);
+        return sample;
     }
+    let Some(reading) = emulators.reading(serial) else {
+        sample.unavailable.emu_cpu_pct = Some(Unavailable::NoEmulatorProcess);
+        sample.unavailable.emu_rss_bytes = Some(Unavailable::NoEmulatorProcess);
+        sample.unavailable.avd_name = Some(Unavailable::NoEmulatorProcess);
+        return sample;
+    };
+    sample.emu_cpu_pct = reading.cpu_pct;
+    sample.emu_rss_bytes = reading.rss_bytes;
+    sample.avd_name = reading.avd;
+    sample.unavailable.emu_cpu_pct = reading
+        .cpu_pct
+        .is_none()
+        .then_some(Unavailable::NoEmulatorProcess);
+    sample.unavailable.emu_rss_bytes = reading
+        .rss_bytes
+        .is_none()
+        .then_some(Unavailable::NoEmulatorProcess);
+    sample.unavailable.avd_name = sample.avd_name.is_none().then_some(Unavailable::NoAvdName);
     sample
 }
 
@@ -1047,6 +1077,8 @@ async fn finalize(
 
 #[cfg(test)]
 mod tests {
+    use fleet_protocol::frame::DeviceUnavailable;
+
     use super::*;
 
     fn report_with_age(dir: &Path, age: Duration) -> PathBuf {
@@ -1099,5 +1131,140 @@ mod tests {
             .set_modified(SystemTime::now())
             .unwrap();
         assert_eq!(written_during(&p, started), Some(true));
+    }
+
+    /// A device sample of `session`, with its probe readings set and every emulator reading unknown.
+    fn device_sample(session: Uuid) -> DeviceSample {
+        DeviceSample {
+            at: ClockSample {
+                wall: OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            },
+            device_session_id: session,
+            adb_state: Some(fleet_protocol::event::AdbState::Device),
+            boot_completed: Some(true),
+            guest_cpu_pct: None,
+            guest_mem_available_bytes: None,
+            emu_cpu_pct: None,
+            emu_rss_bytes: None,
+            avd_name: None,
+            api_level: Some(37),
+            foreground_activity: None,
+            shard: Some(1),
+            unavailable: DeviceUnavailable::default(),
+        }
+    }
+
+    /// An emulator serial gets its process's CPU, memory and AVD name, and a physical device gets
+    /// none of them: each unknown emulator reading says why.
+    #[cfg(unix)]
+    #[test]
+    fn with_emulator_adds_the_process_readings_to_an_emulator_serial_only() {
+        let _emulator = crate::emulator::fake::qemu(5599, Some("Test_Device"));
+        let mut emulators = Emulators::new();
+        emulators.rescan();
+        emulators.refresh();
+        let (emu, physical) = (Uuid::from_u128(1), Uuid::from_u128(2));
+        let driven = [
+            DrivenDevice {
+                serial: "emulator-5599".into(),
+                device_session_id: emu,
+                shard: 1,
+            },
+            DrivenDevice {
+                serial: "R58M12345".into(),
+                device_session_id: physical,
+                shard: 2,
+            },
+        ];
+
+        let on_emulator = with_emulator(device_sample(emu), &driven, &emulators);
+        assert_eq!(on_emulator.avd_name.as_deref(), Some("Test_Device"));
+        assert!(on_emulator.emu_rss_bytes.is_some_and(|b| b > 0));
+        assert!(on_emulator.emu_cpu_pct.is_some(), "the process was read");
+        assert_eq!(
+            (
+                on_emulator.unavailable.emu_cpu_pct,
+                on_emulator.unavailable.emu_rss_bytes,
+                on_emulator.unavailable.avd_name,
+            ),
+            (None, None, None),
+            "a reading that is set has no reason"
+        );
+
+        let on_device = with_emulator(device_sample(physical), &driven, &emulators);
+        assert_eq!(
+            (
+                on_device.emu_cpu_pct,
+                on_device.emu_rss_bytes,
+                on_device.avd_name.clone()
+            ),
+            (None, None, None),
+            "a physical device has no emulator process"
+        );
+        assert_eq!(
+            (
+                on_device.unavailable.emu_cpu_pct,
+                on_device.unavailable.emu_rss_bytes,
+                on_device.unavailable.avd_name,
+                on_device.boot_completed,
+                on_device.shard,
+            ),
+            (
+                Some(Unavailable::NotAnEmulator),
+                Some(Unavailable::NotAnEmulator),
+                Some(Unavailable::NotAnEmulator),
+                Some(true),
+                Some(1),
+            ),
+            "not an emulator, and the probe's own readings are kept"
+        );
+    }
+
+    /// An emulator serial that no process maps to says so; one whose process names no AVD says that.
+    #[cfg(unix)]
+    #[test]
+    fn with_emulator_says_why_an_emulator_reading_is_missing() {
+        let no_process = Emulators::new();
+        let session = Uuid::from_u128(3);
+        let driven = [DrivenDevice {
+            serial: "emulator-5598".into(),
+            device_session_id: session,
+            shard: 1,
+        }];
+        let s = with_emulator(device_sample(session), &driven, &no_process);
+        assert_eq!(
+            (s.emu_cpu_pct, s.emu_rss_bytes, s.avd_name.clone()),
+            (None, None, None)
+        );
+        assert_eq!(
+            (
+                s.unavailable.emu_cpu_pct,
+                s.unavailable.emu_rss_bytes,
+                s.unavailable.avd_name,
+            ),
+            (
+                Some(Unavailable::NoEmulatorProcess),
+                Some(Unavailable::NoEmulatorProcess),
+                Some(Unavailable::NoEmulatorProcess),
+            ),
+        );
+
+        let _no_avd = crate::emulator::fake::qemu(5597, None);
+        let mut emulators = Emulators::new();
+        emulators.rescan();
+        emulators.refresh();
+        let driven = [DrivenDevice {
+            serial: "emulator-5597".into(),
+            device_session_id: session,
+            shard: 1,
+        }];
+        let s = with_emulator(device_sample(session), &driven, &emulators);
+        assert!(s.emu_rss_bytes.is_some(), "the process is found");
+        assert_eq!(
+            (s.avd_name, s.unavailable.avd_name),
+            (None, Some(Unavailable::NoAvdName)),
+            "its command line names no AVD"
+        );
     }
 }

@@ -186,6 +186,95 @@ pub struct DeviceSample {
     /// this device (PLAN §6.5: current activity only on failure); `None` otherwise.
     #[serde(default)]
     pub foreground_activity: Option<String>,
+    /// The shard the device was assigned to: the planner's shard for a plan run (`plan.assigned`,
+    /// as the plan numbers it), otherwise the `shard_number` its `shard.assigned` event names
+    /// (1-based). Absent from older agents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shard: Option<u32>,
+    /// Why each reading above is unknown, for every reading that is `None` (PLAN §6.5: availability
+    /// with a reason when unknown). Empty from older agents.
+    #[serde(default, skip_serializing_if = "DeviceUnavailable::is_empty")]
+    pub unavailable: DeviceUnavailable,
+}
+
+/// Why a device reading is unknown (PLAN §6.5). A reading that is set has no reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum Unavailable {
+    /// The serial is not an emulator's (`emulator-<console port>`), so no emulator process is read.
+    NotAnEmulator,
+    /// An emulator serial that no `qemu-system-*` process maps to (it exited, or the process table
+    /// could not be read), or a device session the agent no longer drives.
+    NoEmulatorProcess,
+    /// The emulator's command line names no AVD (`-avd` is optional).
+    NoAvdName,
+    /// adb did not answer the read, or answered without it (an error, a timeout or a malformed
+    /// reply).
+    ProbeFailed,
+    /// The host is under pressure, so the guest's CPU and memory are not read (PLAN §6.5).
+    Throttled,
+    /// The first probe of a device only sets its CPU baseline; so does one after the guest's
+    /// counters went backwards.
+    NoBaseline,
+    /// adb's device list has not arrived yet.
+    NoAdbList,
+    /// This sample does not take the reading: a probe sample carries no activity, and the sample
+    /// of a failed flow's activity carries no probe.
+    NotSampled,
+    /// A reason this build doesn't know.
+    #[serde(other)]
+    Other,
+}
+
+/// The reason each device reading is unknown. Each field is the reason for the reading of the
+/// same name in [`DeviceSample`]; a reading that is set has `None` here.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DeviceUnavailable {
+    /// Why `adb_state` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adb_state: Option<Unavailable>,
+    /// Why `boot_completed` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot_completed: Option<Unavailable>,
+    /// Why `guest_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guest_cpu_pct: Option<Unavailable>,
+    /// Why `guest_mem_available_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guest_mem_available_bytes: Option<Unavailable>,
+    /// Why `emu_cpu_pct` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emu_cpu_pct: Option<Unavailable>,
+    /// Why `emu_rss_bytes` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emu_rss_bytes: Option<Unavailable>,
+    /// Why `avd_name` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avd_name: Option<Unavailable>,
+    /// Why `api_level` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_level: Option<Unavailable>,
+    /// Why `foreground_activity` is unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foreground_activity: Option<Unavailable>,
+}
+
+impl DeviceUnavailable {
+    /// Whether no reading has a reason, so nothing needs sending.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.adb_state.is_none()
+            && self.boot_completed.is_none()
+            && self.guest_cpu_pct.is_none()
+            && self.guest_mem_available_bytes.is_none()
+            && self.emu_cpu_pct.is_none()
+            && self.emu_rss_bytes.is_none()
+            && self.avd_name.is_none()
+            && self.api_level.is_none()
+            && self.foreground_activity.is_none()
+    }
 }
 
 /// One metric sample. `None` means unavailable, never zero (research 05 §5.4).
@@ -573,6 +662,57 @@ mod tests {
         };
         let back: Telemetry = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
         assert_eq!(back, full);
+    }
+
+    #[test]
+    fn device_samples_carry_their_shard_and_a_reason_for_each_unknown_reading() {
+        // An agent that predates shards and reasons: both are absent, and nothing is invented.
+        let old: DeviceSample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},
+                "device_session_id":"00000000-0000-7000-8000-000000000001"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (old.shard, old.unavailable),
+            (None, DeviceUnavailable::default())
+        );
+        assert!(old.unavailable.is_empty());
+        let wire = serde_json::to_string(&old).unwrap();
+        assert!(
+            !wire.contains("shard") && !wire.contains("unavailable"),
+            "nothing unset is sent: {wire}"
+        );
+
+        let throttled = DeviceSample {
+            shard: Some(2),
+            unavailable: DeviceUnavailable {
+                guest_cpu_pct: Some(Unavailable::Throttled),
+                guest_mem_available_bytes: Some(Unavailable::Throttled),
+                emu_cpu_pct: Some(Unavailable::NotAnEmulator),
+                avd_name: Some(Unavailable::NotAnEmulator),
+                ..DeviceUnavailable::default()
+            },
+            ..old
+        };
+        let wire = serde_json::to_value(&throttled).unwrap();
+        assert_eq!(wire["shard"], 2);
+        assert_eq!(wire["unavailable"]["guest_cpu_pct"], "throttled");
+        assert_eq!(wire["unavailable"]["emu_cpu_pct"], "not_an_emulator");
+        assert!(
+            wire["unavailable"].get("boot_completed").is_none(),
+            "a reading that has no reason is not listed"
+        );
+        let back: DeviceSample = serde_json::from_value(wire).unwrap();
+        assert_eq!(back, throttled);
+
+        // A reason this build doesn't know decodes as `Other`, not as a failed frame.
+        let newer: DeviceSample = serde_json::from_str(
+            r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},
+                "device_session_id":"00000000-0000-7000-8000-000000000001",
+                "unavailable":{"boot_completed":"brand_new_reason"}}"#,
+        )
+        .unwrap();
+        assert_eq!(newer.unavailable.boot_completed, Some(Unavailable::Other));
     }
 
     #[test]

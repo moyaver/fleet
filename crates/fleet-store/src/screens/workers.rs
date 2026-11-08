@@ -161,6 +161,8 @@ impl Store {
             session,
             flows: ids.iter().filter_map(|id| by_id.remove(id)).collect(),
             flow_count,
+            // The newest sample is read by the server, which turns its readings into the view.
+            latest: None,
         }))
     }
 }

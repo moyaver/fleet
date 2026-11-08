@@ -160,10 +160,24 @@ pub(crate) mod fake {
         serial: &'static str,
         replies: Vec<(&'static str, &'static [u8])>,
     ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        devices_in_turn(
+            serial,
+            replies.into_iter().map(|(c, r)| (c, vec![r])).collect(),
+        )
+        .await
+    }
+
+    /// As [`devices`], where a command answers its replies in turn, and the last one again once
+    /// they are used up: a device whose reading changes between two reads.
+    pub(crate) async fn devices_in_turn(
+        serial: &'static str,
+        replies: Vec<(&'static str, Vec<&'static [u8]>)>,
+    ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap().to_string();
         let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let seen = std::sync::Arc::clone(&count);
+        let mut turn = vec![0usize; replies.len()];
         tokio::spawn(async move {
             loop {
                 let Ok((mut s, _)) = listener.accept().await else {
@@ -174,8 +188,16 @@ pub(crate) mod fake {
                 assert_eq!(body, format!("host:transport:{serial}"));
                 s.write_all(b"OKAY").await.unwrap();
                 let body = read_request(&mut s).await;
-                match replies.iter().find(|(c, _)| body == format!("shell:{c}")) {
-                    Some((_, reply)) => s.write_all(reply).await.unwrap(),
+                match replies
+                    .iter()
+                    .position(|(c, _)| body == format!("shell:{c}"))
+                {
+                    Some(i) => {
+                        let (_, answers) = &replies[i];
+                        let n = turn[i].min(answers.len() - 1);
+                        turn[i] += 1;
+                        s.write_all(answers[n]).await.unwrap();
+                    }
                     None => s.write_all(b"FAIL000funknown command").await.unwrap(),
                 }
             }

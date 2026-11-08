@@ -18,7 +18,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use fleet_protocol::{event::AdbState, frame::DeviceSample, journal::ClockSample};
+use fleet_protocol::{
+    event::AdbState,
+    frame::{DeviceSample, DeviceUnavailable, Unavailable},
+    journal::ClockSample,
+};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
@@ -162,11 +166,15 @@ pub(crate) struct Target {
     pub(crate) serial: String,
     /// The device session of that shard: the samples belong to it.
     pub(crate) device_session_id: Uuid,
+    /// The shard the device was assigned to (its `shard.assigned` event's shard number).
+    pub(crate) shard: u32,
     /// adb's state for the serial, from the latest device list (`None`: no list yet).
     pub(crate) adb_state: Option<AdbState>,
 }
 
-/// One device's probing state.
+/// One device session's probing state. Keyed by the session, so a serial that comes back as a new
+/// device session starts again: its API level is read anew and its CPU baseline is not the old
+/// guest's.
 #[derive(Debug, Default)]
 struct Watch {
     in_flight: bool,
@@ -179,10 +187,12 @@ struct Watch {
 /// What a finished task read.
 #[derive(Debug)]
 enum Read {
-    /// A probe, and the API level if this one also read it.
+    /// A probe, and the API level if this one also read it. `guest` is whether the guest's CPU
+    /// and memory were asked for (false while the host is throttled).
     Probe {
         probe: io::Result<Probe>,
         api_level: Option<u32>,
+        guest: bool,
     },
     /// The resumed activity's component, if the listing named one.
     Activity(io::Result<Option<String>>),
@@ -202,7 +212,7 @@ struct Done {
 pub(crate) struct Probes {
     addr: String,
     timeout: Duration,
-    watch: HashMap<String, Watch>,
+    watch: HashMap<(String, Uuid), Watch>,
     /// Probes that finished since the last [`take`](Self::take). At most one per device in flight,
     /// so this stays as small as the device list.
     finished: Arc<Mutex<Vec<Done>>>,
@@ -241,8 +251,17 @@ impl Probes {
         guest: bool,
     ) {
         for target in targets {
-            let watch = self.watch.entry(target.serial.clone()).or_default();
-            let due = !watch.in_flight
+            // One probe at a time per serial, whichever session the earlier one belonged to.
+            let busy = self
+                .watch
+                .iter()
+                .any(|((serial, _), w)| *serial == target.serial && w.in_flight);
+            let watch = self
+                .watch
+                .entry((target.serial.clone(), target.device_session_id))
+                .or_default();
+            let due = !busy
+                && !watch.in_flight
                 && watch
                     .last_started
                     .is_none_or(|t| now.duration_since(t) >= INTERVAL);
@@ -267,10 +286,15 @@ impl Probes {
                 )
                 .await;
                 let read = match result {
-                    Ok((probe, api_level)) => Read::Probe { probe, api_level },
+                    Ok((probe, api_level)) => Read::Probe {
+                        probe,
+                        api_level,
+                        guest,
+                    },
                     Err(_) => Read::Probe {
                         probe: Err(io::Error::new(io::ErrorKind::TimedOut, "probe timed out")),
                         api_level: None,
+                        guest,
                     },
                 };
                 push(&finished, &woken, Done { target, at, read });
@@ -337,21 +361,48 @@ impl Probes {
     /// empty activity read: unknown, so nothing is sent).
     fn finish(&mut self, done: Done) -> Option<DeviceSample> {
         let serial = done.target.serial.clone();
-        let watch = self.watch.entry(serial.clone()).or_default();
+        let key = (serial.clone(), done.target.device_session_id);
+        let watch = self.watch.entry(key).or_default();
+        // The reasons this sample's readings are unknown. The emulator readings are the observer's
+        // to set (`observer::with_emulator`), once it has the process table.
+        let mut why = DeviceUnavailable {
+            adb_state: done
+                .target
+                .adb_state
+                .is_none()
+                .then_some(Unavailable::NoAdbList),
+            ..DeviceUnavailable::default()
+        };
         match done.read {
-            Read::Probe { probe, api_level } => {
+            Read::Probe {
+                probe,
+                api_level,
+                guest,
+            } => {
                 watch.in_flight = false;
                 if let Some(level) = api_level {
                     watch.api_level = Some(level);
                 }
+                why.api_level = watch
+                    .api_level
+                    .is_none()
+                    .then_some(Unavailable::ProbeFailed);
+                why.foreground_activity = Some(Unavailable::NotSampled);
                 let (boot_completed, guest_cpu_pct, guest_mem_available_bytes) = match probe {
-                    Ok(probe) => (
-                        Some(probe.boot_completed),
-                        probe.cpu.and_then(|now| watch.cpu.percent(now)),
-                        probe.mem_available_bytes,
-                    ),
+                    Ok(probe) => {
+                        let (cpu, mem) = guest_readings(watch, &probe, guest, &mut why);
+                        (Some(probe.boot_completed), cpu, mem)
+                    }
                     Err(e) => {
                         log_failure(&mut self.warned, &serial, &e);
+                        why.boot_completed = Some(Unavailable::ProbeFailed);
+                        let guest_reason = if guest {
+                            Unavailable::ProbeFailed
+                        } else {
+                            Unavailable::Throttled
+                        };
+                        why.guest_cpu_pct = Some(guest_reason);
+                        why.guest_mem_available_bytes = Some(guest_reason);
                         (None, None, None)
                     }
                 };
@@ -367,22 +418,33 @@ impl Probes {
                     avd_name: None,
                     api_level: watch.api_level,
                     foreground_activity: None,
+                    shard: Some(done.target.shard),
+                    unavailable: why,
                 })
             }
             Read::Activity(result) => match result {
-                Ok(Some(component)) => Some(DeviceSample {
-                    at: done.at,
-                    device_session_id: done.target.device_session_id,
-                    adb_state: done.target.adb_state,
-                    boot_completed: None,
-                    guest_cpu_pct: None,
-                    guest_mem_available_bytes: None,
-                    emu_cpu_pct: None,
-                    emu_rss_bytes: None,
-                    avd_name: None,
-                    api_level: watch.api_level,
-                    foreground_activity: Some(component),
-                }),
+                Ok(Some(component)) => {
+                    // An activity read takes no probe: none of its readings is sampled.
+                    why.boot_completed = Some(Unavailable::NotSampled);
+                    why.guest_cpu_pct = Some(Unavailable::NotSampled);
+                    why.guest_mem_available_bytes = Some(Unavailable::NotSampled);
+                    why.api_level = watch.api_level.is_none().then_some(Unavailable::NotSampled);
+                    Some(DeviceSample {
+                        at: done.at,
+                        device_session_id: done.target.device_session_id,
+                        adb_state: done.target.adb_state,
+                        boot_completed: None,
+                        guest_cpu_pct: None,
+                        guest_mem_available_bytes: None,
+                        emu_cpu_pct: None,
+                        emu_rss_bytes: None,
+                        avd_name: None,
+                        api_level: watch.api_level,
+                        foreground_activity: Some(component),
+                        shard: Some(done.target.shard),
+                        unavailable: why,
+                    })
+                }
                 Ok(None) => None,
                 Err(e) => {
                     log_failure(&mut self.warned, &serial, &e);
@@ -391,6 +453,46 @@ impl Probes {
             },
         }
     }
+}
+
+/// The guest's CPU and memory of a successful probe, and the reason for each one that is unknown:
+/// `throttled` when the probe did not ask for them, `probe_failed` when the reply lacked them, and
+/// `no_baseline` for a CPU figure that needs an earlier probe.
+fn guest_readings(
+    watch: &mut Watch,
+    probe: &Probe,
+    guest: bool,
+    why: &mut DeviceUnavailable,
+) -> (Option<f32>, Option<u64>) {
+    let cpu = match (guest, probe.cpu) {
+        (false, _) => {
+            why.guest_cpu_pct = Some(Unavailable::Throttled);
+            None
+        }
+        (true, None) => {
+            why.guest_cpu_pct = Some(Unavailable::ProbeFailed);
+            None
+        }
+        (true, Some(now)) => {
+            let pct = watch.cpu.percent(now);
+            if pct.is_none() {
+                why.guest_cpu_pct = Some(Unavailable::NoBaseline);
+            }
+            pct
+        }
+    };
+    let mem = match (guest, probe.mem_available_bytes) {
+        (false, _) => {
+            why.guest_mem_available_bytes = Some(Unavailable::Throttled);
+            None
+        }
+        (true, None) => {
+            why.guest_mem_available_bytes = Some(Unavailable::ProbeFailed);
+            None
+        }
+        (true, Some(bytes)) => Some(bytes),
+    };
+    (cpu, mem)
 }
 
 /// Logs the first failure of the run at warn level, and later ones at debug level. The reading
@@ -488,7 +590,18 @@ mod tests {
         Target {
             serial: serial.into(),
             device_session_id: Uuid::from_u128(7),
+            shard: 1,
             adb_state,
+        }
+    }
+
+    /// A target of `session`, the device session of a shard.
+    fn in_session(serial: &str, session: u128, shard: u32) -> Target {
+        Target {
+            serial: serial.into(),
+            device_session_id: Uuid::from_u128(session),
+            shard,
+            adb_state: Some(AdbState::Device),
         }
     }
 
@@ -578,6 +691,28 @@ mod tests {
             (s.avd_name, s.emu_cpu_pct, s.foreground_activity),
             (None, None, None)
         );
+        // The shard is the device's, and the reasons say why the readings are unknown: the first
+        // probe only sets the CPU baseline, the emulator readings are the observer's to set, and
+        // a probe sample takes no activity.
+        assert_eq!(s.shard, Some(1));
+        assert_eq!(
+            (
+                s.unavailable.guest_cpu_pct,
+                s.unavailable.guest_mem_available_bytes,
+                s.unavailable.api_level,
+                s.unavailable.adb_state,
+                s.unavailable.boot_completed,
+                s.unavailable.foreground_activity,
+            ),
+            (
+                Some(Unavailable::NoBaseline),
+                None,
+                None,
+                None,
+                None,
+                Some(Unavailable::NotSampled),
+            ),
+        );
     }
 
     #[tokio::test]
@@ -614,6 +749,22 @@ mod tests {
             ),
         );
         assert_eq!(s.adb_state, Some(AdbState::Device));
+        assert_eq!(s.shard, Some(1));
+        assert_eq!(
+            (
+                s.unavailable.boot_completed,
+                s.unavailable.guest_cpu_pct,
+                s.unavailable.guest_mem_available_bytes,
+                s.unavailable.foreground_activity,
+            ),
+            (
+                Some(Unavailable::NotSampled),
+                Some(Unavailable::NotSampled),
+                Some(Unavailable::NotSampled),
+                None,
+            ),
+            "an activity read takes no probe, and it has the activity"
+        );
     }
 
     /// While throttled, the probe is the boot-only command: after a full probe has set a CPU
@@ -647,6 +798,19 @@ mod tests {
                 throttled.api_level,
             ),
             (Some(true), None, None, Some(37)),
+        );
+        assert_eq!(
+            (
+                throttled.unavailable.guest_cpu_pct,
+                throttled.unavailable.guest_mem_available_bytes,
+                throttled.unavailable.boot_completed,
+            ),
+            (
+                Some(Unavailable::Throttled),
+                Some(Unavailable::Throttled),
+                None
+            ),
+            "the guest's readings say they were throttled; the boot reading was taken"
         );
     }
 
@@ -718,6 +882,19 @@ mod tests {
             "unknown, not zero"
         );
         assert_eq!(
+            (
+                s.unavailable.boot_completed,
+                s.unavailable.guest_cpu_pct,
+                s.unavailable.guest_mem_available_bytes,
+            ),
+            (
+                Some(Unavailable::ProbeFailed),
+                Some(Unavailable::ProbeFailed),
+                Some(Unavailable::ProbeFailed),
+            ),
+            "a timed-out probe says it failed"
+        );
+        assert_eq!(
             s.adb_state,
             Some(AdbState::Device),
             "adb's own state still stands"
@@ -746,6 +923,84 @@ mod tests {
             ),
             (None, None, None, None)
         );
+        assert_eq!(
+            (s.unavailable.adb_state, s.unavailable.boot_completed),
+            (Some(Unavailable::NoAdbList), Some(Unavailable::ProbeFailed)),
+            "no list from adb, and no probe"
+        );
         assert!(probes.warned, "the first failure is logged once");
+    }
+
+    /// A serial that comes back as a new device session starts over: its API level is read again
+    /// and its first probe only sets a CPU baseline, not a figure against the old device's counters.
+    /// The first session's probe reads `FIRST`, the second's `LATER`, which would give a figure
+    /// (62.8 %) against the first's baseline.
+    #[tokio::test]
+    async fn a_new_device_session_on_the_same_serial_reads_the_api_level_and_starts_its_cpu_over() {
+        let (addr, connections) = fake::devices_in_turn(
+            "emulator-5584",
+            vec![
+                (PROBE, vec![&FIRST[4..], &LATER[4..]]),
+                (API_LEVEL, vec![&API[4..]]),
+            ],
+        )
+        .await;
+        let mut probes = Probes::new(addr);
+        let (old, new) = (
+            in_session("emulator-5584", 7, 1),
+            in_session("emulator-5584", 8, 2),
+        );
+        probes.start_due(Instant::now(), &at(0), std::slice::from_ref(&old), true);
+        let first = collect(&mut probes, 1).await.remove(0);
+        assert_eq!(first.device_session_id, Uuid::from_u128(7));
+        probes.start_due(Instant::now(), &at(1_000), std::slice::from_ref(&new), true);
+        let second = collect(&mut probes, 1).await.remove(0);
+        assert_eq!(
+            (second.device_session_id, second.shard),
+            (Uuid::from_u128(8), Some(2)),
+            "the sample belongs to the new session and its shard"
+        );
+        assert_eq!(second.api_level, Some(37), "read again for the new session");
+        assert_eq!(
+            (second.guest_cpu_pct, second.unavailable.guest_cpu_pct),
+            (None, Some(Unavailable::NoBaseline)),
+            "the new session's first probe has no baseline of its own"
+        );
+        // Two sessions, each with its API read and one probe: four connections.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 4);
+    }
+
+    /// Two device sessions of one serial are never probed at once: the second waits for the first.
+    #[tokio::test]
+    async fn a_new_session_waits_while_the_earlier_probe_of_its_serial_is_in_flight() {
+        let addr = fake::silent().await;
+        let mut probes = Probes::with_timeout(addr, Duration::from_secs(30));
+        let start = Instant::now();
+        probes.start_due(start, &at(0), &[in_session("emulator-5584", 7, 1)], true);
+        probes.start_due(start, &at(0), &[in_session("emulator-5584", 8, 2)], true);
+        let serial = "emulator-5584".to_owned();
+        assert!(probes.watch[&(serial.clone(), Uuid::from_u128(7))].in_flight);
+        assert!(
+            !probes.watch[&(serial, Uuid::from_u128(8))].in_flight,
+            "one probe per serial at a time"
+        );
+    }
+
+    /// The API level is read by the probe; when that read fails, the sample says the probe failed.
+    #[tokio::test]
+    async fn an_api_level_that_adb_does_not_answer_says_the_probe_failed() {
+        let (addr, _) = fake::devices("emulator-5584", vec![(PROBE, &FIRST[4..])]).await;
+        let mut probes = Probes::new(addr);
+        probes.start_due(
+            Instant::now(),
+            &at(0),
+            &[target("emulator-5584", Some(AdbState::Device))],
+            true,
+        );
+        let s = collect(&mut probes, 1).await.remove(0);
+        assert_eq!(
+            (s.api_level, s.unavailable.api_level),
+            (None, Some(Unavailable::ProbeFailed))
+        );
     }
 }

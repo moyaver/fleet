@@ -6,7 +6,11 @@
 //! primary key is `(agent_run_id, ts)`), and every loss is recorded: samples the agent dropped
 //! (`dropped_since_last`) and samples whose clock is too far off to store.
 
-use fleet_protocol::{event::AdbState, frame::Telemetry};
+use fleet_protocol::{
+    event::AdbState,
+    frame::{DeviceUnavailable, Telemetry},
+};
+use sqlx::types::Json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -144,6 +148,20 @@ fn adb_code(state: AdbState) -> i16 {
     }
 }
 
+/// The adb state a `device_samples.adb_state` code stands for; `None` for a code this build does
+/// not know.
+#[must_use]
+pub fn adb_state_of(code: i16) -> Option<AdbState> {
+    Some(match code {
+        0 => AdbState::Device,
+        1 => AdbState::Offline,
+        2 => AdbState::Unauthorized,
+        3 => AdbState::Absent,
+        4 => AdbState::Other,
+        _ => return None,
+    })
+}
+
 fn opt_i64(v: Option<u64>) -> Option<i64> {
     v.and_then(|v| i64::try_from(v).ok())
 }
@@ -168,6 +186,8 @@ struct DeviceColumns {
     avd: Vec<Option<String>>,
     api_level: Vec<Option<i16>>,
     activity: Vec<Option<String>>,
+    shard: Vec<Option<i32>>,
+    unavailable: Vec<Option<Json<DeviceUnavailable>>>,
 }
 
 impl DeviceColumns {
@@ -186,6 +206,8 @@ impl DeviceColumns {
         self.api_level
             .push(d.api_level.and_then(|l| i16::try_from(l).ok()));
         self.activity.push(d.foreground_activity.clone());
+        self.shard.push(opt_i32(d.shard));
+        self.unavailable.push(Some(Json(d.unavailable)));
     }
 
     async fn insert(&self, tx: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
@@ -196,11 +218,12 @@ impl DeviceColumns {
             "INSERT INTO device_samples (ts, device_session_id, agent_run_id, project_id,
                                          adb_state, boot_completed, guest_cpu_pct,
                                          guest_mem_available_bytes, emu_cpu_pct, emu_rss_bytes,
-                                         avd_name, api_level, foreground_activity)
+                                         avd_name, api_level, foreground_activity, shard,
+                                         unavailable)
              SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],
                                   $5::smallint[], $6::boolean[], $7::real[], $8::bigint[],
                                   $9::real[], $10::bigint[], $11::text[], $12::smallint[],
-                                  $13::text[])
+                                  $13::text[], $14::integer[], $15::jsonb[])
              ON CONFLICT DO NOTHING",
             &self.ts,
             &self.session,
@@ -214,7 +237,9 @@ impl DeviceColumns {
             &self.emu_rss as &[Option<i64>],
             &self.avd as &[Option<String>],
             &self.api_level as &[Option<i16>],
-            &self.activity as &[Option<String>]
+            &self.activity as &[Option<String>],
+            &self.shard as &[Option<i32>],
+            &self.unavailable as &[Option<Json<DeviceUnavailable>>]
         )
         .execute(&mut *tx)
         .await?;
@@ -308,6 +333,8 @@ mod tests {
             avd_name: None,
             api_level: None,
             foreground_activity: None,
+            shard: None,
+            unavailable: DeviceUnavailable::default(),
         }
     }
 
@@ -397,6 +424,83 @@ mod tests {
                 (Some(1), None, None, None, None, None, None, None, None),
             ],
             "device, offline; the unknowns are NULL, never zero"
+        );
+    }
+
+    /// The shard and the reason for each unknown reading are stored with the sample, and the
+    /// newest sample reads them back: a reason is kept only where its reading is unknown.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn device_samples_keep_their_shard_and_why_a_reading_is_unknown(pool: PgPool) {
+        use fleet_protocol::frame::Unavailable;
+
+        let store = Store {
+            pool,
+            origin: Uuid::now_v7(),
+        };
+        let project = store.upsert_project("app", "App").await.unwrap();
+        let worker = sqlx::query_scalar!(
+            "INSERT INTO workers (project_id, identity_key) VALUES ($1, 'runner-a') RETURNING id",
+            project
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        let (run, session) = (Uuid::now_v7(), Uuid::now_v7());
+        let now = OffsetDateTime::now_utc();
+        // A physical device: no emulator reading exists, and each one says so.
+        let mut physical = device(now - time::Duration::seconds(30), session);
+        physical.adb_state = Some(AdbState::Device);
+        physical.shard = Some(2);
+        physical.boot_completed = Some(true);
+        physical.unavailable = DeviceUnavailable {
+            guest_cpu_pct: Some(Unavailable::Throttled),
+            guest_mem_available_bytes: Some(Unavailable::Throttled),
+            emu_cpu_pct: Some(Unavailable::NotAnEmulator),
+            emu_rss_bytes: Some(Unavailable::NotAnEmulator),
+            avd_name: Some(Unavailable::NotAnEmulator),
+            ..DeviceUnavailable::default()
+        };
+        let batch = |devices: Vec<DeviceSample>| TelemetryBatch {
+            agent_run_id: run,
+            project_id: project,
+            worker_id: worker,
+            batch: Telemetry {
+                tseq_from: 1,
+                tseq_to: 1,
+                dropped_since_last: 0,
+                samples: Vec::new(),
+                devices,
+            },
+        };
+        store
+            .store_telemetry(&[batch(vec![physical])])
+            .await
+            .unwrap();
+
+        let latest = store
+            .device_latest(project, session)
+            .await
+            .unwrap()
+            .expect("a sample was stored");
+        assert_eq!(latest.shard, Some(2));
+        assert_eq!(latest.boot_completed, Some(true));
+        assert_eq!(latest.guest_cpu_pct, None, "throttled, not zero");
+        let unavailable = latest.unavailable.expect("reasons were stored").0;
+        assert_eq!(
+            unavailable,
+            DeviceUnavailable {
+                guest_cpu_pct: Some(Unavailable::Throttled),
+                guest_mem_available_bytes: Some(Unavailable::Throttled),
+                emu_cpu_pct: Some(Unavailable::NotAnEmulator),
+                emu_rss_bytes: Some(Unavailable::NotAnEmulator),
+                avd_name: Some(Unavailable::NotAnEmulator),
+                ..DeviceUnavailable::default()
+            }
+        );
+        assert_eq!(
+            store.device_latest(project, Uuid::now_v7()).await.unwrap(),
+            None,
+            "a device with no sample has none"
         );
     }
 }

@@ -342,7 +342,7 @@ pub struct WorkerView {
 }
 
 /// Screen C for a device session: the device and the flows that ran on it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeviceDetailView {
     /// The device session.
@@ -351,6 +351,53 @@ pub struct DeviceDetailView {
     pub flows: Vec<FlowView>,
     /// How many flow executions it hosted in all.
     pub flow_count: i64,
+    /// The device's newest sample: every reading, or why there is none. `None` before the agent
+    /// has sampled the device.
+    #[serde(default)]
+    pub latest: Option<DeviceLatestView>,
+}
+
+/// One device reading of the newest sample, with the same labels, units and scope as the device's
+/// metric series. A number (or a flag as 1 or 0) is in `value`; a name, a state or an activity is in
+/// `text`. An unknown reading has neither, `available` false and the reason the agent gave (PLAN
+/// §6.5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct DeviceReadingView {
+    /// Stable identifier, for example `guest_cpu_pct`.
+    pub metric: String,
+    /// What to call it on screen.
+    pub label: String,
+    /// What it is measured in; `None` for a text reading.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<MetricUnit>,
+    /// What it is about.
+    pub scope: MetricScope,
+    /// The number, when the reading is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+    /// The text, when the reading is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// Whether the agent reported a value.
+    pub available: bool,
+    /// Why there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// A device's newest sample: its shard and every reading.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct DeviceLatestView {
+    /// When the sample was taken.
+    #[serde(with = "time::serde::rfc3339")]
+    pub at: OffsetDateTime,
+    /// The shard the device was assigned to, when the agent reported it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shard: Option<u32>,
+    /// Every device reading, or why there is none.
+    pub readings: Vec<DeviceReadingView>,
 }
 
 /// What a metric is measured in.

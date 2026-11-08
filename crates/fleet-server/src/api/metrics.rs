@@ -15,11 +15,15 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use fleet_core::downsample::lttb;
-use fleet_protocol::rest::{
-    LatestReadings, MetricAggregate, MetricPoint, MetricReading, MetricResolution, MetricScope,
-    MetricSubject, MetricSubjectKind, MetricUnit, MetricsView, SeriesView,
+use fleet_protocol::{
+    frame::{DeviceUnavailable, Unavailable},
+    rest::{
+        DeviceLatestView, DeviceReadingView, LatestReadings, MetricAggregate, MetricPoint,
+        MetricReading, MetricResolution, MetricScope, MetricSubject, MetricSubjectKind, MetricUnit,
+        MetricsView, SeriesView,
+    },
 };
-use fleet_store::screens::{DeviceRow, HostRow, ProcessRow};
+use fleet_store::screens::{DeviceLatest, DeviceRow, HostRow, ProcessRow};
 use serde::Deserialize;
 use std::collections::HashMap;
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
@@ -33,6 +37,15 @@ const REASON_NO_SAMPLES: &str = "no samples in this range";
 const REASON_NO_VALUE: &str = "the agent reported no value";
 const REASON_ALL_MISSING: &str = "the agent reported no value in this range";
 const REASON_NOT_AGGREGATED: &str = "not kept in aggregates; use a range of 24 hours or less";
+const REASON_NOT_SAMPLED: &str = "not read in this sample";
+const REASON_NOT_AN_EMULATOR: &str = "not an emulator, so there is no emulator process to read";
+const REASON_NO_EMULATOR_PROCESS: &str = "no emulator process maps to this device";
+const REASON_NO_AVD_NAME: &str = "the emulator's command line names no AVD";
+const REASON_PROBE_FAILED: &str = "the probe failed: adb did not answer it";
+const REASON_THROTTLED: &str = "throttled: the host is under pressure";
+const REASON_NO_BASELINE: &str = "the first probe only sets the CPU baseline";
+const REASON_NO_ADB_LIST: &str = "adb has not listed devices yet";
+const REASON_UNKNOWN_AGENT_REASON: &str = "the agent gave a reason this server does not know";
 
 /// Raw samples cover ranges up to this long.
 const RAW_UP_TO: Duration = Duration::hours(24);
@@ -432,6 +445,137 @@ pub(super) fn latest_readings(row: &HostRow) -> LatestReadings {
                 }
             })
             .collect(),
+    }
+}
+
+/// Why a device reading is unknown, in words (PLAN §6.5).
+fn unavailable_text(reason: Unavailable) -> &'static str {
+    match reason {
+        Unavailable::NotAnEmulator => REASON_NOT_AN_EMULATOR,
+        Unavailable::NoEmulatorProcess => REASON_NO_EMULATOR_PROCESS,
+        Unavailable::NoAvdName => REASON_NO_AVD_NAME,
+        Unavailable::ProbeFailed => REASON_PROBE_FAILED,
+        Unavailable::Throttled => REASON_THROTTLED,
+        Unavailable::NoBaseline => REASON_NO_BASELINE,
+        Unavailable::NoAdbList => REASON_NO_ADB_LIST,
+        Unavailable::NotSampled => REASON_NOT_SAMPLED,
+        Unavailable::Other => REASON_UNKNOWN_AGENT_REASON,
+    }
+}
+
+/// The name of an adb state code (`device_samples.adb_state`).
+fn adb_state_text(code: i16) -> &'static str {
+    match code {
+        0 => "device",
+        1 => "offline",
+        2 => "unauthorized",
+        3 => "absent",
+        _ => "other",
+    }
+}
+
+/// A device's newest sample as the device page shows it: every reading, with its scope, unit and
+/// label, and a reason for each one the agent did not report.
+pub(super) fn device_latest_view(row: &DeviceLatest) -> DeviceLatestView {
+    let why: DeviceUnavailable = row.unavailable.as_ref().map(|j| j.0).unwrap_or_default();
+    // A reading with no value and no reason (an agent that predates reasons) says so.
+    let reason =
+        |r: Option<Unavailable>| Some(r.map_or(REASON_NO_VALUE, unavailable_text).to_owned());
+    let number =
+        |metric: &str, label: &str, unit, scope, value: Option<f64>, r| DeviceReadingView {
+            metric: metric.to_owned(),
+            label: label.to_owned(),
+            unit: Some(unit),
+            scope,
+            value,
+            text: None,
+            available: value.is_some(),
+            reason: if value.is_some() { None } else { reason(r) },
+        };
+    let text = |metric: &str, label: &str, scope, value: Option<String>, r| DeviceReadingView {
+        metric: metric.to_owned(),
+        label: label.to_owned(),
+        unit: None,
+        scope,
+        value: None,
+        available: value.is_some(),
+        reason: if value.is_some() { None } else { reason(r) },
+        text: value,
+    };
+    DeviceLatestView {
+        at: row.at,
+        shard: row.shard.and_then(|s| u32::try_from(s).ok()),
+        readings: vec![
+            text(
+                "adb_state",
+                "ADB state",
+                Device,
+                row.adb_state.map(|c| adb_state_text(c).to_owned()),
+                why.adb_state,
+            ),
+            number(
+                "boot_completed",
+                "Boot completed (1 = yes, 0 = not yet)",
+                Number,
+                Device,
+                row.boot_completed.map(|b| if b { 1.0 } else { 0.0 }),
+                why.boot_completed,
+            ),
+            number(
+                "guest_cpu_pct",
+                "Guest CPU",
+                Percent,
+                Guest,
+                row.guest_cpu_pct,
+                why.guest_cpu_pct,
+            ),
+            number(
+                "guest_mem_available_bytes",
+                "Guest memory available",
+                Bytes,
+                Guest,
+                row.guest_mem_available_bytes,
+                why.guest_mem_available_bytes,
+            ),
+            number(
+                "emu_cpu_pct",
+                "Emulator CPU",
+                Percent,
+                Emulator,
+                row.emu_cpu_pct,
+                why.emu_cpu_pct,
+            ),
+            number(
+                "emu_rss_bytes",
+                "Emulator memory",
+                Bytes,
+                Emulator,
+                row.emu_rss_bytes,
+                why.emu_rss_bytes,
+            ),
+            text(
+                "avd_name",
+                "AVD name",
+                Device,
+                row.avd_name.clone(),
+                why.avd_name,
+            ),
+            number(
+                "api_level",
+                "API level",
+                Number,
+                Device,
+                row.api_level.map(f64::from),
+                why.api_level,
+            ),
+            text(
+                "foreground_activity",
+                "Foreground activity",
+                Device,
+                row.foreground_activity.clone(),
+                why.foreground_activity,
+            ),
+        ],
     }
 }
 

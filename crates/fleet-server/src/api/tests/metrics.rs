@@ -4,7 +4,7 @@
 
 use fleet_protocol::{
     event::{AdbState, FlowOutcome},
-    frame::{DeviceSample, Sample, Telemetry},
+    frame::{DeviceSample, DeviceUnavailable, Sample, Telemetry, Unavailable},
     journal::ClockSample,
 };
 use serde_json::{Value, json};
@@ -463,6 +463,8 @@ async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
         avd_name: None,
         api_level: None,
         foreground_activity: None,
+        shard: None,
+        unavailable: DeviceUnavailable::default(),
     };
     let later = DeviceSample {
         guest_cpu_pct: Some(40.0),
@@ -562,6 +564,8 @@ async fn the_overview_counts_the_emulators_online_now() {
         avd_name: None,
         api_level: None,
         foreground_activity: None,
+        shard: None,
+        unavailable: DeviceUnavailable::default(),
     };
     rig.publish(
         &mut agent,
@@ -722,5 +726,142 @@ async fn concurrent_runs_on_one_worker_each_keep_their_own_maestro_series() {
     assert_eq!(
         points(run_series(&hours, "maestro_cpu_pct", b.id)),
         [(ms(hour), Some(300.0))]
+    );
+}
+
+/// The device page's newest sample: `GET …/devices/{id}` carries its shard and every reading, and
+/// each reading the agent did not take says why in words. The newest sample is the one that counts,
+/// whatever order the agent sent them in.
+#[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one device's newest sample, built and read back reading by reading"
+)]
+async fn a_device_detail_shows_its_newest_sample_with_the_shard_and_a_reason_per_unknown_reading() {
+    let rig = rig().await;
+    let mut agent = Agent::new("621", "build", "runner-a");
+    agent.started();
+    let device = agent
+        .shard("emulator-5584", &["login"])
+        .device_session_id
+        .expect("a shard names its device session");
+    let t0 = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap() - Duration::minutes(5);
+    let older = DeviceSample {
+        at: ClockSample {
+            wall: t0,
+            mono_ms: 0,
+        },
+        device_session_id: device,
+        adb_state: Some(AdbState::Device),
+        boot_completed: Some(true),
+        guest_cpu_pct: Some(12.5),
+        guest_mem_available_bytes: Some(2 << 30),
+        emu_cpu_pct: Some(80.0),
+        emu_rss_bytes: Some(3 << 30),
+        avd_name: Some("Pixel_10a_atd".into()),
+        api_level: Some(37),
+        foreground_activity: None,
+        shard: Some(1),
+        unavailable: DeviceUnavailable::default(),
+    };
+    // Newest: the host was under pressure, so the guest was not read; the emulator's process could
+    // not be found, and its API level could not be read.
+    let newest = DeviceSample {
+        at: ClockSample {
+            wall: t0 + Duration::seconds(30),
+            mono_ms: 0,
+        },
+        guest_cpu_pct: None,
+        guest_mem_available_bytes: None,
+        emu_cpu_pct: None,
+        emu_rss_bytes: None,
+        avd_name: None,
+        api_level: None,
+        shard: Some(2),
+        unavailable: DeviceUnavailable {
+            guest_cpu_pct: Some(Unavailable::Throttled),
+            guest_mem_available_bytes: Some(Unavailable::Throttled),
+            emu_cpu_pct: Some(Unavailable::NoEmulatorProcess),
+            emu_rss_bytes: Some(Unavailable::NoEmulatorProcess),
+            avd_name: Some(Unavailable::NoEmulatorProcess),
+            api_level: Some(Unavailable::ProbeFailed),
+            ..DeviceUnavailable::default()
+        },
+        ..older.clone()
+    };
+    rig.publish(
+        &mut agent,
+        vec![Telemetry {
+            tseq_from: 1,
+            tseq_to: 1,
+            dropped_since_last: 0,
+            samples: Vec::new(),
+            devices: vec![newest, older],
+        }],
+    )
+    .await;
+
+    let view = rig
+        .json(&format!("/api/v1/projects/app/devices/{device}"))
+        .await;
+    let latest = &view["latest"];
+    assert_eq!(latest["shard"], 2, "the newest sample's shard: {latest}");
+    let reading = |metric: &str| -> Value {
+        latest["readings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["metric"] == metric)
+            .unwrap_or_else(|| panic!("no reading {metric}: {latest}"))
+            .clone()
+    };
+    assert_eq!(
+        (
+            reading("adb_state")["text"].clone(),
+            reading("adb_state")["available"].clone()
+        ),
+        (json!("device"), json!(true)),
+        "the probe's adb state comes from the device list"
+    );
+    assert_eq!(
+        (
+            reading("boot_completed")["available"].clone(),
+            reading("boot_completed")["value"].clone()
+        ),
+        (json!(true), json!(1.0)),
+        "a reading that was taken carries its value and no reason"
+    );
+    assert!(reading("boot_completed")["reason"].is_null());
+    let guest = reading("guest_cpu_pct");
+    assert_eq!(
+        (
+            guest["available"].clone(),
+            guest["value"].clone(),
+            guest["reason"].clone(),
+            guest["scope"].clone()
+        ),
+        (
+            json!(false),
+            Value::Null,
+            json!("throttled: the host is under pressure"),
+            json!("guest")
+        ),
+    );
+    assert_eq!(
+        reading("emu_rss_bytes")["reason"],
+        json!("no emulator process maps to this device")
+    );
+    assert_eq!(
+        reading("avd_name")["reason"],
+        json!("no emulator process maps to this device")
+    );
+    assert_eq!(
+        reading("api_level")["reason"],
+        json!("the probe failed: adb did not answer it")
+    );
+    assert_eq!(
+        reading("api_level")["unit"],
+        json!("number"),
+        "a number keeps its unit"
     );
 }

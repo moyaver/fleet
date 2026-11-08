@@ -21,7 +21,11 @@ use serde::Deserialize;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use super::{ApiError, error, internal, metrics::latest_readings, read_project};
+use super::{
+    ApiError, error, internal,
+    metrics::{device_latest_view, latest_readings},
+    read_project,
+};
 use crate::{live::Hub, session::Caller, state::AppState};
 
 /// Workers listed on the overview, most recently seen first.
@@ -194,11 +198,16 @@ pub(super) async fn device(
         Ok(p) => p,
         Err(r) => return *r,
     };
-    match state.store.device(project, device).await {
-        Ok(Some(d)) => Json(d).into_response(),
-        Ok(None) => error(StatusCode::NOT_FOUND, "no such device"),
-        Err(e) => internal(&e),
-    }
+    let mut view = match state.store.device(project, device).await {
+        Ok(Some(d)) => d,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "no such device"),
+        Err(e) => return internal(&e),
+    };
+    view.latest = match state.store.device_latest(project, device).await {
+        Ok(latest) => latest.as_ref().map(device_latest_view),
+        Err(e) => return internal(&e),
+    };
+    Json(view).into_response()
 }
 
 fn with_run_liveness(hub: &Hub, mut r: WorkerRunView) -> WorkerRunView {
