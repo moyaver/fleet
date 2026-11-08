@@ -301,14 +301,18 @@ fn clock(t0: Instant) -> ClockSample {
 /// One host sample with fixed readings; the newer optional host fields are left unreported.
 /// Every device the run's events name, reported in adb's `device` state, which is what an emulator
 /// that is up reads (issue #123: the overview's active emulators count comes from these samples).
-fn device_samples(events: &[EventEnvelope], t0: Instant) -> Vec<DeviceSample> {
+fn device_samples(events: &[EventEnvelope], t0: Instant, opts: &Options) -> Vec<DeviceSample> {
     let devices: std::collections::BTreeSet<Uuid> = events
         .iter()
         .filter_map(|e| e.subject.device_session_id)
         .collect();
     devices
         .into_iter()
-        .map(|device_session_id| DeviceSample {
+        .enumerate()
+        .map(|(n, device_session_id)| DeviceSample {
+            // The corpus names a device's model and OS version too, when the run has one.
+            model: corpus_item(opts, n).map(str::to_owned),
+            os_version: corpus_item(opts, n + 1).map(str::to_owned),
             at: clock(t0),
             device_session_id,
             adb_state: Some(AdbState::Device),
@@ -664,6 +668,27 @@ async fn connect(opts: &Options) -> anyhow::Result<Ws> {
     Ok(ws)
 }
 
+/// The workspace catalog of a corpus run: the first few items name flows that have not run, with
+/// the item as their tag (a tag is at most 64 bytes, as the agent bounds them).
+fn corpus_catalog(opts: &Options) -> fleet_protocol::frame::FlowCatalog {
+    let flows = opts
+        .corpus
+        .iter()
+        .enumerate()
+        .filter(|(_, tag)| tag.len() <= fleet_protocol::frame::MAX_CATALOG_TAG_BYTES)
+        .take(4)
+        .map(|(n, tag)| fleet_protocol::frame::CatalogFlow {
+            path: format!("flows/corpus-{n}.yaml"),
+            name: None,
+            tags: vec![tag.clone()],
+        })
+        .collect();
+    fleet_protocol::frame::FlowCatalog {
+        flows,
+        truncated: false,
+    }
+}
+
 fn hello(
     id: Uuid,
     job_key: &str,
@@ -695,6 +720,7 @@ fn hello(
             git_ref: opts.git_ref.clone(),
             runner: Some(format!("runner-{id}")),
         },
+        catalog: corpus_catalog(opts),
         resume: ResumeState {
             next_seq,
             oldest_unacked_seq: Some(oldest),
@@ -843,7 +869,7 @@ async fn stream(
             tseq_from: tseq,
             tseq_to: tseq,
             dropped_since_last: 0,
-            devices: device_samples(events, t0),
+            devices: device_samples(events, t0, opts),
             samples: vec![host_sample(t0)],
         })))
         .await?;
