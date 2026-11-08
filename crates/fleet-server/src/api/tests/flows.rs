@@ -7,6 +7,8 @@ use fleet_protocol::{
 };
 use serde_json::{Value, json};
 
+use fleet_core::policy::Role;
+
 use super::rig::{Agent, Rig, rig};
 
 /// The ID of the only flow named `name` in `attempt`'s snapshot.
@@ -343,4 +345,35 @@ async fn a_flow_of_another_project_or_that_does_not_exist_is_missing() {
         assert_eq!(res.status_code(), 404);
         assert_eq!(res.json::<Value>(), json!({"error": "no such flow"}));
     }
+}
+
+/// Screen D by flow ID alone (the job summary's link): a redirect that names the project to a
+/// reader of it, and the same missing answer for a stranger and for a flow that does not exist.
+#[tokio::test]
+async fn a_flow_known_only_by_its_id_redirects_to_screen_d_for_a_reader_of_its_project() {
+    let rig = rig().await;
+    let flow = failed_checkout(&rig, "741").await;
+    let page = format!("/api/v1/flows/{flow}/page");
+
+    let res = rig.get(&page).await;
+    assert_eq!(res.status_code(), 303, "{}", res.text());
+    assert_eq!(
+        res.header("location").to_str().unwrap(),
+        format!("/flows/{flow}?project=app")
+    );
+
+    let foreign = rig.get_as("other", Role::Admin, &page).await;
+    let nowhere = rig
+        .get(&format!("/api/v1/flows/{}/page", uuid::Uuid::now_v7()))
+        .await;
+    for res in [foreign, nowhere] {
+        assert_eq!(res.status_code(), 404);
+        assert_eq!(res.json::<Value>(), json!({"error": "no such flow"}));
+    }
+    let anonymous = rig.app.get(&page).await;
+    assert_eq!(
+        anonymous.status_code(),
+        401,
+        "a credential is still required"
+    );
 }
