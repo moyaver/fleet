@@ -67,13 +67,22 @@ pub(crate) struct Published {
 /// Publishes the run at `input`. Nothing is kept on disk afterwards.
 ///
 /// # Errors
-/// Returns why the run could not be published: no server configured, an input that is neither a
-/// bundle nor a Maestro output directory, or a server that refused or did not take the run.
+/// Returns why the run could not be published: no server configured, no credential, an input
+/// that is neither a bundle nor a Maestro output directory, or a server that refused or did not
+/// take the run.
 pub(crate) fn run(input: &Path) -> anyhow::Result<Published> {
     // Installed like the observer does: TLS to the server needs a crypto provider.
     let _ = rustls::crypto::ring::default_provider().install_default();
     let url = observer::server_url()
         .context("FLEET_SERVER is not set: publish sends the run to a Fleet server")?;
+    // Checked before anything is read or sent: without a credential the transport would only
+    // report the run as refused, which does not say what to set.
+    if !crate::net::has_credential(|k| std::env::var(k).ok()) {
+        bail!(
+            "publish needs a credential: set FLEET_TOKEN, or the CI OIDC variables \
+             (ACTIONS_ID_TOKEN_REQUEST_URL and ACTIONS_ID_TOKEN_REQUEST_TOKEN)"
+        );
+    }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

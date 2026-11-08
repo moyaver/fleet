@@ -44,7 +44,7 @@ pub(super) struct State {
     first_seen: BTreeMap<String, Instant>,
     /// Committed events by seq (dedup: a resent seq replaces nothing).
     pub(super) committed: BTreeMap<u64, Value>,
-    connections: u32,
+    pub(super) connections: u32,
     /// When each connection was accepted, and each refusal sent.
     accepted: Vec<Instant>,
     refusals: Vec<Instant>,

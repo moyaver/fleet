@@ -95,22 +95,49 @@ fn the_bundle_holds_no_planted_secret_and_shows_where_it_was_redacted() {
     );
 }
 
-/// `fleet-agent publish <path>` against the fake server, in a cleared environment.
-fn publish(path: &Path, ws: &str) -> std::process::Output {
-    Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"))
-        .env_clear()
+/// The token the publish tests give the publishing agent. The fake server does not check it.
+const TOKEN: &str = "fleet-test-token";
+
+/// `fleet-agent publish <path>` against the fake server, in a cleared environment, with `token`
+/// as its `FLEET_TOKEN` when given.
+fn publish(path: &Path, ws: &str, token: Option<&str>) -> std::process::Output {
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"));
+    cmd.env_clear()
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
         .env("HOME", std::env::var_os("HOME").unwrap_or_default())
         .env("TMPDIR", std::env::temp_dir())
         .env("FLEET_SERVER", ws)
         .env("FLEET_FLUSH_TIMEOUT", "15")
         // The fake server never answers an upload: the uploads are given up on at once.
-        .env("FLEET_UPLOAD_TIMEOUT", "2")
-        .arg("publish")
+        .env("FLEET_UPLOAD_TIMEOUT", "2");
+    if let Some(token) = token {
+        cmd.env("FLEET_TOKEN", token);
+    }
+    cmd.arg("publish")
         .arg(path)
         .stdin(Stdio::null())
         .output()
         .unwrap()
+}
+
+#[test]
+fn publish_without_a_credential_fails_clearly_and_sends_nothing() {
+    let (out, _, run_dir) = run_agent("fail", None, &[], &[]);
+    assert_eq!(out.status.code(), Some(1));
+
+    let srv = server(Mode::Normal);
+    let ws = format!("ws://{}", srv.addr);
+    let out = publish(&run_dir.join("fleet-bundle.tar.zst"), &ws, None);
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("publish needs a credential"), "{stderr}");
+    assert!(stderr.contains("FLEET_TOKEN"), "{stderr}");
+    assert!(!stderr.contains("refused"), "{stderr}");
+    assert!(out.stdout.is_empty(), "nothing was published");
+
+    let s = srv.state.lock().unwrap();
+    assert_eq!(s.connections, 0, "no connection was attempted");
+    assert!(s.hellos.is_empty() && s.committed.is_empty());
 }
 
 #[test]
@@ -126,7 +153,7 @@ fn a_bundle_publishes_its_journal_as_the_run_it_recorded() {
 
     let srv = server(Mode::Normal);
     let ws = format!("ws://{}", srv.addr);
-    let out = publish(&run_dir.join("fleet-bundle.tar.zst"), &ws);
+    let out = publish(&run_dir.join("fleet-bundle.tar.zst"), &ws, Some(TOKEN));
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     assert_eq!(
         out.status.code(),
@@ -171,7 +198,7 @@ fn a_bundle_publishes_its_journal_as_the_run_it_recorded() {
 fn a_maestro_output_directory_publishes_its_run_end_last() {
     let srv = server(Mode::Normal);
     let ws = format!("ws://{}", srv.addr);
-    let out = publish(&fixture("fail"), &ws);
+    let out = publish(&fixture("fail"), &ws, Some(TOKEN));
     assert_eq!(
         out.status.code(),
         Some(0),
