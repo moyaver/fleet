@@ -41,6 +41,13 @@ pub(crate) const PROBE_BOOT: &str = r#"echo "boot=$(getprop sys.boot_completed)"
 /// `fixtures/adb/android-37.1/api-level.raw`.
 pub(crate) const API_LEVEL: &str = "getprop ro.build.version.sdk";
 
+/// Reads the device's model, once per device session (issue #85): the flow history's device filter
+/// and the condition fingerprint use it.
+pub(crate) const MODEL: &str = "getprop ro.product.model";
+
+/// Reads the device's OS version, once per device session (issue #85), as [`MODEL`] does.
+pub(crate) const OS_VERSION: &str = "getprop ro.build.version.release";
+
 /// Lists the activities, to find the resumed one after a failure. Captured output:
 /// `fixtures/adb/android-37.1/dumpsys-activity-activities.raw`.
 pub(crate) const ACTIVITY: &str = "dumpsys activity activities";
@@ -182,6 +189,15 @@ struct Watch {
     cpu: GuestCpu,
     /// The API level, once a probe has read it.
     api_level: Option<u32>,
+    /// The model and OS version, once a probe has read them.
+    identity: Identity,
+}
+
+/// What a device says about itself, read once per device session (issue #85).
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Identity {
+    model: Option<String>,
+    os_version: Option<String>,
 }
 
 /// What a finished task read.
@@ -192,6 +208,7 @@ enum Read {
     Probe {
         probe: io::Result<Probe>,
         api_level: Option<u32>,
+        identity: Identity,
         guest: bool,
     },
     /// The resumed activity's component, if the listing named one.
@@ -271,6 +288,8 @@ impl Probes {
             watch.in_flight = true;
             watch.last_started = Some(now);
             let want_api_level = watch.api_level.is_none();
+            let want_identity =
+                watch.identity.model.is_none() || watch.identity.os_version.is_none();
             let (addr, timeout, finished, woken, target, at) = (
                 self.addr.clone(),
                 self.timeout,
@@ -282,18 +301,20 @@ impl Probes {
             tokio::spawn(async move {
                 let result = tokio::time::timeout(
                     timeout,
-                    read_probe(&addr, &target.serial, want_api_level, guest),
+                    read_probe(&addr, &target.serial, want_api_level, want_identity, guest),
                 )
                 .await;
                 let read = match result {
-                    Ok((probe, api_level)) => Read::Probe {
+                    Ok((probe, api_level, identity)) => Read::Probe {
                         probe,
                         api_level,
+                        identity,
                         guest,
                     },
                     Err(_) => Read::Probe {
                         probe: Err(io::Error::new(io::ErrorKind::TimedOut, "probe timed out")),
                         api_level: None,
+                        identity: Identity::default(),
                         guest,
                     },
                 };
@@ -377,11 +398,18 @@ impl Probes {
             Read::Probe {
                 probe,
                 api_level,
+                identity,
                 guest,
             } => {
                 watch.in_flight = false;
                 if let Some(level) = api_level {
                     watch.api_level = Some(level);
+                }
+                if watch.identity.model.is_none() {
+                    watch.identity.model = identity.model;
+                }
+                if watch.identity.os_version.is_none() {
+                    watch.identity.os_version = identity.os_version;
                 }
                 why.api_level = watch
                     .api_level
@@ -420,6 +448,8 @@ impl Probes {
                     foreground_activity: None,
                     shard: Some(done.target.shard),
                     unavailable: why,
+                    model: watch.identity.model.clone(),
+                    os_version: watch.identity.os_version.clone(),
                 })
             }
             Read::Activity(result) => match result {
@@ -443,6 +473,8 @@ impl Probes {
                         foreground_activity: Some(component),
                         shard: Some(done.target.shard),
                         unavailable: why,
+                        model: watch.identity.model.clone(),
+                        os_version: watch.identity.os_version.clone(),
                     })
                 }
                 Ok(None) => None,
@@ -517,8 +549,9 @@ async fn read_probe(
     addr: &str,
     serial: &str,
     want_api_level: bool,
+    want_identity: bool,
     guest: bool,
-) -> (io::Result<Probe>, Option<u32>) {
+) -> (io::Result<Probe>, Option<u32>, Identity) {
     let api_level = if want_api_level {
         adb::shell(addr, serial, API_LEVEL)
             .await
@@ -527,13 +560,28 @@ async fn read_probe(
     } else {
         None
     };
+    let identity = if want_identity {
+        Identity {
+            model: getprop(addr, serial, MODEL).await,
+            os_version: getprop(addr, serial, OS_VERSION).await,
+        }
+    } else {
+        Identity::default()
+    };
     let command = if guest { PROBE } else { PROBE_BOOT };
     let probe = match adb::shell(addr, serial, command).await {
         Ok(bytes) => parse(&String::from_utf8_lossy(&bytes))
             .ok_or_else(|| io::Error::other("the probe's reply had no boot line")),
         Err(e) => Err(e),
     };
-    (probe, api_level)
+    (probe, api_level, identity)
+}
+
+/// One `getprop` value: its trimmed text, `None` when adb fails or the property is empty.
+async fn getprop(addr: &str, serial: &str, command: &str) -> Option<String> {
+    let bytes = adb::shell(addr, serial, command).await.ok()?;
+    let text = String::from_utf8_lossy(&bytes).trim().to_owned();
+    (!text.is_empty()).then_some(text)
 }
 
 /// Hands a finished task to the observer and wakes anyone waiting for one.
@@ -572,7 +620,12 @@ mod tests {
 
     /// The replies of a device that answers both the probe and the API level read.
     fn answers_probe_and_level() -> Vec<(&'static str, &'static [u8])> {
-        vec![(PROBE, &FIRST[4..]), (API_LEVEL, &API[4..])]
+        vec![
+            (PROBE, &FIRST[4..]),
+            (API_LEVEL, &API[4..]),
+            (MODEL, b"OKAYPixel_8\n"),
+            (OS_VERSION, b"OKAY16\n"),
+        ]
     }
 
     fn text(captured: &[u8]) -> String {
@@ -726,8 +779,8 @@ mod tests {
         probes.start_due(start + INTERVAL, &at(30_000), &targets, true);
         let second = collect(&mut probes, 1).await.remove(0);
         assert_eq!((first.api_level, second.api_level), (Some(37), Some(37)));
-        // One API read and two probes: the level is not asked for again once it is known.
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 3);
+        // One API read, the model and OS-version reads, and two probes: the identity is not asked for again once known.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 5);
     }
 
     #[tokio::test]
@@ -837,8 +890,8 @@ mod tests {
         // Thirty seconds after the first probe, the next one is due.
         probes.start_due(start + INTERVAL, &at(30_000), &targets, true);
         assert_eq!(collect(&mut probes, 1).await[0].at.mono_ms, 30_000);
-        // The API read, then one probe, then the next probe: three connections.
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 3);
+        // The API, model and OS reads, then one probe, then the next probe: five connections.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 5);
     }
 
     #[tokio::test]
@@ -854,8 +907,8 @@ mod tests {
         // Give a wrongly started probe time to connect; none may.
         tokio::time::sleep(Duration::from_millis(200)).await;
         assert!(probes.take().is_empty(), "no second probe was started");
-        // The API read and the first probe only.
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        // The API, model and OS reads and the first probe only.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 4);
     }
 
     #[tokio::test]
@@ -942,6 +995,8 @@ mod tests {
             vec![
                 (PROBE, vec![&FIRST[4..], &LATER[4..]]),
                 (API_LEVEL, vec![&API[4..]]),
+                (MODEL, vec![b"OKAYPixel_8\n"]),
+                (OS_VERSION, vec![b"OKAY16\n"]),
             ],
         )
         .await;
@@ -966,8 +1021,8 @@ mod tests {
             (None, Some(Unavailable::NoBaseline)),
             "the new session's first probe has no baseline of its own"
         );
-        // Two sessions, each with its API read and one probe: four connections.
-        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 4);
+        // Two sessions, each with its API, model and OS reads and one probe: eight connections.
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 8);
     }
 
     /// Two device sessions of one serial are never probed at once: the second waits for the first.
