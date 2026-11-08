@@ -32,6 +32,8 @@ use crate::{
     session::Caller,
     state::AppState,
 };
+/// Screen G's writes: the forms and the API's changes (see [`mod@write`]).
+pub(super) mod write;
 
 /// The most audit events one page carries, and the page a request gets when it names no limit.
 const AUDIT_PAGE: i64 = 50;

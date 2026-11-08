@@ -23,7 +23,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
 };
 use fleet_core::policy::{Action, Decision, Denied, Principal, Resource, authorize};
 use fleet_protocol::{
@@ -35,9 +35,9 @@ use fleet_protocol::{
     plan::PlanManifest,
     rest::admin::{
         AdminAgentRow, AdminAgentsView, AdminApiKeyView, AdminAuditEventView, AdminAuditPage,
-        AdminGapRow, AdminIngestionView, AdminLagRow, AdminProjectView, AdminRejectionRow,
-        AdminRetentionClassView, AdminRetentionView, AdminRoleMappingsView, AdminSettingView,
-        AdminTrustPolicyView,
+        AdminChangedView, AdminCreatedKeyView, AdminGapRow, AdminIngestionView, AdminLagRow,
+        AdminPersonView, AdminProjectView, AdminRejectionRow, AdminRetentionClassView,
+        AdminRetentionView, AdminRoleMappingsView, AdminSettingView, AdminTrustPolicyView,
     },
     rest::{
         ActiveAttemptView, ArtifactLinkView, ArtifactListView, ArtifactRefView, ArtifactView,
@@ -106,7 +106,21 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         admin::metric_policy_view,
         admin::agents,
         admin::ingestion,
-        admin::audit
+        admin::audit,
+        admin::write::create_project,
+        admin::write::rename_project,
+        admin::write::create_key,
+        admin::write::revoke_key,
+        admin::write::expire_key,
+        admin::write::add_binding,
+        admin::write::remove_binding,
+        admin::write::add_group,
+        admin::write::edit_group,
+        admin::write::remove_group,
+        admin::write::add_policy,
+        admin::write::edit_policy,
+        admin::write::revoke_policy,
+        admin::write::remove_policy
     ),
     components(schemas(
         ProjectView,
@@ -197,6 +211,17 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         AdminTrustPolicyView,
         AdminApiKeyView,
         AdminRoleMappingsView,
+        AdminPersonView,
+        AdminChangedView,
+        AdminCreatedKeyView,
+        admin::write::ProjectInput,
+        admin::write::RenameInput,
+        admin::write::KeyInput,
+        admin::write::ExpireInput,
+        admin::write::BindingInput,
+        admin::write::GroupInput,
+        admin::write::GroupRoleInput,
+        admin::write::PolicyInput,
         AdminRetentionView,
         AdminRetentionClassView,
         AdminSettingView,
@@ -213,6 +238,10 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
 )]
 pub(crate) struct ApiDoc;
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one `.route` per path and method: the router reads as the table of routes"
+)]
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/api/v1/openapi.json", get(openapi))
@@ -284,9 +313,82 @@ pub(crate) fn router() -> Router<AppState> {
         )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))
-        .route("/api/v1/admin/projects", get(admin::projects))
-        .route("/api/v1/admin/trust-policies", get(admin::trust_policies))
-        .route("/api/v1/admin/api-keys", get(admin::api_keys))
+        .route(
+            "/api/v1/admin/projects",
+            get(admin::projects).post(admin::write::create_project),
+        )
+        .route(
+            "/api/v1/admin/projects/{project}",
+            put(admin::write::rename_project),
+        )
+        .route(
+            "/api/v1/admin/projects/{project}/rename",
+            post(admin::write::rename_project),
+        )
+        .route(
+            "/api/v1/admin/trust-policies",
+            get(admin::trust_policies).post(admin::write::add_policy),
+        )
+        .route(
+            "/api/v1/admin/trust-policies/{id}",
+            put(admin::write::edit_policy).delete(admin::write::remove_policy),
+        )
+        .route(
+            "/api/v1/admin/trust-policies/{id}/edit",
+            post(admin::write::edit_policy),
+        )
+        .route(
+            "/api/v1/admin/trust-policies/{id}/revoke",
+            post(admin::write::revoke_policy),
+        )
+        .route(
+            "/api/v1/admin/trust-policies/{id}/remove",
+            post(admin::write::remove_policy),
+        )
+        .route(
+            "/api/v1/admin/api-keys",
+            get(admin::api_keys).post(admin::write::create_key),
+        )
+        .route(
+            "/api/v1/admin/api-keys/{id}",
+            delete(admin::write::revoke_key),
+        )
+        .route(
+            "/api/v1/admin/api-keys/{id}/revoke",
+            post(admin::write::revoke_key),
+        )
+        .route(
+            "/api/v1/admin/api-keys/{id}/expire",
+            post(admin::write::expire_key),
+        )
+        .route(
+            "/api/v1/admin/role-bindings",
+            post(admin::write::add_binding),
+        )
+        .route(
+            "/api/v1/admin/role-bindings/{id}",
+            delete(admin::write::remove_binding),
+        )
+        .route(
+            "/api/v1/admin/role-bindings/{id}/remove",
+            post(admin::write::remove_binding),
+        )
+        .route(
+            "/api/v1/admin/group-mappings",
+            post(admin::write::add_group),
+        )
+        .route(
+            "/api/v1/admin/group-mappings/{id}",
+            put(admin::write::edit_group).delete(admin::write::remove_group),
+        )
+        .route(
+            "/api/v1/admin/group-mappings/{id}/edit",
+            post(admin::write::edit_group),
+        )
+        .route(
+            "/api/v1/admin/group-mappings/{id}/remove",
+            post(admin::write::remove_group),
+        )
         .route("/api/v1/admin/role-mappings", get(admin::role_mappings))
         .route("/api/v1/admin/retention", get(admin::retention))
         .route(

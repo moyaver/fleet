@@ -243,26 +243,13 @@ pub async fn start(config: Config) -> anyhow::Result<Server> {
 }
 
 fn policies(p: &crate::config::ProjectConfig) -> Vec<fleet_store::auth::PolicyRow> {
-    use fleet_core::trust::{Policy, PrPolicy};
     p.trust_policies
         .iter()
         .map(|t| fleet_store::auth::PolicyRow {
             name: t.name.clone(),
             issuer: t.issuer.clone(),
             audience: t.audience.clone(),
-            policy: Policy {
-                repository_id: t.repository_id.clone(),
-                repository_owner_id: t.repository_owner_id.clone(),
-                trusted_refs: t.trusted_refs.clone(),
-                allowed_events: t.allowed_events.clone(),
-                pr_policy: match t.pr_policy.as_str() {
-                    "full" => PrPolicy::Full,
-                    "deny" => PrPolicy::Deny,
-                    _ => PrPolicy::Restricted,
-                },
-                job_workflow_ref: t.job_workflow_ref.clone(),
-                environment: t.environment.clone(),
-            },
+            policy: t.policy(),
         })
         .collect()
 }

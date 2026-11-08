@@ -122,6 +122,7 @@ rustls-native-certs = "0.8.5"
 schemars = { version = "1.2.3", default-features = false, features = ["derive", "std", "uuid1"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+serde_urlencoded = "0.7.1"
 serde_yaml_ng = "0.10.0"
 sha2 = "0.11.1"
 # Postgres only (ADR-0006). TLS trusts the OS store, so corporate CAs work (research 03 §4).

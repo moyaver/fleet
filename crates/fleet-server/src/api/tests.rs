@@ -6,6 +6,7 @@
 
 mod access;
 mod admin;
+mod admin_writes;
 mod artifacts;
 mod authz_matrix;
 mod compare;

@@ -900,6 +900,48 @@ pub struct TrustPolicyConfig {
     pub environment: Option<String>,
 }
 
+impl TrustPolicyConfig {
+    /// Checks one policy the way the configuration does, and the dashboard checks a policy it adds
+    /// or edits: a name, the IDs it matches, a known pull-request policy, and an issuer the server
+    /// accepts (`oidc.issuers`).
+    pub(crate) fn check(&self, oidc: &Oidc) -> anyhow::Result<()> {
+        anyhow::ensure!(!self.name.trim().is_empty(), "a trust policy needs a name");
+        anyhow::ensure!(
+            !self.repository_id.trim().is_empty() && !self.repository_owner_id.trim().is_empty(),
+            "the repository and owner IDs are required"
+        );
+        anyhow::ensure!(
+            ["restricted", "full", "deny"].contains(&self.pr_policy.as_str()),
+            "pr_policy must be restricted, full or deny"
+        );
+        anyhow::ensure!(
+            oidc.issuers.iter().any(|i| i.issuer == self.issuer),
+            "issuer {} is not in oidc.issuers",
+            self.issuer
+        );
+        Ok(())
+    }
+
+    /// The matching rule this policy stores.
+    #[must_use]
+    pub(crate) fn policy(&self) -> fleet_core::trust::Policy {
+        use fleet_core::trust::{Policy, PrPolicy};
+        Policy {
+            repository_id: self.repository_id.clone(),
+            repository_owner_id: self.repository_owner_id.clone(),
+            trusted_refs: self.trusted_refs.clone(),
+            allowed_events: self.allowed_events.clone(),
+            pr_policy: match self.pr_policy.as_str() {
+                "full" => PrPolicy::Full,
+                "deny" => PrPolicy::Deny,
+                _ => PrPolicy::Restricted,
+            },
+            job_workflow_ref: self.job_workflow_ref.clone(),
+            environment: self.environment.clone(),
+        }
+    }
+}
+
 fn github_issuer() -> String {
     GITHUB_ISSUER.into()
 }
@@ -1002,27 +1044,11 @@ impl Config {
         self.usercontent.validate(self.api.public_url.as_deref())?;
         for p in &self.projects {
             for t in &p.trust_policies {
-                anyhow::ensure!(
-                    ["restricted", "full", "deny"].contains(&t.pr_policy.as_str()),
-                    "projects.{}.trust_policies.{}: pr_policy must be restricted, full or deny",
-                    p.slug,
-                    t.name
-                );
-                anyhow::ensure!(
-                    self.oidc.issuers.iter().any(|i| i.issuer == t.issuer),
-                    "projects.{}.trust_policies.{}: issuer {} is not in oidc.issuers",
-                    p.slug,
-                    t.name,
-                    t.issuer
-                );
+                t.check(&self.oidc)
+                    .with_context(|| format!("projects.{}.trust_policies.{}", p.slug, t.name))?;
             }
             anyhow::ensure!(
-                p.slug.len() >= 2
-                    && p.slug.len() <= 63
-                    && p.slug
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-                    && !p.slug.starts_with('-'),
+                fleet_store::admin::write::valid_slug(&p.slug),
                 "project slug {:?} must be 2–63 of a-z, 0-9 and -",
                 p.slug
             );
