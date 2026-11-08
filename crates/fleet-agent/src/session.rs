@@ -90,6 +90,15 @@ pub(crate) struct Flow {
     pending_files: Vec<PendingFile>,
 }
 
+/// The one flow file a command runs alone (issue #148): the flow it names and its path.
+#[derive(Debug, Clone)]
+struct SingleFlow {
+    /// The flow's name, which is also its bundle folder's name before sanitising.
+    name: String,
+    /// The path the command names.
+    path: String,
+}
+
 /// A step as the live log reported it (issue #148): how deeply it nested, which command kind its
 /// description names, and how it ended.
 #[derive(Debug, Clone, Copy)]
@@ -208,6 +217,8 @@ pub(crate) struct Session {
     selections: u64,
     /// The planner's shard this run executes, when it is a plan shard (`plan.assigned`).
     plan_shard: Option<u32>,
+    /// The one flow file the command runs alone, when it names exactly one (issue #148).
+    single_flow: Option<SingleFlow>,
 }
 
 /// A device Maestro selected for a shard: what the observer probes and names in its samples.
@@ -317,6 +328,7 @@ impl Session {
             devices: None,
             out: Vec::new(),
             uploads: Vec::new(),
+            single_flow: None,
         };
         // Values of flags nobody classified, and `-e`/`--env` values, never leave (research 06 T5).
         let argv_redacted = redact_argv(
@@ -339,6 +351,10 @@ impl Session {
             }),
         );
         let inv = fleet_maestro::invocation::parse(argv);
+        s.single_flow = fleet_maestro::invocation::single_flow(&inv).map(|path| SingleFlow {
+            name: stem(path),
+            path: path.to_owned(),
+        });
         let subject = s.suite_subject();
         s.emit(
             at,
@@ -526,24 +542,10 @@ impl Session {
             Some(log::Event::FlowStarted { shard, name }) => {
                 let shard = shard.unwrap_or(1);
                 let idx = self.start_flow(shard, &name);
-                let f = self.flows.get(idx).cloned();
-                if let Some(f) = f {
-                    let subject = self.flow_subject(&f);
-                    self.emit(
-                        at,
-                        subject,
-                        SourceKind::DebugLog,
-                        Some(parser),
-                        &EventBody::FlowStarted(FlowStarted {
-                            flow: FlowRef {
-                                name: f.name.clone(),
-                                path: f.path.clone(),
-                            },
-                            shard_number: shard,
-                            ordinal: f.ordinal,
-                        }),
-                    );
-                }
+                self.announce_flow(at, idx, parser);
+            }
+            Some(log::Event::CommandStep { description, state }) => {
+                self.on_command_step(at, &description, state, parser);
             }
             Some(log::Event::Step {
                 shard,
@@ -616,6 +618,59 @@ impl Session {
                 }
             }
         }
+    }
+
+    /// Emits `flow.started` for flow `idx`.
+    fn announce_flow(&mut self, at: ClockSample, idx: usize, parser: String) {
+        let Some(f) = self.flows.get(idx).cloned() else {
+            return;
+        };
+        let subject = self.flow_subject(&f);
+        self.emit(
+            at,
+            subject,
+            SourceKind::DebugLog,
+            Some(parser),
+            &EventBody::FlowStarted(FlowStarted {
+                flow: FlowRef {
+                    name: f.name.clone(),
+                    path: f.path.clone(),
+                },
+                shard_number: f.shard,
+                ordinal: f.ordinal,
+            }),
+        );
+    }
+
+    /// A command's step line from Maestro's default console, which names no flow (issue #148). When
+    /// the command runs one flow file alone, the line is that flow's: the flow starts at its first
+    /// line, named and pathed by the argument, and the line is handled as shard 1's step. Otherwise
+    /// the line names nothing and is not recorded (I3).
+    fn on_command_step(
+        &mut self,
+        at: ClockSample,
+        raw: &str,
+        state: log::StepState,
+        parser: String,
+    ) {
+        let Some(single) = self.single_flow.clone() else {
+            return;
+        };
+        if state == log::StepState::Pending {
+            return;
+        }
+        let known = self
+            .flows
+            .iter()
+            .any(|f| f.shard == 1 && f.name == single.name);
+        if !known {
+            let idx = self.start_flow_unstarted(1, &single.name, Some(single.path));
+            if let Some(f) = self.flows.get_mut(idx) {
+                f.started = true;
+            }
+            self.announce_flow(at, idx, parser.clone());
+        }
+        self.on_step(at, 1, raw, state, parser);
     }
 
     fn on_step(
@@ -2390,6 +2445,9 @@ mod tests {
     /// A captured run: its session `maestro.log`, its stdout and each flow folder's `commands.json`.
     struct Captured {
         name: String,
+        /// The Maestro command the run was started with, from its `meta.json`: from `maestro` on,
+        /// so a wrapper's shell arguments are left out.
+        argv: Vec<String>,
         log: String,
         stdout: String,
         /// `(flow folder, commands.json bytes)`, in folder order.
@@ -2451,12 +2509,44 @@ mod tests {
                     .collect();
                 Captured {
                     name: dir.file_name().unwrap().to_string_lossy().into_owned(),
+                    argv: captured_argv(dir),
                     log,
                     stdout: std::fs::read_to_string(dir.join("stdout.bin")).unwrap_or_default(),
                     commands,
                 }
             })
             .collect()
+    }
+
+    /// The Maestro command a captured run was started with (its `meta.json`), from the `maestro`
+    /// program on: the invocation the agent reads, which names the flow the run executed.
+    fn captured_argv(dir: &std::path::Path) -> Vec<String> {
+        let meta: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.join("meta.json")).unwrap()).unwrap();
+        let command: Vec<String> = meta["command"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a.as_str().unwrap().to_owned())
+            .collect();
+        let program = command.iter().position(|a| {
+            std::path::Path::new(a)
+                .file_name()
+                .is_some_and(|n| n == "maestro")
+        });
+        if let Some(program) = program {
+            return command[program..].to_vec();
+        }
+        // A wrapper that runs Maestro from a shell script (`exec maestro …`): the script's words after
+        // `exec` are the Maestro command.
+        command
+            .iter()
+            .find_map(|a| {
+                a.split_once("exec ")
+                    .filter(|(_, rest)| rest.starts_with("maestro "))
+                    .map(|(_, rest)| rest.split_whitespace().map(str::to_owned).collect())
+            })
+            .unwrap_or_else(|| panic!("{}: no maestro in the command", dir.display()))
     }
 
     /// The captured run called `name`.
@@ -2469,18 +2559,17 @@ mod tests {
 
     /// A session with no flow yet: the log and stdout start the flows, as they do live.
     fn fresh_session() -> Session {
+        session_for(&["maestro".into(), "test".into()])
+    }
+
+    /// A session for the command `argv`, with no flow yet.
+    fn session_for(argv: &[String]) -> Session {
         let mut n = 0u128;
         let ids: IdGen = Box::new(move || {
             n += 1;
             Uuid::from_u128(n)
         });
-        Session::new(
-            &["maestro".into(), "test".into()],
-            None,
-            Redactor::new([]),
-            ids,
-            at(),
-        )
+        Session::new(argv, None, Redactor::new([]), ids, at())
     }
 
     /// Feeds a captured `maestro.log` through the session, record by record.
@@ -2543,9 +2632,9 @@ mod tests {
         }
     }
 
-    /// Runs whose console log is in Maestro's default format. The agent reads no step from such a log
-    /// and starts no flow from it (its stdout has no result lines either), so their files settle
-    /// nothing and no flow is found for them.
+    /// Runs whose console log is in Maestro's default format (no report format). Such a log names no
+    /// flow in its stdout, so it starts a flow only through its command's argument: each of these
+    /// runs names exactly one flow file, and its steps settle from its final file (issue #148).
     const DEFAULT_FORMAT_RUNS: [&str; 13] = [
         "paths-config-explicit",
         "paths-config-file-beside",
@@ -2562,18 +2651,17 @@ mod tests {
         "single-flow-no-format",
     ];
 
-    /// Every captured run, replayed through one session each: its log, its stdout, then its
-    /// `commands.json` files. Each flow's final file settles each of its steps with the file's status
-    /// and timing, and says nothing about the alignment. The default-format runs settle nothing and
-    /// find no flow. A cut-short or empty file settles nothing (issue #148).
+    /// Every captured run, replayed through one session each, with the command it was started with:
+    /// its log, its stdout, then its `commands.json` files. Each flow's final file settles each of its
+    /// steps with the file's status and timing, and says nothing about the alignment. A cut-short or
+    /// empty file settles nothing (issue #148).
     #[test]
     fn every_captured_run_settles_each_flows_steps_from_its_final_commands_file() {
         let runs = captured_runs();
         assert_eq!(runs.len(), 45, "every captured run is replayed");
         let mut settled_flows = 0;
         for run in &runs {
-            let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
-            let mut s = fresh_session();
+            let mut s = session_for(&run.argv);
             replay_log(&mut s, &run.log);
             for line in run.stdout.lines() {
                 s.observe(at(), Observation::Stdout(line.to_owned()));
@@ -2591,12 +2679,9 @@ mod tests {
             let warnings = alignment_warnings(&events);
             for (folder, bytes) in &run.commands {
                 let (name, shard) = bundle::split_shard_suffix(folder);
-                let found = s.find_flow(shard.unwrap_or(1), name);
-                if default_format {
-                    assert_eq!(found, None, "{}: {folder} names no flow", run.name);
-                    continue;
-                }
-                let idx = found.unwrap_or_else(|| panic!("{}: {folder} never started", run.name));
+                let idx = s
+                    .find_flow(shard.unwrap_or(1), name)
+                    .unwrap_or_else(|| panic!("{}: {folder} never started", run.name));
                 let id = s.flows[idx].id;
                 let want: Vec<(u32, StepEnded)> = match bundle::parse_commands(bytes) {
                     bundle::Commands::Final(records) => records
@@ -2621,27 +2706,50 @@ mod tests {
                 }
             }
         }
-        // Every final file of a run whose log the agent reads settles its flow's steps.
         let final_files = runs
             .iter()
-            .filter(|r| !DEFAULT_FORMAT_RUNS.contains(&r.name.as_str()))
             .flat_map(|r| &r.commands)
             .filter(|(_, bytes)| {
                 matches!(bundle::parse_commands(bytes), bundle::Commands::Final(_))
             })
             .count();
         assert_eq!(settled_flows, final_files);
-        assert_eq!(final_files, 40, "the captured final files");
+        assert_eq!(final_files, 53, "the captured final files");
     }
 
-    /// A commands file whose flow the log never named is warned on the run, once per file, and
+    /// The default-format runs settle their steps from their final files, where the console names no
+    /// flow and only the command's argument does (issue #148). Each has a final file whose steps the
+    /// log lines up with, so the steps are settled, not only found.
+    #[test]
+    fn default_format_single_flow_runs_settle_their_steps() {
+        for name in DEFAULT_FORMAT_RUNS {
+            let run = captured(name);
+            assert_eq!(run.commands.len(), 1, "{name}: one flow, one commands file");
+            let mut s = session_for(&run.argv);
+            replay_log(&mut s, &run.log);
+            s.drain();
+            file(
+                &mut s,
+                &format!("{}/commands.json", run.commands[0].0),
+                Some(run.commands[0].1.as_slice()),
+            );
+            let events = s.drain();
+            let settled = settled_steps(&events);
+            assert!(!settled.is_empty(), "{name}: its steps settle");
+            let want = match bundle::parse_commands(&run.commands[0].1) {
+                bundle::Commands::Final(records) => records.len(),
+                other => panic!("{name}: a final file, not {other:?}"),
+            };
+            assert_eq!(settled.len(), want, "{name}: every command settles");
+        }
+    }
+
+    /// A commands file whose flow the argument does not name is warned on the run, once per file, and
     /// settles nothing; a run whose files all find their flow warns nothing of the kind (issue #148).
-    /// The default-format runs are the ones whose log names no flow.
     #[test]
     fn every_captured_run_warns_each_commands_file_whose_flow_was_never_named() {
         for run in captured_runs() {
-            let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
-            let mut s = fresh_session();
+            let mut s = session_for(&run.argv);
             replay_log(&mut s, &run.log);
             for line in run.stdout.lines() {
                 s.observe(at(), Observation::Stdout(line.to_owned()));
@@ -2655,36 +2763,71 @@ mod tests {
                 );
             }
             let events = s.drain();
-            let unnamed: Vec<&EventEnvelope> = events
+            let unnamed = events
                 .iter()
                 .filter(|e| e.kind == "agent.warning" && e.data["code"] == "commands_flow_unnamed")
-                .collect();
-            let expected = if default_format {
-                run.commands.len()
-            } else {
-                0
-            };
-            assert_eq!(
-                unnamed.len(),
-                expected,
-                "{}: one warning per file",
-                run.name
-            );
-            assert!(
-                unnamed
-                    .iter()
-                    .all(|e| e.subject.flow_execution_id.is_none()),
-                "{}: the warning belongs to the run, not to a flow",
-                run.name
-            );
-            if default_format {
-                assert!(
-                    settled_steps(&events).is_empty(),
-                    "{}: nothing settles",
-                    run.name
-                );
-            }
+                .count();
+            assert_eq!(unnamed, 0, "{}: every file names its flow", run.name);
         }
+    }
+
+    /// Issue #148: the same captured console and commands settle only when the command names their
+    /// flow. A directory, another flow's name, or a report format leaves the file unnamed, warned on
+    /// the run and settling nothing.
+    #[test]
+    fn a_commands_file_settles_only_when_the_command_names_its_flow() {
+        let run = captured("single-flow-no-format");
+        let unnamed_by = |argv: &[&str]| {
+            let argv: Vec<String> = argv.iter().map(|a| (*a).to_owned()).collect();
+            let mut s = session_for(&argv);
+            replay_log(&mut s, &run.log);
+            s.drain();
+            file(
+                &mut s,
+                "pass/commands.json",
+                Some(run.commands[0].1.as_slice()),
+            );
+            let events = s.drain();
+            let warned = events
+                .iter()
+                .filter(|e| e.kind == "agent.warning" && e.data["code"] == "commands_flow_unnamed")
+                .count();
+            (warned, settled_steps(&events).len())
+        };
+        assert_eq!(
+            unnamed_by(&[
+                "maestro",
+                "--device",
+                "emulator-5600",
+                "test",
+                "examples/pass.yaml"
+            ]),
+            (0, 7),
+            "the argument names the flow: its seven steps settle"
+        );
+        assert_eq!(
+            unnamed_by(&["maestro", "--device", "emulator-5600", "test", "flows/"]),
+            (1, 0),
+            "a directory names no flow"
+        );
+        assert_eq!(
+            unnamed_by(&["maestro", "test", "other.yaml"]),
+            (1, 0),
+            "another flow's name does not name this one"
+        );
+        assert_eq!(
+            unnamed_by(&[
+                "maestro",
+                "--format",
+                "junit",
+                "--output",
+                "r.xml",
+                "test",
+                "examples/pass.yaml"
+            ]),
+            (1, 0),
+            "with a report format the console names the flows, so the argument is not read"
+        );
     }
 
     /// `pair_steps`: the depth and kind rules, and the shapes of a missing or shifted step.

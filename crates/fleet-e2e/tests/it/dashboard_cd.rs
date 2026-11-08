@@ -587,16 +587,51 @@ async fn steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so() 
     browser.quit().await;
 }
 
-/// A default-format Maestro output directory is replayed by `fleet-agent publish` (issue #148): its
-/// log names no flow, so its `commands.json` names none the log started. The run keeps one warning
-/// on itself, and its job's page says so; a run whose file finds its flow says nothing of the kind.
+/// A copy of the captured `paths-none` run whose command names a directory of flows, not its one
+/// flow file: the same log and files, with only the command's last word changed.
+fn unnamed_copy_of_paths_none() -> std::path::PathBuf {
+    fn copy_capture(from: &std::path::Path, to: &std::path::Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap().flatten() {
+            let target = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                copy_capture(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+    let dst = std::env::temp_dir().join(format!("fleet-e2e-unnamed-{}", uuid::Uuid::now_v7()));
+    copy_capture(&fixture("paths-none"), &dst);
+    let meta_path = dst.join("meta.json");
+    let mut meta: Value = serde_json::from_slice(&std::fs::read(&meta_path).unwrap()).unwrap();
+    let command = meta["command"].as_array_mut().unwrap();
+    *command.last_mut().unwrap() = Value::String("flows/".into());
+    std::fs::write(&meta_path, serde_json::to_vec_pretty(&meta).unwrap()).unwrap();
+    dst
+}
+
+/// A default-format Maestro output directory is replayed by `fleet-agent publish` (issue #148). Its
+/// log names no flow, so the flow is the one its command names. `paths-none` names its one flow
+/// file, so its steps settle. The same capture under a command that names a directory names no
+/// flow: its `commands.json` is warned on its run, and the file creates no flow. The job's page says
+/// so, and a run whose file finds its flow says nothing of the kind.
 #[tokio::test(flavor = "multi_thread")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "three published runs, their attempt and the job page in one scenario"
+)]
 async fn a_commands_file_no_flow_names_is_said_on_its_job_and_nowhere_else() {
     let stack = stack(|_| {}).await;
-    for (fixture_name, job) in [("paths-none", "job-unnamed"), ("pass", "job-named")] {
+    let unnamed = unnamed_copy_of_paths_none();
+    for (dir, job) in [
+        (unnamed.clone(), "job-unnamed"),
+        (fixture("paths-none"), "job-single"),
+        (fixture("pass"), "job-named"),
+    ] {
         let (ws, key) = (stack.ws_url(), stack.key.clone());
         let job_key = job.to_owned();
-        let dir = fixture(fixture_name);
+        let shown = dir.display().to_string();
         let out = tokio::task::spawn_blocking(move || {
             publish(
                 &dir,
@@ -610,10 +645,12 @@ async fn a_commands_file_no_flow_names_is_said_on_its_job_and_nowhere_else() {
         })
         .await
         .unwrap();
-        assert_eq!(out.status.code(), Some(0), "publishing {fixture_name}");
+        assert_eq!(out.status.code(), Some(0), "publishing {shown}");
     }
     let snap = stack.await_run_ended("job-unnamed").await;
+    stack.await_run_ended("job-single").await;
     stack.await_run_ended("job-named").await;
+    let _ = std::fs::remove_dir_all(&unnamed);
     let snap = stack
         .get(&format!(
             "/api/v1/projects/app/attempts/{}",
@@ -656,6 +693,19 @@ async fn a_commands_file_no_flow_names_is_said_on_its_job_and_nowhere_else() {
     assert!(
         run_of("job-named")["file_warnings"].is_null(),
         "a run whose files all find their flow keeps no file warning"
+    );
+    let single = job_id("job-single");
+    assert!(
+        run_of("job-single")["file_warnings"].is_null(),
+        "the run names its one flow, so its file finds it"
+    );
+    assert!(
+        snap["flows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f["job_id"] == single && f["state"] == "passed"),
+        "the command's one flow passes from its settled final file"
     );
 
     let browser = Browser::launch().await;

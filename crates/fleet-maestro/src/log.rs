@@ -135,6 +135,14 @@ pub enum Event {
         /// Planned flow file paths, as Maestro wrote them.
         flows: Vec<String>,
     },
+    /// A command's step line in Maestro's default console (no report format). It names no shard and
+    /// no flow, so it belongs to the one flow the command runs (issue #148).
+    CommandStep {
+        /// Maestro's description of the step.
+        description: String,
+        /// Its state.
+        state: StepState,
+    },
     /// `Running flow <name>`.
     FlowStarted {
         /// Shard, when the run is sharded.
@@ -169,6 +177,8 @@ pub enum Event {
 }
 
 const CONSOLE_LISTENER: &str = "maestro.cli.runner.CliConsoleListener";
+/// Logger of the command runner, which logs each command's step line in Maestro's default console.
+const COMMAND_RUNNER: &str = "maestro.cli.runner.MaestroCommandRunner";
 const SUITE_INTERACTOR: &str = "maestro.cli.runner.TestSuiteInteractor";
 /// Logger of Maestro's system info (`MAESTRO.logSystemInfo`, the method is dropped).
 const SYSTEM_INFO: &str = "MAESTRO";
@@ -193,7 +203,7 @@ pub fn classify(record: &Record) -> Option<Event> {
         }
         return None;
     }
-    if record.logger == CONSOLE_LISTENER {
+    if record.logger == CONSOLE_LISTENER || record.logger == COMMAND_RUNNER {
         let (description, state) = msg.rsplit_once(' ')?;
         let state = match state {
             "PENDING" => StepState::Pending,
@@ -204,6 +214,14 @@ pub fn classify(record: &Record) -> Option<Event> {
             "SKIPPED" => StepState::Skipped,
             _ => return None,
         };
+        // Maestro's default console (no report format) logs each command here, with no shard and no
+        // flow name: the caller decides which flow the line belongs to (issue #148).
+        if record.logger == COMMAND_RUNNER {
+            return Some(Event::CommandStep {
+                description: description.to_owned(),
+                state,
+            });
+        }
         return Some(Event::Step {
             shard,
             description: description.to_owned(),
@@ -441,6 +459,42 @@ mod tests {
                 .collect();
             assert_eq!(versions, ["2.12.1"]);
         }
+    }
+
+    /// The default console's step lines come from the command runner, with no shard and no flow
+    /// name (issue #148). The console listener's lines are unchanged.
+    #[test]
+    fn default_console_step_lines_are_command_steps() {
+        let r = records(
+            "MFLT1|1|main|INFO|maestro.cli.runner.MaestroCommandRunner|Tap on \"Apps\" RUNNING\n\
+             MFLT1|2|main|INFO|maestro.cli.runner.MaestroCommandRunner|Tap on \"Apps\" COMPLETED\n\
+             MFLT1|3|main|INFO|maestro.cli.runner.MaestroCommandRunner|Starting the device\n\
+             MFLT1|4|main|INFO|maestro.cli.runner.TestRunner|Running flow pass.yaml...",
+        );
+        assert_eq!(
+            classify(&r[0]),
+            Some(Event::CommandStep {
+                description: "Tap on \"Apps\"".into(),
+                state: StepState::Running
+            })
+        );
+        assert_eq!(
+            classify(&r[1]),
+            Some(Event::CommandStep {
+                description: "Tap on \"Apps\"".into(),
+                state: StepState::Completed
+            })
+        );
+        assert_eq!(
+            classify(&r[2]),
+            None,
+            "a message that names no state is not a step"
+        );
+        assert_eq!(
+            classify(&r[3]),
+            None,
+            "the runner's `Running flow` line is not read: the argument names the flow"
+        );
     }
 
     #[test]

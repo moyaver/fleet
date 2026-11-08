@@ -197,6 +197,24 @@ pub fn parse(argv: &[String]) -> Invocation {
     inv
 }
 
+/// The one flow file the command runs alone, when it names exactly one flow file and nothing else
+/// would run another: no report format (Maestro's default console does not name the flow, issue
+/// #148), no continuous run, one device and one shard. `None` for a directory, several paths, or a
+/// run Maestro could split. Only the file name is read (this crate does no I/O), so a directory
+/// named like a flow file is taken for one.
+#[must_use]
+pub fn single_flow(inv: &Invocation) -> Option<&str> {
+    let [flow] = inv.positionals.as_slice() else {
+        return None;
+    };
+    let alone =
+        inv.format.is_none() && !inv.continuous && inv.devices.len() <= 1 && inv.shards <= 1;
+    let yaml = Path::new(flow)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("yaml") || e.eq_ignore_ascii_case("yml"));
+    (alone && yaml).then_some(flow.as_str())
+}
+
 /// `-ch`-style clusters of Maestro's two short boolean flags (`-c`, `-h`).
 fn is_short_cluster(name: &str) -> bool {
     name.len() > 2 && name.starts_with('-') && name.chars().skip(1).all(|c| c == 'c' || c == 'h')
@@ -560,6 +578,52 @@ mod tests {
 
     fn argv(s: &str) -> Vec<String> {
         s.split_whitespace().map(String::from).collect()
+    }
+
+    /// Issue #148: one flow file, run alone, is identified by the argument. Anything that could run
+    /// another flow, or a directory, is not.
+    #[test]
+    fn a_single_flow_file_run_alone_is_identified() {
+        let one = |line: &str| single_flow(&parse(&argv(line))).map(str::to_owned);
+        assert_eq!(
+            one("maestro --device emulator-5600 test <REPO>/examples/flows/phase0/pass.yaml"),
+            Some("<REPO>/examples/flows/phase0/pass.yaml".into())
+        );
+        assert_eq!(
+            one(
+                "maestro --device emulator-5584 test --config cfg/config.yaml --test-output-dir T flows/pass.yml"
+            ),
+            Some("flows/pass.yml".into()),
+            "flags with values do not hide the flow"
+        );
+        assert_eq!(
+            one("maestro test flows/"),
+            None,
+            "a directory may hold many flows"
+        );
+        assert_eq!(one("maestro test a.yaml b.yaml"), None, "two flows");
+        assert_eq!(one("maestro test"), None, "no flow");
+        assert_eq!(
+            one("maestro test --format junit --output r.xml a.yaml"),
+            None,
+            "a report format is the multi-flow path, whose log names the flows"
+        );
+        assert_eq!(
+            one("maestro test -c a.yaml"),
+            None,
+            "a continuous run repeats the flow"
+        );
+        assert_eq!(
+            one("maestro --device a,b test a.yaml"),
+            None,
+            "two devices may split the run"
+        );
+        assert_eq!(
+            one("maestro test --shard-split 2 a.yaml"),
+            None,
+            "a sharded run may place the flow on any shard"
+        );
+        assert_eq!(one("maestro test login.js"), None, "not a flow file");
     }
 
     /// Names ending in `/` are directories, `.yaml` are files, the rest don't exist.
