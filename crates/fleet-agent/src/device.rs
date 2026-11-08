@@ -353,7 +353,7 @@ impl Probes {
 
     /// Returns once a task has finished (or at once if one finished since the last wait).
     #[cfg(test)]
-    async fn finished_one(&self) {
+    pub(crate) async fn finished_one(&self) {
         self.woken.notified().await;
     }
 
