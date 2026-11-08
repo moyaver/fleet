@@ -16,7 +16,7 @@ gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyave
 
 ## GitHub Actions
 
-The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent (its archive's checksum is verified, and its build attestation too when the `gh` CLI is on the runner), runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason, and a link to the dashboard when `FLEET_SERVER` is set. Give the job `permissions: id-token: write`:
+The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent (its archive's checksum is verified, and its build attestation too when the `gh` CLI is on the runner), runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason and provenance, each of them linked to its flow page when `FLEET_SERVER` is set, and a link to the dashboard. Maestro's output and exit status are unchanged. Give the job `permissions: id-token: write`:
 
 ```yaml
 - uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.3
@@ -25,6 +25,10 @@ The [composite action](https://github.com/moyaver/fleet/blob/main/examples/githu
 ```
 
 The summary is included from `v0.1.0-alpha.2`; `v0.1.0-alpha.1` predates it. The example workflow is [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).
+
+The `command` input is split as a shell splits words for quotes and backslashes, without expansion: `maestro test "my flows/"` passes `my flows/` as one argument. An unterminated quote fails the step before Maestro starts. With `install: "false"` the action runs the `fleet-agent` already on `PATH` (for example one built from the repository) and downloads nothing. The action's `summary-file` output names the file the summary was written to, for a later step that reads it.
+
+The links open the flow page through `/api/v1/flows/{id}/page`, so they need a signed-in dashboard session in the browser. A reader of another project sees the same not-found answer as for a flow that does not exist.
 
 ## Check the setup
 
