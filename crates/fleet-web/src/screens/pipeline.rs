@@ -29,7 +29,7 @@ use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
     components::{
         display::{
-            EmptyState, ProvenanceBadge, ReadoutStrip, RowProvenance, Skeleton, StatusPill,
+            EmptyState, OriginBadge, ProvenanceBadge, ReadoutStrip, RowProvenance, Skeleton, StatusPill,
             TableBox,
         },
         live::{Announcements, LiveState},
@@ -611,6 +611,9 @@ fn FailureLine(
                 {move || mark().map(|p| view! {
                     <span data-testid="flow-provenance"><RowProvenance provenance=Signal::stored(p) /></span>
                 })}
+                {move || model.flows.cell(flow_id).map(|f| view! {
+                    <OriginBadge origin=move || f.with(|f| f.origin) />
+                })}
             </td>
             <td data-label="Device">{device}</td>
             <td data-label="Duration" class="num">{duration}</td>
@@ -837,6 +840,7 @@ fn RunLiveness(model: LiveModel, id: Uuid) -> impl IntoView {
                 view! { <StatusPill mark=pill.mark label=pill.label /> }
             }}
         </span>
+        <OriginBadge origin=move || run.get().origin />
     }
     .into_any()
 }
@@ -1015,6 +1019,7 @@ fn FlowRow(
                 {move || mark().map(|p| view! {
                     <span data-testid="flow-provenance"><RowProvenance provenance=Signal::stored(p) /></span>
                 })}
+                <OriginBadge origin=move || flow.get().origin />
             </td>
             <td data-label="Duration" class="num">
                 {move || flow.get().duration_ms.map_or_else(|| "—".to_owned(), format_duration)}

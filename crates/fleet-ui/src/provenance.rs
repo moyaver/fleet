@@ -8,6 +8,16 @@
 /// How long without an update before data counts as stale, in milliseconds (research 05 §6.1).
 pub const STALE_AFTER_MS: u64 = 25_000;
 
+/// The label of a run that was published after the fact (issue #83). It is
+/// not a provenance: a published run's values keep their own provenance, and this only says the
+/// run was imported rather than observed live.
+pub const PUBLISHED: Badge = Badge {
+    label: "Published",
+    aria_label: "Origin: published run",
+    glyph: "pg-published",
+    description: "Imported after the run ended, with fleet-agent publish. Nothing here was watched live.",
+};
+
 /// Where a displayed value comes from (spec §18).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Provenance {
@@ -151,6 +161,24 @@ mod tests {
             assert!(a.badge().aria_label.starts_with("Provenance: "));
             assert!(a.badge().glyph.starts_with("pg-"));
         }
+    }
+
+    #[test]
+    fn the_published_label_is_distinct_from_every_provenance() {
+        let all = [
+            Provenance::Observed,
+            Provenance::Provisional,
+            Provenance::Final,
+            Provenance::Derived,
+            Provenance::Inferred,
+            Provenance::Missing,
+            Provenance::Stale,
+        ];
+        for p in all {
+            assert_ne!(p.badge().label, PUBLISHED.label);
+            assert_ne!(p.badge().glyph, PUBLISHED.glyph);
+        }
+        assert!(PUBLISHED.aria_label.starts_with("Origin: "));
     }
 
     #[test]
