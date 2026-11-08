@@ -93,7 +93,7 @@ pub(crate) struct Refused {
     pub(crate) reason: String,
 }
 
-/// What [`write`] put in the bundle.
+/// What [`write()`] put in the bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Written {
     /// The bundle file.
