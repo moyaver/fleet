@@ -331,6 +331,11 @@ fn classify(class: ArtifactClass, head: &[u8]) -> Result<Kind, VerifyError> {
     }
 }
 
+/// Whether the head names an `<svg` element, case-insensitively.
+fn mentions_svg(head: &[u8]) -> bool {
+    head.windows(4).any(|w| w.eq_ignore_ascii_case(b"<svg"))
+}
+
 fn detect(head: &[u8]) -> Option<Kind> {
     use infer::{archive, image, text};
     if image::is_png(head) {
@@ -344,7 +349,8 @@ fn detect(head: &[u8]) -> Option<Kind> {
         Some(Kind::Zip)
     } else if archive::is_zst(head) {
         Some(Kind::TarZst)
-    } else if text::is_xml(head) {
+    } else if text::is_xml(head) && !mentions_svg(head) {
+        // An SVG with an XML prolog is XML to `infer`; it is never an accepted type (no SVG).
         Some(Kind::Xml)
     } else if text::is_html(head) {
         Some(Kind::Html)
