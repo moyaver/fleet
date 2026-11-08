@@ -8,7 +8,7 @@
 //! behind gets `{"op":"resync"}` and re-subscribes. The `Origin` must be the dashboard's own
 //! (cross-site WebSocket hijacking).
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use axum::{
     extract::{
@@ -27,7 +27,7 @@ use fleet_protocol::live::{LiveFrame, LiveRequest, ResyncReason};
 
 use super::{error, require};
 use crate::{
-    session::{principal, same_origin},
+    session::{self, principal, same_origin},
     state::AppState,
 };
 
@@ -49,10 +49,22 @@ pub(crate) async fn upgrade(
         Ok(p) => p,
         Err(r) => return *r,
     };
+    // A browser sign-in is re-checked while the socket is open: logout or expiry ends it.
+    let cookie = session::read(&headers);
     let tracker = state.tracker.clone();
     ws.max_message_size(MAX_CLIENT_MESSAGE)
-        .on_upgrade(move |socket| tracker.track_future(session(state, principal, socket)))
+        .on_upgrade(move |socket| tracker.track_future(session(state, principal, cookie, socket)))
         .into_response()
+}
+
+/// Whether the browser's sign-in named by `cookie` still exists: a session that was ended or has
+/// expired is gone, and a sign-in transaction (no user yet) doesn't count.
+async fn still_signed_in(state: &AppState, cookie: &str) -> Result<bool, fleet_store::Error> {
+    Ok(state
+        .store
+        .session(cookie)
+        .await?
+        .is_some_and(|s| s.user_id.is_some()))
 }
 
 async fn send(socket: &mut WebSocket, frame: &LiveFrame) -> bool {
@@ -60,7 +72,12 @@ async fn send(socket: &mut WebSocket, frame: &LiveFrame) -> bool {
     socket.send(Message::Text(text.into())).await.is_ok()
 }
 
-async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
+async fn session(
+    state: AppState,
+    principal: Principal,
+    cookie: Option<String>,
+    mut socket: WebSocket,
+) {
     // The first message must be a subscription.
     let Some(Ok(Message::Text(first))) = socket.recv().await else {
         return;
@@ -129,8 +146,22 @@ async fn session(state: AppState, principal: Principal, mut socket: WebSocket) {
     if !send(&mut socket, &LiveFrame::Subscribed { project_id }).await {
         return;
     }
+    let period = Duration::from_millis(state.config.api.session_recheck_ms.max(1));
+    let mut recheck = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
     loop {
         tokio::select! {
+            _ = recheck.tick(), if cookie.is_some() => {
+                let live = match &cookie {
+                    Some(c) => still_signed_in(&state, c).await.unwrap_or(false),
+                    None => true,
+                };
+                if !live {
+                    let _ = socket
+                        .send(Message::Close(Some(CloseFrame { code: 1008, reason: "session ended".into() })))
+                        .await;
+                    return;
+                }
+            }
             next = next(&mut rx, floor) => {
                 let text = match next {
                     Next::Frame(f) => f,

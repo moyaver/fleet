@@ -875,6 +875,35 @@ async fn the_live_socket_follows_the_sessions_roles_and_refuses_foreign_origins(
 }
 
 #[tokio::test]
+async fn a_live_socket_closes_when_its_sign_in_ends() {
+    let rig = rig_with(|c| c.api.session_recheck_ms = 50).await;
+    let qa = sign_in(&rig, &json!({"groups": ["qa"]})).await;
+    let mut live = rig
+        .app
+        .get_websocket("/api/v1/live")
+        .add_header("origin", PUBLIC)
+        .add_header("cookie", &qa)
+        .await
+        .into_websocket()
+        .await;
+    live.send_json(&json!({"op": "subscribe", "project": "app"}))
+        .await;
+    let frame: Value = live.receive_json().await;
+    assert_eq!(frame["op"], "subscribed", "{frame}");
+
+    // Logout (or expiry) removes the session row; the open socket must not outlive it.
+    let cookie = qa.split_once('=').unwrap().1;
+    rig.store.delete_session(cookie).await.unwrap();
+    let closed = tokio::time::timeout(std::time::Duration::from_secs(5), live.receive_message())
+        .await
+        .expect("the socket closes once its session is gone");
+    assert!(
+        matches!(closed, axum_test::WsMessage::Close(_)),
+        "{closed:?}"
+    );
+}
+
+#[tokio::test]
 async fn without_a_login_configuration_there_is_no_browser_sign_in() {
     let rig = rig_with(|c| c.login = None).await;
 
