@@ -31,7 +31,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `ingest.telemetry_flush_ms` | `15000` | Telemetry checkpoint (10–30 s), then `telemetry_ack` |
 | `ingest.shutdown_grace_ms` | `15000` | Drain time for sockets on SIGTERM |
 | `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
-| `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown` |
+| `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown`, and their open steps become `unknown` and Inferred |
 | `api.viewer_tokens` | — | Bearer tokens that may read every project (scripts, tests); people sign in with `[login]` |
 | `api.api_key_ttl_days` | `90` | Days until a new API key expires when `fleet api-key create` gets no `--expires-in-days`. Keys made before this setting have no expiry; set `expires_at` on them in SQL |
 | `api.public_url` | — | The dashboard's origin: browser sockets from other origins are refused, and the sign-in redirect URI is built from it (required with `[login]`) |
@@ -404,7 +404,7 @@ docker compose -p fleet-restore up -d --wait fleet
 
 The restored stack has no proxy in this sequence. Start one when the restored stack is the live one, on its own host or with the old stack stopped, since both publish ports 80 and 443. Point the agents' `FLEET_SERVER` and the DNS name at it.
 
-Runs that were in progress at the dump come back `active`. Once their agents stop reporting they are detached, and they are abandoned after `liveness.resume_grace_ms` unless an agent resumes them; their open flows then become `unknown`, never success.
+Runs that were in progress at the dump come back `active`. Once their agents stop reporting they are detached, and they are abandoned after `liveness.resume_grace_ms` unless an agent resumes them; their open flows then become `unknown`, and so do their open steps (each shows Inferred), never success.
 
 ### Verify a restore
 
