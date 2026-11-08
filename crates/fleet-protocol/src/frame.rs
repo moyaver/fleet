@@ -236,6 +236,48 @@ pub struct Sample {
     pub host_psi_io_pct: Option<f32>,
 }
 
+/// Where a run's evidence came from (issue #83). A live run is observed as it happens; a published
+/// run is a finished run the agent sent after the fact (`fleet-agent publish`), so the server shows
+/// it as imported, never as live.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RunOrigin {
+    /// Observed while it ran.
+    #[default]
+    Live,
+    /// Sent after the fact by `fleet-agent publish`: an offline bundle or a saved output.
+    Published,
+}
+
+impl RunOrigin {
+    /// The stored and wire name: `live` or `published`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Live => "live",
+            Self::Published => "published",
+        }
+    }
+
+    /// The origin named by [`Self::as_str`], or `None` for any other text.
+    #[must_use]
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "live" => Some(Self::Live),
+            "published" => Some(Self::Published),
+            _ => None,
+        }
+    }
+
+    /// Whether this is [`RunOrigin::Live`] (the default, which older agents never send).
+    #[must_use]
+    pub const fn is_live(&self) -> bool {
+        matches!(self, Self::Live)
+    }
+}
+
 /// The handshake payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -255,6 +297,21 @@ pub struct Hello {
     pub resume: ResumeState,
     /// Agent clock at send.
     pub clock: ClockSample,
+    /// Where the run's evidence came from. Absent from live agents, which send nothing here.
+    #[serde(default, skip_serializing_if = "RunOrigin::is_live")]
+    pub origin: RunOrigin,
+    /// When the run started, as the agent recorded it. A published run takes its date (`run_day`)
+    /// from this, not from the day it is published; a live run leaves it out and starts now.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "time::serde::rfc3339::option"
+    )]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(schema_with = "crate::schema::rfc3339_option")
+    )]
+    pub started_at: Option<time::OffsetDateTime>,
 }
 
 /// A closed range of protocol versions.

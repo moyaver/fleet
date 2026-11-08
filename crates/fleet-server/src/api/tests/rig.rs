@@ -16,7 +16,7 @@ use fleet_protocol::{
     },
     frame::{
         AgentInfo, BatchRequest, BatchResponse, CiContext, CiProvider, ClientFrame, Hello,
-        ProtocolRange, ResumeState, Sample, ServerFrame, Telemetry,
+        ProtocolRange, ResumeState, RunOrigin, Sample, ServerFrame, Telemetry,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -353,6 +353,8 @@ impl Agent {
                 oldest_unacked_seq: self.queued.first().map(|e| e.seq),
             },
             clock: now(),
+            origin: RunOrigin::Live,
+            started_at: None,
         }
     }
 

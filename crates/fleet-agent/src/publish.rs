@@ -28,7 +28,7 @@ use anyhow::{Context as _, anyhow, bail};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{EventBody, JournalGap},
-    frame::{CiContext, Telemetry},
+    frame::{CiContext, RunOrigin, Telemetry},
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
 };
 use sha2::{Digest, Sha256};
@@ -511,13 +511,18 @@ impl Sender {
         start: Instant,
     ) -> anyhow::Result<Self> {
         let next = events.last().map_or(1, |e| e.seq + 1);
+        // The run started when its first event happened: the server files the run under that day.
+        let started_at = events.iter().map(|e| e.at.wall).min();
         let mut outbox = Outbox::with_spool(&work.join("spool.bin"), run, Budget::default());
         outbox.push(events);
         let shared = Arc::new(Shared {
             outbox: Mutex::new(outbox),
             ..Shared::default()
         });
-        let cfg = transport::Config::from_env(url.to_owned(), run, ci, |k| std::env::var(k).ok());
+        let mut cfg =
+            transport::Config::from_env(url.to_owned(), run, ci, |k| std::env::var(k).ok());
+        cfg.origin = RunOrigin::Published;
+        cfg.started_at = started_at;
         let uploader = Uploader::new(upload::Config {
             base: crate::net::http_base(url),
             credential: Arc::clone(&shared.credential),

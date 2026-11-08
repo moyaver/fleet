@@ -13,6 +13,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
+    frame::RunOrigin,
     live::AttemptView,
     rest::{FlowCounts, InfrastructureView},
 };
@@ -144,6 +145,9 @@ pub struct HistoryEntryView {
     pub at: OffsetDateTime,
     /// Maestro's or the report's duration.
     pub duration_ms: Option<i64>,
+    /// The origin of the agent run that ran the flow: a published run is imported, not live.
+    #[serde(default)]
+    pub origin: RunOrigin,
     /// The failure message, redacted.
     pub failure_message: Option<String>,
     /// `v1:` and 16 hex digits; set on a final failure.

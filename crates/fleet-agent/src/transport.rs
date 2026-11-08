@@ -16,11 +16,12 @@ use fleet_protocol::{
     brand::WS_SUBPROTOCOL,
     frame::{
         AgentInfo, BatchRequest, BatchResponse, CiContext, ClientFrame, ErrorCode, Hello, Limits,
-        ProtocolRange, ResumeState, ServerFrame, Telemetry, Welcome,
+        ProtocolRange, ResumeState, RunOrigin, ServerFrame, Telemetry, Welcome,
     },
     journal::ClockSample,
 };
 use futures_util::{SinkExt, StreamExt};
+use time::OffsetDateTime;
 use tokio::sync::{Notify, mpsc};
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest, http::HeaderValue};
 use uuid::Uuid;
@@ -44,6 +45,10 @@ pub(crate) struct Config {
     pub(crate) agent_run_id: Uuid,
     /// CI identity.
     pub(crate) ci: CiContext,
+    /// Where the run's evidence came from: [`RunOrigin::Live`] unless this is a publish.
+    pub(crate) origin: RunOrigin,
+    /// When the run started, as its recorded events say (a publish only; see `Hello::started_at`).
+    pub(crate) started_at: Option<OffsetDateTime>,
 }
 
 impl Config {
@@ -67,6 +72,8 @@ impl Config {
             url,
             agent_run_id,
             ci,
+            origin: RunOrigin::Live,
+            started_at: None,
         }
     }
 }
@@ -642,6 +649,8 @@ fn hello_frame(
         ci: cfg.ci.clone(),
         resume,
         clock: clock(),
+        origin: cfg.origin,
+        started_at: cfg.started_at,
     })))
 }
 

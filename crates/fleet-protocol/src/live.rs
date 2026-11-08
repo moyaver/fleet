@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::frame::RunOrigin;
+
 /// A project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -127,6 +129,9 @@ pub struct AgentRunView {
     pub maestro_profile_supported: Option<bool>,
     /// Revision.
     pub rev: i64,
+    /// Where the run's evidence came from: a published run is imported, not live.
+    #[serde(default)]
+    pub origin: RunOrigin,
     /// Set by the server from live contact (heartbeats never touch the database).
     pub liveness: Option<Liveness>,
 }
@@ -218,6 +223,9 @@ pub struct FlowView {
     pub duration_ms: Option<i64>,
     /// Steps seen.
     pub steps: i64,
+    /// The origin of the agent run that produced the flow (see the run's `origin`).
+    #[serde(default)]
+    pub origin: RunOrigin,
     /// Revision.
     pub rev: i64,
 }

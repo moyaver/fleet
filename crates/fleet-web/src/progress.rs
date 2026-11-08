@@ -136,6 +136,7 @@ impl Progress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fleet_protocol::frame::RunOrigin;
 
     fn counts(passed: i64, failed: i64, running: i64, pending: i64) -> FlowCounts {
         FlowCounts {
@@ -193,6 +194,7 @@ mod tests {
     #[test]
     fn flows_are_counted_by_state_and_an_unknown_state_is_never_a_pass() {
         let flow = |state: &str| FlowView {
+            origin: RunOrigin::Live,
             id: uuid::Uuid::nil(),
             job_id: uuid::Uuid::nil(),
             suite_execution_id: uuid::Uuid::nil(),

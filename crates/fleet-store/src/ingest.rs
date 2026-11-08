@@ -312,7 +312,7 @@ impl Store {
             (run.job_id, worker, run.run_day, committed, resume, false)
         } else {
             let (job_id, worker_id) = upsert_hierarchy(&mut tx, publisher, hello, &id).await?;
-            let run_day = now.date();
+            let run_day = run_day_of(hello, now);
             insert_run(&mut tx, publisher, hello, job_id, worker_id, run_day).await?;
             (job_id, worker_id, run_day, 0, ResumeOutcome::New, true)
         };
@@ -703,6 +703,17 @@ fn check_resume(
     Ok(())
 }
 
+/// The day a run belongs to (its `run_day` partition key): the day it started, as the agent
+/// recorded it, or the day the server first heard from it. A published run keeps the day of the
+/// run it describes, not the day it was published (issue #83).
+fn run_day_of(hello: &Hello, now: OffsetDateTime) -> Date {
+    hello
+        .started_at
+        .unwrap_or(now)
+        .to_offset(time::UtcOffset::UTC)
+        .date()
+}
+
 async fn insert_run(
     tx: &mut PgConnection,
     publisher: &Publisher,
@@ -715,11 +726,20 @@ async fn insert_run(
         Credential::AgentToken(t) => (Some(t), None),
         Credential::ApiKey(k) => (None, Some(k)),
     };
+    // A run from an earlier day than the partitions the hourly job keeps (a published run) needs
+    // its day's partitions first; the function takes an advisory lock, so creators do not race.
+    sqlx::query(
+        "SELECT fleet_ensure_partitions('agent_events'::regclass, $1, $1),
+                fleet_ensure_partitions('step_executions'::regclass, $1, $1)",
+    )
+    .bind(run_day)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query!(
         "INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id,
                                  previous_agent_run_id, trust_level, run_day,
-                                 agent_version, protocol_version)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                                 agent_version, protocol_version, origin)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         hello.agent_run_id,
         publisher.project_id,
         job_id,
@@ -730,7 +750,8 @@ async fn insert_run(
         publisher.trust.as_str(),
         run_day,
         hello.agent.version,
-        i16::try_from(hello.protocol.max).unwrap_or(i16::MAX)
+        i16::try_from(hello.protocol.max).unwrap_or(i16::MAX),
+        hello.origin.as_str()
     )
     .execute(&mut *tx)
     .await?;

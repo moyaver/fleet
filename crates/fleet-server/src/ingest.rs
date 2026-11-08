@@ -107,6 +107,21 @@ pub(crate) async fn open(
             true,
         ));
     }
+    // A published run from before the journal's retention would be removed by the next retention
+    // pass, so it is refused now, with the reason, rather than accepted and dropped.
+    if let Some(started) = hello.started_at {
+        let days = state.config.retention.journal_days;
+        let cutoff = time::OffsetDateTime::now_utc() - time::Duration::days(i64::from(days));
+        if started < cutoff {
+            return Err(reject(
+                ErrorCode::Invalid,
+                &format!(
+                    "the run started before the {days} days the journal keeps, so it would be removed at once"
+                ),
+                true,
+            ));
+        }
+    }
     match state.store.open_run(publisher, hello, transport).await {
         Ok(opened) => {
             let i = &state.config.ingest;

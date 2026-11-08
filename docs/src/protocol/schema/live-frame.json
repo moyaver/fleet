@@ -65,6 +65,11 @@
             "null"
           ]
         },
+        "origin": {
+          "$ref": "#/$defs/RunOrigin",
+          "default": "live",
+          "description": "Where the run's evidence came from: a published run is imported, not live."
+        },
         "plan_id": {
           "description": "The Fleet plan it runs a shard of.",
           "type": [
@@ -398,6 +403,11 @@
             "null"
           ]
         },
+        "origin": {
+          "$ref": "#/$defs/RunOrigin",
+          "default": "live",
+          "description": "The origin of the agent run that produced the flow (see the run's `origin`)."
+        },
         "outcome_source": {
           "description": "The winning claim's source.",
           "type": [
@@ -638,6 +648,21 @@
         {
           "const": "lagged",
           "description": "The client's socket fell behind the project's channel.",
+          "type": "string"
+        }
+      ]
+    },
+    "RunOrigin": {
+      "description": "Where a run's evidence came from (issue #83). A live run is observed as it happens; a published\nrun is a finished run the agent sent after the fact (`fleet-agent publish`), so the server shows\nit as imported, never as live.",
+      "oneOf": [
+        {
+          "const": "live",
+          "description": "Observed while it ran.",
+          "type": "string"
+        },
+        {
+          "const": "published",
+          "description": "Sent after the fact by `fleet-agent publish`: an offline bundle or a saved output.",
           "type": "string"
         }
       ]

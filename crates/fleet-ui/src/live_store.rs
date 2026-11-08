@@ -231,7 +231,10 @@ impl LiveStore {
 
 #[cfg(test)]
 mod tests {
-    use fleet_protocol::live::{Liveness, ResyncReason};
+    use fleet_protocol::{
+        frame::RunOrigin,
+        live::{Liveness, ResyncReason},
+    };
     use time::OffsetDateTime;
 
     use super::*;
@@ -262,6 +265,7 @@ mod tests {
 
     fn flow(n: u128, name: &str, state: &str, rev: i64) -> FlowView {
         FlowView {
+            origin: RunOrigin::Live,
             id: id(n),
             job_id: id(10),
             suite_execution_id: id(11),
@@ -284,6 +288,7 @@ mod tests {
 
     fn run(liveness: Option<Liveness>) -> AgentRunView {
         AgentRunView {
+            origin: RunOrigin::Live,
             id: id(12),
             job_id: id(10),
             worker_id: None,

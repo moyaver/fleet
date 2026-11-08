@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT f.id, f.job_id, f.suite_execution_id, f.agent_run_id, f.device_session_id,\n                f.shard_number, f.ordinal, f.flow_name AS name, f.flow_path AS path, f.state,\n                f.outcome_source::text AS outcome_source, f.finality::text AS \"finality!\",\n                f.has_conflict, f.failure_message, f.duration_ms, f.rev,\n                (SELECT count(*) FROM step_executions st\n                  WHERE st.run_day = r.run_day AND st.flow_execution_id = f.id) AS \"steps!\"\n           FROM flow_executions f JOIN agent_runs r ON r.id = f.agent_run_id\n          WHERE ($1::uuid IS NULL OR f.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR f.id = ANY($2)) AND ($3::uuid IS NULL OR f.project_id = $3)\n          ORDER BY f.shard_number NULLS LAST, f.ordinal NULLS LAST, f.id",
+  "query": "SELECT f.id, f.job_id, f.suite_execution_id, f.agent_run_id, f.device_session_id,\n                f.shard_number, f.ordinal, f.flow_name AS name, f.flow_path AS path, f.state,\n                f.outcome_source::text AS outcome_source, f.finality::text AS \"finality!\",\n                f.has_conflict, f.failure_message, f.duration_ms, f.rev, r.origin,\n                (SELECT count(*) FROM step_executions st\n                  WHERE st.run_day = r.run_day AND st.flow_execution_id = f.id) AS \"steps!\"\n           FROM flow_executions f JOIN agent_runs r ON r.id = f.agent_run_id\n          WHERE ($1::uuid IS NULL OR f.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR f.id = ANY($2)) AND ($3::uuid IS NULL OR f.project_id = $3)\n          ORDER BY f.shard_number NULLS LAST, f.ordinal NULLS LAST, f.id",
   "describe": {
     "columns": [
       {
@@ -171,6 +171,17 @@
       },
       {
         "ordinal": 16,
+        "name": "origin",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "origin"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
         "name": "steps!",
         "type_info": "Int8",
         "origin": "Expression"
@@ -200,8 +211,9 @@
       true,
       true,
       false,
+      false,
       null
     ]
   },
-  "hash": "2afe7e3d144b43fca4925445f30551f941ed8e5bd5174ecaee95f7661dd26cc5"
+  "hash": "49fce4473e7d70c21eaecdf36ccda5201cc7c6d9cfcab985bf427dbaaf5169fd"
 }
