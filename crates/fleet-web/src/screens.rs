@@ -8,9 +8,11 @@
 //! - [`parts`]: Leptos pieces shared by the pages of screens C and D.
 //! - [`history`]: screen E. [`compare`]: screen F. [`project`]: which project they are about.
 //! - [`routes`]: the routes of screens C and D, fetching with the REST client.
+//! - [`admin`]: Screen G, the administration pages (global administrators only).
 //! - [`worker`], [`device`]: screen C. [`flow`]: screen D. [`triage`]: a failure's recorded state,
 //!   shown on D and E.
 
+pub mod admin;
 pub mod common;
 pub mod compare;
 pub mod device;

@@ -29,6 +29,10 @@ use crate::{
     api::{self, ApiError},
     paths::login_url,
     screens::{
+        admin::{
+            model::{ADMIN_PATH, is_global_admin},
+            route::{AdminRoute, AuditRoute},
+        },
         compare::route::CompareRoute,
         history::route::HistoryRoute,
         overview::Overview,
@@ -91,6 +95,8 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/flows/:execution_id") view=FlowRoute />
                     <Route path=path!("/history") view=HistoryRoute />
                     <Route path=path!("/compare") view=CompareRoute />
+                    <Route path=path!("/admin") view=AdminRoute />
+                    <Route path=path!("/admin/audit") view=AuditRoute />
                 </Routes>
             </Layout>
         </Router>
@@ -120,6 +126,12 @@ fn Header() -> impl IntoView {
     let location = use_location();
     let project = move || project_of(&location.pathname.get(), &location.search.get());
     let live = expect_context::<LiveSlot>().0;
+    // Administration is offered to global administrators only; the server refuses everyone else.
+    let auth = expect_context::<Auth>();
+    let admin = move || {
+        auth.session
+            .with(|s| s.as_ref().is_some_and(is_global_admin))
+    };
     view! {
         <TopBar>
             // The product name is the page's only h1; the link takes the reader to Overview.
@@ -146,6 +158,11 @@ fn Header() -> impl IntoView {
                     <li>
                         <A href="/compare">"Compare"</A>
                     </li>
+                    {move || admin().then(|| view! {
+                        <li>
+                            <A href=ADMIN_PATH attr:data-testid="nav-admin">"Administration"</A>
+                        </li>
+                    })}
                 </ul>
             </nav>
             <div class="top-right">
@@ -188,6 +205,11 @@ fn Header() -> impl IntoView {
                                     <li>
                                         <A href="/compare" attr:class="flex min-h-11 items-center">"Compare"</A>
                                     </li>
+                                    {move || admin().then(|| view! {
+                                        <li>
+                                            <A href=ADMIN_PATH attr:class="flex min-h-11 items-center">"Administration"</A>
+                                        </li>
+                                    })}
                                 </ul>
                             </nav>
                             <div class="flex flex-col gap-2 border-t border-line pt-3">

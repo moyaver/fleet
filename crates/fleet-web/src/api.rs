@@ -7,6 +7,10 @@ use fleet_protocol::{
     rest::{
         ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
         TimelineView, WorkerRunPage, WorkerView,
+        admin::{
+            AdminAgentsView, AdminApiKeyView, AdminAuditPage, AdminIngestionView, AdminProjectView,
+            AdminRetentionView, AdminRoleMappingsView, AdminSettingView, AdminTrustPolicyView,
+        },
         history::{
             CompareView, FailureTriageRequest, FailureTriageView, FlowCatalogPage, FlowStatsView,
             HistoryPage, HistoryTrendView,
@@ -369,6 +373,61 @@ fn triage_path(project: &str, fingerprint: &str) -> String {
 /// A project slug as one path segment.
 fn segment(slug: &str) -> String {
     crate::paths::escape(slug)
+}
+
+/// Screen G: the projects, for onboarding. Global administrators only.
+pub async fn admin_projects() -> Result<Vec<AdminProjectView>, ApiError> {
+    get(&format!("{API}/admin/projects")).await
+}
+
+/// Screen G: publisher trust policies, by project.
+pub async fn admin_trust_policies() -> Result<Vec<AdminTrustPolicyView>, ApiError> {
+    get(&format!("{API}/admin/trust-policies")).await
+}
+
+/// Screen G: API keys, metadata only.
+pub async fn admin_api_keys() -> Result<Vec<AdminApiKeyView>, ApiError> {
+    get(&format!("{API}/admin/api-keys")).await
+}
+
+/// Screen G: roles bound to people and the identity-provider groups that grant them.
+pub async fn admin_role_mappings() -> Result<AdminRoleMappingsView, ApiError> {
+    get(&format!("{API}/admin/role-mappings")).await
+}
+
+/// Screen G: retention classes per project, and the server's retention windows.
+pub async fn admin_retention() -> Result<AdminRetentionView, ApiError> {
+    get(&format!("{API}/admin/retention")).await
+}
+
+/// Screen G: the artifact policy, from the running configuration.
+pub async fn admin_artifact_policy() -> Result<Vec<AdminSettingView>, ApiError> {
+    get(&format!("{API}/admin/artifact-policy")).await
+}
+
+/// Screen G: the metric collection policy, from the running configuration.
+pub async fn admin_metric_policy() -> Result<Vec<AdminSettingView>, ApiError> {
+    get(&format!("{API}/admin/metric-policy")).await
+}
+
+/// Screen G: agent versions seen and this server's protocol.
+pub async fn admin_agents() -> Result<AdminAgentsView, ApiError> {
+    get(&format!("{API}/admin/agents")).await
+}
+
+/// Screen G: refusals, losses and open runs.
+pub async fn admin_ingestion() -> Result<AdminIngestionView, ApiError> {
+    get(&format!("{API}/admin/ingestion")).await
+}
+
+/// The audit history, newest first: one page of up to `limit` events after `cursor`.
+pub async fn admin_audit(cursor: Option<&str>, limit: u32) -> Result<AdminAuditPage, ApiError> {
+    let mut path = format!("{API}/admin/audit?limit={limit}");
+    if let Some(cursor) = cursor {
+        path.push_str("&cursor=");
+        path.push_str(&crate::paths::escape(cursor));
+    }
+    get(&path).await
 }
 
 #[cfg(test)]
