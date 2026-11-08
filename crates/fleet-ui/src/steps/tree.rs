@@ -335,16 +335,16 @@ pub fn status_mark(status: StepStatus) -> Mark {
 }
 
 /// The provenance badge for evidence of this kind (invariant I4): live console and debug-log
-/// readings are provisional until the final report confirms them.
+/// readings are provisional until a final file settles them. A step settled from `commands.json`
+/// (issue #148) is verified, as a flow's outcome from that file is.
 #[must_use]
 pub fn provenance_of(source: SourceKind) -> Provenance {
     match source {
-        SourceKind::Declared
-        | SourceKind::AgentObserved
-        | SourceKind::ProcessExit
-        | SourceKind::ArtifactFile => Provenance::Observed,
+        SourceKind::Declared | SourceKind::AgentObserved | SourceKind::ProcessExit => {
+            Provenance::Observed
+        }
+        SourceKind::ArtifactFile | SourceKind::JunitFinal => Provenance::Final,
         SourceKind::LiveConsole | SourceKind::DebugLog => Provenance::Provisional,
-        SourceKind::JunitFinal => Provenance::Final,
         SourceKind::ServerInferred => Provenance::Inferred,
         SourceKind::Unrecognized => Provenance::Missing,
     }
@@ -539,6 +539,11 @@ mod tests {
             Provenance::Provisional
         );
         assert_eq!(provenance_of(SourceKind::JunitFinal), Provenance::Final);
+        assert_eq!(provenance_of(SourceKind::ArtifactFile), Provenance::Final);
+        assert_eq!(
+            provenance_of(SourceKind::AgentObserved),
+            Provenance::Observed
+        );
         assert_eq!(
             provenance_of(SourceKind::ServerInferred),
             Provenance::Inferred

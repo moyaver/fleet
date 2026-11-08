@@ -18,7 +18,7 @@ use fleet_ui::{
     components::live::LiveState,
     mark::Mark,
     provenance::Provenance,
-    steps::tree::{StepExec, StepTree, format_duration as step_duration},
+    steps::tree::{StepExec, StepTree, format_duration as step_duration, provenance_of},
 };
 
 use crate::{
@@ -557,6 +557,12 @@ fn steps(
         attempt: s.attempt.and_then(|a| u32::try_from(a).ok()).unwrap_or(1),
     }));
     let tree = StepTree::build(&execs);
+    // The section says how its steps are known by its weakest row, so one step still read from the
+    // log keeps the whole section provisional (issue #148). With no steps it says how the flow ended.
+    let weakest = execs
+        .iter()
+        .map(|e| provenance_of(e.source))
+        .min_by_key(|p| provenance_rank(*p));
     let n = flat.len() - setup.len();
     let open = matches!(view.flow.state.as_str(), "running" | "pending");
     let summary = match (n, open) {
@@ -574,11 +580,24 @@ fn steps(
         note: (n > 0).then_some(
             "Listed in the order Maestro ran them. A block (runFlow, retry, repeat) holds the steps it ran; a retried step shows its attempt.",
         ),
-        provenance: if settled {
+        provenance: weakest.unwrap_or(if settled {
             Provenance::Observed
         } else {
             Provenance::Provisional
-        },
+        }),
+    }
+}
+
+/// How far a provenance can be relied on, lowest first: a section takes its weakest row's.
+fn provenance_rank(p: Provenance) -> u8 {
+    match p {
+        Provenance::Missing => 0,
+        Provenance::Stale => 1,
+        Provenance::Provisional => 2,
+        Provenance::Inferred => 3,
+        Provenance::Observed => 4,
+        Provenance::Derived => 5,
+        Provenance::Final => 6,
     }
 }
 
@@ -1204,10 +1223,30 @@ mod tests {
         );
     }
 
+    /// The steps section shows its weakest row's provenance: a step still read from the log keeps the
+    /// section provisional, and steps a final file settled are verified (issue #148).
+    #[test]
+    fn the_steps_section_shows_the_weakest_rows_provenance() {
+        let mut v = view();
+        for step in &mut v.steps {
+            step.source = "artifact_file".to_owned();
+        }
+        assert_eq!(
+            FlowPage::build(&v, &ctx()).steps.provenance,
+            Provenance::Final
+        );
+        v.steps[2].source = "debug_log".to_owned();
+        assert_eq!(
+            FlowPage::build(&v, &ctx()).steps.provenance,
+            Provenance::Provisional
+        );
+    }
+
     #[test]
     fn the_live_indicator_is_settled_only_once_the_outcome_is_final() {
         assert!(page().settled);
-        assert_eq!(page().steps.provenance, Provenance::Observed);
+        // The fixture's steps were all read from the log, so the section is provisional.
+        assert_eq!(page().steps.provenance, Provenance::Provisional);
         let mut v = view();
         v.flow.finality = "provisional".to_owned();
         let open = FlowPage::build(&v, &ctx());
