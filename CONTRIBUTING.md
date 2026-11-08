@@ -34,6 +34,8 @@ This installs the latest cargo-nextest, cargo-deny, cargo-about, Trunk and mdBoo
 | `cargo xtask web [--release]` | Build the dashboard into `crates/fleet-web/dist` |
 | `cargo run -p fleet-server -- serve` | Serve the dashboard and API on <http://127.0.0.1:8080> |
 
+Two checkouts can share one Postgres server, but not the `#[sqlx::test]` tests at the same time. sqlx 0.9 names each such test's database from a hash of the test's module path and name (`_sqlx_test_<hash>`), with no per-process or per-checkout part, so two runs of the same test both create `_sqlx_test_<hash>` and the second fails with `duplicate key … _sqlx_test_<hash> already exists`. Give each checkout its own server (a container on its own port), or run one checkout's database tests at a time. The other database tests name their databases `fleet_test_<uuid>` (`fleet_store::testing::fresh_database`) and do not collide.
+
 ## 3. Rules that CI enforces
 
 The invariants in [PLAN §3](docs/PLAN.md#3-invariants-non-negotiable) are non-negotiable. The ones you'll meet first:
