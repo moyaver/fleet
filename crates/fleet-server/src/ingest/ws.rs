@@ -276,8 +276,11 @@ async fn stream(state: &AppState, socket: &mut WebSocket, run: &RunHandle) -> En
     }
 }
 
+/// How long a draining socket waits for the peer's close frame before it gives up on it.
+const CLOSE_HANDSHAKE: Duration = Duration::from_secs(1);
+
 /// Graceful shutdown for one socket (research 05 §3.9): `goaway`, the last telemetry
-/// checkpoint and its ack, then close 1012 (service restart).
+/// checkpoint and its ack, then close 1012 (service restart), and the peer's close frame.
 async fn drain(state: &AppState, socket: &mut WebSocket, acks: &mut mpsc::Receiver<u64>) {
     let goaway = ServerFrame::Goaway {
         reason: GoawayReason::Shutdown,
@@ -289,6 +292,22 @@ async fn drain(state: &AppState, socket: &mut WebSocket, acks: &mut mpsc::Receiv
         let _ = send(socket, &ServerFrame::TelemetryAck { through }).await;
     }
     close(socket, 1012, "server restarting").await;
+    close_handshake(socket).await;
+}
+
+/// Reads until the peer's close frame, so the socket is closed with nothing unread. A socket
+/// dropped with inbound bytes still queued is reset by the kernel, and the peer can lose the
+/// `goaway` and close frames it has not read yet (RFC 6455 §5.5.1). Frames that arrive now are
+/// read and dropped: their batches were never acked, so the agent resends them on reconnect.
+async fn close_handshake(socket: &mut WebSocket) {
+    let peer_closes = async {
+        while let Some(Ok(msg)) = socket.recv().await {
+            if matches!(msg, Message::Close(_)) {
+                break;
+            }
+        }
+    };
+    let _ = tokio::time::timeout(CLOSE_HANDSHAKE, peer_closes).await;
 }
 
 fn invalid(message: &str) -> ServerFrame {
