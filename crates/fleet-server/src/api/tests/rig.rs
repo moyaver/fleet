@@ -46,6 +46,8 @@ pub(super) struct Rig {
     pub(super) store: Store,
     /// A publisher key for project `app`.
     pub(super) key: String,
+    /// The test's database, dropped with the rig.
+    _db: fleet_store::testing::TestDatabase,
 }
 
 pub(super) async fn rig() -> Rig {
@@ -53,9 +55,9 @@ pub(super) async fn rig() -> Rig {
 }
 
 pub(super) async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
-    let (_store, url) = fleet_store::testing::fresh_database().await.unwrap();
+    let db = fleet_store::testing::fresh_database().await.unwrap();
     let mut config = Config::default();
-    config.database.url = Some(Secret::from(url.as_str()));
+    config.database.url = Some(Secret::from(db.url()));
     config.api.viewer_tokens = vec![Secret::from(VIEWER)];
     config.ingest.telemetry_flush_ms = 50;
     config.projects = ["app", "other"]
@@ -90,6 +92,7 @@ pub(super) async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
         state,
         store,
         key: key.expose().to_owned(),
+        _db: db,
     }
 }
 

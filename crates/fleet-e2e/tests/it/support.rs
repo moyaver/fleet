@@ -30,16 +30,18 @@ pub(crate) struct Stack {
     pub(crate) server: Option<fleet_server::Server>,
     pub(crate) config: Config,
     pub(crate) key: String,
+    /// The test's database, dropped with the stack.
+    _db: fleet_store::testing::TestDatabase,
 }
 
 impl Stack {
     pub(crate) async fn start(tweak: impl FnOnce(&mut Config)) -> Self {
-        let (store, url) = fleet_store::testing::fresh_database().await.unwrap();
+        let db = fleet_store::testing::fresh_database().await.unwrap();
         let mut c = Config {
             listen: SocketAddr::from(([127, 0, 0, 1], 0)),
             ..Config::default()
         };
-        c.database.url = Some(Secret::from(url.as_str()));
+        c.database.url = Some(Secret::from(db.url()));
         c.ingest.telemetry_flush_ms = 200;
         c.api.viewer_tokens = vec![Secret::from(VIEWER)];
         c.projects = vec![ProjectConfig {
@@ -55,6 +57,7 @@ impl Stack {
             std::env::temp_dir().join(format!("fleet-e2e-spool-{}", uuid::Uuid::now_v7()));
         tweak(&mut c);
         let server = fleet_server::start(c.clone()).await.unwrap();
+        let store = db.store();
         let project = store.project_id("app").await.unwrap().unwrap();
         let (_, key) = store
             .create_api_key(
@@ -69,6 +72,7 @@ impl Stack {
             server: Some(server),
             config: c,
             key: key.expose().to_owned(),
+            _db: db,
         }
     }
 

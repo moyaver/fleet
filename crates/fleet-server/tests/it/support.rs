@@ -37,6 +37,8 @@ pub(crate) struct Harness {
     pub(crate) server: Option<fleet_server::Server>,
     pub(crate) config: Config,
     pub(crate) key: String,
+    /// The test's database, dropped with the harness.
+    _db: fleet_store::testing::TestDatabase,
 }
 
 pub(crate) fn test_config(url: &str) -> Config {
@@ -64,10 +66,11 @@ impl Harness {
     }
 
     pub(crate) async fn start_with(tweak: impl FnOnce(&mut Config)) -> Self {
-        let (store, url) = fleet_store::testing::fresh_database().await.unwrap();
-        let mut config = test_config(&url);
+        let db = fleet_store::testing::fresh_database().await.unwrap();
+        let mut config = test_config(db.url());
         tweak(&mut config);
         let server = fleet_server::start(config.clone()).await.unwrap();
+        let store = db.store();
         let project = store.project_id("app").await.unwrap().unwrap();
         let (_, key) = store
             .create_api_key(
@@ -82,6 +85,7 @@ impl Harness {
             server: Some(server),
             config,
             key: key.expose().to_owned(),
+            _db: db,
         }
     }
 

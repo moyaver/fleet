@@ -162,6 +162,8 @@ struct Rig {
     app: TestServer,
     store: fleet_store::Store,
     idp: Idp,
+    /// The test's database, dropped with the rig.
+    _db: fleet_store::testing::TestDatabase,
 }
 
 async fn rig() -> Rig {
@@ -170,9 +172,10 @@ async fn rig() -> Rig {
 
 async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     let idp = Idp::start().await;
-    let (store, url) = fleet_store::testing::fresh_database().await.unwrap();
+    let db = fleet_store::testing::fresh_database().await.unwrap();
+    let store = db.store().clone();
     let mut config = Config::default();
-    config.database.url = Some(Secret::from(url.as_str()));
+    config.database.url = Some(Secret::from(db.url()));
     config.api.public_url = Some(PUBLIC.into());
     config.projects = ["app", "other"]
         .map(|slug| ProjectConfig {
@@ -208,7 +211,12 @@ async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     let app = TestServer::builder()
         .http_transport()
         .build(app::router(&state).into_make_service_with_connect_info::<SocketAddr>());
-    Rig { app, store, idp }
+    Rig {
+        app,
+        store,
+        idp,
+        _db: db,
+    }
 }
 
 fn set_cookie(res: &axum_test::TestResponse) -> String {
