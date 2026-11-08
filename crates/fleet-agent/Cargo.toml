@@ -23,6 +23,7 @@ crc32fast.workspace = true
 fleet-core.workspace = true
 fleet-maestro.workspace = true
 fleet-protocol.workspace = true
+glob.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
 nix = { workspace = true, features = ["user"] }

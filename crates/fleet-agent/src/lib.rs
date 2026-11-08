@@ -5,6 +5,7 @@
 
 mod adb;
 mod bundle;
+mod catalog;
 mod ci;
 pub mod cli;
 mod commands;

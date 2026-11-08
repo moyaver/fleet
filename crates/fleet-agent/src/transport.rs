@@ -51,6 +51,8 @@ pub(crate) struct Config {
     pub(crate) started_at: Option<OffsetDateTime>,
     /// How long the server may send nothing before the connection is given up for a new one.
     pub(crate) silence_timeout: Duration,
+    /// The workspace's flows, found before the run (issue #85); sent in `hello`.
+    pub(crate) catalog: fleet_protocol::frame::FlowCatalog,
 }
 
 impl Config {
@@ -77,6 +79,7 @@ impl Config {
             origin: RunOrigin::Live,
             started_at: None,
             silence_timeout: SILENCE_TIMEOUT,
+            catalog: fleet_protocol::frame::FlowCatalog::default(),
         }
     }
 }
@@ -678,6 +681,7 @@ fn hello_frame(
         clock: clock(),
         origin: cfg.origin,
         started_at: cfg.started_at,
+        catalog: cfg.catalog.clone(),
     })))
 }
 

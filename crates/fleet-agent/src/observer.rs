@@ -383,6 +383,37 @@ fn watched_layout(argv: &[String], recognised: bool, started: SystemTime) -> Opt
     })
 }
 
+/// The flows of the workspace a `maestro test` run reads: the directory it names, else the one its
+/// `--config` lies in, else the current directory. A run that names flow files alone reads no
+/// workspace, so its catalog is empty (issue #85).
+fn catalog_of(argv: &[String], cwd: Option<&Path>) -> fleet_protocol::frame::FlowCatalog {
+    let inv = fleet_maestro::invocation::parse(argv);
+    if inv.test_index.is_none() {
+        return fleet_protocol::frame::FlowCatalog::default();
+    }
+    let resolve = |p: &str| match cwd {
+        Some(cwd) if Path::new(p).is_relative() => cwd.join(p),
+        _ => PathBuf::from(p),
+    };
+    let workspace = match &inv.config {
+        Some(config) => resolve(config).parent().map(Path::to_path_buf),
+        None if inv.positionals.is_empty() => cwd.map(Path::to_path_buf),
+        None => inv
+            .positionals
+            .iter()
+            .map(|p| resolve(p))
+            .find(|p| p.is_dir()),
+    };
+    let Some(workspace) = workspace else {
+        return fleet_protocol::frame::FlowCatalog::default();
+    };
+    let repo_root = std::env::var_os("GITHUB_WORKSPACE")
+        .map(PathBuf::from)
+        .filter(|root| workspace.starts_with(root))
+        .unwrap_or_else(|| crate::catalog::repo_root_of(&workspace));
+    crate::catalog::discover(&workspace, &repo_root)
+}
+
 fn configure_workspace(session: &mut Session, argv: &[String]) {
     let cwd = std::env::current_dir().ok();
     let git_root = |path: &Path| {
@@ -408,6 +439,10 @@ fn configure_workspace(session: &mut Session, argv: &[String]) {
     clippy::too_many_arguments,
     reason = "everything ChildStarted carries, unpacked once"
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one straight-line assembly of the run's state: the sources, transport and devices"
+)]
 fn start(
     argv: &[String],
     pid: u32,
@@ -429,6 +464,7 @@ fn start(
             .map(|(k, v)| (k.as_str(), v.as_str())),
     );
     let layout = watched_layout(argv, evidence.is_some(), started);
+    let cwd = std::env::current_dir().ok();
     let mut session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
     configure_workspace(&mut session, argv);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
@@ -462,9 +498,10 @@ fn start(
                     tls: crate::net::tls(std::env::var("FLEET_CA_FILE").ok().as_deref()),
                 })
             });
-            let cfg = transport::Config::from_env(url, agent_run_id, ci.clone(), |k| {
+            let mut cfg = transport::Config::from_env(url, agent_run_id, ci.clone(), |k| {
                 std::env::var(k).ok()
             });
+            cfg.catalog = catalog_of(argv, cwd.as_deref());
             (
                 Some(tx),
                 Some(tokio::spawn(transport::run(
@@ -1150,6 +1187,8 @@ mod tests {
     /// A device sample of `session`, with its probe readings set and every emulator reading unknown.
     fn device_sample(session: Uuid) -> DeviceSample {
         DeviceSample {
+            model: None,
+            os_version: None,
             at: ClockSample {
                 wall: OffsetDateTime::UNIX_EPOCH,
                 mono_ms: 0,
@@ -1356,5 +1395,36 @@ mod tests {
             (None, Some(Unavailable::NoAvdName)),
             "its command line names no AVD"
         );
+    }
+
+    #[test]
+    fn a_run_reads_the_workspace_its_command_names_and_no_catalog_for_a_flow_file() {
+        let dir =
+            std::env::temp_dir().join(format!("fleet-observer-catalog-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(dir.join("flows")).unwrap();
+        std::fs::write(dir.join("config.yaml"), "flows:\n  - flows/*.yaml\n").unwrap();
+        std::fs::write(
+            dir.join("flows/login.yaml"),
+            "name: login\ntags:\n  - smoke\n---\n- back\n",
+        )
+        .unwrap();
+        let argv =
+            |args: &[&str]| -> Vec<String> { args.iter().map(|a| (*a).to_owned()).collect() };
+        let dir_arg = dir.to_string_lossy().into_owned();
+
+        let by_dir = catalog_of(&argv(&["maestro", "test", &dir_arg]), None);
+        assert_eq!(by_dir.flows.len(), 1, "{by_dir:?}");
+        assert_eq!(by_dir.flows[0].tags, ["smoke"]);
+
+        let file_arg = dir.join("flows/login.yaml").to_string_lossy().into_owned();
+        assert!(
+            catalog_of(&argv(&["maestro", "test", &file_arg]), None).is_empty(),
+            "a flow file names no workspace"
+        );
+        assert!(
+            catalog_of(&argv(&["bash", "-c", "true"]), None).is_empty(),
+            "not a maestro test"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
