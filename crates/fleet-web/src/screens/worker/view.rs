@@ -10,7 +10,9 @@
 
 use fleet_protocol::rest::{MetricsView, TimelineView, WorkerRunPage, WorkerView};
 use fleet_ui::{
-    components::display::{Card, EmptyState, ProvenanceBadge, ReadoutStrip, TableBox},
+    components::display::{
+        Card, EmptyState, ProvenanceBadge, ReadoutStrip, RowProvenance, TableBox,
+    },
     provenance::Provenance,
 };
 use leptos::prelude::*;
@@ -180,7 +182,7 @@ fn HeaderView(
                         <span data-testid="runner-liveness"><PillView pill=h.liveness /></span>
                         {h.sampled.map(|s| view! { <span class="note">{s}</span> })}
                         {(sampled_now || stale)
-                            .then(|| view! { <ProvenanceBadge provenance=Signal::stored(h.provenance) /> })}
+                            .then(|| view! { <RowProvenance provenance=Signal::stored(h.provenance) /> })}
                     </div>
                     <p class="meta">{h.meta}</p>
                 </header>

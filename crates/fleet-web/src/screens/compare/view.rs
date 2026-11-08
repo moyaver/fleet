@@ -10,7 +10,8 @@
 use fleet_protocol::rest::history::ChangeKind;
 use fleet_ui::{
     components::display::{
-        EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutStrip, StatTile, TableBox,
+        EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutStrip, RowProvenance, StatTile,
+        TableBox,
     },
     provenance::Provenance,
     tone::Tone,
@@ -273,7 +274,7 @@ fn side_cell(cell: Option<SideCell>, show_provenance: bool) -> AnyView {
         Some(c) => view! {
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span title=c.finality_note><PillView pill=c.state /></span>
-                {show_provenance.then(|| view! { <ProvenanceBadge provenance=c.provenance /> })}
+                {show_provenance.then(|| view! { <RowProvenance provenance=c.provenance /> })}
                 <a class="text-sm text-primary underline" href=c.href>"Open"</a>
             </div>
             {c.failure_fingerprint.map(|f| view! { <FailureFingerprint fingerprint=f /> })}
