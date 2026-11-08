@@ -73,12 +73,15 @@ jobs:
       - run: cargo build --locked --release -p fleet-agent
 
   action-smoke:
-    # Installs the released agent through the composite action in install-only mode (no command, so
-    # no Maestro, server or token). Proves the release archive matches sha256.sum, its build
-    # attestation verifies, and the binary runs. Not covered: the run and job summary.
-    name: fleet-agent action (install and verify)
+    # The composite action in two halves (#71). First the released agent installs through it in
+    # install-only mode: the archive matches sha256.sum, its build attestation verifies, and the
+    # binary runs. Then the repository's own agent runs through it on a fake Maestro: the script the
+    # agent's tests use, replaying a captured fixture (fixtures/maestro), with a quoted argument in
+    # the command. The job summary must reach GITHUB_STEP_SUMMARY, and Maestro's exit status (1, a
+    # failing flow) must come through unchanged.
+    name: fleet-agent action (install, run and job summary)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
       attestations: read   # gh attestation verify, with the job's GITHUB_TOKEN
@@ -90,3 +93,39 @@ jobs:
         with:
           version: v0.1.0-alpha.3
       - run: fleet-agent version
+      - name: Build the repository's agent
+        run: cargo build --locked -p fleet-agent
+      - name: Put the fake Maestro and the built agent on PATH
+        run: |
+          set -euo pipefail
+          fake="$RUNNER_TEMP/fake-maestro"
+          mkdir -p "$fake"
+          ln -s "$GITHUB_WORKSPACE/crates/fleet-agent/tests/it/fake-maestro.sh" "$fake/maestro"
+          echo "$fake" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/target/debug" >> "$GITHUB_PATH"
+      - name: Run Maestro under the composite action
+        id: run
+        uses: ./examples/github-actions/fleet-agent
+        # The fixture has a failing flow, so Maestro exits 1 and this step fails; the next step
+        # checks that it did, and reads the summary.
+        continue-on-error: true
+        env:
+          FLEET_FAKE_FIXTURE: ${{ github.workspace }}/fixtures/maestro/2.12.1/suite
+          FLEET_FAKE_ARGV_LOG: ${{ runner.temp }}/maestro-argv.txt
+        with:
+          install: "false"
+          command: maestro test "flows with a space/"
+      - name: Check the job summary and the pass-through exit status
+        env:
+          OUTCOME: ${{ steps.run.outcome }}
+          SUMMARY: ${{ steps.run.outputs.summary-file }}
+          ARGV: ${{ runner.temp }}/maestro-argv.txt
+        run: |
+          set -euo pipefail
+          test "$OUTCOME" = failure || { echo "::error::Maestro's exit 1 should fail the step, not $OUTCOME"; exit 1; }
+          # The quoted argument reached Maestro as one argument.
+          grep -Fxq "flows with a space/" "$ARGV"
+          grep -Fxq "## Fleet" "$SUMMARY"
+          grep -Fxq "Flows: 1 failed, 3 passed (4 in total)." "$SUMMARY"
+          grep -Fq "| delta-fails | failed | verified (artifact_file) |" "$SUMMARY"
+          cat "$SUMMARY"
