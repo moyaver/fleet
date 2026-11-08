@@ -2,8 +2,9 @@
 # through unchanged; telemetry is best-effort. Needs `permissions: id-token: write` for OIDC.
 name: Run Maestro under Fleet
 description: >-
-  Installs a pinned, checksum-verified fleet-agent release and runs a Maestro command under it.
-  Maestro's output and exit status are unchanged. A job summary is written to GITHUB_STEP_SUMMARY.
+  Installs a pinned fleet-agent release, checked against its GitHub build attestation (required by
+  default), and runs a Maestro command under it. Maestro's output and exit status are unchanged. A
+  job summary is written to GITHUB_STEP_SUMMARY.
 inputs:
   command:
     description: >-
@@ -29,10 +30,17 @@ inputs:
     default: ""
   github-token:
     description: >-
-      Token for `gh attestation verify`. Defaults to the job's GITHUB_TOKEN. Verification runs only
-      when the `gh` CLI is installed.
+      Token for `gh attestation verify`, with `attestations: read`. Defaults to the job's GITHUB_TOKEN,
+      which needs `permissions: attestations: read` in the workflow.
     required: false
     default: ""
+  verify-attestation:
+    description: >-
+      `true` (the default) requires the release's build attestation to verify, against the `gh` CLI and
+      a token, and takes the archive's expected SHA-256 from that attestation. `false` skips the check
+      with a warning; the archive is then not authenticated.
+    required: false
+    default: "true"
 outputs:
   summary-file:
     description: >-
@@ -47,6 +55,7 @@ runs:
       shell: bash
       env:
         AGENT_VERSION: ${{ inputs.version }}
+        VERIFY_ATTESTATION: ${{ inputs.verify-attestation }}
         GH_TOKEN: ${{ inputs.github-token || github.token }}
       run: |
         set -euo pipefail
@@ -68,23 +77,47 @@ runs:
         dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fleet-agent"
         mkdir -p "$dir"
         curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$dir/$archive" "$base/$archive"
-        curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$dir/sha256.sum" "$base/sha256.sum"
-        # A checksum mismatch fails the job. Other problems with the file list do too.
-        grep -F " *$archive" "$dir/sha256.sum" > "$dir/expected.sum" \
-          || { echo "::error::$archive is not listed in sha256.sum"; exit 1; }
-        (
-          cd "$dir"
-          if command -v sha256sum > /dev/null 2>&1; then
-            sha256sum -c expected.sum
-          else
-            shasum -a 256 -c expected.sum
-          fi
-        ) || { echo "::error::checksum mismatch for $archive"; exit 1; }
-        if command -v gh > /dev/null 2>&1 && [ -n "$GH_TOKEN" ]; then
-          gh attestation verify "$dir/$archive" --repo moyaver/fleet
-        else
-          echo "::notice::build attestation not checked: the gh CLI or a token is not available"
-        fi
+        # The expected digest comes from the build attestation, signed by the release workflow and
+        # recorded in Sigstore's transparency log. It does not come from sha256.sum, which is
+        # served from the same release as the archive and so proves nothing about it (research 06 T18).
+        case "$VERIFY_ATTESTATION" in
+          true)
+            if ! command -v gh > /dev/null 2>&1; then
+              echo "::error::verify-attestation is true but the gh CLI is not installed; install gh or set verify-attestation: false"
+              exit 1
+            fi
+            if ! command -v jq > /dev/null 2>&1; then
+              echo "::error::verify-attestation is true but jq is not installed"
+              exit 1
+            fi
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::verify-attestation is true but there is no token: grant attestations: read, or set github-token"
+              exit 1
+            fi
+            attestation="$dir/attestation.json"
+            if ! gh attestation verify "$dir/$archive" --repo moyaver/fleet --format json > "$attestation"; then
+              echo "::error::the build attestation for $archive does not verify"
+              exit 1
+            fi
+            expected=$(jq -r '.[].verificationResult.statement.subject[]?.digest.sha256 // empty' "$attestation")
+            if command -v sha256sum > /dev/null 2>&1; then
+              actual=$(sha256sum "$dir/$archive" | cut -d' ' -f1)
+            else
+              actual=$(shasum -a 256 "$dir/$archive" | cut -d' ' -f1)
+            fi
+            if [ -z "$expected" ] || ! grep -Fxq "$actual" <<< "$expected"; then
+              echo "::error::checksum mismatch for $archive: its digest is not among those in the build attestation"
+              exit 1
+            fi
+            ;;
+          false)
+            echo "::warning::build attestation not checked (verify-attestation: false): the archive is not authenticated"
+            ;;
+          *)
+            echo "::error::verify-attestation must be true or false, not '$VERIFY_ATTESTATION'"
+            exit 1
+            ;;
+        esac
         tar -xJf "$dir/$archive" -C "$dir"
         bin="$dir/fleet-agent-$target"
         "$bin/fleet-agent" version

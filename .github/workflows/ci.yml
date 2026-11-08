@@ -81,11 +81,11 @@ jobs:
 
   action-smoke:
     # The composite action in two halves (#71). First the released agent installs through it in
-    # install-only mode: the archive matches sha256.sum, its build attestation verifies, and the
-    # binary runs. Then the repository's own agent runs through it on a fake Maestro: the script the
-    # agent's tests use, replaying a captured fixture (fixtures/maestro), with a quoted argument in
-    # the command. The job summary must reach GITHUB_STEP_SUMMARY, and Maestro's exit status (1, a
-    # failing flow) must come through unchanged.
+    # install-only mode: its build attestation must verify, the archive's digest must be the one in
+    # that attestation (the action's default), and the binary runs. Then the repository's own agent
+    # runs through it on a fake Maestro: the script the agent's tests use, replaying a captured
+    # fixture (fixtures/maestro), with a quoted argument in the command. The job summary must reach
+    # GITHUB_STEP_SUMMARY, and Maestro's exit status (1, a failing flow) must come through unchanged.
     name: fleet-agent action (install, run and job summary)
     runs-on: ubuntu-latest
     timeout-minutes: 30
