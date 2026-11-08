@@ -95,6 +95,27 @@ role = "admin"
 - **Serve the dashboard over HTTPS.** The session cookie is `Secure` and carries the `__Host-` prefix, which browsers accept only from a secure origin, so sign-in cannot work over plain `http://` (browsers treat `localhost` and `127.0.0.1` as secure, which is how the end-to-end tests run). Put TLS in front of Fleet (the Compose file's Caddy does) and set `api.public_url` to the `https://` address people use.
 - A project the user has no role on looks exactly like a project that does not exist.
 
+## Administration
+
+Global administrators see **Administration** in the navigation (`/admin`), and the audit history at `/admin/audit`. Every other person, including a project's own admin, a viewer token and anonymous readers, is refused on those URLs and in the API. Grant the role with `[[login.group_roles]]` and no `project`, or bind it to a person as a role for every project.
+
+The page is **read only** in this release. It shows, one section per area:
+
+| Section | Where the data lives | Changed by |
+|---|---|---|
+| Projects (onboarding) | `projects`, with each project's working API keys and trust policies | `projects` in the configuration (at start-up) |
+| Publisher trust | `publisher_trust_policies` | `projects[].trust_policies` (replaced at start-up) |
+| API keys | `api_keys`: name, prefix, trust level, expiry, revocation, last use. The secret and its hash are never shown | `fleet api-key create|revoke|expire` |
+| Role mappings | `role_bindings` (people) and `group_mappings` (identity-provider groups) | `[[login.group_roles]]` at sign-in; bindings in SQL |
+| Retention | `retention_classes` per project, and the `retention.*` windows of the configuration | the `retention_classes` table (SQL) and `retention.*` |
+| Artifact policy | the `storage`, `artifacts` and `usercontent` settings of the running configuration | the configuration file, then a restart |
+| Metric collection | the `ingest` checkpoint and heartbeat and the `retention` windows of the configuration. The agents sample every 5 s, and every 15 s under host pressure; no server setting changes that | the configuration file, then a restart |
+| Agent compatibility | `agent_runs`: each agent version and protocol seen, with its open runs. Compatible means the protocol is the one this server speaks | agents are upgraded outside Fleet |
+| Ingestion health | `ingest_rejections` (refused events), `ingest_gaps` (losses the agents reported) and the open runs with how long since the server last heard from them and how far behind their newest event was | |
+| Audit history | `audit_events`, newest first, 50 at a time. Each event shows who (a person, an API key, or the system), what, when, and the values it changed where one was recorded (`before` and `after`, or the `from` and `to` of a triage change) | recorded by Fleet; kept for `retention.audit_days` |
+
+Values from the configuration are shown with their key and marked `config`, so an operator can see what the running server uses. Until the forms arrive, a change to a table-backed area is made with SQL, as described in [Retention](#retention) and [API keys](#configuration).
+
 ## Client addresses and limits
 
 Pre-auth requests (`POST /api/v1/agent/token`, browser sign-in and its callback) are limited per client IP, and each agent credential is limited on its WebSocket upgrades and batch requests. Each viewer credential (a configured viewer token, or a browser session) is limited on the REST reads and the live socket's upgrades. A refused request gets `429 Too Many Requests` with `Retry-After` in seconds. The agent waits that long and keeps spooling, so a limit slows a run's upload and never fails the run; the dashboard waits and keeps the data it has on screen.
@@ -197,7 +218,7 @@ Fleet keeps what you need to debug last week's failure and see this year's trend
 
 **Raw partitions are never dropped before they are rolled up.** If the rollup job is behind (or was down) when a partition expires, the partition is kept, a `keeping an expired partition` warning is logged, and it is dropped by a later pass.
 
-**Artifact classes.** Each artifact gets a retention class when it arrives, and the class decides when it expires. The defaults (seeded per project in the `retention_classes` table; an admin screen arrives in M6, until then change them with SQL) are:
+**Artifact classes.** Each artifact gets a retention class when it arrives, and the class decides when it expires. The defaults (seeded per project in the `retention_classes` table, shown read only on the [Administration](#administration) page; change them with SQL until the forms arrive) are:
 
 | Class | Default | Applies to |
 |---|---|---|
