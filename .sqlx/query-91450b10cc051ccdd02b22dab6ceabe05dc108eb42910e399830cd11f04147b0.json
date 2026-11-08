@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE device_sessions SET profile_id = $3\n          WHERE id = $1 AND project_id = $2 AND profile_id IS DISTINCT FROM $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "91450b10cc051ccdd02b22dab6ceabe05dc108eb42910e399830cd11f04147b0"
+}

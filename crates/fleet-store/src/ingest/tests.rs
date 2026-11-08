@@ -77,6 +77,7 @@ impl Agent {
             clock: now(),
             origin: RunOrigin::Live,
             started_at: None,
+            catalog: fleet_protocol::frame::FlowCatalog::default(),
         }
     }
 
@@ -159,11 +160,21 @@ pub(crate) struct Script<'a> {
 }
 
 /// A whole run of scripted flows on one device, ending normally.
-#[expect(clippy::too_many_lines, reason = "one straight-line event script")]
 pub(crate) fn suite_run_scripted(
     a: &mut Agent,
     ids: SuiteIds,
     flows: &[Script<'_>],
+) -> Vec<EventEnvelope> {
+    suite_run_scripted_on(a, ids, flows, "emulator-5554")
+}
+
+/// A whole run of scripted flows on the device `serial`, ending normally.
+#[expect(clippy::too_many_lines, reason = "one straight-line event script")]
+pub(crate) fn suite_run_scripted_on(
+    a: &mut Agent,
+    ids: SuiteIds,
+    flows: &[Script<'_>],
+    serial: &str,
 ) -> Vec<EventEnvelope> {
     let mut out = vec![
         a.event(
@@ -189,7 +200,7 @@ pub(crate) fn suite_run_scripted(
             SourceKind::DebugLog,
             &EventBody::ShardAssigned(ShardAssigned {
                 shard_number: 1,
-                device_serial: "emulator-5554".into(),
+                device_serial: serial.into(),
                 planned: flows
                     .iter()
                     .map(|s| FlowRef {
@@ -1504,9 +1515,12 @@ async fn absolute_and_relative_report_paths_share_history_identity(pool: PgPool)
         .history(
             p.project_id,
             &crate::screens::HistoryQuery {
-                flow: None,
-                branch: None,
-                outcome: None,
+                filters: crate::screens::Filters {
+                    flow: None,
+                    branch: None,
+                    outcome: None,
+                    ..Default::default()
+                },
                 from: OffsetDateTime::UNIX_EPOCH,
                 to: OffsetDateTime::now_utc() + time::Duration::days(1),
                 after: None,
@@ -2174,9 +2188,12 @@ async fn a_lost_device_label_survives_the_journal_being_purged(pool: PgPool) {
         .history(
             p.project_id,
             &crate::screens::HistoryQuery {
-                flow: None,
-                branch: None,
-                outcome: None,
+                filters: crate::screens::Filters {
+                    flow: None,
+                    branch: None,
+                    outcome: None,
+                    ..Default::default()
+                },
                 from: now - time::Duration::days(1),
                 to: now + time::Duration::days(1),
                 after: None,

@@ -316,6 +316,8 @@ impl Store {
             insert_run(&mut tx, publisher, hello, job_id, worker_id, run_day).await?;
             (job_id, worker_id, run_day, 0, ResumeOutcome::New, true)
         };
+        // The workspace's flows, so a flow that has not run yet is listed (issue #85).
+        crate::catalog::upsert_catalog(&mut tx, publisher.project_id, &hello.catalog).await?;
 
         // The agent no longer holds what the server never committed: record the loss explicitly
         // and move the cursor on, so a gap never wedges ingestion (I5).

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)\n             ON CONFLICT (project_id, repo_path) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "02434eff1544035aca65aebbc58eeb736703381ab7486497fa5ce688456e87fa"
+}

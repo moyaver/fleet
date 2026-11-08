@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO flow_definitions (project_id, repo_path, last_name, tags)\n             VALUES ($1, $2, $3, $4)\n             ON CONFLICT (project_id, repo_path)\n             DO UPDATE SET tags = EXCLUDED.tags, last_name = coalesce(flow_definitions.last_name, EXCLUDED.last_name)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d1cf48a311e2ba08ce4e719c6c5b0006bf3ccc77f9143844f90208ac5486e47d"
+}

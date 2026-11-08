@@ -185,6 +185,13 @@ impl Store {
             });
         }
         insert_shards(&mut tx, project, manifest).await?;
+        // The plan's flows are known before any of them runs (issue #85).
+        let assigned: Vec<&str> = manifest
+            .shards
+            .iter()
+            .flat_map(|s| s.flows.iter().map(String::as_str))
+            .collect();
+        crate::catalog::upsert_plan_flows(&mut tx, project, &assigned).await?;
         let change = match attempt_id {
             Some(a) => {
                 let version = sqlx::query_scalar!(
