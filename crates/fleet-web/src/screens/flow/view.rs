@@ -12,7 +12,9 @@
 
 use fleet_protocol::rest::{CrashView, FlowDetailView};
 use fleet_ui::{
-    components::display::{Card, OriginBadge, ProvenanceBadge, RowProvenance, StatusPill, TableBox},
+    components::display::{
+        Card, OriginBadge, ProvenanceBadge, RowProvenance, StatusPill, TableBox,
+    },
     mark::Mark,
     provenance::Provenance,
     steps::view::StepTreeView,

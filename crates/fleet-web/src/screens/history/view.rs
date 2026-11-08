@@ -12,8 +12,8 @@ use fleet_ui::{
     components::{
         controls::{Button, ButtonVariant},
         display::{
-            Badge, Card, EmptyState, OriginBadge, ProvenanceBadge, ProvenanceStatement, ReadoutStrip,
-            RowProvenance, StatTile, TableBox,
+            Badge, Card, EmptyState, OriginBadge, ProvenanceBadge, ProvenanceStatement,
+            ReadoutStrip, RowProvenance, StatTile, TableBox,
         },
         forms::FilterBar,
     },
