@@ -12,10 +12,18 @@ use fleet_protocol::rest::{
     SessionView,
     history::{FailureTriageRequest, FailureTriageView, TriageState},
 };
-use fleet_ui::components::controls::{Button, ButtonVariant};
+use fleet_ui::{
+    charts::format::format_timestamp,
+    components::controls::{Button, ButtonVariant},
+};
 use leptos::{prelude::*, task::spawn_local};
+use time::OffsetDateTime;
 
-use crate::{api, app::Auth};
+use crate::{
+    api,
+    app::Auth,
+    clock::{unix_ms, utc_offset_minutes},
+};
 
 /// Whether a session may triage `project`: a maintainer or an admin, on that project or on every
 /// project.
@@ -42,6 +50,16 @@ fn label_of(state: Option<TriageState>) -> &'static str {
         Some(TriageState::Known) => "Known",
         Some(TriageState::Resolved) => "Resolved",
     }
+}
+
+/// "First seen 2026-01-01 10:00:00": when the failure fingerprint was first seen, at the viewer's
+/// offset from UTC. Every failure has one, so the control always says it.
+#[must_use]
+pub fn first_seen_text(first_seen_at: OffsetDateTime, utc_offset_minutes: i32) -> String {
+    format!(
+        "First seen {}",
+        format_timestamp(unix_ms(first_seen_at), utc_offset_minutes)
+    )
 }
 
 /// What the control shows and edits: the recorded state and link, and the draft a maintainer is
@@ -104,6 +122,7 @@ pub fn TriageControl(
 ) -> impl IntoView {
     let auth = expect_context::<Auth>();
     let state = triage.as_ref().and_then(|t| t.state);
+    let first_seen = triage.as_ref().map(|t| t.first_seen_at);
     let link = triage.and_then(|t| t.issue_url).unwrap_or_default();
     let signals = Signals {
         state: RwSignal::new(state),
@@ -124,6 +143,14 @@ pub fn TriageControl(
             <span data-testid="triage-state" data-state=move || choice_of(signals.state.get()).to_owned()>
                 {move || label_of(signals.state.get())}
             </span>
+            {first_seen
+                .map(|at| {
+                    view! {
+                        <span class="note" data-testid="triage-first-seen">
+                            {first_seen_text(at, utc_offset_minutes())}
+                        </span>
+                    }
+                })}
             {move || {
                 let url = signals.link.get();
                 (!url.is_empty())
@@ -228,6 +255,13 @@ mod tests {
                 .collect(),
             csrf_token: "csrf".to_owned(),
         }
+    }
+
+    #[test]
+    fn first_seen_names_the_day_and_time_the_failure_was_first_seen_at_the_viewers_offset() {
+        let at = OffsetDateTime::from_unix_timestamp(1_767_261_600).unwrap();
+        assert_eq!(first_seen_text(at, 0), "First seen 2026-01-01 10:00:00");
+        assert_eq!(first_seen_text(at, 60), "First seen 2026-01-01 11:00:00");
     }
 
     #[test]
