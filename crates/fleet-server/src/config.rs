@@ -233,6 +233,10 @@ pub struct Artifacts {
     pub max_run_bytes: u64,
     /// Most files one agent run may store.
     pub max_run_files: u32,
+    /// Most bytes one project may declare in any 24 hours, across all its runs.
+    pub max_project_bytes_per_day: u64,
+    /// Most files one project may declare in any 24 hours, across all its runs.
+    pub max_project_files_per_day: u32,
     /// Size limits per class, in bytes.
     pub max_bytes: ClassLimits,
 }
@@ -244,6 +248,8 @@ impl Default for Artifacts {
             grant_ttl_seconds: 600,
             max_run_bytes: 2 * 1024 * 1024 * 1024,
             max_run_files: 2_000,
+            max_project_bytes_per_day: 20 * 1024 * 1024 * 1024,
+            max_project_files_per_day: 20_000,
             max_bytes: ClassLimits::default(),
         }
     }
@@ -577,7 +583,7 @@ impl Default for Ingest {
             ping_interval_ms: 20_000,
             idle_timeout_ms: 45_000,
             hello_timeout_ms: 10_000,
-            max_frame_bytes: 1024 * 1024,
+            max_frame_bytes: 256 * 1024,
             max_inflight_events: 512,
             telemetry_flush_ms: 15_000,
             shutdown_grace_ms: 15_000,
@@ -1223,6 +1229,18 @@ mod tests {
             format!("{zero:#}").contains("api.api_key_ttl_days"),
             "{zero:#}"
         );
+    }
+
+    #[test]
+    fn frames_are_capped_at_256_kib_and_a_project_has_a_daily_quota() {
+        // Research 06 T12: the agent batches under this cap, and one project's day is bounded.
+        let c = Config::load(None, &[]).unwrap();
+        assert_eq!(c.ingest.max_frame_bytes, 256 * 1024);
+        assert_eq!(
+            c.artifacts.max_project_bytes_per_day,
+            20 * 1024 * 1024 * 1024
+        );
+        assert_eq!(c.artifacts.max_project_files_per_day, 20_000);
     }
 
     #[test]

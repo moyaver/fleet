@@ -74,13 +74,17 @@ pub struct UploadAsk<'a> {
     pub sha256: &'a str,
 }
 
-/// What one run may store (research 06 T12).
+/// What one run may store, and what its project may declare in a day (research 06 T12).
 #[derive(Debug, Clone, Copy)]
 pub struct Quota {
     /// Bytes across all of the run's artifacts.
     pub max_bytes: u64,
     /// Number of artifacts.
     pub max_files: u32,
+    /// Bytes across the project's artifacts declared in the last 24 hours, in all its runs.
+    pub project_max_bytes: u64,
+    /// Number of the project's artifacts declared in the last 24 hours, in all its runs.
+    pub project_max_files: u32,
 }
 
 /// The answer to [`Store::request_upload`].
@@ -111,6 +115,8 @@ pub enum Requested {
     UnknownFlow,
     /// The run is over its quota.
     OverQuota,
+    /// The project is over its quota for the last 24 hours.
+    OverProjectQuota,
 }
 
 /// The result of claiming a grant for its bytes.
@@ -640,16 +646,12 @@ async fn regrant(
     })
 }
 
-/// A request for a file this run hasn't asked about: check the quota, then either reuse the
-/// project's verified copy (deduplication) or declare it and grant an upload.
-async fn declare(
+/// The quota refusal for this upload, if it would take its run or its project over quota.
+async fn over_quota(
     tx: &mut sqlx::PgConnection,
     ask: &UploadAsk<'_>,
-    scope: Scope,
-    grant_ttl: Duration,
     quota: Quota,
-) -> Result<Requested> {
-    let class = ask.class.as_str();
+) -> Result<Option<Requested>> {
     let used = sqlx::query!(
         "SELECT count(*) AS \"files!\", coalesce(sum(size_bytes), 0)::bigint AS \"bytes!\"
            FROM artifacts
@@ -664,7 +666,42 @@ async fn declare(
         .saturating_add(ask.size)
         > quota.max_bytes;
     if over_files || over_bytes {
-        return Ok(Requested::OverQuota);
+        return Ok(Some(Requested::OverQuota));
+    }
+    // The same check over the project's last 24 hours, so one project cannot fill storage
+    // by many runs, each within its own run quota.
+    let day = sqlx::query!(
+        "SELECT count(*) AS \"files!\", coalesce(sum(size_bytes), 0)::bigint AS \"bytes!\"
+           FROM artifacts
+          WHERE project_id = $1 AND created_at > now() - interval '24 hours'
+            AND state IN ('declared', 'uploading', 'available')",
+        ask.project_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    let over_project_files = day.files >= i64::from(quota.project_max_files);
+    let over_project_bytes = u64::try_from(day.bytes)
+        .unwrap_or(u64::MAX)
+        .saturating_add(ask.size)
+        > quota.project_max_bytes;
+    if over_project_files || over_project_bytes {
+        return Ok(Some(Requested::OverProjectQuota));
+    }
+    Ok(None)
+}
+
+/// A request for a file this run hasn't asked about: check the quota, then either reuse the
+/// project's verified copy (deduplication) or declare it and grant an upload.
+async fn declare(
+    tx: &mut sqlx::PgConnection,
+    ask: &UploadAsk<'_>,
+    scope: Scope,
+    grant_ttl: Duration,
+    quota: Quota,
+) -> Result<Requested> {
+    let class = ask.class.as_str();
+    if let Some(refused) = over_quota(tx, ask, quota).await? {
+        return Ok(refused);
     }
 
     // The project already holds these bytes under this class (verified for it): no upload.
@@ -789,6 +826,8 @@ mod tests {
         let quota = Quota {
             max_bytes: 1 << 30,
             max_files: 100,
+            project_max_bytes: 1 << 40,
+            project_max_files: 1_000_000,
         };
         let Requested::Grant {
             artifact_id: id, ..
@@ -880,6 +919,8 @@ mod tests {
         let quota = Quota {
             max_bytes: 1 << 30,
             max_files: 100,
+            project_max_bytes: 1 << 40,
+            project_max_files: 1_000_000,
         };
         for (class, name, content_type, content) in [
             (

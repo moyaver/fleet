@@ -108,8 +108,19 @@ const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
 const SILENCE_TIMEOUT: Duration = Duration::from_secs(30);
 const PING_INTERVAL: Duration = Duration::from_secs(10);
 const BATCH: usize = 64;
+/// Room kept in every frame for its envelope (`op`, the array brackets and separators): the
+/// events fill the rest of the server's `max_frame_bytes`.
+const FRAME_RESERVE: usize = 1024;
 const BACKOFF_BASE: Duration = Duration::from_millis(250);
 const BACKOFF_CAP: Duration = Duration::from_secs(30);
+
+/// Serialized event bytes one frame may carry under the server's `max_frame_bytes`, less the
+/// batch's other parts (`fixed`, such as the hello and telemetry of a batch request).
+fn event_budget(max_frame_bytes: u32, fixed: usize) -> usize {
+    usize::try_from(max_frame_bytes)
+        .unwrap_or(usize::MAX)
+        .saturating_sub(FRAME_RESERVE + fixed)
+}
 
 /// Runs until everything is flushed after `finishing`, or the server refuses the run.
 /// The caller bounds it with a deadline.
@@ -248,6 +259,7 @@ async fn batch(
     };
     let mut cursor: Option<u64> = None;
     let mut max_events = BATCH;
+    let mut max_frame_bytes = 0_u32;
     let mut failures = 0_u32;
     let mut samples: Vec<Telemetry> = Vec::new();
     loop {
@@ -258,20 +270,27 @@ async fn batch(
             Ok(ClientFrame::Hello(hello)) => *hello,
             _ => return Ok(End::Refused("cannot build batch hello".into())),
         };
-        let events = if let Some(after) = cursor {
-            match shared.outbox.lock() {
-                Ok(mut o) => o.after(after, max_events),
-                Err(_) => return Ok(End::Refused("outbox lock".into())),
-            }
-        } else {
-            Vec::new()
-        };
         while samples.len() < BATCH {
             match telemetry.try_recv() {
                 Ok(sample) => samples.push(sample),
                 Err(_) => break,
             }
         }
+        let events = if let Some(after) = cursor {
+            // The events fill what the hello and telemetry leave of the frame (research 06 T12).
+            let fixed = serde_json::to_vec(&hello).map_or(0, |v| v.len())
+                + samples
+                    .iter()
+                    .map(|s| serde_json::to_vec(s).map_or(0, |v| v.len() + 1))
+                    .sum::<usize>();
+            let budget = event_budget(max_frame_bytes, fixed);
+            match shared.outbox.lock() {
+                Ok(mut o) => o.after(after, max_events, budget),
+                Err(_) => return Ok(End::Refused("outbox lock".into())),
+            }
+        } else {
+            Vec::new()
+        };
         let sent_events = !events.is_empty();
         let before_ack = shared.outbox.lock().map_or(0, |o| o.acked_through());
         let mut post = client.post(&url).json(&BatchRequest {
@@ -330,6 +349,7 @@ async fn batch(
                         .store(true, std::sync::atomic::Ordering::SeqCst);
                     max_events =
                         BATCH.min(usize::try_from(welcome.limits.max_inflight_events).unwrap_or(0));
+                    max_frame_bytes = welcome.limits.max_frame_bytes;
                     sent = welcome.committed_through;
                     if let Ok(mut o) = shared.outbox.lock() {
                         o.ack(sent);
@@ -522,7 +542,11 @@ async fn connection(
             let room =
                 usize::try_from(u64::from(limits.max_inflight_events).saturating_sub(inflight))
                     .unwrap_or(0);
-            o.after(sent, BATCH.min(room))
+            o.after(
+                sent,
+                BATCH.min(room),
+                event_budget(limits.max_frame_bytes, 0),
+            )
         };
         if let Some(last) = batch.last() {
             sent = last.seq;

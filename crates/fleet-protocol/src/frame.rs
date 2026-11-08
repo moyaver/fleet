@@ -604,7 +604,7 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             max_inflight_events: 512,
-            max_frame_bytes: 1024 * 1024,
+            max_frame_bytes: 256 * 1024,
             heartbeat_interval_ms: 10_000,
         }
     }

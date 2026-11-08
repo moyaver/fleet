@@ -749,6 +749,42 @@ async fn a_run_cannot_store_more_files_or_bytes_than_its_quota() {
 }
 
 #[tokio::test]
+async fn a_project_cannot_declare_more_than_its_daily_quota_across_its_runs() {
+    // Each run is well inside its own quota; the project's day is not.
+    let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_project_files_per_day = 2).await;
+    let first = run_with_failed_flow(&rig, "1000").await;
+    let second = run_with_failed_flow(&rig, "1001").await;
+    let log = |run: &Run, n: u8| request(run, "maestro_log", "m.log", "text/plain", &[n; 30]);
+    assert!(matches!(
+        rig.grant(&log(&first, 1)).await,
+        UploadGrant::Upload { .. }
+    ));
+    assert!(matches!(
+        rig.grant(&log(&second, 1)).await,
+        UploadGrant::Upload { .. }
+    ));
+    assert_eq!(
+        refused(rig.grant(&log(&second, 2)).await),
+        RejectReason::ProjectQuotaExceeded,
+        "a third file in the project's day"
+    );
+
+    let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_project_bytes_per_day = 100).await;
+    let first = run_with_failed_flow(&rig, "1002").await;
+    let second = run_with_failed_flow(&rig, "1003").await;
+    let big = |run: &Run, n: u8| request(run, "maestro_log", "m.log", "text/plain", &[n; 60]);
+    assert!(matches!(
+        rig.grant(&big(&first, 1)).await,
+        UploadGrant::Upload { .. }
+    ));
+    assert_eq!(
+        refused(rig.grant(&big(&second, 2)).await),
+        RejectReason::ProjectQuotaExceeded,
+        "120 > 100 bytes in the project's day"
+    );
+}
+
+#[tokio::test]
 async fn a_flow_lists_its_own_evidence_and_its_runs_report_and_log_but_not_another_runs() {
     let (rig, _dirs) = artifact_rig(|_| {}).await;
     let run = run_with_failed_flow(&rig, "990").await;
