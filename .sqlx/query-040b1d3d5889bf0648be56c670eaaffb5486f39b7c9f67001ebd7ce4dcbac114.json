@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT ON (worker_id) worker_id AS \"worker_id!\", ts,\n                host_cpu_pct::float8 AS host_cpu_pct,\n                host_mem_used_bytes::float8 AS host_mem_used_bytes,\n                host_mem_total_bytes::float8 AS host_mem_total_bytes,\n                host_load_1m::float8 AS host_load_1m,\n                host_cpu_cores::float8 AS host_cpu_cores,\n                host_swap_used_bytes::float8 AS host_swap_used_bytes,\n                host_swap_total_bytes::float8 AS host_swap_total_bytes,\n                host_psi_cpu_pct::float8 AS host_psi_cpu_pct,\n                host_psi_memory_pct::float8 AS host_psi_memory_pct,\n                host_psi_io_pct::float8 AS host_psi_io_pct\n           FROM host_samples\n          WHERE project_id = $1 AND worker_id = ANY($2) AND ts > now() - interval '1 hour'\n          ORDER BY worker_id, ts DESC",
+  "query": "SELECT DISTINCT ON (worker_id) worker_id AS \"worker_id!\", ts,\n                host_cpu_pct::float8 AS host_cpu_pct,\n                host_mem_used_bytes::float8 AS host_mem_used_bytes,\n                host_mem_total_bytes::float8 AS host_mem_total_bytes,\n                host_load_1m::float8 AS host_load_1m,\n                host_cpu_cores::float8 AS host_cpu_cores,\n                host_swap_used_bytes::float8 AS host_swap_used_bytes,\n                host_swap_total_bytes::float8 AS host_swap_total_bytes,\n                host_psi_cpu_pct::float8 AS host_psi_cpu_pct,\n                host_psi_memory_pct::float8 AS host_psi_memory_pct,\n                host_psi_io_pct::float8 AS host_psi_io_pct,\n                unavailable AS \"unavailable: Json<SampleUnavailable>\"\n           FROM host_samples\n          WHERE project_id = $1 AND worker_id = ANY($2) AND ts > now() - interval '1 hour'\n          ORDER BY worker_id, ts DESC",
   "describe": {
     "columns": [
       {
@@ -84,6 +84,17 @@
         "name": "host_psi_io_pct",
         "type_info": "Float8",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 12,
+        "name": "unavailable: Json<SampleUnavailable>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "host_samples",
+            "name": "unavailable"
+          }
+        }
       }
     ],
     "parameters": {
@@ -104,8 +115,9 @@
       null,
       null,
       null,
-      null
+      null,
+      true
     ]
   },
-  "hash": "a4e216f4f6cd921207dec18091ea5beb1b4f3ab7d8aabf6e5cf478efa5f619bb"
+  "hash": "040b1d3d5889bf0648be56c670eaaffb5486f39b7c9f67001ebd7ce4dcbac114"
 }

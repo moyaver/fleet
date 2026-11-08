@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT bucket AS \"at!\", avg(host_cpu_pct_avg)::float8 AS host_cpu_pct,\n                            avg(host_mem_used_avg)::float8 AS host_mem_used_bytes,\n                            NULL::float8 AS host_mem_total_bytes,\n                            avg(host_load_1m_avg)::float8 AS host_load_1m,\n                            NULL::float8 AS host_cpu_cores,\n                            avg(host_swap_used_avg)::float8 AS host_swap_used_bytes,\n                            NULL::float8 AS host_swap_total_bytes,\n                            avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,\n                            avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,\n                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct\n                       FROM host_rollup_1m\n                      WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4\n                      GROUP BY bucket ORDER BY bucket LIMIT $5",
+  "query": "SELECT bucket AS \"at!\", avg(host_cpu_pct_avg)::float8 AS host_cpu_pct,\n                            avg(host_mem_used_avg)::float8 AS host_mem_used_bytes,\n                            NULL::float8 AS host_mem_total_bytes,\n                            avg(host_load_1m_avg)::float8 AS host_load_1m,\n                            NULL::float8 AS host_cpu_cores,\n                            avg(host_swap_used_avg)::float8 AS host_swap_used_bytes,\n                            NULL::float8 AS host_swap_total_bytes,\n                            avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,\n                            avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,\n                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct,\n                            NULL::jsonb AS \"unavailable: Json<SampleUnavailable>\"\n                       FROM host_rollup_1m\n                      WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4\n                      GROUP BY bucket ORDER BY bucket LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -73,6 +73,12 @@
         "name": "host_psi_io_pct",
         "type_info": "Float8",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "unavailable: Json<SampleUnavailable>",
+        "type_info": "Jsonb",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -95,8 +101,9 @@
       null,
       null,
       null,
+      null,
       null
     ]
   },
-  "hash": "bdd0d16a1d32c13d174e22ff358aee617d35dfbbc5884145ce6095139d8b6218"
+  "hash": "71c073d8ceed3614eb850f1703f0bc1c0494bef3b63c69e74808099868a3e76f"
 }

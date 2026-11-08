@@ -4,9 +4,11 @@
 use std::collections::HashMap;
 
 use fleet_protocol::{
+    frame::SampleUnavailable,
     live::{AttemptView, JobView},
     rest::{ActiveAttemptView, FlowCounts, JobCounts, RecentAttemptView, WorkerSummaryView},
 };
+use sqlx::types::Json;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -329,7 +331,8 @@ async fn latest_host_samples(
                 host_swap_total_bytes::float8 AS host_swap_total_bytes,
                 host_psi_cpu_pct::float8 AS host_psi_cpu_pct,
                 host_psi_memory_pct::float8 AS host_psi_memory_pct,
-                host_psi_io_pct::float8 AS host_psi_io_pct
+                host_psi_io_pct::float8 AS host_psi_io_pct,
+                unavailable AS \"unavailable: Json<SampleUnavailable>\"
            FROM host_samples
           WHERE project_id = $1 AND worker_id = ANY($2) AND ts > now() - interval '1 hour'
           ORDER BY worker_id, ts DESC",
@@ -354,6 +357,7 @@ async fn latest_host_samples(
                 host_psi_cpu_pct: r.host_psi_cpu_pct,
                 host_psi_memory_pct: r.host_psi_memory_pct,
                 host_psi_io_pct: r.host_psi_io_pct,
+                unavailable: r.unavailable,
             },
         )
     })

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen C's metric samples: raw rows and the one-minute and one-hour aggregates.
 
-use fleet_protocol::{frame::DeviceUnavailable, rest::MetricResolution};
+use fleet_protocol::{
+    frame::{DeviceUnavailable, SampleUnavailable},
+    rest::MetricResolution,
+};
 use sqlx::types::Json;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -37,6 +40,9 @@ pub struct HostRow {
     pub host_psi_memory_pct: Option<f64>,
     /// Linux pressure stall: percent of the last 10 seconds with some task waiting for I/O.
     pub host_psi_io_pct: Option<f64>,
+    /// Why each unknown reading is unknown. Raw samples only: aggregates keep no reasons, and a raw
+    /// sample from an agent that predates them has none.
+    pub unavailable: Option<Json<SampleUnavailable>>,
 }
 
 /// One sample, or one aggregate bucket, of an agent run's own processes: its Maestro process and
@@ -185,7 +191,8 @@ impl Store {
                             host_swap_total_bytes::float8 AS host_swap_total_bytes,
                             host_psi_cpu_pct::float8 AS host_psi_cpu_pct,
                             host_psi_memory_pct::float8 AS host_psi_memory_pct,
-                            host_psi_io_pct::float8 AS host_psi_io_pct
+                            host_psi_io_pct::float8 AS host_psi_io_pct,
+                            unavailable AS \"unavailable: Json<SampleUnavailable>\"
                        FROM host_samples
                       WHERE project_id = $1 AND worker_id = $2 AND ts >= $3 AND ts < $4
                       ORDER BY ts LIMIT $5",
@@ -210,7 +217,8 @@ impl Store {
                             NULL::float8 AS host_swap_total_bytes,
                             avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,
                             avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,
-                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct
+                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct,
+                            NULL::jsonb AS \"unavailable: Json<SampleUnavailable>\"
                        FROM host_rollup_1m
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4
                       GROUP BY bucket ORDER BY bucket LIMIT $5",
@@ -235,7 +243,8 @@ impl Store {
                             NULL::float8 AS host_swap_total_bytes,
                             avg(host_psi_cpu_pct_avg)::float8 AS host_psi_cpu_pct,
                             avg(host_psi_memory_pct_avg)::float8 AS host_psi_memory_pct,
-                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct
+                            avg(host_psi_io_pct_avg)::float8 AS host_psi_io_pct,
+                            NULL::jsonb AS \"unavailable: Json<SampleUnavailable>\"
                        FROM host_rollup_1h
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4
                       GROUP BY bucket ORDER BY bucket LIMIT $5",

@@ -8,7 +8,7 @@
 
 use fleet_protocol::{
     event::AdbState,
-    frame::{DeviceUnavailable, Telemetry},
+    frame::{DeviceUnavailable, SampleUnavailable, Telemetry},
 };
 use sqlx::types::Json;
 use time::OffsetDateTime;
@@ -134,6 +134,7 @@ struct Columns {
     psi_cpu: Vec<Option<f32>>,
     psi_memory: Vec<Option<f32>>,
     psi_io: Vec<Option<f32>>,
+    unavailable: Vec<Option<Json<SampleUnavailable>>>,
 }
 
 /// adb's state as the `device_samples.adb_state` code: 0 device, 1 offline, 2 unauthorized,
@@ -268,6 +269,7 @@ impl Columns {
         self.psi_cpu.push(s.host_psi_cpu_pct);
         self.psi_memory.push(s.host_psi_memory_pct);
         self.psi_io.push(s.host_psi_io_pct);
+        self.unavailable.push(Some(Json(s.unavailable)));
     }
 
     async fn insert(&self, tx: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
@@ -280,12 +282,12 @@ impl Columns {
                                        maestro_rss_bytes, agent_cpu_pct, agent_rss_bytes,
                                        host_load_1m, host_cpu_cores, host_swap_used_bytes,
                                        host_swap_total_bytes, host_psi_cpu_pct,
-                                       host_psi_memory_pct, host_psi_io_pct)
+                                       host_psi_memory_pct, host_psi_io_pct, unavailable)
              SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::uuid[], $4::uuid[],
                                   $5::bigint[], $6::real[], $7::bigint[], $8::bigint[],
                                   $9::real[], $10::bigint[], $11::real[], $12::bigint[],
                                   $13::real[], $14::integer[], $15::bigint[], $16::bigint[],
-                                  $17::real[], $18::real[], $19::real[])
+                                  $17::real[], $18::real[], $19::real[], $20::jsonb[])
              ON CONFLICT DO NOTHING",
             &self.ts,
             &self.run,
@@ -305,7 +307,8 @@ impl Columns {
             &self.swap_total as &[Option<i64>],
             &self.psi_cpu as &[Option<f32>],
             &self.psi_memory as &[Option<f32>],
-            &self.psi_io as &[Option<f32>]
+            &self.psi_io as &[Option<f32>],
+            &self.unavailable as &[Option<Json<SampleUnavailable>>]
         )
         .execute(&mut *tx)
         .await?;
@@ -315,10 +318,103 @@ impl Columns {
 
 #[cfg(test)]
 mod tests {
-    use fleet_protocol::{frame::DeviceSample, journal::ClockSample};
+    use fleet_protocol::{
+        frame::{DeviceSample, Sample, Unavailable},
+        journal::ClockSample,
+        rest::MetricResolution,
+    };
     use sqlx::PgPool;
 
     use super::*;
+
+    fn host(wall: OffsetDateTime) -> Sample {
+        Sample {
+            at: ClockSample { wall, mono_ms: 0 },
+            host_cpu_pct: None,
+            host_mem_used_bytes: None,
+            host_mem_total_bytes: None,
+            maestro_cpu_pct: None,
+            maestro_rss_bytes: None,
+            agent_cpu_pct: None,
+            agent_rss_bytes: None,
+            host_load_1m: None,
+            host_cpu_cores: None,
+            host_swap_used_bytes: None,
+            host_swap_total_bytes: None,
+            host_psi_cpu_pct: None,
+            host_psi_memory_pct: None,
+            host_psi_io_pct: None,
+            unavailable: SampleUnavailable::default(),
+        }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn host_samples_keep_the_reason_of_each_unknown_reading(pool: PgPool) {
+        let store = Store {
+            pool,
+            origin: Uuid::now_v7(),
+        };
+        let project = store.upsert_project("app", "App").await.unwrap();
+        let worker = sqlx::query_scalar!(
+            "INSERT INTO workers (project_id, identity_key) VALUES ($1, 'runner-a') RETURNING id",
+            project
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        let now = OffsetDateTime::now_utc();
+        // A macOS runner: no PSI, and no Maestro process yet. The reasons are what the agent sent.
+        let mut mac = host(now - time::Duration::seconds(30));
+        mac.host_cpu_pct = Some(10.0);
+        mac.unavailable = SampleUnavailable {
+            host_psi_cpu_pct: Some(Unavailable::NoPsi),
+            host_psi_memory_pct: Some(Unavailable::NoPsi),
+            host_psi_io_pct: Some(Unavailable::NoPsi),
+            maestro_cpu_pct: Some(Unavailable::NoProcess),
+            maestro_rss_bytes: Some(Unavailable::NoProcess),
+            ..SampleUnavailable::default()
+        };
+        // An agent that predates reasons: a value for every reading it has, and no reason at all.
+        let mut older = host(now - time::Duration::seconds(60));
+        older.host_cpu_pct = Some(12.5);
+        let batch = TelemetryBatch {
+            agent_run_id: Uuid::now_v7(),
+            project_id: project,
+            worker_id: worker,
+            batch: Telemetry {
+                tseq_from: 1,
+                tseq_to: 2,
+                dropped_since_last: 0,
+                samples: vec![older, mac.clone()],
+                devices: Vec::new(),
+            },
+        };
+        store.store_telemetry(&[batch]).await.unwrap();
+
+        let rows = store
+            .host_samples(
+                project,
+                worker,
+                (
+                    now - time::Duration::hours(1),
+                    now + time::Duration::hours(1),
+                ),
+                MetricResolution::Raw,
+            )
+            .await
+            .unwrap()
+            .expect("the worker exists")
+            .rows;
+        let reasons: Vec<SampleUnavailable> = rows
+            .iter()
+            .map(|r| r.unavailable.as_ref().expect("stored").0)
+            .collect();
+        assert_eq!(
+            reasons,
+            [SampleUnavailable::default(), mac.unavailable],
+            "the older sample has no reasons and the mac's are kept as sent"
+        );
+    }
 
     fn device(wall: OffsetDateTime, session: Uuid) -> DeviceSample {
         DeviceSample {
