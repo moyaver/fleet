@@ -5,8 +5,14 @@
 //! and previous flow outcomes. What the server doesn't know (a current step, a progress clock)
 //! is shown as "Not reported" instead of being derived from something else.
 
-use fleet_protocol::rest::{DeviceDetailView, DeviceProfileView, DeviceSessionView};
-use fleet_ui::{charts::format::format_duration, mark::Mark, provenance::Provenance};
+use fleet_protocol::rest::{
+    DeviceDetailView, DeviceProfileView, DeviceReadingView, DeviceSessionView, MetricUnit,
+};
+use fleet_ui::{
+    charts::format::{Unit, format_duration},
+    mark::Mark,
+    provenance::Provenance,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -163,6 +169,71 @@ impl ExecutionDetails {
                 pipeline_href(&ctx.project, view.session.pipeline_attempt_id),
             ),
         }
+    }
+}
+
+/// One reading of the device's newest sample: its value, or why it is unknown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadingRow {
+    /// What it is, with its unit where it has one.
+    pub label: String,
+    /// The value, formatted with its unit; `None` when the reading is unknown.
+    pub value: Option<String>,
+    /// Why it is unknown, in words; `None` when there is a value.
+    pub reason: Option<String>,
+}
+
+impl ReadingRow {
+    fn of(r: &DeviceReadingView) -> Self {
+        let value = r.available.then(|| match (&r.text, r.value, r.unit) {
+            (Some(text), _, _) => text.clone(),
+            (None, Some(v), Some(unit)) => format_value(unit, v),
+            (None, Some(v), None) => v.to_string(),
+            (None, None, _) => "Not reported".to_owned(),
+        });
+        Self {
+            label: r.label.clone(),
+            reason: value.is_none().then(|| {
+                r.reason
+                    .clone()
+                    .unwrap_or_else(|| "The agent gave no reason".to_owned())
+            }),
+            value,
+        }
+    }
+}
+
+/// The unit's formatting of a reading's value, as the charts show it.
+fn format_value(unit: MetricUnit, v: f64) -> String {
+    match unit {
+        MetricUnit::Percent => Unit::Percent.format(v),
+        MetricUnit::Bytes => Unit::Bytes.format(v),
+        MetricUnit::Celsius => Unit::Celsius.format(v),
+        MetricUnit::Number => Unit::Number.format(v),
+    }
+}
+
+/// The device's newest sample: when it was taken, the shard it ran as, and every reading.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadingsView {
+    /// `sampled 12 s ago`.
+    pub taken: String,
+    /// `Shard 2`, when the agent reported the shard.
+    pub shard: Option<String>,
+    /// Every reading, in the order the agent reports them.
+    pub rows: Vec<ReadingRow>,
+}
+
+impl ReadingsView {
+    /// The newest sample in `view`, or `None` before the agent has sampled the device.
+    #[must_use]
+    pub fn build(view: &DeviceDetailView, ctx: &Ctx) -> Option<Self> {
+        let latest = view.latest.as_ref()?;
+        Some(Self {
+            taken: format!("sampled {}", ctx.ago(unix_ms(latest.at))),
+            shard: latest.shard.map(|s| format!("Shard {s}")),
+            rows: latest.readings.iter().map(ReadingRow::of).collect(),
+        })
     }
 }
 
@@ -453,6 +524,110 @@ mod tests {
         assert_eq!(
             FlowRows::build(&v, &ctx()).summary,
             "Showing the latest 3 of 240 flow executions"
+        );
+    }
+
+    /// The newest sample: a value is shown with its unit; a reading the agent did not take says why.
+    #[test]
+    fn the_newest_sample_shows_each_reading_or_why_it_is_unknown() {
+        use fleet_protocol::rest::{DeviceLatestView, DeviceReadingView, MetricScope};
+        use time::OffsetDateTime;
+
+        let reading = |metric: &str,
+                       label: &str,
+                       unit: Option<MetricUnit>,
+                       value: Option<f64>,
+                       text: Option<&str>,
+                       reason: Option<&str>| DeviceReadingView {
+            metric: metric.to_owned(),
+            label: label.to_owned(),
+            unit,
+            scope: MetricScope::Guest,
+            value,
+            text: text.map(str::to_owned),
+            available: value.is_some() || text.is_some(),
+            reason: reason.map(str::to_owned),
+        };
+        let mut v = view();
+        assert!(
+            ReadingsView::build(&v, &ctx()).is_none(),
+            "a device the agent has not sampled has no readings"
+        );
+        v.latest = Some(DeviceLatestView {
+            // 2026-01-01T10:59:48Z: twelve seconds before the context's clock.
+            at: OffsetDateTime::from_unix_timestamp(1_767_265_188).unwrap(),
+            shard: Some(2),
+            readings: vec![
+                reading("adb_state", "ADB state", None, None, Some("device"), None),
+                reading(
+                    "boot_completed",
+                    "Boot completed (1 = yes, 0 = not yet)",
+                    Some(MetricUnit::Number),
+                    Some(1.0),
+                    None,
+                    None,
+                ),
+                reading(
+                    "guest_cpu_pct",
+                    "Guest CPU",
+                    Some(MetricUnit::Percent),
+                    None,
+                    None,
+                    Some("throttled: the host is under pressure"),
+                ),
+                reading(
+                    "guest_mem_available_bytes",
+                    "Guest memory available",
+                    Some(MetricUnit::Bytes),
+                    Some(2.0 * 1024.0 * 1024.0 * 1024.0),
+                    None,
+                    None,
+                ),
+                reading(
+                    "emu_cpu_pct",
+                    "Emulator CPU",
+                    Some(MetricUnit::Percent),
+                    None,
+                    None,
+                    None,
+                ),
+                reading(
+                    "api_level",
+                    "API level",
+                    Some(MetricUnit::Number),
+                    Some(37.0),
+                    None,
+                    None,
+                ),
+            ],
+        });
+        let shown = ReadingsView::build(&v, &ctx()).expect("the device was sampled");
+        assert_eq!(shown.taken, "sampled 12 s ago");
+        assert_eq!(shown.shard.as_deref(), Some("Shard 2"));
+        let row = |label: &str| {
+            shown
+                .rows
+                .iter()
+                .find(|r| r.label == label)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(row("ADB state").value.as_deref(), Some("device"));
+        assert_eq!(row("API level").value.as_deref(), Some("37"));
+        assert_eq!(
+            row("Guest memory available").value.as_deref(),
+            Some("2 GiB")
+        );
+        // A reading that is unknown has no value and says why, in words.
+        let guest = row("Guest CPU");
+        assert_eq!(
+            (guest.value, guest.reason.as_deref()),
+            (None, Some("throttled: the host is under pressure"))
+        );
+        // No reason from the server is not hidden: the page says the agent gave none.
+        assert_eq!(
+            row("Emulator CPU").reason.as_deref(),
+            Some("The agent gave no reason")
         );
     }
 
