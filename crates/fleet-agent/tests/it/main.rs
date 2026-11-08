@@ -8,6 +8,7 @@
 mod bundle;
 mod html_report;
 mod inspect;
+mod layouts;
 mod stream;
 mod summary;
 mod supervisor;

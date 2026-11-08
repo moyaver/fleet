@@ -42,7 +42,7 @@ use crate::{
     session::{Candidate, Observation, Session},
     transport::{self, Shared},
     upload::{self, Outcome, Source, Uploader},
-    watch::{self, BundleScanner, LogTailer},
+    watch::{self, BundleScanner, Located, LogTailer},
 };
 
 /// Fault injection for tests (research 02 §14): `observer_panic`, `observer_abort`,
@@ -131,10 +131,21 @@ fn clean(bytes: &[u8]) -> String {
     strip_ansi(text.trim_end_matches(['\r', '\n'])).into_owned()
 }
 
+/// Where Maestro writes this run's session log and flow bundles, for the command that runs. Each
+/// is looked up until Maestro has created it (see [`Located`]).
+struct Layout {
+    log: Located,
+    bundles: Located,
+}
+
 /// Everything that exists once Maestro has started.
 struct Live {
     session: Session,
+    /// Where Maestro writes; `None` for a command that is not `maestro test`.
+    layout: Option<Layout>,
+    /// The session log, once its directory is known.
     tailer: Option<LogTailer>,
+    log_file: Option<PathBuf>,
     scanner: Option<BundleScanner>,
     report: Option<PathBuf>,
     /// The HTML report the command asks for (`--format html` or `html-detailed`): its `--output`,
@@ -162,8 +173,8 @@ struct Live {
     pending_devices: Vec<DeviceSample>,
     /// Uploads artifacts (PLAN §6.6); `None` offline or with `FLEET_UPLOAD_ARTIFACTS=off`.
     uploader: Option<Uploader>,
-    /// Maestro's debug output directory: where the files to upload are.
-    debug: Option<PathBuf>,
+    /// Maestro's flow bundles directory: where the files to upload are, once it is known.
+    bundles: Option<PathBuf>,
     /// The run directory: where the journal is, and where an offline bundle goes.
     run_dir: Option<PathBuf>,
     /// The artifacts an offline run would have uploaded, for its bundle (issue #83). `None` when
@@ -200,8 +211,8 @@ async fn observe() -> io::Result<Option<String>> {
     loop {
         tokio::select! {
             frame = frames.recv() => match frame {
-                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, started_at_ms, debug_dir, report, run_dir, plan, evidence, journal_max_bytes })) => {
-                    let mut l = start(&argv, pid, pgid, debug_dir, report, run_dir.as_deref().map(Path::new), evidence.map(|e| *e), UNIX_EPOCH + Duration::from_millis(started_at_ms), clock(), clock, journal_max_bytes);
+                Some(Frame::Control(Control::ChildStarted { pid, pgid, argv, started_at_ms, report, run_dir, plan, evidence, journal_max_bytes })) => {
+                    let mut l = start(&argv, pid, pgid, report, run_dir.as_deref().map(Path::new), evidence.map(|e| *e), UNIX_EPOCH + Duration::from_millis(started_at_ms), clock(), clock, journal_max_bytes);
                     if let Some(plan) = plan {
                         l.session.observe(clock(), Observation::Plan(plan));
                     }
@@ -329,6 +340,29 @@ async fn observe() -> io::Result<Option<String>> {
     }
 }
 
+/// Where Maestro writes this run's files, for the command as given. Only a `maestro test` the agent
+/// recognised (`recognised`) has one. Maestro inherits this process's environment, so its state
+/// directory is found from the same variables.
+fn watched_layout(argv: &[String], recognised: bool, started: SystemTime) -> Option<Layout> {
+    if !recognised {
+        return None;
+    }
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let state = fleet_maestro::invocation::state_tests_dir(
+        std::env::var_os("XDG_STATE_HOME").as_deref(),
+        home.as_deref(),
+    );
+    let layout = fleet_maestro::invocation::output_layout(
+        &fleet_maestro::invocation::parse(argv),
+        state.as_deref(),
+        home.as_deref(),
+    )?;
+    Some(Layout {
+        log: Located::new(layout.log, started),
+        bundles: Located::new(layout.bundles, started),
+    })
+}
+
 fn configure_workspace(session: &mut Session, argv: &[String]) {
     let cwd = std::env::current_dir().ok();
     let git_root = |path: &Path| {
@@ -358,7 +392,6 @@ fn start(
     argv: &[String],
     pid: u32,
     group: Option<u32>,
-    debug_dir: Option<String>,
     report: Option<String>,
     run_dir: Option<&Path>,
     evidence: Option<EvidenceSources>,
@@ -375,6 +408,7 @@ fn start(
             .iter()
             .map(|(k, v)| (k.as_str(), v.as_str())),
     );
+    let layout = watched_layout(argv, evidence.is_some(), started);
     let mut session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
     configure_workspace(&mut session, argv);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
@@ -427,10 +461,9 @@ fn start(
     tokio::spawn(crate::adb::track(crate::adb::server_addr(), devices_tx));
     let mut emulators = Emulators::new();
     emulators.rescan();
-    let debug = debug_dir.map(PathBuf::from);
     Live {
         uploader: uploader.flatten(),
-        debug: debug.clone(),
+        bundles: None,
         // Offline (no server) with a run directory: the run keeps a bundle (issue #83). Artifacts
         // are left out when `FLEET_UPLOAD_ARTIFACTS` turns them off, as they are for a live run.
         bundle: (server_url().is_none() && run_dir.is_some() && uploads_enabled()).then(Vec::new),
@@ -438,10 +471,10 @@ fn start(
         agent_run_id,
         ci,
         session,
-        tailer: debug
-            .as_ref()
-            .map(|d| LogTailer::new(d.join("maestro.log"))),
-        scanner: debug.map(BundleScanner::new),
+        layout,
+        tailer: None,
+        log_file: None,
+        scanner: None,
         report: report.map(PathBuf::from),
         html: fleet_maestro::invocation::requested_html_report(&fleet_maestro::invocation::parse(
             argv,
@@ -500,7 +533,7 @@ fn uploads_enabled() -> bool {
 /// Never blocks and never fails: an upload problem is a journal entry and a log line (I2).
 fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
     for c in l.session.take_uploads() {
-        if let Some(item) = candidate_item(&l.session, l.debug.as_deref(), &c) {
+        if let Some(item) = candidate_item(&l.session, l.bundles.as_deref(), &c) {
             enqueue(l, item);
         }
     }
@@ -511,10 +544,10 @@ fn pump_uploads(l: &mut Live, clock: &impl Fn() -> ClockSample) {
 /// read and redacted when the upload starts, or when the bundle is written (`upload::materialize`).
 pub(crate) fn candidate_item(
     session: &Session,
-    debug: Option<&Path>,
+    bundles: Option<&Path>,
     c: &Candidate,
 ) -> Option<upload::Item> {
-    let file = debug?.join(&c.rel);
+    let file = bundles?.join(&c.rel);
     let path = session.label(&c.rel);
     let (content_type, source) = match c.class {
         ArtifactClass::FailureScreenshot => {
@@ -689,7 +722,7 @@ fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> Cloc
             None => {}
         }
     }
-    if let Some(log) = l.debug.as_ref().map(|d| d.join("maestro.log"))
+    if let Some(log) = l.log_file.clone()
         && log.is_file()
     {
         let redactor = Arc::new(l.session.redactor().clone());
@@ -763,8 +796,31 @@ pub(crate) fn server_url() -> Option<String> {
 }
 
 fn watch(l: &mut Live, final_pass: bool, clock: &impl Fn() -> ClockSample) {
+    attach(l);
     for o in watch::observations(l.tailer.as_mut(), l.scanner.as_mut(), final_pass) {
         l.session.observe(clock(), o);
+    }
+}
+
+/// Starts following the session log and the flow bundles as soon as Maestro has created their
+/// directories. Until then there is nothing to read, and the next poll looks again.
+fn attach(l: &mut Live) {
+    let Some(layout) = l.layout.as_mut() else {
+        return;
+    };
+    if l.tailer.is_none()
+        && let Some(dir) = layout.log.dir()
+    {
+        let file = dir.join("maestro.log");
+        l.tailer = Some(LogTailer::new(file.clone()));
+        l.log_file = Some(file);
+    }
+    if l.scanner.is_none()
+        && let Some(dir) = layout.bundles.dir()
+    {
+        let dir = dir.to_path_buf();
+        l.scanner = Some(BundleScanner::new(dir.clone()));
+        l.bundles = Some(dir);
     }
 }
 

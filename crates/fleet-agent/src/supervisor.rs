@@ -125,7 +125,6 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
                 .map(|a| a.to_string_lossy().into_owned())
                 .collect(),
             started_at_ms: now_ms(),
-            debug_dir: prepared.debug_dir.clone(),
             report: prepared.report.clone(),
             run_dir: prepared
                 .run_dir

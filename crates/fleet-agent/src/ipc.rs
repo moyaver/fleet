@@ -39,9 +39,6 @@ pub(crate) enum Control {
         argv: Vec<String>,
         /// Supervisor wall clock at spawn, Unix milliseconds.
         started_at_ms: u64,
-        /// Where the session log and flow bundles will be, when known.
-        #[serde(default)]
-        debug_dir: Option<String>,
         /// Where the JUnit report will be, when known.
         #[serde(default)]
         report: Option<String>,
@@ -167,7 +164,6 @@ mod tests {
                 pgid: Some(7),
                 argv: vec!["maestro".into()],
                 started_at_ms: 1,
-                debug_dir: Some("/run/artifacts".into()),
                 report: None,
                 run_dir: None,
                 plan: None,

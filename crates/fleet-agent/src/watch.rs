@@ -10,11 +10,80 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
+    time::SystemTime,
 };
 
-use fleet_maestro::log;
+use fleet_maestro::{invocation::OutputRoot, log};
 
 use crate::session::Observation;
+
+/// Whether `name` is a `yyyy-MM-dd_HHmmss` directory name: the run directory Maestro creates
+/// (research 01 §4.1).
+fn is_run_stamp(name: &str) -> bool {
+    name.len() == 17
+        && name.char_indices().all(|(i, c)| match i {
+            4 | 7 => c == '-',
+            10 => c == '_',
+            _ => c.is_ascii_digit(),
+        })
+}
+
+/// The run directory Maestro created inside `base` for this run: the oldest `yyyy-MM-dd_HHmmss`
+/// directory created at or after `started`. Maestro names it when its JVM starts, which is after
+/// the agent spawned it, so a directory left by an earlier run is never this one. `None` until
+/// it exists.
+pub(crate) fn run_stamp_dir(base: &Path, started: SystemTime) -> Option<PathBuf> {
+    std::fs::read_dir(base)
+        .ok()?
+        .flatten()
+        .filter(|e| e.file_name().to_str().is_some_and(is_run_stamp))
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            let born = meta.created().or_else(|_| meta.modified()).ok()?;
+            (born >= started).then(|| (born, e.path()))
+        })
+        .min_by_key(|(born, _)| *born)
+        .map(|(_, path)| path)
+}
+
+/// One of a run's output directories, found once Maestro has made it. A flat directory is known
+/// from the start. A stamped one is looked for in its base on each call until it appears, and
+/// then kept.
+#[derive(Debug)]
+pub(crate) struct Located {
+    stamped_in: Option<PathBuf>,
+    started: SystemTime,
+    dir: Option<PathBuf>,
+}
+
+impl Located {
+    pub(crate) fn new(root: OutputRoot, started: SystemTime) -> Self {
+        match root {
+            OutputRoot::Flat(dir) => Self {
+                stamped_in: None,
+                started,
+                dir: Some(dir),
+            },
+            OutputRoot::Stamped(base) => Self {
+                stamped_in: Some(base),
+                started,
+                dir: None,
+            },
+        }
+    }
+
+    /// The directory, or `None` while a stamped one does not exist yet.
+    pub(crate) fn dir(&mut self) -> Option<&Path> {
+        if self.dir.is_none() {
+            let started = self.started;
+            self.dir = self
+                .stamped_in
+                .as_deref()
+                .and_then(|base| run_stamp_dir(base, started));
+        }
+        self.dir.as_deref()
+    }
+}
 
 /// Reads lines appended to the session `maestro.log`.
 #[derive(Debug)]
@@ -361,5 +430,84 @@ mod tests {
             .collect();
         assert_eq!(settled, [0, 1], "both steps settle from the file");
         std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// The run directory is the one created since the run started, and never an older one.
+    #[test]
+    fn the_run_directory_is_the_one_created_for_this_run() {
+        let d = tmp("stamp");
+        std::fs::create_dir_all(d.join("2020-01-01_000000")).unwrap();
+        std::fs::create_dir_all(d.join("not-a-run")).unwrap();
+        let started = SystemTime::now();
+        assert_eq!(
+            run_stamp_dir(&d, started),
+            None,
+            "an older run is not this one"
+        );
+        let mine = d.join("2026-11-08_101112");
+        std::fs::create_dir_all(&mine).unwrap();
+        assert_eq!(run_stamp_dir(&d, started), Some(mine));
+        assert_eq!(run_stamp_dir(&d.join("missing"), started), None);
+        std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// Each captured layout (fixtures/maestro/2.12.1) has its session log and its flow bundles
+    /// where the layout model says Maestro wrote them, so the live watcher finds the same files.
+    #[test]
+    fn the_captured_layouts_are_found_where_the_layout_model_puts_them() {
+        use std::time::UNIX_EPOCH;
+
+        use fleet_maestro::invocation::{output_layout, parse};
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1");
+        let scenarios = [
+            "paths-none",
+            "single-flow-no-format",
+            "paths-test-output-dir",
+            "paths-debug-output",
+            "paths-debug-and-test-output-same",
+            "html-test-output-dir",
+            "html-no-debug-flags",
+            "html-report-default-path",
+        ];
+        for scenario in scenarios {
+            let capture = fixtures.join(scenario);
+            let text = std::fs::read_to_string(capture.join("meta.json")).unwrap();
+            let meta: serde_json::Value = serde_json::from_str(&text).unwrap();
+            let capture_str = capture.to_string_lossy().into_owned();
+            let argv: Vec<String> = meta["command"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|a| a.as_str().unwrap().replace("<CAPTURE>", &capture_str))
+                .collect();
+            // The capture ran with XDG_STATE_HOME=<CAPTURE>/state, so Maestro's state directory is
+            // `state/maestro`, and its tests live under `tests`.
+            let state = capture.join("state/maestro/tests");
+            let layout = output_layout(&parse(&argv), Some(&state), None)
+                .unwrap_or_else(|| panic!("{scenario}: a layout"));
+            let mut log = Located::new(layout.log, UNIX_EPOCH);
+            let log_dir = log
+                .dir()
+                .unwrap_or_else(|| panic!("{scenario}: the log directory"));
+            assert!(
+                log_dir.join("maestro.log").is_file(),
+                "{scenario}: the session log is at {}",
+                log_dir.display()
+            );
+            let mut bundles = Located::new(layout.bundles, UNIX_EPOCH);
+            let bundle_dir = bundles
+                .dir()
+                .unwrap_or_else(|| panic!("{scenario}: the bundle directory"))
+                .to_path_buf();
+            let has_commands = std::fs::read_dir(&bundle_dir)
+                .unwrap()
+                .flatten()
+                .any(|e| e.path().join("commands.json").is_file());
+            assert!(
+                has_commands,
+                "{scenario}: a flow bundle with commands.json is in {}",
+                bundle_dir.display()
+            );
+        }
     }
 }
