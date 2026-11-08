@@ -9,7 +9,7 @@ use fleet_protocol::frame::Telemetry;
 use fleet_store::{Store, ingest::RunHandle, telemetry::TelemetryBatch};
 use tokio::sync::mpsc;
 
-use crate::state::AppState;
+use crate::{live::Hub, state::AppState};
 
 /// Buffered samples beyond this trigger an early flush.
 const EARLY_FLUSH_SAMPLES: usize = 50_000;
@@ -48,7 +48,7 @@ impl TelemetryBuffer {
 
     /// Writes everything buffered and sends the acks. On failure the samples stay queued for
     /// the next checkpoint (telemetry may lag, but is never acked before it is stored).
-    pub(crate) async fn flush(&self, store: &Store) {
+    pub(crate) async fn flush(&self, store: &Store, hub: &Hub) {
         let _one = self.flushing.lock().await;
         let taken = match self.pending.lock() {
             Ok(mut p) => std::mem::take(&mut *p),
@@ -60,6 +60,13 @@ impl TelemetryBuffer {
         let batches: Vec<TelemetryBatch> = taken.iter().map(|(b, _)| b.clone()).collect();
         match store.store_telemetry(&batches).await {
             Ok(through) => {
+                for project in batches
+                    .iter()
+                    .filter(|b| b.batch.has_samples())
+                    .map(|b| b.project_id)
+                {
+                    hub.publish_samples(project);
+                }
                 for (b, acks) in &taken {
                     if let Some((_, t)) = through.iter().find(|(r, _)| *r == b.agent_run_id) {
                         // A closed connection just doesn't get its ack; the agent resends.
@@ -91,7 +98,7 @@ pub(crate) async fn flusher(state: AppState) {
             () = state.telemetry.wake.notified() => {}
             () = state.shutdown.cancelled() => break,
         }
-        state.telemetry.flush(&state.store).await;
+        state.telemetry.flush(&state.store, &state.hub).await;
     }
-    state.telemetry.flush(&state.store).await;
+    state.telemetry.flush(&state.store, &state.hub).await;
 }

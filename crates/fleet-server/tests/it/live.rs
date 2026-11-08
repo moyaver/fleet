@@ -3,7 +3,10 @@
 
 use std::{net::SocketAddr, time::Duration};
 
-use fleet_protocol::{frame::ClientFrame, journal::ClockSample};
+use fleet_protocol::{
+    frame::{ClientFrame, Sample, SampleUnavailable, Telemetry},
+    journal::ClockSample,
+};
 use futures_util::SinkExt;
 use serde_json::{Value, json};
 use time::OffsetDateTime;
@@ -534,5 +537,286 @@ async fn a_socket_closing_on_one_instance_reaches_a_subscriber_on_another() {
     .await
     .expect("a delta showing the run disconnected, within 5 s");
     assert_eq!(liveness, "disconnected");
+    other.stop().await.unwrap();
+}
+
+/// Reads frames until one satisfies `want`, which must happen within ten seconds. Frames read on
+/// the way are dropped.
+async fn until(ws: &mut Ws, what: &str, mut want: impl FnMut(&Value) -> bool) -> Value {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let m = tokio::time::timeout_at(deadline, live_next(ws))
+            .await
+            .unwrap_or_else(|_| panic!("{what} within 10 s"));
+        if want(&m) {
+            return m;
+        }
+    }
+}
+
+/// Subscribes under `id` to `project`, and to `attempt`'s snapshot when given. Returns once the
+/// subscription is confirmed.
+async fn subscribe_as(ws: &mut Ws, id: &str, project: &str, attempt: Option<&str>) {
+    let mut req = json!({"op": "subscribe", "id": id, "project": project});
+    if let Some(attempt) = attempt {
+        req["attempt"] = json!(attempt);
+    }
+    ws.send(Message::text(req.to_string())).await.unwrap();
+    until(ws, &format!("{id} confirmed"), |m| {
+        m["sub"] == id && m["op"] == "subscribed"
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn one_socket_carries_several_subscriptions_and_each_gets_its_own_frames() {
+    let h = Harness::start().await;
+    let mut agent = Agent::new("multi", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    subscribe_as(&mut ws, "flow", "app", Some(&attempt)).await;
+    subscribe_as(&mut ws, "project", "app", None).await;
+
+    // One batch per event: each commit is a version.
+    for e in events {
+        c.events(vec![e]).await;
+    }
+    // Both subscriptions see the attempt's deltas, each tagged with its own key and in order.
+    let mut versions: std::collections::BTreeMap<String, Vec<u64>> =
+        std::collections::BTreeMap::default();
+    while !(versions.get("flow").is_some_and(|v| v.len() >= 3)
+        && versions.get("project").is_some_and(|v| v.len() >= 3))
+    {
+        let m = next_within(&mut ws, Duration::from_secs(5)).await;
+        if m["op"] == "delta" {
+            let key = m["sub"].as_str().expect("a delta names its subscription");
+            versions
+                .entry(key.to_owned())
+                .or_default()
+                .push(m["version"].as_u64().unwrap());
+        }
+    }
+    for key in ["flow", "project"] {
+        let seen = &versions[key];
+        assert!(
+            seen.windows(2).all(|w| w[1] == w[0] + 1),
+            "{key}: contiguous versions {seen:?}"
+        );
+    }
+    assert_eq!(
+        versions["flow"][..3],
+        versions["project"][..3],
+        "the same changes, in the same order"
+    );
+}
+
+#[tokio::test]
+async fn a_refused_subscription_leaves_the_others_working_and_the_socket_open() {
+    let h = Harness::start().await;
+    let mut agent = Agent::new("refused", "e2e");
+    let events = agent.suite(&[("login", true)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    subscribe_as(&mut ws, "good", "app", None).await;
+
+    ws.send(Message::text(
+        json!({"op": "subscribe", "id": "bad", "project": "nowhere"}).to_string(),
+    ))
+    .await
+    .unwrap();
+    let refusal = until(&mut ws, "the refusal", |m| m["op"] == "error").await;
+    assert_eq!(refusal["sub"], "bad", "{refusal}");
+    assert_eq!(refusal["message"], "no such project nowhere");
+
+    // The socket is still open: the good subscription gets the next change.
+    c.events(events).await;
+    let delta = until(&mut ws, "a delta under good", |m| m["op"] == "delta").await;
+    assert_eq!(delta["sub"], "good", "{delta}");
+}
+
+#[tokio::test]
+async fn an_unsubscribed_key_gets_no_more_frames_and_the_others_keep_theirs() {
+    let h = Harness::start().await;
+    let mut agent = Agent::new("unsub", "e2e");
+    let events = agent.suite(&[("login", true), ("pay", false)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    subscribe_as(&mut ws, "a", "app", None).await;
+    subscribe_as(&mut ws, "b", "app", None).await;
+
+    ws.send(Message::text(
+        json!({"op": "unsubscribe", "id": "b"}).to_string(),
+    ))
+    .await
+    .unwrap();
+    until(&mut ws, "b unsubscribed", |m| {
+        m["sub"] == "b" && m["op"] == "unsubscribed"
+    })
+    .await;
+
+    for e in events {
+        c.events(vec![e]).await;
+    }
+    let mut under_a = 0;
+    while under_a < 2 {
+        let m = next_within(&mut ws, Duration::from_secs(5)).await;
+        assert_ne!(m["sub"], "b", "nothing under b after unsubscribed: {m}");
+        if m["sub"] == "a" && m["op"] == "delta" {
+            under_a += 1;
+        }
+    }
+}
+
+#[tokio::test]
+async fn unsubscribing_a_key_the_socket_does_not_hold_is_refused_alone() {
+    let h = Harness::start().await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    ws.send(Message::text(
+        json!({"op": "unsubscribe", "id": "ghost"}).to_string(),
+    ))
+    .await
+    .unwrap();
+    let refusal = live_next(&mut ws).await;
+    assert_eq!(refusal["op"], "error");
+    assert_eq!(refusal["sub"], "ghost", "{refusal}");
+    subscribe_as(&mut ws, "after", "app", None).await;
+}
+
+#[tokio::test]
+async fn the_socket_caps_its_subscriptions_and_a_freed_slot_takes_another() {
+    let h = Harness::start().await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    for n in 0..32 {
+        subscribe_as(&mut ws, &format!("s{n}"), "app", None).await;
+    }
+    ws.send(Message::text(
+        json!({"op": "subscribe", "id": "s32", "project": "app"}).to_string(),
+    ))
+    .await
+    .unwrap();
+    let refusal = until(&mut ws, "the cap's refusal", |m| m["op"] == "error").await;
+    assert_eq!(refusal["sub"], "s32", "{refusal}");
+    assert!(
+        refusal["message"].as_str().unwrap().contains("32"),
+        "{refusal}"
+    );
+
+    ws.send(Message::text(
+        json!({"op": "unsubscribe", "id": "s0"}).to_string(),
+    ))
+    .await
+    .unwrap();
+    until(&mut ws, "s0 unsubscribed", |m| m["op"] == "unsubscribed").await;
+    subscribe_as(&mut ws, "s32", "app", None).await;
+}
+
+#[tokio::test]
+async fn a_request_that_is_not_a_subscription_is_answered_and_the_socket_stays_open() {
+    let h = Harness::start().await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    ws.send(Message::text(json!({"op": "dance"}).to_string()))
+        .await
+        .unwrap();
+    let answer = live_next(&mut ws).await;
+    assert_eq!(answer["op"], "error");
+    assert!(
+        answer.get("sub").is_none(),
+        "no subscription answers it: {answer}"
+    );
+    subscribe_as(&mut ws, "still", "app", None).await;
+}
+
+/// A telemetry frame with one host sample, taken now.
+fn one_sample() -> ClientFrame {
+    let at = ClockSample {
+        wall: OffsetDateTime::now_utc(),
+        mono_ms: 1,
+    };
+    ClientFrame::Telemetry(Telemetry {
+        tseq_from: 1,
+        tseq_to: 1,
+        dropped_since_last: 0,
+        devices: Vec::new(),
+        samples: vec![Sample {
+            at,
+            host_cpu_pct: Some(12.5),
+            host_mem_used_bytes: None,
+            host_mem_total_bytes: None,
+            maestro_cpu_pct: None,
+            maestro_rss_bytes: None,
+            agent_cpu_pct: None,
+            agent_rss_bytes: None,
+            host_load_1m: None,
+            host_cpu_cores: None,
+            host_swap_used_bytes: None,
+            host_swap_total_bytes: None,
+            host_psi_cpu_pct: None,
+            host_psi_memory_pct: None,
+            host_psi_io_pct: None,
+            unavailable: SampleUnavailable::default(),
+        }],
+    })
+}
+
+#[tokio::test]
+async fn a_committed_telemetry_checkpoint_tells_the_project_its_samples_changed() {
+    let h = Harness::start().await;
+    let mut agent = Agent::new("samples", "e2e");
+    agent.suite(&[("login", true)]);
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let attempt = attempt_of(&h).await;
+    let mut ws = live(h.addr(), Some(VIEWER), None).await.unwrap();
+    subscribe_as(&mut ws, "project", "app", None).await;
+    subscribe_as(&mut ws, "flow", "app", Some(&attempt)).await;
+
+    c.send(&one_sample()).await;
+    let samples = until(&mut ws, "the samples frame", |m| m["op"] == "samples").await;
+    assert_eq!(samples["sub"], "project", "{samples}");
+    assert_eq!(samples["project_id"], json!(project_id(&h).await));
+
+    // An attempt subscription does not follow the project's samples.
+    let quiet = tokio::time::timeout(Duration::from_millis(600), async {
+        loop {
+            let m = live_next(&mut ws).await;
+            if m["op"] == "samples" && m["sub"] == "flow" {
+                return m;
+            }
+        }
+    })
+    .await;
+    assert!(quiet.is_err(), "the attempt got samples: {quiet:?}");
+}
+
+/// The project's id, read from the list the viewer sees.
+async fn project_id(h: &Harness) -> String {
+    let (status, body) = get(h.addr(), "/api/v1/projects", Some(VIEWER)).await;
+    assert_eq!(status, 200, "{body}");
+    let list: Value = serde_json::from_str(&body).unwrap();
+    list[0]["id"].as_str().unwrap().to_owned()
+}
+
+#[tokio::test]
+async fn samples_committed_on_one_instance_reach_a_subscriber_on_another() {
+    let h = Harness::start().await;
+    let other = second_instance(&h).await;
+    let agent = Agent::new("samples-elsewhere", "e2e");
+    let mut c = h.connect(None).await;
+    c.hello(&agent, Some(1)).await;
+    let mut ws = live(other.addr(), Some(VIEWER), None).await.unwrap();
+    subscribe_as(&mut ws, "project", "app", None).await;
+
+    c.send(&one_sample()).await;
+    let samples = until(&mut ws, "the samples frame from the other instance", |m| {
+        m["op"] == "samples"
+    })
+    .await;
+    assert_eq!(samples["sub"], "project", "{samples}");
     other.stop().await.unwrap();
 }

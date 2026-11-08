@@ -82,6 +82,16 @@ impl Store {
         for sighting in &profiles {
             upsert_profile(&mut tx, sighting).await?;
         }
+        let mut sampled: Vec<Uuid> = batches
+            .iter()
+            .filter(|b| b.batch.has_samples())
+            .map(|b| b.project_id)
+            .collect();
+        sampled.sort_unstable();
+        sampled.dedup();
+        for project in sampled {
+            crate::live::notify_samples(&mut tx, self.origin(), project).await?;
+        }
         for (run, t) in &through {
             sqlx::query!(
                 "UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2)

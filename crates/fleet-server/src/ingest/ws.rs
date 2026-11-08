@@ -287,7 +287,7 @@ async fn drain(state: &AppState, socket: &mut WebSocket, acks: &mut mpsc::Receiv
         reconnect_after_ms: jitter(state.config.ingest.reconnect_jitter_ms),
     };
     let _ = send(socket, &goaway).await;
-    state.telemetry.flush(&state.store).await;
+    state.telemetry.flush(&state.store, &state.hub).await;
     while let Ok(through) = acks.try_recv() {
         let _ = send(socket, &ServerFrame::TelemetryAck { through }).await;
     }

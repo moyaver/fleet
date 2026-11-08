@@ -177,7 +177,9 @@ impl LiveStore {
                 self.last_error = Some(message);
                 Applied::Ignored
             }
-            LiveFrame::Subscribed { .. } => Applied::Ignored,
+            LiveFrame::Subscribed { .. } | LiveFrame::Unsubscribed | LiveFrame::Samples { .. } => {
+                Applied::Ignored
+            }
         }
     }
 

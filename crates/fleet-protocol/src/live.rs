@@ -337,13 +337,22 @@ pub enum ResyncReason {
     Lagged,
 }
 
-/// What the browser socket receives.
+/// What the browser socket receives. Every frame of a subscription arrives inside a [`Routed`]
+/// envelope that names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum LiveFrame {
     /// Subscribed to a project; deltas follow.
     Subscribed {
+        /// The project.
+        project_id: Uuid,
+    },
+    /// The subscription was removed at the client's request; no frame of it follows.
+    Unsubscribed,
+    /// Telemetry was committed for a project: runners' host and device samples changed. Carries
+    /// no state; a subscriber reads what it shows again.
+    Samples {
         /// The project.
         project_id: Uuid,
     },
@@ -384,19 +393,46 @@ pub enum LiveFrame {
     },
 }
 
-/// What the browser socket accepts.
+/// The longest subscription id a client may choose.
+pub const MAX_SUBSCRIPTION_ID: usize = 64;
+
+/// What the browser socket accepts. One socket carries several subscriptions, each named by a
+/// `sub` key: the `id` the client chose, or, when the client chose none, the topic (`<slug>` for a
+/// project, `<slug>/<attempt>` for an attempt). Keys and ids share one namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum LiveRequest {
-    /// Subscribe to a project, and to one attempt's snapshot.
+    /// Subscribe to a project, and to one attempt's snapshot. Subscribing again under a key the
+    /// socket already holds replaces that subscription and sends a fresh snapshot.
     Subscribe {
+        /// The key this subscription is known by on the socket.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
         /// The project's slug.
         project: String,
         /// The attempt to snapshot.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         attempt: Option<Uuid>,
     },
+    /// Stop a subscription. The socket answers `unsubscribed` under the same key.
+    Unsubscribe {
+        /// The key the subscription was made under.
+        id: String,
+    },
+}
+
+/// A frame and the subscription it belongs to. A frame that answers no subscription (a request
+/// the socket could not read) has no `sub`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Routed {
+    /// The subscription's key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub: Option<String>,
+    /// The frame.
+    #[serde(flatten)]
+    pub frame: LiveFrame,
 }
 
 #[cfg(test)]
@@ -437,6 +473,35 @@ mod tests {
             })
             .unwrap(),
             r#"{"op":"resync","reason":"lagged"}"#
+        );
+    }
+
+    #[test]
+    fn a_single_subscribe_without_an_id_still_parses_as_before() {
+        let wire = r#"{"op":"subscribe","project":"app","attempt":"00000000-0000-0000-0000-000000000002"}"#;
+        assert_eq!(
+            serde_json::from_str::<LiveRequest>(wire).unwrap(),
+            LiveRequest::Subscribe {
+                id: None,
+                project: "app".into(),
+                attempt: Some(Uuid::from_u128(2)),
+            }
+        );
+    }
+
+    #[test]
+    fn a_routed_frame_names_its_subscription_and_an_unrouted_one_names_none() {
+        let wire = r#"{"sub":"p1","op":"unsubscribed"}"#;
+        let routed: Routed = serde_json::from_str(wire).unwrap();
+        assert_eq!(routed.sub.as_deref(), Some("p1"));
+        assert_eq!(routed.frame, LiveFrame::Unsubscribed);
+        assert_eq!(serde_json::to_string(&routed).unwrap(), wire);
+
+        let plain: Routed = serde_json::from_str(r#"{"op":"error","message":"bad"}"#).unwrap();
+        assert_eq!(plain.sub, None);
+        assert_eq!(
+            serde_json::to_string(&plain).unwrap(),
+            r#"{"op":"error","message":"bad"}"#
         );
     }
 }

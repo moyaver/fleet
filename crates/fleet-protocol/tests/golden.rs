@@ -3,7 +3,7 @@
 
 use fleet_protocol::{
     frame::{ClientFrame, ServerFrame},
-    live::{LiveFrame, LiveRequest},
+    live::{LiveRequest, Routed},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -62,14 +62,16 @@ fn every_websocket_frame_shape_round_trips_and_matches_its_schema() {
             "goaway",
         ],
     );
-    check::<LiveFrame>(
+    check::<Routed>(
         "live-frame",
         include_str!("golden/live-frame.json"),
         &[
             "subscribed",
+            "unsubscribed",
             "snapshot",
             "delta",
             "liveness",
+            "samples",
             "resync",
             "error",
         ],
@@ -77,6 +79,6 @@ fn every_websocket_frame_shape_round_trips_and_matches_its_schema() {
     check::<LiveRequest>(
         "live-request",
         include_str!("golden/live-request.json"),
-        &["subscribe"],
+        &["subscribe", "unsubscribe"],
     );
 }

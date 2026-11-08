@@ -1,13 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "What the browser socket accepts.",
+  "description": "What the browser socket accepts. One socket carries several subscriptions, each named by a\n`sub` key: the `id` the client chose, or, when the client chose none, the topic (`<slug>` for a\nproject, `<slug>/<attempt>` for an attempt). Keys and ids share one namespace.",
   "oneOf": [
     {
-      "description": "Subscribe to a project, and to one attempt's snapshot.",
+      "description": "Subscribe to a project, and to one attempt's snapshot. Subscribing again under a key the\nsocket already holds replaces that subscription and sends a fresh snapshot.",
       "properties": {
         "attempt": {
           "description": "The attempt to snapshot.",
           "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "The key this subscription is known by on the socket.",
           "type": [
             "string",
             "null"
@@ -25,6 +32,24 @@
       "required": [
         "op",
         "project"
+      ],
+      "type": "object"
+    },
+    {
+      "description": "Stop a subscription. The socket answers `unsubscribed` under the same key.",
+      "properties": {
+        "id": {
+          "description": "The key the subscription was made under.",
+          "type": "string"
+        },
+        "op": {
+          "const": "unsubscribe",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "id"
       ],
       "type": "object"
     }

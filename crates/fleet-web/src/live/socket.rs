@@ -206,6 +206,7 @@ async fn session(
     };
     let (mut write, mut read) = socket.split();
     let request = LiveRequest::Subscribe {
+        id: None,
         project: subscription.project.clone(),
         attempt: subscription.attempt,
     };

@@ -492,14 +492,26 @@ async fn live_as(rig: &Rig, cookies: &HashMap<Who, String>, who: Who) -> Result<
         );
     }
     let mut live = res.into_websocket().await;
-    live.send_json(&json!({"op": "subscribe", "project": "app"}))
+    live.send_json(&json!({"op": "subscribe", "id": "first", "project": "app"}))
         .await;
     let frame: Value = live.receive_json().await;
+    check_subscription(who, &frame, "first")?;
+    // Each subscription on the socket is authorized on its own: a second one gets its own answer,
+    // and a refusal does not close the socket that the first one is on.
+    live.send_json(&json!({"op": "subscribe", "id": "second", "project": "app"}))
+        .await;
+    let frame: Value = live.receive_json().await;
+    check_subscription(who, &frame, "second")
+}
+
+/// The answer one subscription of `who` must get: a confirmation for a principal with a role on
+/// the project, and the answer for a missing project for a stranger.
+fn check_subscription(who: Who, frame: &Value, key: &str) -> Result<(), String> {
     match who {
-        Who::Stranger if frame["message"] == "no such project app" => Ok(()),
-        Who::Stranger => Err(format!("Stranger: subscribe answered {frame}")),
-        _ if frame["op"] == "subscribed" => Ok(()),
-        _ => Err(format!("{who:?}: subscribe answered {frame}")),
+        Who::Stranger if frame["message"] == "no such project app" && frame["sub"] == key => Ok(()),
+        Who::Stranger => Err(format!("Stranger: subscribe {key} answered {frame}")),
+        _ if frame["op"] == "subscribed" && frame["sub"] == key => Ok(()),
+        _ => Err(format!("{who:?}: subscribe {key} answered {frame}")),
     }
 }
 

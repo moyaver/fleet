@@ -145,6 +145,14 @@ pub struct Telemetry {
     pub devices: Vec<DeviceSample>,
 }
 
+impl Telemetry {
+    /// Whether the batch carries any host or device sample.
+    #[must_use]
+    pub fn has_samples(&self) -> bool {
+        !self.samples.is_empty() || !self.devices.is_empty()
+    }
+}
+
 /// One device's sample: what adb and the guest reported about a device session at one time.
 /// `None` means that reading was not observed; a device that could not be reached has `None`
 /// readings, never zeros.
