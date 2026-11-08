@@ -19,6 +19,9 @@ async fn a_live_run_whose_flags_move_maestros_files_settles_its_steps_on_the_ser
                 ("FLEET_SERVER", &ws),
                 ("FLEET_TOKEN", &key),
                 ("FLEET_UPLOAD_TIMEOUT", "20"),
+                // The agent finds the run's directory by the process that holds its log, so the fake
+                // must outlive the agent's first look, as Maestro does (seconds, not 0.6 s).
+                ("FLEET_FAKE_LINGER", "2"),
             ],
             &[
                 "--debug-output",

@@ -1,0 +1,18 @@
+Running on fleet-fixtures-148
+ > Flow pass
+Launch app "com.android.settings"... FAILED
+
+Package com.android.settings is not installed
+
+==== Debug output (logs & screenshots) ====
+
+<CAPTURE>/run/D
+╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                │
+│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │
+│                                                                                                │
+│   Run your flows on Maestro Cloud:                                                             │
+│   maestro cloud app_file flows_folder/                                                         │
+│                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+

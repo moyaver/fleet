@@ -1,0 +1,44 @@
+--------- beginning of main
+11-08 11:05:26.030 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+11-08 11:05:26.068 D/WifiClientModeImpl[21602:wlan0](  642): updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2437 RxLinkSpeed=2
+11-08 11:05:26.070 D/WifiDataStall(  642): tx tput in kbps: 37000
+11-08 11:05:26.070 D/WifiDataStall(  642): rx tput in kbps: 37000
+11-08 11:05:26.070 V/WifiConfigManager(  642): Updating scan detail cache freq=2437 BSSID=02:15:b2:00:00:01 RSSI=-50 for "AndroidWifi"NONE
+11-08 11:05:26.071 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:05:26.071 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:05:26.071 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:05:26.071 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:05:26.075 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:05:26.075 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:05:26.075 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:05:26.075 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:05:26.080 I/HalDevMgr(  642): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 11:05:26.084 D/WifiScoreCard(  642): BSSID update SIGNAL_POLL ID: 237047356 SSID: "AndroidWifi", BSSID: 02:15:b2:00:00:01, MAC: 02:15:d0:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 54Mbps, Calculated Tx : 0Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 54Mbps, Calculated Rx : 0Mbps, Frequency: 2437MHz, Net ID: 0, Metered hint: false, score: 100, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+11-08 11:05:26.084 D/WifiScoreCard(  642): txRate: 1 txSpeed: 1
+11-08 11:05:26.084 D/WifiScoreCard(  642): network update SIGNAL_POLL "AndroidWifi" ID: 506841123 RSSI -50 txSpeed -1
+11-08 11:05:26.084 D/WifiClientModeImpl[21602:wlan0](  642):  ClientModeImpl$L2ConnectedState screen=on 2 0 "AndroidWifi" 02:15:b2:00:00:01 rssi=-50 f=2437 sc=100 link=1 tx=0.2, 0.0, 0.0 rx=0.2 bcn=0 [on:0 tx:0 rx:0 period:3026] from screen [on:0 period:-1167603644] score=100
+--------- beginning of system
+11-08 11:05:26.089 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:05:26.098 I/adbd    (  499): adbd service requested 'sync:'
+11-08 11:05:26.181 I/adbd    (  499): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 11:05:26.220 W/ActivityManager(  642): Invalid packageName: com.android.settings
+11-08 11:05:26.225 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-08 11:05:26.259 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:05:26.298 D/Maestro ( 3630): Requesting view hierarchy
+11-08 11:05:26.302 W/QueryController( 3630): Could not detect idle state.
+11-08 11:05:26.306 W/QueryController( 3630): Could not detect idle state.
+11-08 11:05:26.338 I/Maestro ( 3630): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9d94; boundsInParent: Rect(0, 0 - 0, 154); boundsInScreen: Rect(1080, 0 - 1080, 154); boundsInWindow: Rect(1080, 0 - 1080, 154); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-08 11:05:26.338 D/Maestro ( 3630): View hierarchy received in 40 ms
+11-08 11:05:26.460 D/WindowManager(  642): captureDisplay
+--------- beginning of kernel
+11-08 11:05:26.500 I/servicemanager(  285): Caller(pid=3630,uid=10121,sid=u:r:untrusted_app:s0:c121,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:05:26.503 I/servicemanager(  285): Caller(pid=3630,uid=10121,sid=u:r:untrusted_app:s0:c121,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:05:26.506 I/servicemanager(  285): Caller(pid=3630,uid=10121,sid=u:r:untrusted_app:s0:c121,c256,c512,c768) Found mapper/ranchu in device VINTF manifest.
+11-08 11:05:26.516 W/libc    ( 3630): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:05:26.532 I/DisplayManager( 3630): Choreographer implicitly registered for the refresh rate.
+11-08 11:05:26.551 I/GFXSTREAM( 3630): [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+11-08 11:05:26.551 I/GFXSTREAM( 3630): [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+11-08 11:05:26.554 W/libc    ( 3630): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:05:26.568 W/HWUI    ( 3630): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-08 11:05:26.568 W/HWUI    ( 3630): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-08 11:05:27.026 I/adbd    (  499): adbd service requested 'shell,v2,raw:logcat -v time -d'

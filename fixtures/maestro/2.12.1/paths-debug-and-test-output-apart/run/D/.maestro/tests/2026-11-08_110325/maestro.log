@@ -1,0 +1,31 @@
+11:03:25.195 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: <CAPTURE>/run/D/.maestro/tests/2026-11-08_110325
+11:03:25.209 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+11:03:25.209 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.12.1
+11:03:25.210 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+11:03:25.210 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+11:03:25.210 [ INFO] MAESTRO.logSystemInfo: OS Version: 26.7.1
+11:03:25.210 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+11:03:25.211 [ INFO] MAESTRO.logSystemInfo: Java Version: 27
+11:03:25.377 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 27.1
+11:03:25.384 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+11:03:25.394 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+11:03:25.394 [ INFO] MAESTRO.logSystemInfo: ---------------------
+11:03:36.660 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5584 using port 53693 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+11:03:41.579 [ INFO] maestro.cli.runner.TestRunner.runSingle: Running flow pass.yaml...
+11:03:41.611 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+11:03:41.807 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2220, widthGrid=1080, heightGrid=2220)
+11:03:42.093 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING
+11:03:42.097 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true, MAESTRO_DISABLE_UPDATE_CHECK=true, MAESTRO_CLI_NO_ANALYTICS=1, MAESTRO_FILENAME=pass, MAESTRO_DEVICE_UDID=emulator-5584, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:03:42.098 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED
+11:03:42.099 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING
+11:03:42.100 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.android.settings, name=pass, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:03:42.101 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED
+11:03:42.103 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Launch app "com.android.settings" RUNNING
+11:03:42.105 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Launch app "com.android.settings" metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(launchAppCommand=LaunchAppCommand(appId=com.android.settings, clearState=null, clearKeychain=null, stopApp=null, permissions=null, launchArguments=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:03:42.205 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+11:03:42.206 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+11:03:42.252 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed
+11:03:42.542 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+11:03:42.544 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:03:42.988 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$4: Launch app "com.android.settings" FAILED
+11:03:43.441 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from <CAPTURE>/run/T

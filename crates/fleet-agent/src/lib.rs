@@ -13,6 +13,7 @@ mod emulator;
 pub mod inspect;
 mod ipc;
 pub mod journal;
+mod layout;
 mod metrics;
 mod net;
 mod observer;

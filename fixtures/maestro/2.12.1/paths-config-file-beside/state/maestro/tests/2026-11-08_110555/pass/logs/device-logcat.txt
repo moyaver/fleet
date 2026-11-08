@@ -1,0 +1,58 @@
+--------- beginning of main
+11-08 11:06:00.734 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+--------- beginning of system
+11-08 11:06:00.766 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:06:00.774 I/adbd    (  499): adbd service requested 'sync:'
+11-08 11:06:00.835 I/adbd    (  499): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 11:06:00.859 W/ActivityManager(  642): Invalid packageName: com.android.settings
+11-08 11:06:00.867 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-08 11:06:00.893 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:06:00.922 D/Maestro ( 4151): Requesting view hierarchy
+11-08 11:06:00.926 W/QueryController( 4151): Could not detect idle state.
+11-08 11:06:00.928 W/QueryController( 4151): Could not detect idle state.
+11-08 11:06:00.952 I/Maestro ( 4151): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9d99; boundsInParent: Rect(0, 0 - 0, 154); boundsInScreen: Rect(1080, 0 - 1080, 154); boundsInWindow: Rect(1080, 0 - 1080, 154); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-08 11:06:00.953 D/Maestro ( 4151): View hierarchy received in 31 ms
+--------- beginning of kernel
+11-08 11:06:01.118 I/logd    ( 2930): start watching /data/system/packages.list ...
+11-08 11:06:01.118 I/logd    ( 2930): ReadPackageList, total packages: 122
+11-08 11:06:01.178 D/WindowManager(  642): captureDisplay
+11-08 11:06:01.200 I/servicemanager(  285): Caller(pid=4151,uid=10127,sid=u:r:untrusted_app:s0:c127,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:06:01.202 I/servicemanager(  285): Caller(pid=4151,uid=10127,sid=u:r:untrusted_app:s0:c127,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:06:01.203 I/servicemanager(  285): Caller(pid=4151,uid=10127,sid=u:r:untrusted_app:s0:c127,c256,c512,c768) Found mapper/ranchu in device VINTF manifest.
+11-08 11:06:01.210 W/libc    ( 4151): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:06:01.221 I/DisplayManager( 4151): Choreographer implicitly registered for the refresh rate.
+11-08 11:06:01.238 I/GFXSTREAM( 4151): [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+11-08 11:06:01.238 I/GFXSTREAM( 4151): [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+11-08 11:06:01.239 W/libc    ( 4151): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:06:01.244 W/HWUI    ( 4151): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-08 11:06:01.245 W/HWUI    ( 4151): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-08 11:06:01.471 W/FileUtils(  642): Failed to chmod(AtomicFile[/data/system_de/0/system/game-manager-service.xml])
+11-08 11:06:01.471 W/FileUtils(  642): android.system.ErrnoException: chmod failed: ENOENT (No such file or directory)
+11-08 11:06:01.471 W/FileUtils(  642): 	at libcore.io.Linux.chmod(Native Method)
+11-08 11:06:01.471 W/FileUtils(  642): 	at libcore.io.ForwardingOs.chmod(ForwardingOs.java:166)
+11-08 11:06:01.471 W/FileUtils(  642): 	at libcore.io.BlockGuardOs.chmod(BlockGuardOs.java:83)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.system.Os.chmod(Os.java:119)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.FileUtils.setPermissions(FileUtils.java:189)
+11-08 11:06:01.471 W/FileUtils(  642): 	at com.android.server.app.GameManagerSettings.writePersistentDataLocked(GameManagerSettings.java:179)
+11-08 11:06:01.471 W/FileUtils(  642): 	at com.android.server.app.GameManagerService$SettingsHandler.doHandleMessage(GameManagerService.java:329)
+11-08 11:06:01.471 W/FileUtils(  642): 	at com.android.server.app.GameManagerService$SettingsHandler.handleMessage(GameManagerService.java:310)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.Handler.dispatchMessageImpl(Handler.java:142)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.Looper.loop(Looper.java:397)
+11-08 11:06:01.471 W/FileUtils(  642): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 11:06:01.471 W/FileUtils(  642): 	at com.android.server.ServiceThread.run(ServiceThread.java:46)
+11-08 11:06:01.477 I/PackageManager(  642): getInstalledPackages: callingUid=1000 flags=0 updatedFlags=786432 userId=0
+11-08 11:06:01.609 D/ActivityManager(  642): freezing 1978 com.google.android.documentsui
+11-08 11:06:01.619 D/ActivityManager(  642): freezing 2408 com.google.android.rkpdapp
+11-08 11:06:01.623 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:06:01.623 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:06:01.623 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10038} in 2ms
+11-08 11:06:01.624 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:06:01.624 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:06:01.624 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10088} in 1ms
+11-08 11:06:01.699 D/ActivityManager(  642): freezing 1916 android.process.media
+11-08 11:06:01.705 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:06:01.705 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:06:01.705 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10028} in 1ms
+11-08 11:06:01.719 I/adbd    (  499): adbd service requested 'shell,v2,raw:logcat -v time -d'

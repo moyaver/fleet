@@ -2354,9 +2354,17 @@ mod tests {
     /// Runs whose console log is in Maestro's default format. The agent reads no step from such a log
     /// and starts no flow from it (its stdout has no result lines either), so their files settle
     /// nothing and no flow is found for them.
-    const DEFAULT_FORMAT_RUNS: [&str; 5] = [
+    const DEFAULT_FORMAT_RUNS: [&str; 13] = [
+        "paths-config-explicit",
+        "paths-config-file-beside",
+        "paths-config-overridden-by-flag",
+        "paths-debug-and-test-output-apart",
         "paths-debug-and-test-output-same",
         "paths-debug-output",
+        "paths-flatten-alone",
+        "paths-flatten-config",
+        "paths-flatten-debug-and-test-output",
+        "paths-flatten-test-output-dir",
         "paths-none",
         "paths-test-output-dir",
         "single-flow-no-format",
@@ -2369,7 +2377,7 @@ mod tests {
     #[test]
     fn every_captured_run_settles_each_flows_steps_from_its_final_commands_file() {
         let runs = captured_runs();
-        assert_eq!(runs.len(), 35, "every captured run is replayed");
+        assert_eq!(runs.len(), 45, "every captured run is replayed");
         let mut settled_flows = 0;
         for run in &runs {
             let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
@@ -2431,7 +2439,7 @@ mod tests {
             })
             .count();
         assert_eq!(settled_flows, final_files);
-        assert_eq!(final_files, 39, "the captured final files");
+        assert_eq!(final_files, 40, "the captured final files");
     }
 
     /// A commands file whose flow the log never named is warned on the run, once per file, and

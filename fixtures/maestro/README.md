@@ -44,6 +44,16 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | `paths-test-output-dir` | | `--device A test --test-output-dir {RUN}/T pass.yaml` |
 | `paths-debug-output` | | `--device A test --debug-output {RUN}/D pass.yaml` |
 | `paths-debug-and-test-output-same` | | `--device A test --debug-output {RUN}/X --test-output-dir {RUN}/X pass.yaml` |
+| `paths-debug-and-test-output-apart` | | `--device A test --debug-output {RUN}/D --test-output-dir {RUN}/T pass.yaml` |
+| `paths-flatten-alone` | `user.home` is `{RUN}/home` (see [provenance](#provenance-of-the-layout-captures-148)) | `--device A test --flatten-debug-output pass.yaml` |
+| `paths-flatten-test-output-dir` | `user.home` is `{RUN}/home` | `--device A test --flatten-debug-output --test-output-dir {RUN}/T pass.yaml` |
+| `paths-flatten-debug-and-test-output` | | `--device A test --flatten-debug-output --debug-output {RUN}/D --test-output-dir {RUN}/T pass.yaml` |
+| `paths-flatten-repeated` | exits 2 before it runs anything | `--device A test --flatten-debug-output --flatten-debug-output --debug-output {RUN}/D pass.yaml` |
+| `paths-flatten-config` | `user.home` is `{RUN}/home`; run from `{RUN}`, with `cfg/config.yaml` | `--device A test --flatten-debug-output --config cfg/config.yaml pass.yaml` |
+| `paths-config-explicit` | run from `{RUN}`, with `cfg/config.yaml` (`testOutputDir: out-config`) | `--device A test --config cfg/config.yaml pass.yaml` |
+| `paths-config-overridden-by-flag` | as `paths-config-explicit` | `--device A test --config cfg/config.yaml --test-output-dir {RUN}/T pass.yaml` |
+| `paths-config-dir-input` | run from `{RUN}`, with `flows/config.yaml` beside `flows/pass.yaml` | `--device A test flows/` |
+| `paths-config-file-beside` | as `paths-config-dir-input` | `--device A test flows/pass.yaml` |
 | `tty-ansi`, `tty-no-ansi` | (run under `script -q /dev/null`) | `[--no-ansi] --device A test CANON fail.yaml` |
 | `suite-with-adb-load` | `MP`, plus an adb poller every 5 s | `--device A test CANON suite` |
 | `shard-split-2` | `MP` | `--device "A,B" test --shard-split 2 CANON suite` |
@@ -82,6 +92,18 @@ Findings:
 - **Where the report goes without `--output`:** Maestro 2.12.1 writes `report.html` in its working directory, for both `--format html` and `--format html-detailed`. It is one file, with no assets directory (`html-report-default-path`, `html-detailed-default-path`). It is not written into `--debug-output`, into `--test-output-dir` (`html-test-output-dir`: the flow bundles go into `T/<timestamp>/`, the report stays in the working directory), or into the session state directory (`html-no-debug-flags`: the session tree is `state/maestro/tests/<timestamp>/`).
 - **With `--output`:** the report is written to that path exactly, whatever the format; `html-report` and `html-detailed` hold it at `run/report.html`.
 - **Imports:** every report is well under the import limit (2.3 KB to 5.9 KB), so no `SKIPPED.txt` was needed. `device-logcat.txt` is cut to 32 KiB as usual.
+
+### Provenance of the layout captures (#148)
+
+Captured on 2026-11-08 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula, on a throwaway AVD `fleet-fixtures-148` created in a temporary `ANDROID_AVD_HOME` from `system-images;android-37.0;google_atd;arm64-v8a` (the image on the capturing machine). It booted headless on port 5584 (serial `emulator-5584`) and was shut down and deleted afterwards. `device.json` in each scenario records the device, which is the same for all of them. Every scenario ran `pass.yaml` on this image, and it failed (exit 1) there: the layouts do not depend on the outcome, and each `exit.json` records what Maestro reported.
+
+- **`user.home`.** The JVM does not read `$HOME`: with `HOME` changed, `java -XshowSettings:properties` still reports the account's home (checked on macOS). The flattened captures that write into the home directory run through `sh -c 'h="$1"; …; export JAVA_OPTS="-Duser.home=$h"; exec "$@"'` with `{RUN}/home`, which Maestro's launcher passes to the JVM. The fixture records the wrapper in `meta.json`. Files Maestro wrote beside the flow bundles there (the adb key it created, the simulator tools under `.maestro/deps`, `.maestro/sessions`, the DebugLogStore zip under `Library/Logs`) were removed on import: the adb key is a private key, and none of the rest is part of any layout.
+- **Flatten alone** writes into `user.home`: `home/maestro.log` and `home/pass/`.
+- **Flatten with `--test-output-dir`** ignores `T`: the bundles stay in `home/`, and no `T` directory is created.
+- **Flatten with a debug and a test directory** ignores `T`: everything is in `D/`.
+- **A repeated `--flatten-debug-output`** is a picocli usage error: `option '--flatten-debug-output' should be specified only once`, exit 2, and nothing runs.
+- **`testOutputDir` in a workspace config** is read from `--config`, and from a `config.yaml` (or `config.yml`) in a directory the command names, not from a single file beside it (`paths-config-file-beside` writes its bundles beside the log). Its value is relative to the working directory, not to the config file (`paths-config-explicit` writes to `run/out-config/`, not `run/cfg/out-config/`). `--test-output-dir` wins over it (`paths-config-overridden-by-flag`), and `--flatten-debug-output` ignores it (`paths-flatten-config`).
+- **Two runs in one tree** are told apart by the process that holds each run's `maestro.log` open: Maestro's log4j file appender keeps the file open for the JVM's life (checked by running Maestro's own `LogConfig` in a JVM and listing its open files with `lsof`). The agent's tests use this to tell two concurrent runs apart (`crates/fleet-agent/tests/it/layouts.rs`).
 
 ## Capturing a new version
 

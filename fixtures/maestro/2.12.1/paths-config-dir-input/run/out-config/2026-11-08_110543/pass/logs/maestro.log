@@ -1,0 +1,11 @@
+11:05:49.842 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+11:05:49.848 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+11:05:49.849 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+11:05:49.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+11:05:49.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+11:05:50.018 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+11:05:50.018 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+11:05:50.093 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed
+11:05:50.292 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+11:05:50.293 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:05:50.719 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" FAILED

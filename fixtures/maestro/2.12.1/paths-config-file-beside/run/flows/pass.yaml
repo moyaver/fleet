@@ -1,0 +1,8 @@
+appId: com.android.settings
+name: pass
+---
+- launchApp
+- assertVisible: "Network & internet"
+- tapOn: "Apps"
+- assertVisible: "Apps"
+- back

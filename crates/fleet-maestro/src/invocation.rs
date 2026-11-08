@@ -36,6 +36,8 @@ pub struct Invocation {
     pub flatten: bool,
     /// `--test-output-dir`.
     pub test_output_dir: Option<String>,
+    /// `--config`: the workspace config file, relative to the working directory as given.
+    pub config: Option<String>,
     /// Sharding mode.
     pub shard_mode: Option<ShardMode>,
     /// Shard count.
@@ -149,6 +151,7 @@ pub fn parse(argv: &[String]) -> Invocation {
             "--output" => inv.output.clone_from(&value),
             "--debug-output" => inv.debug_output.clone_from(&value),
             "--test-output-dir" => inv.test_output_dir.clone_from(&value),
+            "--config" => inv.config.clone_from(&value),
             "--flatten-debug-output" => inv.flatten = true,
             "--shard-split" | "--shards" | "-s" => {
                 inv.shard_mode = Some(ShardMode::Split);
@@ -276,8 +279,32 @@ pub struct OutputLayout {
     pub bundles: OutputRoot,
 }
 
+/// The directory Maestro calls `user.home`: the one `-Duser.home=` names in `JAVA_OPTS` or
+/// `MAESTRO_OPTS` (the launcher passes both to the JVM, the later one wins), else the account's home
+/// directory (`account_home`). The JVM does not read `$HOME`: with `HOME` changed, `user.home` stayed
+/// the account's, on macOS (checked with `java -XshowSettings:properties`). Maestro's state
+/// directory and `--flatten-debug-output` without a debug directory both use it.
+#[must_use]
+pub fn user_home(
+    java_opts: Option<&str>,
+    maestro_opts: Option<&str>,
+    account_home: Option<&Path>,
+) -> Option<PathBuf> {
+    let overridden = [java_opts, maestro_opts]
+        .into_iter()
+        .flatten()
+        .flat_map(str::split_whitespace)
+        .filter_map(|opt| opt.strip_prefix("-Duser.home="))
+        .next_back();
+    overridden.map_or_else(
+        || account_home.map(Path::to_path_buf),
+        |h| Some(PathBuf::from(h)),
+    )
+}
+
 /// Maestro's state directory for test runs: `$XDG_STATE_HOME/maestro/tests` when that variable is
-/// set (and not empty), else `~/.maestro/tests` (research 01 §4.1). `None` when neither is known.
+/// set (and not empty), else `<user.home>/.maestro/tests` (research 01 §4.1). `None` when neither is
+/// known. `home` is [`user_home`].
 #[must_use]
 pub fn state_tests_dir(xdg_state_home: Option<&OsStr>, home: Option<&Path>) -> Option<PathBuf> {
     match (xdg_state_home.filter(|v| !v.is_empty()), home) {
@@ -287,24 +314,43 @@ pub fn state_tests_dir(xdg_state_home: Option<&OsStr>, home: Option<&Path>) -> O
     }
 }
 
+/// The `testOutputDir` of a workspace `config.yaml` (or `config.yml`), if it sets one. Maestro reads
+/// it when the command has no `--test-output-dir`, and it is relative to the working directory, not
+/// to the config file (captured: `paths-config-explicit`). Unknown keys are ignored, as Maestro does.
+/// `None` for a config that does not parse or sets no directory.
+#[must_use]
+pub fn workspace_test_output_dir(config_yaml: &str) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Workspace {
+        test_output_dir: Option<String>,
+    }
+    serde_yaml_ng::from_str::<Workspace>(config_yaml)
+        .ok()?
+        .test_output_dir
+}
+
 /// Where Maestro writes the session log and the flow bundles for a parsed `maestro test` command.
 ///
-/// The rules are Maestro 2.12.1's (`TestDebugReporter.kt` L187-226, research 01 §4.1), and the
-/// captured fixtures agree with them: `paths-*`, `html-test-output-dir` and `html-no-debug-flags`
-/// (see `fixtures/maestro/2.12.1`).
+/// The rules are Maestro 2.12.1's (`TestDebugReporter.kt` L187-226 and `TestCommand.kt`
+/// `resolveTestOutputDir`, research 01 §4.1), and the captured fixtures agree with them:
+/// `paths-*`, `html-test-output-dir` and `html-no-debug-flags` (see `fixtures/maestro/2.12.1`).
 ///
-/// - `--flatten-debug-output` writes both into `--debug-output`, or into the home directory without
-///   one. `--test-output-dir` is ignored.
+/// - `--flatten-debug-output` writes both into `--debug-output`, or into `home` without one.
+///   `--test-output-dir` and the workspace config's `testOutputDir` are ignored.
 /// - Otherwise the log goes into a stamped directory under `<debug>/.maestro/tests`, or under the
-///   state directory without `--debug-output`. The bundles go into a stamped directory under
-///   `--test-output-dir` when given, else beside the log.
+///   state directory without `--debug-output`. The bundles go into a stamped directory under the
+///   test output directory when one is set (`--test-output-dir`, else `workspace_test_dir`, the
+///   config's `testOutputDir`), else beside the log. The flag wins over the config.
 ///
-/// `None` when the directory is needed and unknown (no home, no state directory).
+/// `home` is [`user_home`]. `None` when the directory is needed and unknown (no home, no state
+/// directory).
 #[must_use]
 pub fn output_layout(
     inv: &Invocation,
     state_tests: Option<&Path>,
     home: Option<&Path>,
+    workspace_test_dir: Option<&str>,
 ) -> Option<OutputLayout> {
     if inv.flatten {
         let dir = match inv.debug_output.as_deref() {
@@ -320,7 +366,7 @@ pub fn output_layout(
         Some(debug) => PathBuf::from(debug).join(".maestro").join("tests"),
         None => state_tests?.to_path_buf(),
     };
-    let bundles = match inv.test_output_dir.as_deref() {
+    let bundles = match inv.test_output_dir.as_deref().or(workspace_test_dir) {
         Some(test) => OutputRoot::Stamped(PathBuf::from(test)),
         None => OutputRoot::Stamped(log_base.clone()),
     };
@@ -369,7 +415,11 @@ fn report_decision(
 /// Adds the agent's flags and environment (`rewrite` = `--fleet-rewrite=auto`).
 ///
 /// `extra_flows` are flow paths the agent will append later (a planner shard); `classify` tells
-/// files from directories.
+/// files from directories. `workspace_test_dir` is the config's `testOutputDir` ([`workspace_test_output_dir`]):
+/// a directory the user set counts as a flag they chose, so the agent adds no output flags then.
+///
+/// Maestro rejects a repeated `--flatten-debug-output` (captured: `paths-flatten-repeated`, exit 2),
+/// so a user's own flatten flag is never added a second time.
 ///
 /// The report is one normalization over (user's `--format`, user's `--output`, injection
 /// decision); the agent never adds an option the user already gave:
@@ -388,6 +438,7 @@ pub fn prepare(
     run_dir: &Path,
     rewrite: bool,
     extra_flows: &[String],
+    workspace_test_dir: Option<&str>,
     classify: impl Fn(&str) -> PathKind,
     user_env: impl Fn(&str) -> bool,
 ) -> Prepared {
@@ -427,15 +478,18 @@ pub fn prepare(
         (UserFormat::Junit, ..) => (requested_report(&inv), ReportReason::UserJunit),
         (UserFormat::Other, ..) => (None, ReportReason::UserFormat),
     };
-    if rewriting && inv.debug_output.is_none() && inv.test_output_dir.is_none() {
+    if rewriting
+        && inv.debug_output.is_none()
+        && inv.test_output_dir.is_none()
+        && workspace_test_dir.is_none()
+    {
         let dir = run_dir.join("artifacts").to_string_lossy().into_owned();
+        let flatten = (!inv.flatten).then(|| "--flatten-debug-output".to_owned());
         added.splice(
             0..0,
-            [
-                "--flatten-debug-output".to_owned(),
-                "--debug-output".to_owned(),
-                dir.clone(),
-            ],
+            flatten
+                .into_iter()
+                .chain(["--debug-output".to_owned(), dir.clone()]),
         );
         debug_dir = Some(dir);
     }
@@ -504,7 +558,15 @@ mod tests {
     }
 
     fn inject(cmd: &str, extra: &[String]) -> (ReportInjection, Vec<String>) {
-        let p = prepare(&argv(cmd), Path::new("/run"), true, extra, dirs, |_| false);
+        let p = prepare(
+            &argv(cmd),
+            Path::new("/run"),
+            true,
+            extra,
+            None,
+            dirs,
+            |_| false,
+        );
         (p.report_injection, p.argv)
     }
 
@@ -569,6 +631,7 @@ mod tests {
             Path::new("/r"),
             false,
             &[],
+            None,
             dirs,
             |_| false,
         );
@@ -611,9 +674,15 @@ mod tests {
     #[test]
     fn adds_only_what_is_missing() {
         let run = Path::new("/run");
-        let p = prepare(&argv("maestro test flows/"), run, true, &[], dirs, |_| {
-            false
-        });
+        let p = prepare(
+            &argv("maestro test flows/"),
+            run,
+            true,
+            &[],
+            None,
+            dirs,
+            |_| false,
+        );
         assert_eq!(
             p.argv,
             argv(
@@ -631,7 +700,7 @@ mod tests {
         );
 
         let user = argv("maestro test --format html --test-output-dir out flows/");
-        let p = prepare(&user, run, true, &[], dirs, |k| {
+        let p = prepare(&user, run, true, &[], None, dirs, |k| {
             k == "MAESTRO_CLI_NO_ANALYTICS"
         });
         assert_eq!(p.argv, user, "the user chose both; nothing is added");
@@ -640,14 +709,22 @@ mod tests {
             "user env wins"
         );
 
-        let p = prepare(&argv("maestro test flows/"), run, false, &[], dirs, |_| {
-            false
-        });
+        let p = prepare(
+            &argv("maestro test flows/"),
+            run,
+            false,
+            &[],
+            None,
+            dirs,
+            |_| false,
+        );
         assert_eq!(p.argv, argv("maestro test flows/"), "rewrite off");
     }
 
     fn run(cmd: &str) -> Prepared {
-        prepare(&argv(cmd), Path::new("/run"), true, &[], dirs, |_| false)
+        prepare(&argv(cmd), Path::new("/run"), true, &[], None, dirs, |_| {
+            false
+        })
     }
 
     fn count(p: &Prepared, flag: &str) -> usize {
@@ -739,6 +816,7 @@ mod tests {
             Path::new("/run"),
             false,
             &[],
+            None,
             dirs,
             |_| false,
         );
@@ -765,6 +843,7 @@ mod tests {
             Path::new("/r"),
             false,
             &[],
+            None,
             dirs,
             |_| true,
         );
@@ -779,7 +858,7 @@ mod tests {
         let state = Path::new("/state/maestro/tests");
         let home = Path::new("/home/me");
         let layout = |cmd: &str| {
-            output_layout(&parse(&argv(cmd)), Some(state), Some(home)).expect("a layout")
+            output_layout(&parse(&argv(cmd)), Some(state), Some(home), None).expect("a layout")
         };
         let stamped = |p: &str| OutputRoot::Stamped(PathBuf::from(p));
         let flat = |p: &str| OutputRoot::Flat(PathBuf::from(p));
@@ -856,16 +935,151 @@ mod tests {
             output_layout(
                 &parse(&argv("maestro test --flatten-debug-output flows/")),
                 Some(state),
-                None
+                None,
+                None,
             ),
             None,
             "no home, no directory"
         );
         assert_eq!(
-            output_layout(&parse(&argv("maestro test flows/")), None, Some(home)),
+            output_layout(&parse(&argv("maestro test flows/")), None, Some(home), None),
             None,
             "no state directory"
         );
+    }
+
+    #[test]
+    fn the_workspace_config_sets_the_bundles_directory_and_the_flag_wins() {
+        let state = Path::new("/state/maestro/tests");
+        let layout = |cmd: &str, config: Option<&str>| {
+            output_layout(&parse(&argv(cmd)), Some(state), None, config).expect("a layout")
+        };
+        // paths-config-explicit, paths-config-dir-input: the log stays in the state directory and
+        // the bundles go into the config's directory (relative to the working directory).
+        assert_eq!(
+            layout(
+                "maestro test --config cfg/config.yaml flows/",
+                Some("out-config")
+            ),
+            OutputLayout {
+                log: OutputRoot::Stamped(PathBuf::from("/state/maestro/tests")),
+                bundles: OutputRoot::Stamped(PathBuf::from("out-config")),
+            }
+        );
+        // paths-config-overridden-by-flag: --test-output-dir wins.
+        assert_eq!(
+            layout(
+                "maestro test --config cfg/config.yaml --test-output-dir T flows/",
+                Some("out-config")
+            ),
+            OutputLayout {
+                log: OutputRoot::Stamped(PathBuf::from("/state/maestro/tests")),
+                bundles: OutputRoot::Stamped(PathBuf::from("T")),
+            }
+        );
+        // paths-config-file-beside: a single flow file does not read the config beside it, so the
+        // config is None for it and the bundles stay beside the log.
+        assert_eq!(
+            layout("maestro test flows/pass.yaml", None).bundles,
+            OutputRoot::Stamped(PathBuf::from("/state/maestro/tests"))
+        );
+        // paths-flatten-config: flatten ignores the config.
+        assert_eq!(
+            output_layout(
+                &parse(&argv(
+                    "maestro test --flatten-debug-output --config cfg/config.yaml flows/"
+                )),
+                Some(state),
+                Some(Path::new("/home/me")),
+                Some("out-config"),
+            ),
+            Some(OutputLayout {
+                log: OutputRoot::Flat(PathBuf::from("/home/me")),
+                bundles: OutputRoot::Flat(PathBuf::from("/home/me")),
+            })
+        );
+    }
+
+    #[test]
+    fn the_workspace_config_reads_test_output_dir_and_ignores_the_rest() {
+        assert_eq!(
+            workspace_test_output_dir("flows:\n  - a.yaml\ntestOutputDir: out-config\n"),
+            Some("out-config".to_owned())
+        );
+        assert_eq!(
+            workspace_test_output_dir("includeTags: [smoke]\n"),
+            None,
+            "no key, no directory"
+        );
+        assert_eq!(
+            workspace_test_output_dir("testOutputDir: [not, a, string]\n"),
+            None,
+            "a value of the wrong type does not parse"
+        );
+        assert_eq!(
+            workspace_test_output_dir("testOutputDir: ["),
+            None,
+            "invalid YAML"
+        );
+    }
+
+    #[test]
+    fn user_home_is_the_jvm_override_else_the_account_home() {
+        let account = Some(Path::new("/Users/me"));
+        assert_eq!(
+            user_home(None, None, account),
+            Some(PathBuf::from("/Users/me"))
+        );
+        assert_eq!(
+            user_home(Some("-Xmx1g -Duser.home=/w/h"), None, account),
+            Some(PathBuf::from("/w/h")),
+            "-Duser.home in JAVA_OPTS"
+        );
+        assert_eq!(
+            user_home(Some("-Duser.home=/a"), Some("-Duser.home=/b"), account),
+            Some(PathBuf::from("/b")),
+            "MAESTRO_OPTS comes after JAVA_OPTS, so it wins"
+        );
+        assert_eq!(user_home(None, None, None), None);
+    }
+
+    #[test]
+    fn a_users_flatten_flag_is_never_added_again() {
+        // Maestro rejects a second --flatten-debug-output (paths-flatten-repeated, exit 2), so the
+        // agent adds only the debug directory it needs.
+        let p = run("maestro test --flatten-debug-output flows/");
+        assert_eq!(count(&p, "--flatten-debug-output"), 1, "{:?}", p.argv);
+        assert!(
+            p.argv
+                .windows(2)
+                .any(|w| w == ["--debug-output", "/run/artifacts"])
+        );
+        assert_eq!(p.debug_dir.as_deref(), Some("/run/artifacts"));
+        assert!(!p.added_flags.iter().any(|a| a == "--flatten-debug-output"));
+        // Without the user's flag the agent adds it, as before.
+        let p = run("maestro test flows/");
+        assert_eq!(count(&p, "--flatten-debug-output"), 1);
+    }
+
+    #[test]
+    fn a_configured_test_output_dir_is_the_users_choice() {
+        let p = prepare(
+            &argv("maestro test flows/"),
+            Path::new("/run"),
+            true,
+            &[],
+            Some("out-config"),
+            dirs,
+            |_| false,
+        );
+        assert!(
+            !p.argv
+                .iter()
+                .any(|a| a == "--flatten-debug-output" || a == "--debug-output"),
+            "the agent adds no debug flags over a config directory: {:?}",
+            p.argv
+        );
+        assert_eq!(p.debug_dir, None);
     }
 
     #[test]

@@ -202,7 +202,7 @@ fn every_fixture_parses() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();
-    assert_eq!(names.len(), 35, "{names:?}");
+    assert_eq!(names.len(), 45, "{names:?}");
     for name in names {
         let dir = fixtures_root().join(&name);
         let debug = dir.join("run/debug");
@@ -369,4 +369,23 @@ fn a_step_description_names_the_kind_of_the_command_it_runs() {
     }
     assert!(checked > 200, "only {checked} steps were checked");
     assert_eq!(unchecked, Vec::<String>::new());
+}
+
+/// Maestro 2.12.1 rejects a repeated `--flatten-debug-output` with exit 2 and a usage message, so
+/// the agent must never add a second one to a command that has it (issue #148).
+#[test]
+fn a_repeated_flatten_flag_is_a_usage_error_in_maestro() {
+    let dir = fixtures_root().join("paths-flatten-repeated");
+    let exit: Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("exit.json")).unwrap()).unwrap();
+    assert_eq!(exit["code"], 2, "picocli's usage error");
+    let stderr = fs::read_to_string(dir.join("stderr.bin")).unwrap();
+    assert!(
+        stderr.contains("option '--flatten-debug-output' should be specified only once"),
+        "{stderr}"
+    );
+    assert!(
+        !dir.join("run").exists(),
+        "Maestro wrote nothing: the command never ran"
+    );
 }

@@ -1,0 +1,38 @@
+{
+  "command": [
+    "/bin/sh",
+    "-c",
+    "mkdir -p \"$1/cfg\" && printf \"testOutputDir: out-config\\n\" > \"$1/cfg/config.yaml\" && h=\"$1/home\" && mkdir -p \"$h\" && cd \"$1\" && shift && export JAVA_OPTS=\"-Duser.home=$h\" && exec \"$@\"",
+    "sh",
+    "<CAPTURE>/run",
+    "maestro",
+    "--device",
+    "emulator-5584",
+    "test",
+    "--flatten-debug-output",
+    "--config",
+    "cfg/config.yaml",
+    "<REPO>/examples/flows/phase0/pass.yaml"
+  ],
+  "default_env": [
+    {
+      "name": "MAESTRO_CLI_NO_ANALYTICS",
+      "value": "1"
+    },
+    {
+      "name": "MAESTRO_DISABLE_UPDATE_CHECK",
+      "value": "true"
+    },
+    {
+      "name": "MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED",
+      "value": "true"
+    }
+  ],
+  "env": [],
+  "host": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "signal": null,
+  "started_at_unix_ms": 1794129003399
+}
