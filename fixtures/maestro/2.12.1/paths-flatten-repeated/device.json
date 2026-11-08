@@ -1,0 +1,39 @@
+{
+  "maestro": "2.12.1",
+  "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
+  "device": {
+    "avd": "fleet-fixtures-148",
+    "serial": "emulator-5584",
+    "system_image": "system-images;android-37.0;google_atd;arm64-v8a",
+    "api_level": "37",
+    "build": "CE2A.260420.051.A3",
+    "fingerprint": "google/sdk_gslim_arm64/emu64a:17/CE2A.260420.051.A3/16571990:userdebug/dev-keys",
+    "sdk_int": "37",
+    "release": "17",
+    "security_patch": "2026-08-05",
+    "abi": "arm64-v8a",
+    "model": "Android ATD built for arm64"
+  },
+  "emulator": {
+    "version": "37.2.13.0 (build_id 16740729) (CL:N/A)",
+    "launch": "emulator -avd fleet-fixtures-148 -port 5584 -no-window -no-audio -no-snapshot -no-boot-anim",
+    "config_ini": {
+      "hw.gpu.enabled": "no",
+      "hw.gpu.mode": "auto",
+      "hw.lcd.density": "440",
+      "hw.lcd.height": "2220",
+      "hw.lcd.width": "1080",
+      "hw.ramSize": "2G",
+      "image.sysdir.1": "system-images/android-37.0/google_atd/arm64-v8a/",
+      "tag.id": "google_atd"
+    },
+    "avd_home": "temporary directory, deleted after capture",
+    "notes": [
+      "Created with avdmanager from system-images/android-37.0/google_atd (the image the owner's sdk has); the owner's AVDs were not used."
+    ]
+  },
+  "host": {
+    "os": "macOS 26 (Darwin 25.6.0)",
+    "arch": "arm64"
+  }
+}

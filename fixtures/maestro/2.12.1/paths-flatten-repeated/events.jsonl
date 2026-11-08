@@ -1,0 +1,59 @@
+{"src":"proc","t_ms":279,"tree":[{"command":"/bin/sh /opt/homebrew/bin/maestro --device emulator-5584 test --flatten-debug-output --flatten-debug-output --debug-output <CAPTURE>/run/D <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"95801","pid":2117,"ppid":2040,"rss_kib":"1920"},{"command":"(bash)","cpu":"0.0","pgid":"95801","pid":2132,"ppid":2117,"rss_kib":"1600"}]}
+{"src":"proc","t_ms":2509,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --flatten-debug-output --flatten-debug-output --debug-output <CAPTURE>/run/D <REPO>/examples/flows/phase0/pass.yaml","cpu":"21.2","pgid":"95801","pid":2117,"ppid":2040,"rss_kib":"100672"},{"command":"(jspawnhelper)","cpu":"0.0","pgid":"95801","pid":2330,"ppid":2117,"rss_kib":"1376"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":2948}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":2948}
+{"bytes":248,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @184cf7cf (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":3031}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":3031}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":3031}
+{"bytes":62,"line":"option '--flatten-debug-output' should be specified only once\n","src":"stderr","t_ms":3091}
+{"bytes":158,"line":"Usage: maestro test [-ch] [--analyze] [--flatten-debug-output] [--headless] [--[no-]ansi] [--[no-]reinstall-driver] [--api-key=<apiKey>] [--api-url=<apiUrl>]\n","src":"stderr","t_ms":3167}
+{"bytes":155,"line":"                    [--config=<configFile>] [--debug-output=<debugOutput>] [--format=<format>] [--output=<output>] [-p=<platform>] [-s=<legacyShardCount>]\n","src":"stderr","t_ms":3167}
+{"bytes":139,"line":"                    [--screen-size=<screenSize>] [--shard-all=<shardAll>] [--shard-split=<shardSplit>] [--test-output-dir=<testOutputDir>]\n","src":"stderr","t_ms":3167}
+{"bytes":153,"line":"                    [--test-suite-name=<testSuiteName>] [--udid=<deviceId>] [-e=<String=String>]... [--exclude-tags=<excludeTags>[,<excludeTags>...]]...\n","src":"stderr","t_ms":3167}
+{"bytes":88,"line":"                    [--include-tags=<includeTags>[,<includeTags>...]]... <flowFiles>...\n","src":"stderr","t_ms":3167}
+{"bytes":73,"line":"Test a Flow or set of Flows on a local iOS Simulator or Android Emulator\n","src":"stderr","t_ms":3167}
+{"bytes":83,"line":"      <flowFiles>...       One or more flow files or folders containing flow files\n","src":"stderr","t_ms":3167}
+{"bytes":84,"line":"      --analyze            [Beta] Enhance the test output analysis with AI Insights\n","src":"stderr","t_ms":3167}
+{"bytes":42,"line":"      --api-key=<apiKey>   [Beta] API key\n","src":"stderr","t_ms":3167}
+{"bytes":47,"line":"      --api-url=<apiUrl>   [Beta] API base URL\n","src":"stderr","t_ms":3167}
+{"bytes":19,"line":"  -c, --continuous\n","src":"stderr","t_ms":3167}
+{"bytes":28,"line":"      --config=<configFile>\n","src":"stderr","t_ms":3167}
+{"bytes":156,"line":"                           Optional YAML configuration file for the workspace. If not provided, Maestro will look for a config.yaml file in the workspace's\n","src":"stderr","t_ms":3167}
+{"bytes":45,"line":"                             root directory.\n","src":"stderr","t_ms":3167}
+{"bytes":35,"line":"      --debug-output=<debugOutput>\n","src":"stderr","t_ms":3167}
+{"bytes":88,"line":"                           Configures the debug output in this path, instead of default\n","src":"stderr","t_ms":3167}
+{"bytes":28,"line":"  -e, --env=<String=String>\n","src":"stderr","t_ms":3167}
+{"bytes":1,"line":"\n","src":"stderr","t_ms":3167}
+{"bytes":54,"line":"      --exclude-tags=<excludeTags>[,<excludeTags>...]\n","src":"stderr","t_ms":3167}
+{"bytes":96,"line":"                           List of tags that will remove the Flows containing the provided tags\n","src":"stderr","t_ms":3167}
+{"bytes":29,"line":"      --flatten-debug-output\n","src":"stderr","t_ms":3167}
+{"bytes":156,"line":"                           All file outputs from the test case are created in the folder without subfolders or timestamps for each run. It can be used with\n","src":"stderr","t_ms":3167}
+{"bytes":60,"line":"                             --debug-output. Useful for CI.\n","src":"stderr","t_ms":3167}
+{"bytes":95,"line":"      --format=<format>    Test report format (default=NOOP): JUNIT, HTML, HTML-DETAILED, NOOP\n","src":"stderr","t_ms":3167}
+{"bytes":48,"line":"  -h, --help               Display help message\n","src":"stderr","t_ms":3167}
+{"bytes":69,"line":"      --headless           (Web only) Run the tests in headless mode\n","src":"stderr","t_ms":3167}
+{"bytes":54,"line":"      --include-tags=<includeTags>[,<includeTags>...]\n","src":"stderr","t_ms":3167}
+{"bytes":104,"line":"                           List of tags that will remove the Flows that does not have the provided tags\n","src":"stderr","t_ms":3167}
+{"bytes":32,"line":"      --[no-]ansi, --[no-]color\n","src":"stderr","t_ms":3167}
+{"bytes":67,"line":"                           Enable / disable colors and ansi output\n","src":"stderr","t_ms":3167}
+{"bytes":24,"line":"      --output=<output>\n","src":"stderr","t_ms":3167}
+{"bytes":28,"line":"  -p, --platform=<platform>\n","src":"stderr","t_ms":3167}
+{"bytes":55,"line":"                           Select a platform to run on\n","src":"stderr","t_ms":3167}
+{"bytes":30,"line":"      --[no-]reinstall-driver\n","src":"stderr","t_ms":3167}
+{"bytes":156,"line":"                           Reinstalls driver before running the test. On iOS, reinstalls xctestrunner driver. On Android, reinstalls both driver and server\n","src":"stderr","t_ms":3167}
+{"bytes":72,"line":"                             apps. Set to false to skip reinstallation.\n","src":"stderr","t_ms":3167}
+{"bytes":34,"line":"  -s, --shards=<legacyShardCount>\n","src":"stderr","t_ms":3167}
+{"bytes":80,"line":"                           Number of parallel shards to distribute tests across\n","src":"stderr","t_ms":3167}
+{"bytes":33,"line":"      --screen-size=<screenSize>\n","src":"stderr","t_ms":3167}
+{"bytes":142,"line":"                           (Web only) Set the size of the headless browser. Use the format {Width}x{Height}. Usage is --screen-size 1920x1080\n","src":"stderr","t_ms":3167}
+{"bytes":29,"line":"      --shard-all=<shardAll>\n","src":"stderr","t_ms":3167}
+{"bytes":72,"line":"                           Run all the tests across N connected devices\n","src":"stderr","t_ms":3167}
+{"bytes":33,"line":"      --shard-split=<shardSplit>\n","src":"stderr","t_ms":3167}
+{"bytes":108,"line":"                           Run the tests across N connected devices, splitting the tests evenly across them\n","src":"stderr","t_ms":3167}
+{"bytes":40,"line":"      --test-output-dir=<testOutputDir>\n","src":"stderr","t_ms":3167}
+{"bytes":162,"line":"                           Directory for this run's artifacts — manifest.json, commands.json, logs/, takeScreenshot/, and startRecording/ written directly into\n","src":"stderr","t_ms":3167}
+{"bytes":72,"line":"                             it (overrides the default output location)\n","src":"stderr","t_ms":3167}
+{"bytes":40,"line":"      --test-suite-name=<testSuiteName>\n","src":"stderr","t_ms":3167}
+{"bytes":43,"line":"                           Test suite name\n","src":"stderr","t_ms":3167}
+{"bytes":34,"line":"      --udid, --device=<deviceId>\n","src":"stderr","t_ms":3167}
+{"bytes":130,"line":"                           Device ID to run on explicitly, can be a comma separated list of IDs: --device \"Emulator_1,Emulator_2\"\n","src":"stderr","t_ms":3167}

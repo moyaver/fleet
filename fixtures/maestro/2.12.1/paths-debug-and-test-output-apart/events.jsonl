@@ -1,0 +1,122 @@
+{"src":"proc","t_ms":336,"tree":[{"command":"/bin/sh /opt/homebrew/bin/maestro --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"1904"},{"command":"(ls)","cpu":"0.0","pgid":"95801","pid":95877,"ppid":95862,"rss_kib":"208"}]}
+{"src":"proc","t_ms":2815,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"35.3","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"80544"},{"command":"/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -version","cpu":"15.3","pgid":"95801","pid":95981,"ppid":95862,"rss_kib":"1168"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":4220}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":4220}
+{"bytes":248,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @184cf7cf (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":4380}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":4380}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":4380}
+{"event":"dir","path":"run/D","src":"fs","t_ms":5068}
+{"event":"dir","path":"run/D/.maestro","src":"fs","t_ms":5068}
+{"event":"dir","path":"run/D/.maestro/tests","src":"fs","t_ms":5068}
+{"event":"dir","path":"run/D/.maestro/tests/2026-11-08_110325","src":"fs","t_ms":5068}
+{"event":"created","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":701,"src":"fs","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.195 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: <CAPTURE>/run/D/.maestro/tests/2026-11-08_110325\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.209 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.209 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.12.1\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.210 [ INFO] MAESTRO.logSystemInfo: CI: Undefined\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.210 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.210 [ INFO] MAESTRO.logSystemInfo: OS Version: 26.7.1\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.210 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64\n","src":"log","t_ms":5129}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.211 [ INFO] MAESTRO.logSystemInfo: Java Version: 27\n","src":"log","t_ms":5129}
+{"src":"proc","t_ms":5163,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"64.1","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"131280"}]}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":973,"src":"fs","t_ms":5304}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.377 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 27.1\n","src":"log","t_ms":5304}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.384 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined\n","src":"log","t_ms":5304}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.394 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined\n","src":"log","t_ms":5304}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:25.394 [ INFO] MAESTRO.logSystemInfo: ---------------------\n","src":"log","t_ms":5304}
+{"event":"dir","path":"run/T","src":"fs","t_ms":5916}
+{"event":"dir","path":"run/T/2026-11-08_110325","src":"fs","t_ms":5916}
+{"src":"proc","t_ms":7460,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"53.5","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"156640"},{"command":"/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl list -j","cpu":"2.5","pgid":"95801","pid":96281,"ppid":95862,"rss_kib":"336"}]}
+{"src":"proc","t_ms":9800,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"28272"},{"command":"/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl list -j","cpu":"7.5","pgid":"95801","pid":96281,"ppid":95862,"rss_kib":"9280"}]}
+{"src":"proc","t_ms":12048,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"28272"},{"command":"/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl list -j","cpu":"4.4","pgid":"95801","pid":96281,"ppid":95862,"rss_kib":"11136"}]}
+{"src":"proc","t_ms":14286,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"50.8","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"123776"}]}
+{"src":"proc","t_ms":16565,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.0","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"33936"},{"command":"(simctl)","cpu":"9.0","pgid":"95801","pid":96834,"ppid":95862,"rss_kib":"9840"}]}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":1643,"src":"fs","t_ms":16577}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:36.660 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5584 using port 53693 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))\n","src":"log","t_ms":16577}
+{"src":"proc","t_ms":18838,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.4","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"37408"}]}
+{"src":"proc","t_ms":21040,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"0.4","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"31840"}]}
+{"bytes":30,"line":"Running on fleet-fixtures-148\n","src":"stdout","t_ms":21500}
+{"bytes":13,"line":" > Flow pass\n","src":"stdout","t_ms":21500}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":1731,"src":"fs","t_ms":21501}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:41.579 [ INFO] maestro.cli.runner.TestRunner.runSingle: Running flow pass.yaml...\n","src":"log","t_ms":21501}
+{"event":"dir","path":"run/T/2026-11-08_110325/pass","src":"fs","t_ms":21501}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":1824,"src":"fs","t_ms":21561}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:41.611 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info\n","src":"log","t_ms":21561}
+{"bytes":75,"line":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\n","src":"stderr","t_ms":21647}
+{"bytes":187,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/protobuf-java-3.21.9.jar)\n","src":"stderr","t_ms":21647}
+{"bytes":114,"line":"WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\n","src":"stderr","t_ms":21647}
+{"bytes":78,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n","src":"stderr","t_ms":21647}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":2013,"src":"fs","t_ms":21727}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:41.807 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2220, widthGrid=1080, heightGrid=2220)\n","src":"log","t_ms":21727}
+{"event":"dir","path":"run/T/2026-11-08_110325/pass/logs","src":"fs","t_ms":21841}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":0,"src":"fs","t_ms":21841}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":2121,"src":"fs","t_ms":22001}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.093 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING\n","src":"log","t_ms":22001}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":108,"src":"fs","t_ms":22001}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.093 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING\n","src":"log","t_ms":22001}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4105,"src":"fs","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.097 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true, MAESTRO_DISABLE_UPDATE_CHECK=true, MAESTRO_CLI_NO_ANALYTICS=1, MAESTRO_FILENAME=pass, MAESTRO_DEVICE_UDID=emulator-5584, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.098 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.099 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.100 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.android.settings, name=pass, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.101 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.103 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":22061}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.105 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Launch app \"com.android.settings\" metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(launchAppCommand=LaunchAppCommand(appId=com.android.settings, clearState=null, clearKeychain=null, stopApp=null, permissions=null, launchArguments=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":2092,"src":"fs","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.097 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true, MAESTRO_DISABLE_UPDATE_CHECK=true, MAESTRO_CLI_NO_ANALYTICS=1, MAESTRO_FILENAME=pass, MAESTRO_DEVICE_UDID=emulator-5584, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.098 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.099 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.100 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.android.settings, name=pass, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.101 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.103 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Launch app \"com.android.settings\" RUNNING\n","src":"log","t_ms":22061}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.105 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Launch app \"com.android.settings\" metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(launchAppCommand=LaunchAppCommand(appId=com.android.settings, clearState=null, clearKeychain=null, stopApp=null, permissions=null, launchArguments=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)\n","src":"log","t_ms":22061}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4302,"src":"fs","t_ms":22113}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.205 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings\n","src":"log","t_ms":22113}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.206 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch\n","src":"log","t_ms":22113}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":2289,"src":"fs","t_ms":22113}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.205 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings\n","src":"log","t_ms":22113}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.206 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch\n","src":"log","t_ms":22113}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4449,"src":"fs","t_ms":22164}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.252 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed\n","src":"log","t_ms":22164}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":2436,"src":"fs","t_ms":22164}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.252 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed\n","src":"log","t_ms":22164}
+{"event":"dir","path":"run/T/2026-11-08_110325/pass/screen-hierarchy","src":"fs","t_ms":22325}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/screen-hierarchy/step-003-launchApp-com.android.settings.json","size":0,"src":"fs","t_ms":22385}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4620,"src":"fs","t_ms":22494}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.542 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot\n","src":"log","t_ms":22494}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.544 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink\n","src":"log","t_ms":22494}
+{"event":"dir","path":"run/T/2026-11-08_110325/pass/screenshots","src":"fs","t_ms":22494}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":2607,"src":"fs","t_ms":22494}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.542 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot\n","src":"log","t_ms":22494}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.544 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink\n","src":"log","t_ms":22494}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/screenshots/step-003-launchApp-com.android.settings.png.tmp","size":0,"src":"fs","t_ms":22494}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/screen-hierarchy/step-003-launchApp-com.android.settings.json","size":3437,"src":"fs","t_ms":22494}
+{"bytes":44,"line":"Launch app \"com.android.settings\"... FAILED\n","src":"stdout","t_ms":22896}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4744,"src":"fs","t_ms":22936}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:42.988 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$4: Launch app \"com.android.settings\" FAILED\n","src":"log","t_ms":22936}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/commands.json","size":0,"src":"fs","t_ms":22936}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/logs/maestro.log","size":2731,"src":"fs","t_ms":22936}
+{"file":"run/T/2026-11-08_110325/pass/logs/maestro.log","line":"11:03:42.988 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$4: Launch app \"com.android.settings\" FAILED\n","src":"log","t_ms":22936}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/screenshots/step-003-launchApp-com.android.settings.png","size":7092,"src":"fs","t_ms":22936}
+{"event":"size","path":"run/T/2026-11-08_110325/pass/commands.json","size":2320,"src":"fs","t_ms":23210}
+{"src":"proc","t_ms":23262,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5584 test --debug-output <CAPTURE>/run/D --test-output-dir <CAPTURE>/run/T <REPO>/examples/flows/phase0/pass.yaml","cpu":"97.5","pgid":"95801","pid":95862,"ppid":95807,"rss_kib":"178800"}]}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/logs/device-logcat.txt","size":7886,"src":"fs","t_ms":23269}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":23345}
+{"bytes":46,"line":"Package com.android.settings is not installed\n","src":"stdout","t_ms":23345}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":23345}
+{"bytes":44,"line":"==== Debug output (logs & screenshots) ====\n","src":"stdout","t_ms":23345}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":23346}
+{"bytes":150,"line":"<CAPTURE>/run/T/2026-11-08_110325\n","src":"stdout","t_ms":23346}
+{"bytes":295,"line":"╭────────────────────────────────────────────────────────────────────────────────────────────────╮\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│                                                                                                │\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│                                                                                                │\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│   Run your flows on Maestro Cloud:                                                             │\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│   maestro cloud app_file flows_folder/                                                         │\n","src":"stdout","t_ms":23353}
+{"bytes":103,"line":"│                                                                                                │\n","src":"stdout","t_ms":23353}
+{"bytes":295,"line":"╰────────────────────────────────────────────────────────────────────────────────────────────────╯\n","src":"stdout","t_ms":23353}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":23353}
+{"event":"created","path":"state/maestro/promotion-state.json","size":106,"src":"fs","t_ms":23381}
+{"event":"size","path":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","size":4999,"src":"fs","t_ms":23381}
+{"file":"run/D/.maestro/tests/2026-11-08_110325/maestro.log","line":"11:03:43.441 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from <CAPTURE>/run/T\n","src":"log","t_ms":23381}
+{"event":"created","path":"run/T/2026-11-08_110325/pass/manifest.json","size":770,"src":"fs","t_ms":23381}

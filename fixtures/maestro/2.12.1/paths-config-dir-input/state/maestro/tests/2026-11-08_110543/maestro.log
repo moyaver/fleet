@@ -1,0 +1,30 @@
+11:05:43.554 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: <CAPTURE>/state/maestro/tests/2026-11-08_110543
+11:05:43.555 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.12.1
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: OS Version: 26.7.1
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+11:05:43.556 [ INFO] MAESTRO.logSystemInfo: Java Version: 27
+11:05:43.642 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+11:05:43.689 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 27.1
+11:05:43.700 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+11:05:43.707 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+11:05:43.707 [ INFO] MAESTRO.logSystemInfo: ---------------------
+11:05:44.253 [ INFO] maestro.orchestra.workspace.WorkspaceExecutionPlanner.plan: Created execution plan: ExecutionPlan(flowsToRun=[<CAPTURE>/run/flows/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=out-config))
+11:05:45.028 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5584 using port 55911 with execution plan ExecutionPlan(flowsToRun=[<CAPTURE>/run/flows/pass.yaml], sequence=FlowSequence(flows=[], continueOnFailure=null), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=out-config))
+11:05:49.215 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow pass
+11:05:49.245 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+11:05:49.581 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2220, widthGrid=1080, heightGrid=2220)
+11:05:49.842 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+11:05:49.848 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+11:05:49.849 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+11:05:49.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+11:05:49.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.android.settings" RUNNING
+11:05:50.018 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+11:05:50.018 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+11:05:50.093 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed
+11:05:50.292 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+11:05:50.293 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:05:50.719 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.android.settings" FAILED
+11:05:51.185 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from <CAPTURE>/run/out-config

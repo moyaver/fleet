@@ -25,7 +25,7 @@ fleet-maestro.workspace = true
 fleet-protocol.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
-nix.workspace = true
+nix = { workspace = true, features = ["user"] }
 reqwest = { workspace = true, features = ["stream"] }
 ruzstd.workspace = true
 rustls.workspace = true

@@ -1,0 +1,34 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "pass",
+      "path": "<CAPTURE>/run/flows/pass.yaml",
+      "outcome": "failed",
+      "finality": "unverified_final",
+      "source": "live_console",
+      "conflict": false,
+      "steps": 3,
+      "failure": "Package com.android.settings is not installed"
+    }
+  ],
+  "events": 15,
+  "event_types": {
+    "flow.ended": 1,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 3,
+    "step.started": 3,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

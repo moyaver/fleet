@@ -1,0 +1,36 @@
+{
+  "command": [
+    "/bin/sh",
+    "-c",
+    "mkdir -p \"$1/flows\" && cp \"$2\" \"$1/flows/pass.yaml\" && printf \"testOutputDir: out-config\\n\" > \"$1/flows/config.yaml\" && cd \"$1\" && shift 2 && exec \"$@\"",
+    "sh",
+    "<CAPTURE>/run",
+    "<REPO>/examples/flows/phase0/pass.yaml",
+    "maestro",
+    "--device",
+    "emulator-5584",
+    "test",
+    "flows/"
+  ],
+  "default_env": [
+    {
+      "name": "MAESTRO_CLI_NO_ANALYTICS",
+      "value": "1"
+    },
+    {
+      "name": "MAESTRO_DISABLE_UPDATE_CHECK",
+      "value": "true"
+    },
+    {
+      "name": "MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED",
+      "value": "true"
+    }
+  ],
+  "env": [],
+  "host": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "signal": null,
+  "started_at_unix_ms": 1794128741702
+}

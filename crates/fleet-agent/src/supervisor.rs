@@ -102,6 +102,9 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
     };
 
     let own_group = !io::stdin().is_terminal();
+    // Taken before the spawn: a directory the child makes is never older than the run's start, so
+    // the watcher finds it (issue #148).
+    let started_at_ms = now_ms();
     let mut child = match spawn_child(program, args, own_group, &prepared.env) {
         Ok(c) => c,
         Err(code) => {
@@ -124,7 +127,7 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
                 .iter()
                 .map(|a| a.to_string_lossy().into_owned())
                 .collect(),
-            started_at_ms: now_ms(),
+            started_at_ms,
             report: prepared.report.clone(),
             run_dir: prepared
                 .run_dir

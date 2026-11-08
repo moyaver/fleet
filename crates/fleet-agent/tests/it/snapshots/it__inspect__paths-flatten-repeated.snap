@@ -1,0 +1,16 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [],
+  "events": 5,
+  "event_types": {
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

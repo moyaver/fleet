@@ -1,0 +1,123 @@
+--------- beginning of main
+11-08 11:10:23.143 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+--------- beginning of system
+11-08 11:10:23.858 D/ActivityManager(  642): freezing 2419 com.google.android.packageinstaller
+11-08 11:10:24.118 D/SatelliteController( 1187): isInCarrierRoamingNbIotNtn: satellite is disabled
+11-08 11:10:24.118 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 11:10:24.135 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.164 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.164 D/SatelliteController( 1187): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 11:10:24.165 D/WifiClientModeImpl[21602:wlan0](  642): updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=18 freq=2437 RxLinkSpeed=2
+11-08 11:10:24.166 W/Looper  (  642): Slow dispatch took 184ms main app=system_server main=true group=FOREGROUND h=android.os.Handler c=ServiceConnector@653(Intent { act=android.permission.PermissionControllerService xflg=0x4 cmp=com.google.android.permissioncontroller/com.android.permissioncontroller.permission.service.PermissionControllerServiceImpl }, user: 0)[Unbinding...] m=0
+11-08 11:10:24.171 D/OomAdjuster(  642): Not killing cached processes
+11-08 11:10:24.172 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:10:24.179 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:10:24.179 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10032} in 58ms
+11-08 11:10:24.194 D/WifiDataStall(  642): tx tput in kbps: 37000
+11-08 11:10:24.195 D/WifiDataStall(  642): rx tput in kbps: 37000
+11-08 11:10:24.199 V/WifiConfigManager(  642): Updating scan detail cache freq=2437 BSSID=02:15:b2:00:00:01 RSSI=-50 for "AndroidWifi"NONE
+11-08 11:10:24.230 W/Looper  (  642): Slow dispatch took 370ms android.perm app=system_server main=false group=FOREGROUND h=android.os.Handler c=com.android.internal.infra.ServiceConnector$Impl$$ExternalSyntheticLambda0@3c57370 m=0
+11-08 11:10:24.227 I/keystore2(  310): system/security/keystore2/watchdog/src/lib.rs:371 - Watchdog thread idle -> terminating. Have a great day.
+11-08 11:10:24.236 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:24.237 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:24.237 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:24.237 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:24.251 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:24.251 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:24.251 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:24.251 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:24.283 W/system_server(  642): Long monitor contention with owner android.perm (1052) at boolean com.android.server.am.ActivityManagerService.unbindService(android.app.IServiceConnection)(ActivityManagerService.java:14831) waiters=1 in void com.android.server.am.ActivityManagerService.unbindFinished(android.os.IBinder, android.os.IBinder) for 119ms
+11-08 11:10:24.327 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:10:24.350 I/netd    (  436): tetherGetStats() -> {[]} <61.81ms>
+11-08 11:10:24.363 I/HalDevMgr(  642): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 11:10:24.364 D/WifiScoreCard(  642): BSSID update SIGNAL_POLL ID: 237047356 SSID: "AndroidWifi", BSSID: 02:15:b2:00:00:01, MAC: 02:15:d0:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 18Mbps, Tx Link speed: 18Mbps, Max Supported Tx Link speed: 54Mbps, Calculated Tx : 0Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 54Mbps, Calculated Rx : 0Mbps, Frequency: 2437MHz, Net ID: 0, Metered hint: false, score: 100, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+11-08 11:10:24.364 D/WifiScoreCard(  642): txRate: 1 txSpeed: 18
+11-08 11:10:24.364 D/WifiScoreCard(  642): network update SIGNAL_POLL "AndroidWifi" ID: 506841123 RSSI -50 txSpeed -1
+11-08 11:10:24.364 D/WifiClientModeImpl[21602:wlan0](  642):  ClientModeImpl$L2ConnectedState screen=on 2 0 "AndroidWifi" 02:15:b2:00:00:01 rssi=-50 f=2437 sc=100 link=18 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3578] from screen [on:0 period:-1167305364] score=100
+11-08 11:10:24.367 D/SatelliteController( 1187): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 11:10:24.367 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: config: null
+11-08 11:10:24.367 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.367 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.367 D/SatelliteController( 1187): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 11:10:24.368 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 11:10:24.368 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.368 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.368 D/SatelliteController( 1187): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 11:10:24.388 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: Checking connect type from PLMN config for subId: 1
+11-08 11:10:24.389 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.389 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.389 D/SatelliteController( 1187): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 11:10:24.389 D/SatelliteController( 1187): getSatellitePerPlmnConfiguration: invalid subId or not supported via carrier.
+11-08 11:10:24.389 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: config: null
+11-08 11:10:24.390 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.390 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.390 D/SatelliteController( 1187): getCarrierRoamingNtnConnectTypeViaConfigUpdater: return null (satelliteConfig is null)
+11-08 11:10:24.390 D/SatelliteController( 1187): getCarrierRoamingNtnConnectType: Falling back to global carrier config connect type: 0
+11-08 11:10:24.390 D/TelephonyConfigUpdateInstallReceiver( 1187): getConfigParser: domain=satellite
+11-08 11:10:24.390 V/SatelliteController( 1187): satelliteConfigParser is not ready
+11-08 11:10:24.390 D/SatelliteController( 1187): isSatelliteAttachSupportedViaConfigupdater: return null (satelliteConfig is null)
+11-08 11:10:24.477 I/adbd    (  499): adbd service requested 'sync:'
+11-08 11:10:24.980 I/adbd    (  499): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 11:10:25.149 W/ActivityManager(  642): Invalid packageName: com.android.settings
+11-08 11:10:25.212 I/adbd    (  499): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-08 11:10:25.592 I/PackageManager(  642): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 11:10:26.448 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:10:26.452 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:10:26.452 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={10090} in 4ms
+11-08 11:10:26.453 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 11:10:26.453 D/InetDiagMessage(  642): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 11:10:26.454 D/InetDiagMessage(  642): Destroyed live tcp sockets for uids={20090} in 1ms
+11-08 11:10:26.467 D/Maestro ( 4365): Requesting view hierarchy
+11-08 11:10:26.531 W/QueryController( 4365): Could not detect idle state.
+11-08 11:10:26.538 W/QueryController( 4365): Could not detect idle state.
+11-08 11:10:26.789 I/Maestro ( 4365): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9d9c; boundsInParent: Rect(0, 0 - 0, 154); boundsInScreen: Rect(1080, 0 - 1080, 154); boundsInWindow: Rect(1080, 0 - 1080, 154); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-08 11:10:26.791 D/Maestro ( 4365): View hierarchy received in 324 ms
+11-08 11:10:27.420 D/WifiClientModeImpl[21602:wlan0](  642): updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=18 freq=2437 RxLinkSpeed=2
+11-08 11:10:27.423 D/WifiDataStall(  642): tx tput in kbps: 37000
+11-08 11:10:27.424 D/WifiDataStall(  642): rx tput in kbps: 37000
+11-08 11:10:27.424 V/WifiConfigManager(  642): Updating scan detail cache freq=2437 BSSID=02:15:b2:00:00:01 RSSI=-50 for "AndroidWifi"NONE
+11-08 11:10:27.424 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:27.424 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:27.424 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:27.424 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:27.427 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:27.428 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:27.433 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:27.433 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:27.497 I/HalDevMgr(  642): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 11:10:27.518 D/WifiScoreCard(  642): BSSID update SIGNAL_POLL ID: 237047356 SSID: "AndroidWifi", BSSID: 02:15:b2:00:00:01, MAC: 02:15:d0:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 18Mbps, Tx Link speed: 18Mbps, Max Supported Tx Link speed: 54Mbps, Calculated Tx : 0Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 54Mbps, Calculated Rx : 0Mbps, Frequency: 2437MHz, Net ID: 0, Metered hint: false, score: 100, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+11-08 11:10:27.518 D/WifiScoreCard(  642): txRate: 1 txSpeed: 18
+11-08 11:10:27.519 D/WifiScoreCard(  642): network update SIGNAL_POLL "AndroidWifi" ID: 506841123 RSSI -50 txSpeed -1
+11-08 11:10:27.520 D/WifiClientModeImpl[21602:wlan0](  642):  ClientModeImpl$L2ConnectedState screen=on 2 0 "AndroidWifi" 02:15:b2:00:00:01 rssi=-50 f=2437 sc=100 link=18 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3154] from screen [on:0 period:-1167302208] score=100
+11-08 11:10:27.635 D/WindowManager(  642): captureDisplay
+--------- beginning of kernel
+11-08 11:10:27.868 I/servicemanager(  285): Caller(pid=4365,uid=10129,sid=u:r:untrusted_app:s0:c129,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:10:27.884 I/servicemanager(  285): Caller(pid=4365,uid=10129,sid=u:r:untrusted_app:s0:c129,c256,c512,c768) Found android.hardware.graphics.allocator.IAllocator/default in device VINTF manifest.
+11-08 11:10:27.888 I/servicemanager(  285): Caller(pid=4365,uid=10129,sid=u:r:untrusted_app:s0:c129,c256,c512,c768) Found mapper/ranchu in device VINTF manifest.
+11-08 11:10:28.005 W/libc    ( 4365): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:10:28.128 I/DisplayManager( 4365): Choreographer implicitly registered for the refresh rate.
+11-08 11:10:28.257 I/GFXSTREAM( 4365): [eglDisplay.cpp(297)] Opening libGLESv1_CM_emulation.so
+11-08 11:10:28.258 I/GFXSTREAM( 4365): [eglDisplay.cpp(297)] Opening libGLESv2_emulation.so
+11-08 11:10:28.262 W/libc    ( 4365): Access denied finding property "vendor.mesa.virtgpu.kumquat"
+11-08 11:10:28.426 W/HWUI    ( 4365): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-08 11:10:28.430 W/HWUI    ( 4365): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-08 11:10:29.280 D/OomAdjuster(  642): Not killing cached processes
+11-08 11:10:30.571 D/WifiClientModeImpl[21602:wlan0](  642): updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=18 freq=2437 RxLinkSpeed=2
+11-08 11:10:30.578 D/WifiDataStall(  642): tx tput in kbps: 37000
+11-08 11:10:30.578 D/WifiDataStall(  642): rx tput in kbps: 37000
+11-08 11:10:30.578 V/WifiConfigManager(  642): Updating scan detail cache freq=2437 BSSID=02:15:b2:00:00:01 RSSI=-50 for "AndroidWifi"NONE
+11-08 11:10:30.579 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:30.579 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:30.579 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:30.579 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:30.580 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:30.580 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:30.580 D/WifiThroughputPredictor(  642):  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+11-08 11:10:30.580 D/WifiThroughputPredictor(  642):  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 37
+11-08 11:10:30.638 I/HalDevMgr(  642): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 11:10:30.662 D/WifiScoreCard(  642): BSSID update SIGNAL_POLL ID: 237047356 SSID: "AndroidWifi", BSSID: 02:15:b2:00:00:01, MAC: 02:15:d0:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 18Mbps, Tx Link speed: 18Mbps, Max Supported Tx Link speed: 54Mbps, Calculated Tx : 0Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 54Mbps, Calculated Rx : 0Mbps, Frequency: 2437MHz, Net ID: 0, Metered hint: false, score: 100, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+11-08 11:10:30.662 D/WifiScoreCard(  642): txRate: 1 txSpeed: 18
+11-08 11:10:30.662 D/WifiScoreCard(  642): network update SIGNAL_POLL "AndroidWifi" ID: 506841123 RSSI -50 txSpeed -1
+11-08 11:10:30.663 D/WifiClientModeImpl[21602:wlan0](  642):  ClientModeImpl$L2ConnectedState screen=on 2 0 "AndroidWifi" 02:15:b2:00:00:01 rssi=-50 f=2437 sc=100 link=18 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3142] from screen [on:0 period:-1167299065] score=100
+11-08 11:10:30.957 I/adbd    (  499): adbd service requested 'shell,v2,raw:logcat -v time -d'
+11-08 11:10:31.301 I/logd    (  298): logdr: UID=2000 GID=2000 PID=4411 n tail=0 logMask=99 pid=0 start=0ns deadline=0ns

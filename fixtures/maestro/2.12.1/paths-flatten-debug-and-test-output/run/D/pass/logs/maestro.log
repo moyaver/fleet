@@ -1,0 +1,14 @@
+11:04:37.574 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Define variables RUNNING
+11:04:37.582 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Define variables metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(defineVariablesCommand=DefineVariablesCommand(env={MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true, MAESTRO_DISABLE_UPDATE_CHECK=true, MAESTRO_CLI_NO_ANALYTICS=1, MAESTRO_FILENAME=pass, MAESTRO_DEVICE_UDID=emulator-5584, MAESTRO_SHARD_ID=1, MAESTRO_SHARD_INDEX=0}, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:04:37.585 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Define variables COMPLETED
+11:04:37.588 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Apply configuration RUNNING
+11:04:37.592 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Apply configuration metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(applyConfigurationCommand=ApplyConfigurationCommand(config=MaestroConfig(appId=com.android.settings, name=pass, tags=[], ext={}, onFlowStart=null, onFlowComplete=null, properties={}), label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:04:37.593 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$2: Apply configuration COMPLETED
+11:04:37.594 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0: Launch app "com.android.settings" RUNNING
+11:04:37.595 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$11: Launch app "com.android.settings" metadata CommandMetadata(numberOfRuns=null, evaluatedCommand=MaestroCommand(launchAppCommand=LaunchAppCommand(appId=com.android.settings, clearState=null, clearKeychain=null, stopApp=null, permissions=null, launchArguments=null, label=null, optional=false)), logMessages=[], insight=Insight(message=, level=NONE), aiReasoning=null, labeledCommand=null)
+11:04:37.814 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.android.settings
+11:04:37.814 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.android.settings app during launch
+11:04:38.093 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Package com.android.settings is not installed
+11:04:38.388 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+11:04:38.390 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+11:04:39.323 [ INFO] maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$4: Launch app "com.android.settings" FAILED

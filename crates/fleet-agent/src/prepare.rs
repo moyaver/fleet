@@ -25,6 +25,8 @@ use fleet_protocol::{
 };
 use sha2::{Digest, Sha256};
 
+use crate::layout;
+
 /// The command and where its outputs will be.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Prepared {
@@ -119,16 +121,25 @@ fn adjust(
 ) -> Prepared {
     let run_dir = Some(run_dir.map_or_else(default_run_dir, Path::to_path_buf))
         .filter(|d| std::fs::create_dir_all(d).is_ok());
+    let cwd = std::env::current_dir().ok();
+    let workspace = layout::workspace_test_dir(argv, cwd.as_deref());
     let p = match &run_dir {
-        Some(dir) => {
-            fleet_maestro::invocation::prepare(argv, dir, rewrite, flows, classify, &user_env)
-        }
+        Some(dir) => fleet_maestro::invocation::prepare(
+            argv,
+            dir,
+            rewrite,
+            flows,
+            workspace.as_deref(),
+            classify,
+            &user_env,
+        ),
         // No place for outputs: keep the user's flags, still make the log machine-readable.
         None => fleet_maestro::invocation::prepare(
             argv,
             Path::new("."),
             false,
             flows,
+            workspace.as_deref(),
             classify,
             &user_env,
         ),

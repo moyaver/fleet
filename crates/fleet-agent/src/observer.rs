@@ -12,6 +12,7 @@
 //! [`crate::ci`].
 
 use std::{
+    ffi::OsStr,
     fs::File,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -37,6 +38,7 @@ use crate::{
     emulator::Emulators,
     ipc::{Control, Frame, Stream},
     journal::Writer,
+    layout,
     metrics::{Pressure, SAMPLE, Sampler, Throttle},
     outbox::{Budget, Outbox},
     session::{Candidate, Observation, Session},
@@ -141,6 +143,8 @@ struct Layout {
 /// Everything that exists once Maestro has started.
 struct Live {
     session: Session,
+    /// The command's process: the Maestro JVM (the launcher execs it), which holds its session log open.
+    pid: u32,
     /// Where Maestro writes; `None` for a command that is not `maestro test`.
     layout: Option<Layout>,
     /// The session log, once its directory is known.
@@ -341,21 +345,24 @@ async fn observe() -> io::Result<Option<String>> {
 }
 
 /// Where Maestro writes this run's files, for the command as given. Only a `maestro test` the agent
-/// recognised (`recognised`) has one. Maestro inherits this process's environment, so its state
-/// directory is found from the same variables.
+/// recognised (`recognised`) has one. Maestro's own environment decides its state directory and
+/// `user.home` (see [`crate::layout`]), so they are read from the same variables.
 fn watched_layout(argv: &[String], recognised: bool, started: SystemTime) -> Option<Layout> {
     if !recognised {
         return None;
     }
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = layout::user_home_here();
     let state = fleet_maestro::invocation::state_tests_dir(
         std::env::var_os("XDG_STATE_HOME").as_deref(),
         home.as_deref(),
     );
+    let cwd = std::env::current_dir().ok();
+    let workspace = layout::workspace_test_dir(argv, cwd.as_deref());
     let layout = fleet_maestro::invocation::output_layout(
         &fleet_maestro::invocation::parse(argv),
         state.as_deref(),
         home.as_deref(),
+        workspace.as_deref(),
     )?;
     Some(Layout {
         log: Located::new(layout.log, started),
@@ -471,6 +478,7 @@ fn start(
         agent_run_id,
         ci,
         session,
+        pid,
         layout,
         tailer: None,
         log_file: None,
@@ -796,7 +804,7 @@ pub(crate) fn server_url() -> Option<String> {
 }
 
 fn watch(l: &mut Live, final_pass: bool, clock: &impl Fn() -> ClockSample) {
-    attach(l);
+    attach(l, Instant::now());
     for o in watch::observations(l.tailer.as_mut(), l.scanner.as_mut(), final_pass) {
         l.session.observe(clock(), o);
     }
@@ -804,22 +812,30 @@ fn watch(l: &mut Live, final_pass: bool, clock: &impl Fn() -> ClockSample) {
 
 /// Starts following the session log and the flow bundles as soon as Maestro has created their
 /// directories. Until then there is nothing to read, and the next poll looks again.
-fn attach(l: &mut Live) {
+fn attach(l: &mut Live, now: Instant) {
+    let pid = l.pid;
     let Some(layout) = l.layout.as_mut() else {
         return;
     };
     if l.tailer.is_none()
-        && let Some(dir) = layout.log.dir()
+        && let Some(dir) = layout.log.log_dir(Some(pid), now)
     {
         let file = dir.join("maestro.log");
         l.tailer = Some(LogTailer::new(file.clone()));
         l.log_file = Some(file);
     }
+    // A stamped bundles directory has the session log's directory name.
+    let stamp = l
+        .log_file
+        .as_deref()
+        .and_then(Path::parent)
+        .and_then(Path::file_name)
+        .map(OsStr::to_owned);
     if l.scanner.is_none()
-        && let Some(dir) = layout.bundles.dir()
+        && let Some(dir) = layout.bundles.bundles_dir(stamp.as_deref())
     {
         let dir = dir.to_path_buf();
-        l.scanner = Some(BundleScanner::new(dir.clone()));
+        l.scanner = Some(BundleScanner::new(dir.clone(), l.started));
         l.bundles = Some(dir);
     }
 }
