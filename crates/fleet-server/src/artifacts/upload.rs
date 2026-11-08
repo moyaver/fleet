@@ -24,6 +24,7 @@ use fleet_core::policy::{Action, Principal, Resource, authorize};
 use fleet_protocol::artifact::{
     ArtifactClass, RejectReason, UploadGrant, UploadRequest, UploadResult,
 };
+use fleet_store::admin::policy::ProjectOverrides;
 use fleet_store::artifacts::{
     Claim, Finished, Pending, PendingArtifact, Quota, Requested, UploadAsk,
 };
@@ -37,6 +38,7 @@ use uuid::Uuid;
 use crate::{
     api::{ApiError, error},
     ingest::bearer,
+    project_policy,
     state::AppState,
 };
 
@@ -142,7 +144,11 @@ struct Accepted {
 
 /// The allowlist, the declared type, the size limit and the label: everything decided without
 /// touching the database.
-fn check(state: &AppState, req: &UploadRequest) -> Result<Accepted, Box<Response>> {
+fn check(
+    state: &AppState,
+    req: &UploadRequest,
+    overrides: &ProjectOverrides,
+) -> Result<Accepted, Box<Response>> {
     let Some(class) = ArtifactClass::parse(&req.class) else {
         return Err(Box::new(refusal(
             RejectReason::ClassNotAllowed,
@@ -160,7 +166,18 @@ fn check(state: &AppState, req: &UploadRequest) -> Result<Accepted, Box<Response
             ),
         )));
     }
-    let limit = state.config.artifacts.max_bytes.of(class);
+    // The project's policy (#139): a class it turns off is refused, and its own cap applies.
+    let rule = project_policy::class_rule(&state.config, overrides, class);
+    if !rule.accepted {
+        return Err(Box::new(refusal(
+            RejectReason::ClassNotAllowed,
+            format!(
+                "this project does not accept {} artifacts (turned off on the Administration page)",
+                class.as_str()
+            ),
+        )));
+    }
+    let limit = rule.max_bytes;
     if req.size > limit {
         return Err(Box::new(refusal(
             RejectReason::TooLarge,
@@ -194,6 +211,10 @@ fn check(state: &AppState, req: &UploadRequest) -> Result<Accepted, Box<Response
     (status = 401, body = ApiError), (status = 409, body = ApiError, description =
         "The run or flow isn't known to the server yet: retry shortly"),
     (status = 422, body = ApiError)))]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the grant path reads top to bottom: publisher, policy, check, quota, outcome"
+)]
 pub(super) async fn request(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -203,7 +224,11 @@ pub(super) async fn request(
         Ok(p) => p,
         Err(r) => return *r,
     };
-    let accepted = match check(&state, &req) {
+    let overrides = match state.store.project_overrides(publisher.project_id).await {
+        Ok(o) => o,
+        Err(e) => return internal(&e),
+    };
+    let accepted = match check(&state, &req, &overrides) {
         Ok(a) => a,
         Err(r) => return *r,
     };
@@ -221,11 +246,12 @@ pub(super) async fn request(
         size: req.size,
         sha256: &req.sha256,
     };
+    let (project_bytes, project_files) = project_policy::daily_quota(&state.config, &overrides);
     let quota = Quota {
         max_bytes: a.max_run_bytes,
         max_files: a.max_run_files,
-        project_max_bytes: a.max_project_bytes_per_day,
-        project_max_files: a.max_project_files_per_day,
+        project_max_bytes: project_bytes,
+        project_max_files: project_files,
     };
     let ttl = Duration::from_secs(a.grant_ttl_seconds);
     match state.store.request_upload(&ask, ttl, quota).await {
@@ -282,8 +308,7 @@ pub(super) async fn request(
         Ok(Requested::OverProjectQuota) => refusal(
             RejectReason::ProjectQuotaExceeded,
             format!(
-                "a project may declare at most {} files and {} bytes in 24 hours",
-                a.max_project_files_per_day, a.max_project_bytes_per_day
+                "a project may declare at most {project_files} files and {project_bytes} bytes in 24 hours"
             ),
         ),
         Ok(Requested::UnknownRun) => error(

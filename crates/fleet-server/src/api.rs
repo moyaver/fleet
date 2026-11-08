@@ -120,7 +120,12 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         admin::write::add_policy,
         admin::write::edit_policy,
         admin::write::revoke_policy,
-        admin::write::remove_policy
+        admin::write::remove_policy,
+        admin::write::set_retention,
+        admin::write::set_artifact_class,
+        admin::write::set_artifact_quota,
+        admin::write::set_metric_policy,
+        admin::project_policy_view
     ),
     components(schemas(
         ProjectView,
@@ -222,6 +227,13 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         admin::write::GroupInput,
         admin::write::GroupRoleInput,
         admin::write::PolicyInput,
+        admin::write::RetentionInput,
+        admin::write::ClassInput,
+        admin::write::QuotaInput,
+        admin::write::MetricInput,
+        fleet_protocol::rest::admin::AdminArtifactClassView,
+        fleet_protocol::rest::admin::AdminProjectLimitsView,
+        fleet_protocol::rest::admin::AdminProjectPolicyView,
         AdminRetentionView,
         AdminRetentionClassView,
         AdminSettingView,
@@ -394,6 +406,42 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/admin/artifact-policy",
             get(admin::artifact_policy_view),
+        )
+        .route(
+            "/api/v1/admin/project-policy",
+            get(admin::project_policy_view),
+        )
+        .route(
+            "/api/v1/admin/retention/{project}/{class}",
+            put(admin::write::set_retention),
+        )
+        .route(
+            "/api/v1/admin/retention/{project}/{class}/edit",
+            post(admin::write::set_retention),
+        )
+        .route(
+            "/api/v1/admin/artifact-classes/{project}/{class}",
+            put(admin::write::set_artifact_class),
+        )
+        .route(
+            "/api/v1/admin/artifact-classes/{project}/{class}/edit",
+            post(admin::write::set_artifact_class),
+        )
+        .route(
+            "/api/v1/admin/artifact-quota/{project}",
+            put(admin::write::set_artifact_quota),
+        )
+        .route(
+            "/api/v1/admin/artifact-quota/{project}/edit",
+            post(admin::write::set_artifact_quota),
+        )
+        .route(
+            "/api/v1/admin/metric-policy/{project}",
+            put(admin::write::set_metric_policy),
+        )
+        .route(
+            "/api/v1/admin/metric-policy/{project}/edit",
+            post(admin::write::set_metric_policy),
         )
         .route(
             "/api/v1/admin/metric-policy",

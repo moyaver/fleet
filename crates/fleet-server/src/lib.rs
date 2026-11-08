@@ -26,6 +26,7 @@ mod limits;
 mod live;
 mod login;
 mod oidc;
+mod project_policy;
 mod retention;
 mod session;
 mod state;

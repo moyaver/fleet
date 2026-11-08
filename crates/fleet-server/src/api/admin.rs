@@ -18,8 +18,8 @@ use fleet_protocol::{
     PROTOCOL_VERSION,
     rest::admin::{
         AdminAgentRow, AdminAgentsView, AdminApiKeyView, AdminAuditPage, AdminIngestionView,
-        AdminProjectView, AdminRetentionView, AdminRoleMappingsView, AdminSettingView,
-        AdminTrustPolicyView,
+        AdminProjectPolicyView, AdminProjectView, AdminRetentionView, AdminRoleMappingsView,
+        AdminSettingView, AdminTrustPolicyView,
     },
 };
 use fleet_store::admin::AuditCursor;
@@ -277,6 +277,24 @@ pub(super) async fn artifact_policy_view(
         return *r;
     }
     Json(artifact_policy(&state.config)).into_response()
+}
+
+/// The per-project policy: every project's artifact classes and limits, with the configured value
+/// and whether the project overrides it.
+#[utoipa::path(get, path = "/api/v1/admin/project-policy", responses(
+    (status = 200, body = AdminProjectPolicyView), (status = 401, body = ApiError),
+    (status = 403, body = ApiError)))]
+pub(super) async fn project_policy_view(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+) -> Response {
+    if let Err(r) = admin_gate(&principal, Action::ViewAdministration) {
+        return *r;
+    }
+    match state.store.admin_project_overrides().await {
+        Ok(projects) => Json(crate::project_policy::view(&state.config, &projects)).into_response(),
+        Err(e) => internal(&e),
+    }
 }
 
 /// The metric collection policy, read from the running configuration.

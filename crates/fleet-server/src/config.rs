@@ -574,6 +574,12 @@ pub struct Ingest {
     pub shutdown_grace_ms: u64,
     /// `goaway` asks agents to reconnect after a random delay up to this.
     pub reconnect_jitter_ms: u64,
+    /// How often agents sample host and process metrics while the host is calm, in milliseconds
+    /// (1 000 to 300 000). Unset: 5 s. A project may override it on the dashboard.
+    pub sample_interval_ms: Option<u64>,
+    /// How often agents sample while the host is under pressure, in milliseconds (1 000 to
+    /// 300 000). Unset: 15 s. A project may override it on the dashboard.
+    pub pressure_sample_interval_ms: Option<u64>,
 }
 
 impl Default for Ingest {
@@ -588,6 +594,8 @@ impl Default for Ingest {
             telemetry_flush_ms: 15_000,
             shutdown_grace_ms: 15_000,
             reconnect_jitter_ms: 2_000,
+            sample_interval_ms: None,
+            pressure_sample_interval_ms: None,
         }
     }
 }
@@ -995,6 +1003,15 @@ impl Config {
             );
         }
         let i = &self.ingest;
+        for (key, value) in [
+            ("sample_interval_ms", i.sample_interval_ms),
+            ("pressure_sample_interval_ms", i.pressure_sample_interval_ms),
+        ] {
+            anyhow::ensure!(
+                value.is_none_or(|v| (1_000..=300_000).contains(&v)),
+                "ingest.{key} must be between 1000 and 300000 milliseconds"
+            );
+        }
         anyhow::ensure!(
             i.telemetry_flush_ms >= 100,
             "ingest.telemetry_flush_ms must be at least 100"
