@@ -7,12 +7,19 @@ description: >-
 inputs:
   command:
     description: >-
-      Maestro command to run under the agent, split on whitespace, for example
-      `maestro test .maestro/`. Empty only installs the agent.
+      Maestro command to run under the agent, for example `maestro test .maestro/`. Words are split
+      as a shell splits them for quotes and backslashes, so `maestro test "my flows/"` passes one
+      argument `my flows/`. Nothing is expanded or evaluated. Empty only installs the agent.
     required: false
     default: ""
+  install:
+    description: >-
+      `true` installs the pinned release named by `version`. `false` runs the fleet-agent already on
+      PATH, for example one built from this repository.
+    required: false
+    default: "true"
   version:
-    description: fleet-agent release tag to install.
+    description: fleet-agent release tag to install, when `install` is true.
     required: false
     default: v0.1.0-alpha.3
   server:
@@ -26,10 +33,17 @@ inputs:
       when the `gh` CLI is installed.
     required: false
     default: ""
+outputs:
+  summary-file:
+    description: >-
+      The file the job summary was appended to (GITHUB_STEP_SUMMARY of the run step), so a later
+      step can read it. Empty when the run step did not start.
+    value: ${{ steps.run.outputs.summary-file }}
 runs:
   using: composite
   steps:
     - name: Install fleet-agent
+      if: inputs.install == 'true'
       shell: bash
       env:
         AGENT_VERSION: ${{ inputs.version }}
@@ -76,14 +90,28 @@ runs:
         "$bin/fleet-agent" version
         echo "$bin" >> "$GITHUB_PATH"
     - name: Run Maestro under Fleet
+      id: run
       if: inputs.command != ''
       shell: bash
       env:
         AGENT_COMMAND: ${{ inputs.command }}
         AGENT_SERVER: ${{ inputs.server }}
+        SPLIT_COMMAND: ${{ github.action_path }}/split-command.sh
       run: |
+        set -euo pipefail
         if [ -n "$AGENT_SERVER" ]; then
           export FLEET_SERVER="$AGENT_SERVER"
         fi
-        read -r -a maestro <<< "$AGENT_COMMAND"
-        fleet-agent run -- "${maestro[@]}"
+        # shellcheck disable=SC1090 # the path is the action's own split-command.sh
+        . "$SPLIT_COMMAND"
+        if ! split_command "$AGENT_COMMAND"; then
+          echo "::error::the command has an unterminated quote"
+          exit 1
+        fi
+        if [ "${#WORDS[@]}" -eq 0 ]; then
+          echo "::error::the command is empty"
+          exit 1
+        fi
+        # The job summary's file, for a later step that wants to read it (see `outputs`).
+        echo "summary-file=$GITHUB_STEP_SUMMARY" >> "$GITHUB_OUTPUT"
+        fleet-agent run -- "${WORDS[@]}"
