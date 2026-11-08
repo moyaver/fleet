@@ -664,6 +664,14 @@ pub struct Limits {
     pub max_frame_bytes: u32,
     /// How often the agent sends a heartbeat.
     pub heartbeat_interval_ms: u64,
+    /// How often the agent samples host and process metrics while the host is calm. Absent (an
+    /// older server, or none configured): 5 s. The agent clamps it to a sane range and logs it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sample_interval_ms: Option<u64>,
+    /// How often the agent samples host and process metrics while the host is under pressure.
+    /// Absent: 15 s. Clamped like `sample_interval_ms`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure_sample_interval_ms: Option<u64>,
 }
 
 impl Default for Limits {
@@ -672,6 +680,8 @@ impl Default for Limits {
             max_inflight_events: 512,
             max_frame_bytes: 256 * 1024,
             heartbeat_interval_ms: 10_000,
+            sample_interval_ms: None,
+            pressure_sample_interval_ms: None,
         }
     }
 }
@@ -723,6 +733,37 @@ pub enum GoawayReason {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn limits_sampling_fields_are_optional_in_both_directions() {
+        // An older server's welcome has no sampling fields: they decode as absent.
+        let old: Limits = serde_json::from_str(
+            r#"{"max_inflight_events":512,"max_frame_bytes":262144,"heartbeat_interval_ms":10000}"#,
+        )
+        .unwrap();
+        assert_eq!(old.sample_interval_ms, None);
+        assert_eq!(old.pressure_sample_interval_ms, None);
+        assert_eq!(old, Limits::default());
+
+        // A current server's welcome carries them; an older agent ignores unknown fields.
+        let new = Limits {
+            sample_interval_ms: Some(2_000),
+            pressure_sample_interval_ms: Some(30_000),
+            ..Limits::default()
+        };
+        let json = serde_json::to_value(new).unwrap();
+        assert_eq!(json["sample_interval_ms"], 2_000);
+        assert_eq!(json["pressure_sample_interval_ms"], 30_000);
+        let as_old: serde_json::Value = serde_json::from_value(json.clone()).unwrap();
+        assert!(as_old.get("heartbeat_interval_ms").is_some());
+        let round: Limits = serde_json::from_value(json).unwrap();
+        assert_eq!(round, new);
+
+        // Unset fields are not sent at all, so PROTOCOL_VERSION 1 frames are unchanged.
+        let unset = serde_json::to_value(Limits::default()).unwrap();
+        assert!(unset.get("sample_interval_ms").is_none());
+        assert!(unset.get("pressure_sample_interval_ms").is_none());
+    }
 
     #[test]
     fn frames_use_an_op_tag() {
