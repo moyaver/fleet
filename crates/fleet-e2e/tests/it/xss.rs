@@ -25,7 +25,7 @@ use fleet_loadgen::Options;
 use fleet_server::config::{Secret, TrustPolicyConfig};
 use fleet_store::{
     PoolOptions, Store,
-    auth::{AuditActor, TrustLevel},
+    auth::{AuditActor, PolicyRow, TrustLevel},
     sessions::GroupMapping,
     testing,
 };
@@ -149,8 +149,15 @@ fn store_of(stack: &Stack) -> Store {
 async fn seed_administration(stack: &Stack, run: Uuid) {
     let store = store_of(stack);
     let project = store.project_id("app").await.unwrap().unwrap();
+    let person = store
+        .upsert_user("https://idp.example", "xss-person", None, Some(LITERAL[3]))
+        .await
+        .unwrap();
+    // The changes go through Screen G's own writes, so each one is audited as it would be live.
+    let actor = AuditActor::User(person);
     store
-        .create_api_key(
+        .create_api_key_as(
+            actor,
             project,
             LITERAL[1],
             TrustLevel::Trusted,
@@ -158,10 +165,13 @@ async fn seed_administration(stack: &Stack, run: Uuid) {
         )
         .await
         .unwrap();
-    let person = store
-        .upsert_user("https://idp.example", "xss-person", None, Some(LITERAL[3]))
+    // A project made on the dashboard, with a hostile name, then renamed to another one: the
+    // rename's before and after are in the audit history.
+    let made = store
+        .create_project(actor, "xss-dash", CORPUS[1])
         .await
         .unwrap();
+    store.rename_project(actor, made, CORPUS[7]).await.unwrap();
     testing::seed_role_binding(&store, Some(project), person, "viewer")
         .await
         .unwrap();
@@ -176,6 +186,38 @@ async fn seed_administration(stack: &Stack, run: Uuid) {
         )
         .await
         .unwrap();
+    // A group added on the dashboard, and a publisher policy added there with hostile fields.
+    store
+        .add_group_mapping(
+            actor,
+            "https://idp.example",
+            Some(project),
+            CORPUS[4],
+            Role::Viewer,
+        )
+        .await
+        .unwrap();
+    store
+        .add_trust_policy(
+            actor,
+            project,
+            &PolicyRow {
+                name: LITERAL[3].into(),
+                issuer: "https://token.actions.githubusercontent.com".into(),
+                audience: "fleet".into(),
+                policy: fleet_core::trust::Policy {
+                    repository_id: "3003".into(),
+                    repository_owner_id: "4004".into(),
+                    trusted_refs: Vec::new(),
+                    allowed_events: Vec::new(),
+                    pr_policy: fleet_core::trust::PrPolicy::Restricted,
+                    job_workflow_ref: Some(CORPUS[3].into()),
+                    environment: Some(CORPUS[6].into()),
+                },
+            },
+        )
+        .await
+        .unwrap();
     testing::seed_ingest_rejection(&store, run, 1, "invalid", CORPUS[6])
         .await
         .unwrap();
@@ -187,7 +229,7 @@ async fn seed_administration(stack: &Stack, run: Uuid) {
         .unwrap();
     store
         .audit(
-            AuditActor::User(person),
+            actor,
             Some(project),
             "failure.triage",
             json!({
@@ -505,6 +547,7 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
                     CORPUS[1].to_owned(),
                     CORPUS[2].to_owned(),
                     CORPUS[3].to_owned(),
+                    CORPUS[4].to_owned(),
                     CORPUS[6].to_owned(),
                     CORPUS[7].to_owned(),
                 ],
