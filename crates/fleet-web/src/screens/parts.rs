@@ -11,7 +11,7 @@ use fleet_protocol::rest::TimelineView;
 use fleet_ui::{
     charts::{series::Series, view::TimeSeriesChart},
     components::{
-        display::{EmptyState, ProvenanceBadge, Skeleton},
+        display::{EmptyState, ProvenanceBadge, RowProvenance, Skeleton},
         forms::DateTimeRange,
     },
     provenance::Provenance,
@@ -132,7 +132,7 @@ pub fn Outcome(
     view! {
         <span class="inline-flex flex-wrap items-center gap-2" title=finality>
             <PillView pill=pill />
-            <ProvenanceBadge provenance=provenance />
+            <RowProvenance provenance=provenance />
         </span>
     }
 }

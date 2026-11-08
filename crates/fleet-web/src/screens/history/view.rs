@@ -12,8 +12,8 @@ use fleet_ui::{
     components::{
         controls::{Button, ButtonVariant},
         display::{
-            Badge, Card, EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutStrip, StatTile,
-            TableBox,
+            Badge, Card, EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutStrip,
+            RowProvenance, StatTile, TableBox,
         },
         forms::FilterBar,
     },
@@ -267,7 +267,7 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
             <td data-label="Result">
                 <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1" title=r.finality_note>
                     <PillView pill=r.state />
-                    {(!verified).then(|| view! { <ProvenanceBadge provenance=r.provenance /> })}
+                    {(!verified).then(|| view! { <RowProvenance provenance=r.provenance /> })}
                     {r
                         .flaky
                         .map(|b| view! { <span data-testid="flaky-badge"><Badge tone=b.tone>{b.label}</Badge></span> })}

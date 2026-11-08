@@ -9,7 +9,7 @@
 
 use fleet_protocol::rest::{DeviceDetailView, MetricsView};
 use fleet_ui::{
-    components::display::{Card, EmptyState, ProvenanceBadge, TableBox},
+    components::display::{Card, EmptyState, ProvenanceBadge, RowProvenance, TableBox},
     provenance::Provenance,
     tone::Tone,
 };
@@ -237,7 +237,7 @@ fn FlowsSection(
 fn flow_row(r: FlowRow) -> impl IntoView {
     // Settled results are silent; only a result that is not final carries its own mark.
     let mark = (r.provenance != Provenance::Final)
-        .then(|| view! { <ProvenanceBadge provenance=Signal::stored(r.provenance) /> });
+        .then(|| view! { <RowProvenance provenance=Signal::stored(r.provenance) /> });
     view! {
         <tr data-testid="device-flow">
             <td data-label="Flow"><a class="cell-title" href=r.href>{r.name}</a></td>

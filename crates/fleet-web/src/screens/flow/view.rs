@@ -12,7 +12,7 @@
 
 use fleet_protocol::rest::{CrashView, FlowDetailView};
 use fleet_ui::{
-    components::display::{Card, ProvenanceBadge, StatusPill, TableBox},
+    components::display::{Card, ProvenanceBadge, RowProvenance, StatusPill, TableBox},
     mark::Mark,
     provenance::Provenance,
     steps::view::StepTreeView,
@@ -529,7 +529,7 @@ fn claim_row(c: crate::screens::flow::model::ClaimRow) -> impl IntoView {
         <tr class=class data-testid="claim" data-winning=c.winning.then_some("") data-disagrees=c.disagrees.then_some("")>
             <td class="px-2 py-1" data-label="Source">{c.source}</td>
             <td class="px-2 py-1" data-label="Provenance" data-testid="claim-provenance">
-                <ProvenanceBadge provenance=Signal::stored(c.provenance) />
+                <RowProvenance provenance=Signal::stored(c.provenance) />
             </td>
             <td class="px-2 py-1" data-label="Claimed"><PillView pill=c.outcome /></td>
             <td class="px-2 py-1 tabular-nums" data-label="Observed">{c.observed.unwrap_or_else(|| "—".to_owned())}</td>
