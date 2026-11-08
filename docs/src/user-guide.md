@@ -18,6 +18,19 @@ What the agent adds to `maestro test`, only when you haven't set it yourself (tu
 
 It never removes a flag.
 
+**Where the agent looks for Maestro's files.** While the run goes, the agent reads Maestro's session `maestro.log` and each flow's bundle (`commands.json`, `manifest.json`, screenshots) from the place Maestro writes them for the command as given. Maestro's rules (research 01 §4.1) decide that place, and the agent follows them for your flags, including when you set none of them and rewriting is off:
+
+| Flags on `maestro test` | Session log | Flow bundles |
+|---|---|---|
+| none, with `--fleet-rewrite=off` | `$XDG_STATE_HOME/maestro/tests/<ts>/`, or `~/.maestro/tests/<ts>/` | the same directory |
+| `--test-output-dir T` | the state directory, `<ts>/` | `T/<ts>/` |
+| `--debug-output D` | `D/.maestro/tests/<ts>/` | the same directory |
+| `--debug-output D --test-output-dir T` | `D/.maestro/tests/<ts>/` | `T/<ts>/` |
+| `--flatten-debug-output --debug-output D` | `D/` | `D/` (`--test-output-dir` is ignored) |
+| `--flatten-debug-output` alone, with `--fleet-rewrite=off` | `~/` | `~/` |
+
+`<ts>` is the `yyyy-MM-dd_HHmmss` directory Maestro creates for the run; the agent takes the one created after it started the command. With no flags and rewriting on, the agent adds `--flatten-debug-output --debug-output <run dir>/artifacts`, so that row is the flattened one. Captured from Maestro 2.12.1 (`fixtures/maestro/2.12.1`): the first three rows, the fourth only with one path for both flags, and the flattened row. The other rows follow the same rules in Maestro's source and are not captured yet. With `--flatten-debug-output` alone and rewriting off, Maestro writes into your home directory, and the agent scans it for flow folders while the run goes.
+
 **Why the JUnit report is conditional.** In Maestro, `--format` isn't just reporting: asking for a report makes `maestro test` take its multi-flow path, the one it uses for several flows, and that path rejects `-c`/`--continuous`. Fleet must not change how your command runs, so it adds the report only when Maestro would take that path anyway:
 
 | Command | Report added? |

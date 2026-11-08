@@ -198,7 +198,17 @@ pub(crate) fn agent_bin() -> PathBuf {
 /// Runs `fleet-agent run -- maestro test flows/` with the fake Maestro replaying `fixture`, in a
 /// cleared environment (CI sets `GITHUB_*`, which the agent would read) plus `env`.
 pub(crate) fn run_agent(fixture_name: &str, env: &[(&str, &str)]) -> Output {
-    run_agent_with(fixture_name, env, None).0
+    run_agent_with(fixture_name, env, &[], None).0
+}
+
+/// Like [`run_agent`], with `flags` after `test` (before the suite). `{DIR}` in a flag is the
+/// run's own scratch directory, so a test can point Maestro's output somewhere specific.
+pub(crate) fn run_agent_with_flags(
+    fixture_name: &str,
+    env: &[(&str, &str)],
+    flags: &[&str],
+) -> Output {
+    run_agent_with(fixture_name, env, flags, None).0
 }
 
 /// Like [`run_agent`], and also the run directory (`<run>`), where an offline run keeps its bundle.
@@ -206,7 +216,7 @@ pub(crate) fn run_agent_keeping_run_dir(
     fixture_name: &str,
     env: &[(&str, &str)],
 ) -> (Output, PathBuf) {
-    run_agent_with(fixture_name, env, None)
+    run_agent_with(fixture_name, env, &[], None)
 }
 
 /// Like [`run_agent`], but the flows come from a Fleet plan (ADR-0013): `manifest` is written to
@@ -217,15 +227,20 @@ pub(crate) fn run_agent_planned(
     env: &[(&str, &str)],
     manifest: &Value,
 ) -> Output {
-    run_agent_with(fixture_name, env, Some(manifest)).0
+    run_agent_with(fixture_name, env, &[], Some(manifest)).0
 }
 
 fn run_agent_with(
     fixture_name: &str,
     env: &[(&str, &str)],
+    flags: &[&str],
     plan: Option<&Value>,
 ) -> (Output, PathBuf) {
     let dir = std::env::temp_dir().join(format!("fleet-e2e-{}", uuid::Uuid::now_v7()));
+    let flags: Vec<String> = flags
+        .iter()
+        .map(|f| f.replace("{DIR}", &dir.to_string_lossy()))
+        .collect();
     std::fs::create_dir_all(&dir).unwrap();
     std::os::unix::fs::symlink(
         repo().join("crates/fleet-agent/tests/it/fake-maestro.sh"),
@@ -262,6 +277,7 @@ fn run_agent_with(
         cmd.arg("--")
             .arg(dir.join("maestro"))
             .arg("test")
+            .args(&flags)
             .arg(dir.join("flows"));
     }
     cmd.env("FLEET_FAKE_FIXTURE", fixture(fixture_name))

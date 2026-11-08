@@ -32,8 +32,6 @@ pub(crate) struct Prepared {
     pub(crate) argv: Vec<OsString>,
     /// Environment to add.
     pub(crate) env: Vec<(String, String)>,
-    /// Session log and flow bundles.
-    pub(crate) debug_dir: Option<String>,
     /// JUnit report.
     pub(crate) report: Option<String>,
     /// The agent's directory for this run.
@@ -72,7 +70,6 @@ pub(crate) fn prepare(
             _ => Prepared {
                 argv: command.to_vec(),
                 env: Vec::new(),
-                debug_dir: None,
                 report: None,
                 run_dir: None,
                 plan: None,
@@ -143,7 +140,6 @@ fn adjust(
     Prepared {
         argv: p.argv.into_iter().map(OsString::from).collect(),
         env: p.env,
-        debug_dir: p.debug_dir,
         report: p.report,
         run_dir,
         plan: None,
