@@ -333,6 +333,53 @@ fn paired_steps(
         .collect()
 }
 
+/// The agent's own replay of a captured failed run settles its steps from `commands.json` (issue
+/// #148): the failing assertion is Failed by that file, its row is the one the failure names, and
+/// the passing steps before it are Passed by the file too. This drives the live session's settle
+/// path over the captured log and files, not simulated events.
+#[test]
+fn a_failed_flows_failing_step_is_settled_from_its_commands_file() {
+    let run =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1/fail/run/debug");
+    let (result, events) = fleet_agent::inspect::inspect(&run).unwrap();
+    assert_eq!(result.flows.len(), 1);
+    let settled: Vec<(u32, String)> = events
+        .iter()
+        .filter(|e| e.kind == "step.ended" && e.src.kind == SourceKind::ArtifactFile)
+        .map(|e| {
+            let index = e.subject.step.as_ref().map_or(u32::MAX, |r| r.index);
+            (
+                index,
+                e.data["status"].as_str().unwrap_or_default().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        settled,
+        [
+            (0, "completed"),
+            (1, "completed"),
+            (2, "completed"),
+            (3, "completed"),
+            (4, "failed"),
+        ]
+        .map(|(i, s)| (i, s.to_owned()))
+    );
+    let failing = events
+        .iter()
+        .find(|e| e.kind == "step.started" && e.subject.step.as_ref().map(|r| r.index) == Some(4))
+        .map(|e| {
+            e.data["description"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned()
+        });
+    assert_eq!(
+        failing.as_deref(),
+        Some("Assert that \"Fleet never shows this\" is visible")
+    );
+}
+
 /// The statuses of the steps whose description starts with `prefix`, in order.
 fn status_of<'a>(
     steps: &'a std::collections::BTreeMap<u32, (String, String)>,
