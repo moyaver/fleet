@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE step_executions SET status = 'unknown', source = 'server_inferred'\n          WHERE flow_execution_id = ANY($1) AND status = 'running'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f48852900af35f09730323b51c1bbe31205c83fff5ad20cb2b1f411892261e6b"
+}

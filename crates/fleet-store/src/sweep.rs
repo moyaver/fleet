@@ -207,6 +207,15 @@ async fn abandon(
     )
     .fetch_all(&mut *tx)
     .await?;
+    // Their steps still open were never observed to end: they are inferred too, never shown as
+    // passed (issue #148). A step the log or a file already ended keeps its own reading.
+    sqlx::query!(
+        "UPDATE step_executions SET status = 'unknown', source = 'server_inferred'
+          WHERE flow_execution_id = ANY($1) AND status = 'running'",
+        &flows
+    )
+    .execute(&mut *tx)
+    .await?;
     changed.extend(
         derive::flows(tx, &flows)
             .await?
