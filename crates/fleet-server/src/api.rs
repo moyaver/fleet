@@ -6,6 +6,7 @@
 //! and are refused here. `POST /api/v1/plans` takes a publisher credential: the planning CI job
 //! stores its plan like an agent publishes.
 
+mod admin;
 mod compare;
 mod history;
 pub(crate) mod live_ws;
@@ -32,6 +33,12 @@ use fleet_protocol::{
         PlanShardView, PlanView, ProjectView, Snapshot, SuiteView,
     },
     plan::PlanManifest,
+    rest::admin::{
+        AdminAgentRow, AdminAgentsView, AdminApiKeyView, AdminAuditEventView, AdminAuditPage,
+        AdminGapRow, AdminIngestionView, AdminLagRow, AdminProjectView, AdminRejectionRow,
+        AdminRetentionClassView, AdminRetentionView, AdminRoleMappingsView, AdminSettingView,
+        AdminTrustPolicyView,
+    },
     rest::{
         ActiveAttemptView, ArtifactLinkView, ArtifactListView, ArtifactRefView, ArtifactView,
         BarView, ClaimView, CrashView, DeviceDetailView, DeviceLatestView, DeviceProfileView,
@@ -89,7 +96,17 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         history::trend,
         compare::compare,
         triage::set,
-        triage::clear
+        triage::clear,
+        admin::projects,
+        admin::trust_policies,
+        admin::api_keys,
+        admin::role_mappings,
+        admin::retention,
+        admin::artifact_policy_view,
+        admin::metric_policy_view,
+        admin::agents,
+        admin::ingestion,
+        admin::audit
     ),
     components(schemas(
         ProjectView,
@@ -176,6 +193,21 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         Flakiness,
         PlanUpload,
         PlanStored,
+        AdminProjectView,
+        AdminTrustPolicyView,
+        AdminApiKeyView,
+        AdminRoleMappingsView,
+        AdminRetentionView,
+        AdminRetentionClassView,
+        AdminSettingView,
+        AdminAgentsView,
+        AdminAgentRow,
+        AdminIngestionView,
+        AdminRejectionRow,
+        AdminGapRow,
+        AdminLagRow,
+        AdminAuditPage,
+        AdminAuditEventView,
         ApiError
     ))
 )]
@@ -252,6 +284,22 @@ pub(crate) fn router() -> Router<AppState> {
         )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))
+        .route("/api/v1/admin/projects", get(admin::projects))
+        .route("/api/v1/admin/trust-policies", get(admin::trust_policies))
+        .route("/api/v1/admin/api-keys", get(admin::api_keys))
+        .route("/api/v1/admin/role-mappings", get(admin::role_mappings))
+        .route("/api/v1/admin/retention", get(admin::retention))
+        .route(
+            "/api/v1/admin/artifact-policy",
+            get(admin::artifact_policy_view),
+        )
+        .route(
+            "/api/v1/admin/metric-policy",
+            get(admin::metric_policy_view),
+        )
+        .route("/api/v1/admin/agents", get(admin::agents))
+        .route("/api/v1/admin/ingestion", get(admin::ingestion))
+        .route("/api/v1/admin/audit", get(admin::audit))
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {

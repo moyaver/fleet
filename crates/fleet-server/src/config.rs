@@ -86,7 +86,7 @@ pub struct Config {
     pub usercontent: Usercontent,
     /// How long telemetry, the journal, the audit log and artifact blobs are kept (PLAN §9).
     pub retention: Retention,
-    /// Projects to create at start-up (by slug); an admin UI arrives in M6.
+    /// Projects to create at start-up (by slug). Screen G shows them; changing them is by this list.
     pub projects: Vec<ProjectConfig>,
 }
 
@@ -146,8 +146,8 @@ impl Default for Storage {
 /// How long data is kept, and how often the leader's retention jobs run (PLAN §7.7, §9).
 ///
 /// Durations are whole days; **0 keeps the data for ever**. Artifact retention classes are
-/// per project (`retention_classes`, seeded with the research 05 §12.3 defaults); an admin screen
-/// for them arrives in M6.
+/// per project (`retention_classes`, seeded with the research 05 §12.3 defaults). Screen G shows
+/// them read only.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Retention {

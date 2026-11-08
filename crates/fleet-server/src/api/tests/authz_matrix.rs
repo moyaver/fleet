@@ -25,7 +25,9 @@ use crate::session;
 const CSRF: &str = "csrf";
 const CSRF_HEADER: &str = "x-csrf-token";
 
-/// Who is asking. `Stranger` is signed in with an admin role on the other project only.
+/// Who is asking. `Stranger` is signed in with an admin role on the other project only, `Admin`
+/// is an admin of this project, and `GlobalAdmin` holds the admin role for every project (the
+/// only grant that reaches installation-wide administration, Screen G).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Who {
     Anonymous,
@@ -34,15 +36,17 @@ enum Who {
     Viewer,
     Maintainer,
     Admin,
+    GlobalAdmin,
 }
 
-const WHO: [Who; 6] = [
+const WHO: [Who; 7] = [
     Who::Anonymous,
     Who::Publisher,
     Who::Stranger,
     Who::Viewer,
     Who::Maintainer,
     Who::Admin,
+    Who::GlobalAdmin,
 ];
 
 /// How a route is authorized. Every route found in the router must have one.
@@ -69,6 +73,10 @@ enum Class {
     /// Not authorized by role: the same answer for everyone (public documents and probes, the
     /// sign-in flow, capability links).
     RoleIndependent,
+    /// Screen G (installation-wide administration and the audit history): anonymous callers and
+    /// publishers are refused as unauthenticated, and every other signed-in caller without a
+    /// global administrator grant is `403`, project admins included. Only a global admin reads.
+    Admin,
 }
 
 /// The class of a route as the router names it, or `None` for a route nobody has classified yet.
@@ -83,6 +91,16 @@ fn class_of(route: &str) -> Option<Class> {
         "/api/v1/flows/{execution_id}/page" => Class::FlowPage,
         // The rerun manifest (#82): a download a project reader gets, as the project's screens.
         "/api/v1/projects/{project}/attempts/{attempt}/failed-flows" => Class::ProjectRead,
+        "/api/v1/admin/projects"
+        | "/api/v1/admin/trust-policies"
+        | "/api/v1/admin/api-keys"
+        | "/api/v1/admin/role-mappings"
+        | "/api/v1/admin/retention"
+        | "/api/v1/admin/artifact-policy"
+        | "/api/v1/admin/metric-policy"
+        | "/api/v1/admin/agents"
+        | "/api/v1/admin/ingestion"
+        | "/api/v1/admin/audit" => Class::Admin,
         "/api/v1/openapi.json"
         | "/livez"
         | "/readyz"
@@ -289,6 +307,13 @@ async fn cookies(rig: &Rig) -> HashMap<Who, String> {
                 role: Role::Admin,
             }],
         ),
+        (
+            Who::GlobalAdmin,
+            vec![Grant {
+                project: None,
+                role: Role::Admin,
+            }],
+        ),
     ];
     let mut out = HashMap::new();
     for (who, grants) in grants {
@@ -428,6 +453,14 @@ fn check(class: Class, who: Who, status: u16, body: &Value, anonymous: u16) -> R
             _ => Ok(()),
         },
         Class::RoleIndependent => want(status == anonymous, "the same answer as anonymous"),
+        Class::Admin => match who {
+            Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),
+            Who::GlobalAdmin => want(status == 200, "200 expected for a global admin"),
+            _ => want(
+                status == 403,
+                "403 expected: only a global admin may read Screen G",
+            ),
+        },
     }
 }
 
