@@ -688,7 +688,7 @@ async fn evidence_viewers_keep_their_state_when_the_links_are_renewed() {
     browser.quit().await;
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     aws_lc_rs::digest::digest(&aws_lc_rs::digest::SHA256, bytes)
         .as_ref()
