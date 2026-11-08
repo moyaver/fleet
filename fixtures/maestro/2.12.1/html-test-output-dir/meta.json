@@ -1,0 +1,44 @@
+{
+  "command": [
+    "/bin/sh",
+    "-c",
+    "cd \"$1\" && shift && exec \"$@\"",
+    "sh",
+    "<CAPTURE>/run",
+    "/opt/homebrew/bin/maestro",
+    "--device",
+    "emulator-5584",
+    "test",
+    "--format",
+    "html",
+    "--test-output-dir",
+    "<CAPTURE>/run/T",
+    "<REPO>/examples/flows/phase0/fail.yaml"
+  ],
+  "default_env": [
+    {
+      "name": "MAESTRO_CLI_NO_ANALYTICS",
+      "value": "1"
+    },
+    {
+      "name": "MAESTRO_DISABLE_UPDATE_CHECK",
+      "value": "true"
+    },
+    {
+      "name": "MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED",
+      "value": "true"
+    }
+  ],
+  "env": [
+    {
+      "name": "MAESTRO_CLI_LOG_PATTERN_FILE",
+      "value": "MFLT1|%d{UNIX_MILLIS}|%t|%level|%logger|%enc{%msg}{CRLF}%n"
+    }
+  ],
+  "host": {
+    "arch": "aarch64",
+    "os": "macos"
+  },
+  "signal": null,
+  "started_at_unix_ms": 1794122672771
+}

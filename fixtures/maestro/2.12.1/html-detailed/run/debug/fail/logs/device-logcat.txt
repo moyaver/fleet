@@ -1,0 +1,300 @@
+--------- beginning of main
+11-08 09:16:15.275 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:15.276 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.276 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.301 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+11-08 09:16:15.314 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] start to register
+11-08 09:16:15.322 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:15.355 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:15.536 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.539 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.540 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:15.623 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:15.741 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.741 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.789 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.789 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.789 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:15.861 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:15.908 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.908 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.912 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:15.912 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:15.912 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:15.989 I/serviceentitlement( 1632): (REDACTED) [OgiMatcherDataGenerator] Configuration version : %s
+11-08 09:16:16.078 I/HalDevMgr(  643): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:16:16.473 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+--------- beginning of system
+11-08 09:16:16.503 I/PackageManager(  643): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:16:16.555 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.591 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.614 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.614 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.621 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.621 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.624 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.624 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.636 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.640 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.640 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:16.649 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:16.654 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.654 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.655 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:16.676 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:16.687 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.688 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.688 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:16.708 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:16.709 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.712 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.722 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.722 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.728 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.729 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.731 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.731 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.733 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.734 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.734 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:16.776 I/serviceentitlement( 1632): [OgiMatcherDataGenerator] Adding test carrier subscriptions for single sim vct flow [CONTEXT service_id=359 ]
+11-08 09:16:16.759 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:16.800 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:16.800 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:16.800 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:16.851 I/serviceentitlement( 1632): [TestSubscriptionDataGenerator] Getting test subscription registries [CONTEXT service_id=359 ]
+11-08 09:16:16.892 I/serviceentitlement( 1632): [TestSubscriptionDataGenerator] Getting test carrier ids [CONTEXT service_id=359 ]
+11-08 09:16:16.893 I/serviceentitlement( 1632): (REDACTED) [OgiMatcherDataGenerator] Number of subscriptions to register: %d
+11-08 09:16:16.893 I/serviceentitlement( 1632): [OgiMatcherDataGenerator] building registry database [CONTEXT service_id=359 ]
+11-08 09:16:16.897 I/serviceentitlement( 1632): (REDACTED) [OgiMatcherDataGenerator] Matcher data to be registered: %s
+11-08 09:16:16.905 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] Data length [%d] to register
+11-08 09:16:16.937 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] register #1
+11-08 09:16:16.945 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] register credential
+11-08 09:16:16.945 I/serviceentitlement( 1632): (REDACTED) [OgiMatcherDataGenerator] Number of registered carriers: %d
+11-08 09:16:16.947 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] register #2
+11-08 09:16:16.947 I/serviceentitlement( 1632): (REDACTED) [CredManRegistrationManager] [%s] register credential
+11-08 09:16:16.947 I/serviceentitlement( 1632): (REDACTED) [OgiMatcherDataGenerator] Number of registered carriers: %d
+11-08 09:16:17.109 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:17.119 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.119 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.119 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:17.216 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:17.217 I/SQLiteConnection( 1231): Long db operation: /data/user/0/com.google.android.gms/databases/phenotype.db
+11-08 09:16:17.222 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.222 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.225 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.225 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.228 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.228 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.230 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.230 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.237 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.237 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.240 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.240 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.243 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.243 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.244 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.244 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.260 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.260 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.260 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:17.271 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:17.272 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.272 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:17.272 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:17.441 D/BoundBrokerSvc( 1632): onBind: Intent { act=com.google.android.gms.identitycredentials.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+11-08 09:16:17.441 D/BoundBrokerSvc( 1632): Loading bound service for intent: Intent { act=com.google.android.gms.identitycredentials.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+11-08 09:16:17.565 I/adbd    (  484): adbd service requested 'sync:'
+11-08 09:16:17.889 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:17.981 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:17.981 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.169 I/adbd    (  484): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 09:16:18.252 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.253 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.262 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.264 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.272 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onDestroy
+11-08 09:16:18.275 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] onCreate
+11-08 09:16:18.281 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.284 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.370 D/ActivityManager(  643): freezing 3764 com.google.android.partnersetup
+11-08 09:16:18.372 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.372 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.388 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.388 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.389 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.389 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.392 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.392 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.392 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.393 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.400 D/ActivityManager(  643): freezing 2212 com.google.android.verifier
+11-08 09:16:18.405 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.407 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.418 D/ActivityManager(  643): freezing 3925 com.android.chrome
+11-08 09:16:18.442 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.442 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [%s] Action : %s
+11-08 09:16:18.446 I/serviceentitlement( 1632): (REDACTED) [ServiceEntitlementIntentOperation] [Ts.43-IntentOperation] Action : %s
+11-08 09:16:18.446 I/serviceentitlement( 1632): (REDACTED) [Serv
+[... fleet fixtures import: 280628 bytes cut ...]
+luetooth.audio@2.1::IBluetoothAudioProvidersFactory/default.
+11-08 09:19:04.842 I/hwservicemanager(  283): getTransport: Cannot find entry android.hardware.bluetooth.audio@2.0::IBluetoothAudioProvidersFactory/default in either framework or device VINTF manifest.
+11-08 09:19:04.842 E/LegacySupport( 6168): Could not get passthrough implementation for android.hardware.bluetooth.audio@2.0::IBluetoothAudioProvidersFactory/default.
+11-08 09:19:04.842 W/audiohalservice( 6168): Could not register Bluetooth Audio API
+11-08 09:19:04.842 I/hwservicemanager(  283): getTransport: Cannot find entry android.hardware.bluetooth.a2dp@1.0::IBluetoothAudioOffload/default in either framework or device VINTF manifest.
+11-08 09:19:04.842 E/LegacySupport( 6168): Could not get passthrough implementation for android.hardware.bluetooth.a2dp@1.0::IBluetoothAudioOffload/default.
+11-08 09:19:04.842 W/audiohalservice( 6168): Could not register Bluetooth Audio Offload API
+11-08 09:19:05.360 I/adbd    (  484): adbd service requested 'shell,v2,raw:logcat -v time -d'
+11-08 09:19:05.937 I/audiohalservice( 6168): createIBluetoothAudioProviderFactory() from android.hardware.bluetooth.audio-impl success
+11-08 09:19:05.938 E/audiohalservice( 6168): Failed to dlopen android.hardware.audio.sounddose-vendor-impl.so: dlopen failed: library "android.hardware.audio.sounddose-vendor-impl.so" not found
+11-08 09:19:05.938 W/audiohalservice( 6168): createISoundDoseFactory() from android.hardware.audio.sounddose-vendor-impl failed
+11-08 09:19:06.889 I/FastMixerState( 6164): sMaxFastTracks = 8
+11-08 09:19:06.909 I/audioserver_main( 6164): main: starting
+11-08 09:19:06.926 V/MediaUtils( 6164): physMem: 4104712192
+11-08 09:19:06.926 V/MediaUtils( 6164): requested limit: 536870912
+11-08 09:19:06.926 I/libc    ( 6164): malloc_limit: Allocation limit enabled, max size 536870912 bytes
+11-08 09:19:06.933 E/adbd    (  484): failed to connect to socket 'tcp:61027': Connection refused
+11-08 09:19:06.947 E/adbd    (  484): failed to connect to socket 'tcp:61027': Connection refused
+11-08 09:19:06.977 D/XfrmController( 6167): Sending Netlink XFRM Message: XFRM_MSG_FLUSHSA
+11-08 09:19:06.982 D/XfrmController( 6167): Sending Netlink XFRM Message: XFRM_MSG_FLUSHPOLICY
+11-08 09:19:06.983 I/netd    ( 6167): Initializing XfrmController: 2564053us
+11-08 09:19:06.996 I/resolv  ( 6167): resolv_init: Initializing resolver
+11-08 09:19:07.019 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.core.IModule/default: false
+11-08 09:19:07.021 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.effect.IFactory/default: false
+11-08 09:19:07.023 I/hwservicemanager(  283): getTransport: Cannot find entry android.hardware.audio.effect@7.1::IEffectsFactory/default in either framework or device VINTF manifest.
+11-08 09:19:07.052 W/libbinder.BackendUnifiedServiceManager( 6167): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: dnsresolver
+11-08 09:19:07.086 I/hwservicemanager(  283): getTransport: Cannot find entry android.system.net.netd@1.1::INetd/default in either framework or device VINTF manifest.
+11-08 09:19:07.111 E/HidlServiceManagement( 6167): Service android.system.net.netd@1.1::INetd/default must be in VINTF manifest in order to register/get.
+11-08 09:19:07.111 E/Netd    ( 6167): Unable to start HIDL NetdHwService: -2147483648
+11-08 09:19:07.203 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.effect.IFactory/default: false
+11-08 09:19:07.203 I/hwservicemanager(  283): getTransport: Cannot find entry android.hardware.audio.effect@7.1::IEffectsFactory/default in either framework or device VINTF manifest.
+11-08 09:19:07.203 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.core.IModule/default: false
+11-08 09:19:07.363 W/BatteryNotifier( 6164): batterystats service unavailable!
+11-08 09:19:07.427 I/mediaserver( 6166): ServiceManager: 0xb4000073a380bb00
+11-08 09:19:07.432 W/BatteryNotifier( 6166): batterystats service unavailable!
+11-08 09:19:07.452 W/libbinder.BackendUnifiedServiceManager( 6166): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: media.player
+11-08 09:19:07.462 W/BatteryNotifier( 6166): batterystats service unavailable!
+11-08 09:19:07.482 W/libbinder.BackendUnifiedServiceManager( 6166): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: media.resource_manager
+11-08 09:19:07.495 W/libbinder.BackendUnifiedServiceManager( 6166): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: media.resource_observer
+11-08 09:19:07.673 D/AndroidRuntime( 6161): >>>>>> START com.android.internal.os.ZygoteInit uid 0 <<<<<<
+11-08 09:19:07.851 D/AudioFlinger( 6164): onFirstRef: TimerQueue ready
+11-08 09:19:07.919 I/audioserver_main( 6164): main: AudioFlinger created
+11-08 09:19:07.999 D/AudioSystem( 6164): onNewServiceWithAdapter: media.audio_flinger service obtained 0xb4000073d1c126e0
+11-08 09:19:08.009 W/AudioFlinger( 6164): registerClient: linkToDeath returned -38
+11-08 09:19:08.009 W/AudioFlinger( 6164): registerClient: addFrozenStateChangeCallback returned -38
+11-08 09:19:08.086 E/AudioFlinger( 6164): Function: getAudioPolicyConfig Line: 2571 Failed 
+11-08 09:19:08.165 D/APM_EngineLoader( 6164): Loaded engine from libaudiopolicyenginedefault.so
+11-08 09:19:08.166 D/APM::AudioPolicyEngine/Base( 6164): loadAudioPolicyEngineConfig: No configuration found, using default matching phone experience.
+11-08 09:19:08.184 W/APM::AudioPolicyEngine/Base( 6164): operator(): AUDIO_STREAM_BLUETOOTH_SCO attributes are deprecated, removing AttributesGroup AUDIO_STREAM_BLUETOOTH_SCO
+11-08 09:19:08.184 W/APM::AudioPolicyEngine/Base( 6164): operator(): AUDIO_STREAM_BLUETOOTH_SCO attributes are deprecated, removing volume group AUDIO_STREAM_BLUETOOTH_SCO
+11-08 09:19:08.188 W/APM::AudioPolicyEngine/Base( 6164): processParsingResult: No configuration of AUDIO_STREAM_CALL_ASSISTANT found, using default volume configuration
+11-08 09:19:08.190 E/APM::AudioPolicyEngine( 6164): Policy Engine configuration is partially invalid, skipped 1 elements
+11-08 09:19:08.199 I/AndroidRuntime( 6161): Using default boot image
+11-08 09:19:08.199 I/AndroidRuntime( 6161): Leaving lock profiling enabled
+11-08 09:19:08.204 W/DeviceHalHidl( 6164): getSoundDoseInterface service android.hardware.audio.sounddose.ISoundDoseFactory/default doesn't exist
+11-08 09:19:08.204 W/MelReporter( 6164): activateHalSoundDoseComputation: HAL cannot provide sound dose interface for module primary
+11-08 09:19:08.204 W/AudioFlinger( 6164): loadHwModule() sound dose reporting is not available
+11-08 09:19:08.211 I/zygote64( 6161): option[0]=-Xzygote
+11-08 09:19:08.211 I/zygote64( 6161): option[1]=exit
+11-08 09:19:08.211 I/zygote64( 6161): option[2]=vfprintf
+11-08 09:19:08.211 I/zygote64( 6161): option[3]=sensitiveThread
+11-08 09:19:08.211 I/zygote64( 6161): option[4]=-verbose:gc
+11-08 09:19:08.211 I/zygote64( 6161): option[5]=-XX:PerfettoHprof=true
+11-08 09:19:08.211 I/zygote64( 6161): option[6]=-XX:PerfettoJavaHeapStackProf=true
+11-08 09:19:08.211 I/zygote64( 6161): option[7]=-Xprimaryzygote
+11-08 09:19:08.211 I/zygote64( 6161): option[8]=-Xms8m
+11-08 09:19:08.211 I/zygote64( 6161): option[9]=-Xmx576m
+11-08 09:19:08.211 I/zygote64( 6161): option[10]=-XX:HeapGrowthLimit=192m
+11-08 09:19:08.211 I/zygote64( 6161): option[11]=-XX:HeapMinFree=512k
+11-08 09:19:08.211 I/zygote64( 6161): option[12]=-XX:HeapMaxFree=8m
+11-08 09:19:08.211 I/zygote64( 6161): option[13]=-XX:HeapTargetUtilization=0.75
+11-08 09:19:08.211 I/zygote64( 6161): option[14]=-Xusejit:true
+11-08 09:19:08.211 I/zygote64( 6161): option[15]=-Xjitsaveprofilinginfo
+11-08 09:19:08.211 I/zygote64( 6161): option[16]=-XMadviseWillNeedVdexFileSize:104857600
+11-08 09:19:08.211 I/zygote64( 6161): option[17]=-XMadviseWillNeedOdexFileSize:104857600
+11-08 09:19:08.211 I/zygote64( 6161): option[18]=-XjdwpOptions:suspend=n,server=y
+11-08 09:19:08.211 I/zygote64( 6161): option[19]=-XjdwpProvider:default
+11-08 09:19:08.211 I/zygote64( 6161): option[20]=-Xopaque-jni-ids:swapable
+11-08 09:19:08.211 I/zygote64( 6161): option[21]=-Xcompiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[22]=--instruction-set-variant=generic
+11-08 09:19:08.211 I/zygote64( 6161): option[23]=-Xcompiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[24]=--instruction-set-features=default
+11-08 09:19:08.211 I/zygote64( 6161): option[25]=-Xcompiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[26]=--generate-mini-debug-info
+11-08 09:19:08.211 I/zygote64( 6161): option[27]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[28]=--runtime-arg
+11-08 09:19:08.211 I/zygote64( 6161): option[29]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[30]=-Xms64m
+11-08 09:19:08.211 I/zygote64( 6161): option[31]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[32]=--runtime-arg
+11-08 09:19:08.211 I/zygote64( 6161): option[33]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[34]=-Xmx512m
+11-08 09:19:08.211 I/zygote64( 6161): option[35]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[36]=--dirty-image-objects=/apex/com.android.art/etc/dirty-image-objects
+11-08 09:19:08.211 I/zygote64( 6161): option[37]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[38]=--dirty-image-objects=/system/etc/dirty-image-objects
+11-08 09:19:08.211 I/zygote64( 6161): option[39]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[40]=--instruction-set-variant=generic
+11-08 09:19:08.211 I/zygote64( 6161): option[41]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[42]=--instruction-set-features=default
+11-08 09:19:08.211 I/zygote64( 6161): option[43]=-Ximage-compiler-option
+11-08 09:19:08.211 I/zygote64( 6161): option[44]=--generate-mini-debug-info
+11-08 09:19:08.211 I/zygote64( 6161): option[45]=-Duser.locale=en-US
+11-08 09:19:08.211 I/zygote64( 6161): option[46]=--cpu-abilist=arm64-v8a
+11-08 09:19:08.211 I/zygote64( 6161): option[47]=-Xfingerprint:google/sdk_gphone64_arm64/emu64a:17/CE2A.260420.051.A2/16418371:user/release-keys
+11-08 09:19:08.219 I/AudioFlinger( 6164): loadHwModule() Loaded primary audio interface, handle 10
+11-08 09:19:08.233 I/AudioFlinger( 6164): openOutput() this 0xb4000073d1c126e0, module 10 Device AUDIO_DEVICE_OUT_SPEAKER, @:, SamplingRate 48000, Format 0x000001, Channels 0x3, flags 0x2
+11-08 09:19:08.245 I/AudioFlinger( 6164): operator(): Using 3000 ms as standby time
+11-08 09:19:08.246 I/AudioFlinger( 6164): HAL output buffer size 1088 frames, normal sink buffer size 1088 frames
+11-08 09:19:08.250 I/zygote64( 6161): Core platform API enforcement enabled from the hiddenapi_platform_enforcement flag and the device API level
+11-08 09:19:08.253 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.effect.IFactory/default: false
+11-08 09:19:08.256 I/zygote64( 6161): Using generational CollectorTypeCMC GC.
+11-08 09:19:08.261 I/hwservicemanager(  283): getTransport: Cannot find entry android.hardware.audio.effect@7.1::IEffectsFactory/default in either framework or device VINTF manifest.
+11-08 09:19:08.263 W/FactoryHal( 6164): hasAidlHalService android.hardware.audio.core.IModule/default: false
+11-08 09:19:08.300 E/SensorsMultiHal(  439): Dropping 1 events after blockingWrite failed (is system_server running?).
+11-08 09:19:08.349 I/BufferProvider( 6164): found effect "Multichannel Downmix To Stereo" from The Android Open Source Project
+11-08 09:19:08.359 D/AudioFlinger( 6164): Failed to add event callback
+11-08 09:19:08.361 I/AudioFlinger( 6164): AudioFlinger's thread 0xb4000076474bb790 tid=6200 ready to run
+11-08 09:19:08.378 W/AudioFlinger( 6164): no wake lock to update, system not ready yet
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 1:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 2:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 3:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 4:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 5:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 6:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 7:
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.380 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 10:
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 11:
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 12:
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.381 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.381 E/android.hardware.audio@7.1-impl.ranchu( 6168): getPresentationPosition:510 failure: Result::INVALID_STATE
+11-08 09:19:08.427 E/APM_AudioPolicyManager( 6164): invalid volume index range in the curve 13:
+11-08 09:19:08.427 E/APM_AudioPolicyManager( 6164):   Can be muted  Index Min  Index Max  Index Cur [device : index]...
+11-08 09:19:08.427 E/APM_AudioPolicyManager( 6164):   true          -1         -1         40000000 : 00, 
+11-08 09:19:08.460 W/AudioFlinger( 6164): moveEffects() AUDIO_SESSION_OUTPUT_MIX not found in orphans, checking other mix
+11-08 09:19:08.460 W/AudioFlinger( 6164): moveEffects() bad srcIo 0
+11-08 09:19:08.460 I/APM::AudioPolicyEngine( 6164): getDevicesForStrategyInt no device found for strategy 8
+11-08 09:19:08.510 W/AudioFlinger( 6164): no wake lock to update, system not ready yet
+11-08 09:19:08.528 D/AudioFlinger( 6164): updateHalSupportedLatencyModes_l: thread(13) status -38 supported latency modes: { }
+11-08 09:19:08.559 I/AudioFlinger( 6164): openOutput() this 0xb4000073d1c126e0, module 10 Device AUDIO_DEVICE_OUT_TELEPHONY_TX, @:, SamplingRate 48000, Format 0x000001, Channels 0x3, flags 0
+11-08 09:19:08.579 I/AudioFlinger( 6164): HAL output buffer size 1088 frames, normal sink buffer size 1088 frames

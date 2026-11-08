@@ -1,0 +1,201 @@
+--------- beginning of main
+11-08 09:25:11.682 I/artd    (10072): GetBestInfo: dm (/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.dm) is kOatCannotOpen: No primary.vdex file in DexMetadata archive. Not doing fast verification: Failed to find entry 'primary.vdex': Entry not found
+11-08 09:25:11.682 I/artd    (10072): GetBestInfo: /data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.apk has no usable artifacts
+11-08 09:25:11.752 I/artd    (10072): Running dex2oat: /apex/com.android.art/bin/art_exec --drop-capabilities --set-task-profile=Dex2OatBootComplete --set-priority=background --keep-fds=6:7:8:9:10:11:12:13:14:15 -- /apex/com.android.art/bin/dex2oat64 --zip-fd=6 --zip-location=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.apk --oat-fd=7 --oat-location=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.odex --output-vdex-fd=8 --app-image-fd=9 --image-format=lz4 --swap-fd=10 --class-loader-context-fds=11:12:13 --class-loader-context=PCL[]{PCL[/system/framework/org.apache.http.legacy.jar]#PCL[/system_ext/framework/androidx.window.extensions.jar]#PCL[/system_ext/framework/androidx.window.sidecar.jar]} --classpath-dir=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA== --dm-fd=14 --profile-file-fd=15 --instruction-set=arm64 --instruction-set-features=default --instruction-set-variant=generic --compiler-filter=speed-profile --compilation-reason=install-dm --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --runtime-arg -Xtarget-sdk-version:37 --runtime-arg -Xhidden-api-policy:enabled --assume-value=Landroid/os/Build$VERSION;->SDK_INT:37 --no-allow-profile-code --runtime-arg -Xms64m --runtime-arg -Xmx512m --comments=app-name:com.android.vending,app-version-name:53.9.23-34 [0] [PR] 1012244613,app-version-code:85392340,art-version:370546200
+11-08 09:25:11.752 I/artd    (10072): Opened FDs: 6:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.apk 7:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.odex.Skm7HC.tmp 8:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.vdex.6gDqaE.tmp 9:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.art.bTo854.tmp 10:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.odex.swap.NCjhux.tmp 11:/system_ext/framework/androidx.window.sidecar.jar 12:/system_ext/framework/androidx.window.extensions.jar 13:/system/framework/org.apache.http.legacy.jar 14:/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.dm 15:/data/misc/profiles/ref/com.android.vending/primary.prof.NTiJ42.tmp 
+11-08 09:25:11.786 W/libbinder.IPCThreadState( 6269): Sending oneway calls to frozen process.
+11-08 09:25:11.836 W/libprocessgroup(10466): A JoinCgroup action in the SystemMemoryProcess profile is used for controller memory in the cgroup v2 hierarchy and will be ignored
+11-08 09:25:11.865 W/Zygote  ( 6161): forkRepeatedly terminated due to non-simple command
+11-08 09:25:11.865 D/Zygote  ( 6161): mbuffer starts with 1 , nice name is , mEnd = 35, mNext = 35, mLinesLeft = 0, mFd = 75
+11-08 09:25:11.865 D/Zygote  ( 6161): Buffer content prefix: 1?--hidden-api-log-sampling-rate=0?
+11-08 09:25:11.955 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages -f --user 0 | grep com.android.settings | head -1'
+--------- beginning of system
+11-08 09:25:12.145 I/PackageManager( 6269): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:25:12.201 W/dex2oat64(10466): Mismatch between dex2oat instruction set features to use (ISA: Arm64 Feature string: a53,crc,-lse,-fp16,-dotprod,-sve) and those from CPP defines (ISA: Arm64 Feature string: -a53,-crc,-lse,-fp16,-dotprod,-sve) for the command line:
+11-08 09:25:12.201 W/dex2oat64(10466): /apex/com.android.art/bin/dex2oat64 --zip-fd=6 --zip-location=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/base.apk --oat-fd=7 --oat-location=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA==/oat/arm64/base.odex --output-vdex-fd=8 --app-image-fd=9 --image-format=lz4 --swap-fd=10 --class-loader-context-fds=11:12:13 --class-loader-context=PCL[]{PCL[/system/framework/org.apache.http.legacy.jar]#PCL[/system_ext/framework/androidx.window.extensions.jar]#PCL[/system_ext/framework/androidx.window.sidecar.jar]} --classpath-dir=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA== --dm-fd=14 --profile-file-fd=15 --instruction-set=arm64 --instruction-set-features=default --instruction-set-variant=generic --compiler-filter=speed-profile --compilation-reason=install-dm --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --runtime-arg -Xtarget-sdk-version:37 --runtime-arg -Xhidden-api-policy:enabled --assume-value=Landroid/os/Build$VERSION;->SDK_INT:37 --no-allow-profile-code --runtime-arg -Xms64m --runtime-arg -Xmx512m --comments=app-name:com.android.vending,app-version-name:53.9.23-34 [0] [PR] 1012244613,app-version-code:85392340,art-version:370546200
+11-08 09:25:12.347 W/FuseDaemon( 7210): Suspending all threads took: 185.231ms
+11-08 09:25:12.356 D/ActivityManager( 6269): freezing 6986 com.google.android.permissioncontroller
+11-08 09:25:12.447 I/adbd    (  484): adbd service requested 'sync:'
+11-08 09:25:12.471 W/dex2oat64(10466): No primary.vdex file in DexMetadata archive. Not doing fast verification: Failed to find entry 'primary.vdex': Entry not found
+11-08 09:25:12.471 I/dex2oat64(10466): /apex/com.android.art/bin/dex2oat64 --output-vdex-fd=8 --class-loader-context-fds=11:12:13 --class-loader-context=PCL[]{PCL[/system/framework/org.apache.http.legacy.jar]#PCL[/system_ext/framework/androidx.window.extensions.jar]#PCL[/system_ext/framework/androidx.window.sidecar.jar]} --classpath-dir=/data/app/~~QPQ6ykKJQ4WzhbcSCQQ_pQ==/com.android.vending-QvcTBdGOhKnJSSRI7XgtAA== --dm-fd=14 --profile-file-fd=15 --compiler-filter=speed-profile --compilation-reason=install-dm --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --assume-value=Landroid/os/Build$VERSION;->SDK_INT:37 --no-allow-profile-code --comments=app-name:com.android.vending,app-version-name:53.9.23-34 [0] [PR] 1012244613,app-version-code:85392340,art-version:370546200
+11-08 09:25:12.541 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:25:12.542 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:25:12.542 D/InetDiagMessage( 6269): Destroyed live tcp sockets for uids={10212} in 22ms
+11-08 09:25:12.594 I/adbd    (  484): adbd service requested 'shell,v2,raw:am force-stop com.android.settings'
+11-08 09:25:12.635 I/PrivateInferenceConfigReader( 8005): computeConfig: isEvt: false, isUserDebug: false
+11-08 09:25:13.076 I/ActivityManager( 6269): Force stopping com.android.settings appid=1000 user=0: from pid 10490
+11-08 09:25:13.084 I/ActivityManager( 6269): Killing 9076:com.android.settings/1000 (adj 0): stop com.android.settings due to from pid 10490
+11-08 09:25:13.087 D/BoundBrokerSvc(10147): onUnbind: Intent { act=com.google.android.gms.scheduler.ACTION_PROXY_SCHEDULE dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+11-08 09:25:13.180 W/ActivityTaskManager( 6269): Force removing ActivityRecord{63524169 u0 com.android.settings/.Settings t10 f}}: app died, no saved state
+11-08 09:25:13.331 I/MagicTether(10147): [TetherService] onUnbind [CONTEXT service_id=276 ]
+11-08 09:25:13.333 I/MagicTether(10147): [TetherService] Stopping Instant Hotspot feature. [CONTEXT service_id=276 ]
+11-08 09:25:13.365 I/MagicTether(10147): [TetherService] Stopping Nearby component. [CONTEXT service_id=276 ]
+11-08 09:25:13.393 V/RecentTasksController( 6619): Notify recent tasks changed
+11-08 09:25:13.549 V/WindowManagerShell( 6619): Transition requested (#11): android.os.BinderProxy@59e8346 TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=10 effectiveUid=1000 displayId=0 isRunning=false baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.android.settings cmp=com.android.settings/.Settings } baseActivity=null topActivity=null origActivity=ComponentInfo{com.android.settings/com.android.settings.Settings} realActivity=ComponentInfo{com.android.settings/com.android.settings.homepage.SettingsHomepageActivity} realActivityIsAppLockEnabled=false numActivities=0 lastActiveTime=1073100 supportsMultiWindow=true supportsMultiWindowWithoutConstraints=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.os.BinderProxy@cb95d16} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isInteractive=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=true lastNonFullscreenBounds=null leafTaskBoundsFromOptions= false capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=503 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false isLeafTask= true eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 0, 0) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null topNonResizableActivityAspectRatio=-1.0} topActivityMainWindowFrame=null isAppBubble=false}, pipChange = null, remoteTransitionInfo = null, displayChanges = null, requestedLocation = null, userChange = null, windowingLayerChange = null, fullscreenRequestChange = null, flags = 0, debugId = 11 }
+11-08 09:25:13.647 W/DisconnectHandler( 6619): No disconnect change found in the transition, not handling request.
+11-08 09:25:13.678 D/RecentTasksList( 6791): invalidateLoadedTasks - previous requestLoadId: -1
+11-08 09:25:13.859 V/WindowManager( 6269): Defer transition id=11 for TaskFragmentTransaction=android.os.Binder@c690485
+11-08 09:25:13.886 D/OomAdjuster( 6269): Not killing cached processes
+11-08 09:25:14.278 W/ProcessStats( 6269): Tracking association SourceState{8f8a373 system/1000 BFgs #1969} whose proc state 4 is better than process ProcessState{44e179a com.google.android.ext.services/10220 pkg=com.google.android.ext.services} proc state 14 (3 skipped)
+11-08 09:25:14.349 W/Looper  ( 6269): Slow dispatch took 263ms android.fg app=system_server main=false group=FOREGROUND h=android.os.Handler c=com.android.server.location.injector.SystemAppForegroundHelper$$ExternalSyntheticLambda1@3ba6401 m=0
+11-08 09:25:14.359 W/Looper  ( 6269): Slow delivery took 356ms android.fg app=system_server main=false group=FOREGROUND h=android.os.Handler c=com.android.server.power.hint.HintManagerService$MyUidObserver$$ExternalSyntheticLambda0@a9b12a6 m=0
+11-08 09:25:14.368 V/ShellDesktopMode( 6619): DesktopTasksController: skipping handleRequest reason=triggerTask's display doesn't support desktop mode
+11-08 09:25:14.458 W/Looper  ( 6269): Slow dispatch took 186ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@fc7ffd m=0
+11-08 09:25:14.490 W/libbinder.Binder( 6269): Binder transaction to android.app.IActivityManager, function: UNKNOWN_FUNCTION_NAME, code: 1598246212, took 1481ms. Data bytes: 208 Reply bytes: 4 Flags: 16
+11-08 09:25:14.591 I/adbd    (  484): adbd service requested 'shell,v2,raw:pm list packages --user 0 com.android.settings'
+11-08 09:25:14.603 W/libbinder.Binder( 6269): Binder transaction to android.app.IActivityManager, function: UNKNOWN_FUNCTION_NAME, code: 46, took 1543ms. Data bytes: 104 Reply bytes: 8 Flags: 18
+11-08 09:25:14.616 W/libbinder.Binder( 6269): Binder transaction to android.app.IActivityManager, function: UNKNOWN_FUNCTION_NAME, code: 69, took 1528ms. Data bytes: 116 Reply bytes: 0 Flags: 17
+11-08 09:25:14.660 W/Looper  ( 6269): Drained
+11-08 09:25:14.701 I/AdbWifiNetworkMonitor( 6269): Wi-Fi network available
+11-08 09:25:14.702 I/AdbWifiNetworkMonitor( 6269): Received the same Wi-Fi SSID. Ignoring.
+11-08 09:25:14.789 D/ViewRootImpl( 6791): Skipping stats log for color mode
+11-08 09:25:14.841 D/BaseActivity( 6791): Launcher flags updated: [state_started] +[state_started]
+11-08 09:25:14.991 D/BaseActivity( 6791): Launcher flags updated: [state_started|state_resumed|state_user_active] +[state_resumed|state_user_active]
+11-08 09:25:15.007 D/BaseActivity( 6791): Launcher flags updated: [state_started|state_resumed|state_user_active] +[]
+11-08 09:25:15.080 I/dex2oat64(10466): Core platform API enforcement enabled from the hiddenapi_platform_enforcement flag and the device API level
+11-08 09:25:15.084 D/SmartspaceInteractor( 6791): notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+11-08 09:25:15.105 I/dex2oat64(10466): Using generational CollectorTypeCMC GC.
+11-08 09:25:15.139 I/keystore2(  305): system/security/keystore2/watchdog/src/lib.rs:371 - Watchdog thread idle -> terminating. Have a great day.
+11-08 09:25:15.174 W/libbinder.IPCThreadState( 6269): Sending oneway calls to frozen process.
+11-08 09:25:15.174 W/libbinder.IPCThreadState( 6269): Sending oneway calls to frozen process.
+11-08 09:25:15.174 W/libbinder.IPCThreadState( 6269): Sending oneway calls to frozen process.
+11-08 09:25:15.266 D/WindowManagerShell( 6619): setLauncherKeepClearAreaHeight: visible=true, height=495
+11-08 09:25:15.293 I/PackageManager( 6269): getInstalledPackages: callingUid=2000 flags=0 updatedFlags=786432 userId=0
+11-08 09:25:15.304 I/Surface ( 6791): Creating surface for consumer unnamed-6791-14 with slotExpansion=1 for 64 slots
+11-08 09:25:15.327 I/Surface ( 6791): Creating surface for consumer VRI[NexusLauncherActivity]#4(BLAST Consumer)4 with slotExpansion=1 for 64 slots
+11-08 09:25:15.538 D/WindowManager( 6269): setClientSurface Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#289)/@0x2d8662c for 10e706d com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+11-08 09:25:15.611 I/HalDevMgr( 6269): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:25:15.618 W/t_app_installer( 9555): Suspending all threads took: 81.750ms
+11-08 09:25:15.691 W/libbinder.Binder(10147): Binder transaction to android.app.IApplicationThread, function: UNKNOWN_FUNCTION_NAME, code: 12, took 1072ms. Data bytes: 268 Reply bytes: 0 Flags: 17
+11-08 09:25:15.693 V/WindowManager( 6269): Continue transition id=11 for TaskFragmentTransaction=android.os.Binder@c690485
+11-08 09:25:15.738 D/BaseDepthController( 6791): setSurface:
+11-08 09:25:15.738 D/BaseDepthController( 6791): 	mWaitingOnSurfaceValidity: false
+11-08 09:25:15.738 D/BaseDepthController( 6791): 	mBaseSurface: Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#289)/@0xdc79a32
+11-08 09:25:15.755 V/BaseDepthController( 6791): Applying blur: 0 to Surface(name=VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#289)/@0xdc79a32 applyImmediately: false
+11-08 09:25:15.757 D/BaseDepthController( 6791): shouldBlurWorkspace:
+[... fleet fixtures import: 805185 bytes cut ...]
+s for start-requested
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.internal.server.HardwareArProviderService in 156451ms for connection
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.clearcut.debug.ClearcutDebugDumpService in 166451ms for start-requested
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentIntentOperationService in 176451ms for start-requested
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.fitness.service.recording.FitRecordingBroker in 186451ms for start-requested
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.fused.FusedLocationService in 196451ms for connection
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentInternalBoundBrokerService in 206451ms for connection
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.systemserviceacl.service.AclProviderService in 216451ms for connection
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.auth.setup.devicesignals.LockScreenService in 226451ms for start-requested
+11-08 09:26:44.957 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.gcm.GcmService in 236451ms for start-requested
+11-08 09:26:44.958 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.internal.server.GoogleLocationService in 246450ms for start-requested
+11-08 09:26:44.958 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.location.geocode.GeocodeService in 256450ms for connection
+11-08 09:26:44.958 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.internal.GoogleLocationManagerService in 266450ms for start-requested
+11-08 09:26:44.958 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.fido.authenticator.service.AuthenticatorService in 276449ms for start-requested
+11-08 09:26:44.959 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.cast.devicesuggestions.SuggestionsProviderChimeraService in 286449ms for start-requested
+11-08 09:26:44.959 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/com.google.android.contextmanager.service.ContextManagerService in 296449ms for start-requested
+11-08 09:26:44.959 W/ActivityManager( 6269): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentApiService in 306449ms for connection
+11-08 09:26:44.960 D/OomAdjuster( 6269): Not killing cached processes
+11-08 09:26:44.964 I/ServiceWatcher( 6269): [GeofenceProxy] disconnected from 10219/com.google.android.gms/com.google.android.location.internal.GoogleLocationManagerService@1
+11-08 09:26:44.964 I/ServiceWatcher( 6269): [TrustManagerService] disconnected from 10219/com.google.android.gms/.chimera.PersistentInternalBoundBrokerService@-2147483648
+11-08 09:26:44.965 W/Looper  ( 6269): Drained
+11-08 09:26:44.979 I/AppServiceConnection( 6269): Disconnected: com.google.android.gms/.systemserviceacl.service.AclProviderService u0
+11-08 09:26:44.992 E/libbinder.IPCThreadState( 7706): Binder transaction failure. id: 584784, cmd: BR_DEAD_REPLY (29189), error: -22 (Invalid argument)
+11-08 09:26:44.992 D/ActivityThread( 7706): Too many transaction errors, throttling transaction error callback.
+11-08 09:26:45.006 E/libbinder.IPCThreadState( 7706): Binder transaction failure. id: 584787, cmd: BR_DEAD_REPLY (29189), error: -22 (Invalid argument)
+11-08 09:26:45.007 D/ActivityThread( 7706): Too many transaction errors, throttling transaction error callback.
+11-08 09:26:45.009 I/bt_shim_scanner( 7358): system/main/shim/le_scanning_manager.cc:150 Scan: in shim layer stopped
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): Send batch failed [CONTEXT service_id=299 ]
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): bgqf: 20: The connection to Google Play services was lost due to service disconnection. Last reason for disconnect: Timing out service connection.
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgtg.a(:com.google.android.gms@261136035@26.11.36 (260400-892401869):105)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.h(:com.google.android.gms@261136035@26.11.36 (260400-892401869):59)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.onConnectionSuspended(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.s(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.t(:com.google.android.gms@261136035@26.11.36 (260400-892401869):22)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.e(:com.google.android.gms@261136035@26.11.36 (260400-892401869):30)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.f(:com.google.android.gms@261136035@26.11.36 (260400-892401869):82)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bgun.onConnected(:com.google.android.gms@261136035@26.11.36 (260400-892401869):15)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bhpi.a(:com.google.android.gms@261136035@26.11.36 (260400-892401869):3)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bhol.b(:com.google.android.gms@261136035@26.11.36 (260400-892401869):89)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bhoc.c(:com.google.android.gms@261136035@26.11.36 (260400-892401869):7)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at bhof.handleMessage(:com.google.android.gms@261136035@26.11.36 (260400-892401869):264)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at android.os.Handler.dispatchMessageImpl(Handler.java:142)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at cwvx.mr(:com.google.android.gms@261136035@26.11.36 (260400-892401869):1)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at cwvx.dispatchMessage(:com.google.android.gms@261136035@26.11.36 (260400-892401869):140)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:26:45.016 E/GmsCoreLogger( 7706): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:26:45.016 I/bluetooth( 7358): system/gd/hci/le_address_manager.cc:269 unregister_client: Client unregistered
+11-08 09:26:45.017 I/bluetooth( 7358): system/gd/hci/le_address_manager.cc:284 unregister_client: Cancelled address rotation alarm
+11-08 09:26:45.031 W/ActivityManager( 6269): Slow operation: 6274ms so far, now at startProcess: asking zygote to start proc
+11-08 09:26:45.044 I/bt_shim_scanner( 7358): system/main/shim/le_scanning_manager.cc:182 ScanFilterParamSetup: in shim layer, clientIf=1
+11-08 09:26:45.045 I/bt_shim_scanner( 7358): system/main/shim/le_scanning_manager.cc:182 ScanFilterParamSetup: in shim layer, clientIf=1
+11-08 09:26:45.080 I/bt_shim_scanner( 7358): system/main/shim/le_scanning_manager.cc:144 Unregister: in shim layer, scannerId=1
+11-08 09:26:45.088 W/Looper  ( 6269): Slow dispatch took 536ms main app=system_server main=true group=FOREGROUND h=android.app.ActivityThread$H c=android.app.LoadedApk$ServiceDispatcher$RunConnection@c812312 m=0
+11-08 09:26:45.090 W/Looper  ( 6269): Slow delivery took 383ms main app=system_server main=true group=FOREGROUND h=com.android.server.power.Notifier$NotifierHandler c=com.android.server.power.Notifier$$ExternalSyntheticLambda2@d979ae3 m=0
+11-08 09:26:45.167 D/BoundBrokerSvc( 7706): onBind: Intent { act=com.google.android.gms.checkin.START xflg=0x4 pkg=com.google.android.gms }
+11-08 09:26:45.167 D/BoundBrokerSvc( 7706): Loading bound service for intent: Intent { act=com.google.android.gms.checkin.START xflg=0x4 pkg=com.google.android.gms }
+11-08 09:26:45.183 D/ActivityThread( 7706): Too many transaction errors, throttling transaction error callback.
+11-08 09:26:45.184 W/GmsClient( 7706): IGmsServiceBroker.getService failed
+11-08 09:26:45.184 W/GmsClient( 7706): android.os.DeadObjectException
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.BinderProxy.transactNative(Native Method)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.BinderProxy.transact(BinderProxy.java:626)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at bhqm.a(:com.google.android.gms@261136035@26.11.36 (260400-892401869):33)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at bhon.z(:com.google.android.gms@261136035@26.11.36 (260400-892401869):160)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at bgup.run(:com.google.android.gms@261136035@26.11.36 (260400-892401869):42)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at cwvx.mr(:com.google.android.gms@261136035@26.11.36 (260400-892401869):1)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at cwvx.dispatchMessage(:com.google.android.gms@261136035@26.11.36 (260400-892401869):140)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:26:45.184 W/GmsClient( 7706): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:26:45.229 D/BoundBrokerSvc( 7706): onBind: Intent { act=com.google.android.gms.credential.manager.service.zeroparty.checkup.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+11-08 09:26:45.229 D/BoundBrokerSvc( 7706): Loading bound service for intent: Intent { act=com.google.android.gms.credential.manager.service.zeroparty.checkup.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+11-08 09:26:45.531 W/ssioncontroller( 6986): Suspending all threads took: 78.474ms
+11-08 09:26:45.562 E/PackageManager( 6269): Optimistic bind failed.
+11-08 09:26:45.562 E/PackageManager( 6269): java.util.concurrent.TimeoutException: [Optimistic Bind] Didn't bind to resolver in time!
+11-08 09:26:45.562 E/PackageManager( 6269): 	at com.android.server.pm.InstantAppResolverConnection.waitForBindLocked(InstantAppResolverConnection.java:160)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at com.android.server.pm.InstantAppResolverConnection.bind(InstantAppResolverConnection.java:230)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at com.android.server.pm.InstantAppResolverConnection.lambda$optimisticBind$0(InstantAppResolverConnection.java:260)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at com.android.server.pm.InstantAppResolverConnection.$r8$lambda$66W2s2mMKe4pk_xXCScH9RCqav8(InstantAppResolverConnection.java:0)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at com.android.server.pm.InstantAppResolverConnection$$ExternalSyntheticLambda0.run(R8$$SyntheticClass:0)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.Handler.handleCallback(Handler.java:1095)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.Handler.dispatchMessage(Handler.java:125)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.Looper.loopOnce(Looper.java:296)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.Looper.loop(Looper.java:397)
+11-08 09:26:45.562 E/PackageManager( 6269): 	at android.os.HandlerThread.run(HandlerThread.java:139)
+11-08 09:26:45.605 D/ActivityManager( 6269): freezing 9786 com.google.android.partnersetup
+11-08 09:26:45.690 W/dex2oat64(10466): Compilation of cr cs.a(az) took 836.503ms
+11-08 09:26:45.691 W/dex2oat64(10466): Compilation of java.lang.Object crx.a(java.lang.Object, java.lang.Object) took 847.487ms
+11-08 09:26:45.692 W/dex2oat64(10466): Compilation of long crk.d(int) took 849.397ms
+11-08 09:26:45.694 W/dex2oat64(10466): Compilation of boolean crc.g() took 848.245ms
+11-08 09:26:45.780 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-08 09:26:45.816 D/InetDiagMessage( 6269): Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-08 09:26:45.818 W/Looper  ( 6269): Drained
+11-08 09:26:45.822 D/InetDiagMessage( 6269): Destroyed live tcp sockets for uids={10156} in 55ms
+11-08 09:26:45.826 I/HalDevMgr( 6269): bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-08 09:26:45.840 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.841 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.841 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.841 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.841 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.841 W/GmsClient( 7706): mServiceBroker is null, client disconnected
+11-08 09:26:45.899 I/Checkin ( 7706): [CheckinApiChimeraService] onGetService
+11-08 09:26:45.910 I/Finsky:background( 8342): [160] DSC::L: Update all listeners for download <27:RUNNING:25%[25%]> in group com.google.android.gms:i5oQKNQYT4S0hLHLkkNStA
+11-08 09:26:45.911 I/Finsky:background( 8342): [160] DSC::L: Updating listener DownloadServiceManagerListener::amrb@e500b9b for download <27:RUNNING:25%[25%]>
+11-08 09:26:45.911 I/Finsky:background( 8342): [160] DS: Received onProgress request_id=27
+11-08 09:26:45.919 I/Finsky:background( 8342): [160] RM: receive resource status onProgress download_request_id=27, group_id=com.google.android.gms.apk reason: auto_update isid: i5oQKNQYT4S0hLHLkkNStA, status_code=RESOURCE_STATUS_IN_PROGRESS, legacy_status_code=192, size: 19593324/76455089
+11-08 09:26:45.924 I/Finsky:background( 8342): [160] DSC::L: Updating listener DownloadServiceManagerListener::rzy@319a820 for download <27:RUNNING:25%[25%]>
+11-08 09:26:45.924 I/Finsky:background( 8342): [160] DSC::L: Updating listener ucj@be685d9 for download <27:RUNNING:25%[25%]>
+11-08 09:26:45.924 I/Finsky:background( 8342): [160] DS::IDC: updateWith: <27:RUNNING:25%[25%]>
+11-08 09:26:46.001 I/Finsky:background( 8342): [59] RM: getStatus resourceRequestId=f6706618-14e5-4534-951c-15c0ffbeb50d requestId=27 package=com.google.android.gms artifact=com.google.android.gms.apk isid=i5oQKNQYT4S0hLHLkkNStA
+11-08 09:26:46.002 I/Finsky:background( 8342): [59] DSC: reviveDownload(27)
+11-08 09:26:46.027 I/Finsky:background( 8342): [59] DS: reviveDownload(request_id=27)
+11-08 09:26:46.030 I/Finsky:background( 8342): [160] DS: DS: onReviveDownload(request_id=27, files_to_download=[com.google.android.gms.apk(size:76455089)], context[group_id=com.google.android.gms:i5oQKNQYT4S0hLHLkkNStA], display_data[invisible=true, title=Play support libraries update], network_restrictions=ANY_NETWORK status=running, bytes_downloaded=19593324, total_bytes=76455089, retry[count=0, next_retry=n/a])
+11-08 09:26:46.044 I/Finsky:background( 8342): [2] RF: onProgress request_id=27 isid=i5oQKNQYT4S0hLHLkkNStA
+11-08 09:26:46.045 I/Finsky:background( 8342): [2] RF: resourceStatus for request_id=27 group=com.google.android.gms artifact=com.google.android.gms.apk collectedBytes= 19593324 / 76455089
+11-08 09:26:46.054 I/Finsky:background( 8342): [2] RF: Group=com.google.android.gms totalBytesDownloaded= 33332245 / 90194010 for 20 artifacts
+11-08 09:26:46.091 I/Finsky:background( 8342): [2] Updated time lastBroadcast=2026-11-08T07:26:41.762Z current=2026-11-08T07:26:46.091Z
+11-08 09:26:46.104 I/Finsky:background( 8342): [2] bytesCompleted/bytesTotal/ratio = 33332245 / 90194010 / 0.369562
+11-08 09:26:46.162 W/dex2oat64(10466): Compilation of void dch.d(ink, knc, cjqq, boolean, java.util.Map, ksk, int, boolean, int, int, kva, kzw, ebu, cjqq, hsb, int, int) took 101.534ms
+11-08 09:26:46.166 W/.mobile.maestro(10418): Suspending all threads took: 12.396ms

@@ -8,7 +8,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use fleet_maestro::{bundle, junit, log, stdout};
+use fleet_maestro::{
+    bundle,
+    invocation::{parse, requested_html_report},
+    junit, log, stdout,
+};
 use serde_json::{Value, json};
 
 fn fixtures_root() -> PathBuf {
@@ -198,7 +202,7 @@ fn every_fixture_parses() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     names.sort();
-    assert_eq!(names.len(), 29, "{names:?}");
+    assert_eq!(names.len(), 35, "{names:?}");
     for name in names {
         let dir = fixtures_root().join(&name);
         let debug = dir.join("run/debug");
@@ -210,5 +214,47 @@ fn every_fixture_parses() {
             "report": parse_report(&dir.join("run/report.xml")),
         });
         insta::assert_json_snapshot!(name, summary);
+    }
+}
+
+/// Each captured HTML run names, through `requested_html_report` on its own command line, the file
+/// the capture holds: at `--output` when there is one, and otherwise at Maestro's default
+/// `report.html` in its working directory (the default-path captures run Maestro from `run/`).
+#[test]
+fn the_html_report_a_command_names_is_the_file_maestro_wrote() {
+    for name in [
+        "html-report",
+        "html-report-default-path",
+        "html-detailed",
+        "html-detailed-default-path",
+        "html-test-output-dir",
+        "html-no-debug-flags",
+    ] {
+        let dir = fixtures_root().join(name);
+        let meta: Value =
+            serde_json::from_str(&fs::read_to_string(dir.join("meta.json")).unwrap()).unwrap();
+        let command: Vec<String> = meta["command"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        // The default-path captures run Maestro through `sh -c 'cd … && exec "$@"'`: its argv
+        // starts at the Maestro binary.
+        let maestro = command
+            .iter()
+            .position(|a| a.ends_with("/maestro"))
+            .unwrap();
+        let named = requested_html_report(&parse(&command[maestro..]))
+            .unwrap_or_else(|| panic!("{name}: no HTML report named"));
+        let file = match named.strip_prefix("<CAPTURE>/") {
+            Some(rel) => dir.join(rel),
+            None => dir.join("run").join(&named),
+        };
+        assert!(
+            file.is_file(),
+            "{name}: {named} is not in the capture ({})",
+            file.display()
+        );
     }
 }
