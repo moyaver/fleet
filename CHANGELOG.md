@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Dashboard: a failure's *First seen* date shows beside its triage state on the flow page and in the history (#84).
+- Dashboard: every live page (overview, pipeline, flow, runner and device) has one polite status region that reads run events out in batches, at most once every five seconds: a run starting or ending, a flow failing or being interrupted, a pipeline's verdict changing. Log lines and counts are never read out (#149).
 - Agent: each emulator's `qemu-system-*` process is matched to its serial by its console port, and its CPU and resident memory are sent with the device's samples (`emu_cpu_pct`, `emu_rss_bytes`, #39).
 - Agent: device samples carry the AVD name and the API level, and the resumed activity of a device on which a flow failed (#39). The server stores them in `device_samples` (migration 0019).
 - Dashboard: an *Active emulators* tile on the overview counts emulators seen in the last two minutes that adb reports online (#123).
@@ -24,6 +26,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Docs: the operator guide's Upgrades section covers backups before an upgrade, forward-only migrations and their checksums, agent and server protocol versions, rollback by restore, and how to rehearse an upgrade.
 - Tooling: `cargo xtask upgrade-rehearsal` exports each release tag's migrations from git, seeds rows under each release's schema, migrates to the current tree and checks that the rows and the current read paths survive (`crates/fleet-store/tests/upgrade.rs`). CI runs it on every push and pull request.
+
+### Changed
+
+- Dashboard: the *Active emulators* tile sits beside the runners on the overview, not in the readout strip (#123).
+- Dashboard: a pipeline whose flow failed reads *Failed* while its jobs are still running; the verdict follows its flows (#149).
+- Dashboard: the status words follow one vocabulary. *Completed* replaces *Finished*, *Closed* and a job's closed lifecycle without an outcome; *Interrupted* replaces *Cancelled*; *Running* covers starting, finalizing and reporting; *Not started* replaces *No jobs yet* (#149).
+- Dashboard: a settled result carries no provenance badge of its own. Rows mark only *Provisional*, *Inferred*, *Missing* and *Stale* values; each page or section states *Verified* or *Observed* once (#149).
+- Dashboard: on a phone the top bar shows the brand mark and the live indicator. The pages, the project and the account are behind the ⋯ button (#149).
+- Dashboard: the sign-in prompt and error notices are hairline-ruled rather than bordered boxes, and so is the log viewer (#149).
 
 ### Fixed
 
