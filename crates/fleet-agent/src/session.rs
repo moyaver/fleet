@@ -690,6 +690,8 @@ impl Session {
 
     /// The flow a step line belongs to. An end can arrive after a later flow's stdout result (the
     /// log lags stdout), so an end goes to the newest started flow that still holds this step open.
+    /// A step line can also arrive after its own flow's stdout result, when no flow is open: it
+    /// still belongs to the newest started flow on its shard (issue #148).
     fn step_flow(&self, shard: u32, description: &str, state: log::StepState) -> Option<usize> {
         if state != log::StepState::Running {
             let holder = self.flows.iter().rposition(|f| {
@@ -701,7 +703,11 @@ impl Session {
                 return holder;
             }
         }
-        self.open_flow(shard, None)
+        self.open_flow(shard, None).or_else(|| {
+            self.flows
+                .iter()
+                .rposition(|f| f.shard == shard && f.started)
+        })
     }
 
     fn on_stdout(&mut self, at: ClockSample, line: &str) {
@@ -2618,5 +2624,27 @@ mod tests {
                 "{name} says why"
             );
         }
+    }
+
+    /// A step line that arrives after its own flow's stdout result still belongs to that flow, which
+    /// the log-lags-stdout case needs (issue #148).
+    #[test]
+    fn a_step_line_after_its_flows_result_still_belongs_to_that_flow() {
+        const SUITE: &str = "maestro.cli.runner.TestSuiteInteractor";
+        const CONSOLE: &str = "maestro.cli.runner.CliConsoleListener";
+        let mut s = fresh_session();
+        log_line(&mut s, SUITE, "Running flow A");
+        s.observe(at(), Observation::Stdout("[Passed] A (1s)".into()));
+        log_line(&mut s, CONSOLE, "Tap on \"X\" RUNNING");
+        log_line(&mut s, CONSOLE, "Tap on \"X\" COMPLETED");
+        let a = s.flows[0].id;
+        let events = s.drain();
+        let started: Vec<_> = events.iter().filter(|e| e.kind == "step.started").collect();
+        assert_eq!(started.len(), 1, "the late RUNNING is kept: {events:?}");
+        assert_eq!(started[0].subject.flow_execution_id, Some(a));
+        let ended: Vec<_> = events.iter().filter(|e| e.kind == "step.ended").collect();
+        assert_eq!(ended.len(), 1, "and its end pairs with it: {events:?}");
+        assert_eq!(ended[0].subject.flow_execution_id, Some(a));
+        assert_eq!(ended[0].subject.step.as_ref().map(|r| r.index), Some(0));
     }
 }
