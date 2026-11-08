@@ -1777,3 +1777,58 @@ async fn a_final_file_settles_the_rows_it_covers_and_creates_none(pool: PgPool) 
         "an uncovered step stays provisional"
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_in_log_text_is_stored_redacted_though_the_agent_sent_it_raw(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("110", "e2e");
+    let opened = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap();
+    // A GitHub token shape in the failure message and the step text, sent unredacted.
+    let token = "ghp_0123456789abcdefghijABCDEFGHIJ012345";
+    let line = format!("tap {token} failed");
+    let scripted = [Script {
+        name: "checkout",
+        failure: Some(&line),
+        failed_step: Some(&line),
+    }];
+    let events = suite_run_scripted(&mut a, SuiteIds::new(), &scripted);
+    let applied = store.apply_batch(&opened.handle, &events).await.unwrap();
+    assert!(applied.rejected.is_empty(), "{:?}", applied.rejected);
+    let message: Option<String> =
+        sqlx::query_scalar("SELECT failure_message FROM flow_executions WHERE agent_run_id = $1")
+            .bind(opened.handle.agent_run_id)
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+    assert_eq!(message.as_deref(), Some("tap [REDACTED] failed"));
+    let labels: Vec<String> = sqlx::query_scalar(
+        "SELECT st.label FROM step_executions st
+           JOIN flow_executions f ON f.id = st.flow_execution_id
+          WHERE f.agent_run_id = $1",
+    )
+    .bind(opened.handle.agent_run_id)
+    .fetch_all(store.pool())
+    .await
+    .unwrap();
+    assert!(
+        !labels.is_empty() && labels.iter().all(|l| !l.contains(token)),
+        "{labels:?}"
+    );
+    let journal: Vec<String> =
+        sqlx::query_scalar("SELECT data::text FROM agent_events WHERE agent_run_id = $1")
+            .bind(opened.handle.agent_run_id)
+            .fetch_all(store.pool())
+            .await
+            .unwrap();
+    assert!(
+        journal.iter().all(|d| !d.contains(token)),
+        "the journal kept the token"
+    );
+}
