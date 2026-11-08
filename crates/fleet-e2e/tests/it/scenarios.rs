@@ -36,6 +36,40 @@ async fn attempt(stack: &Stack, run_id: &str) -> Value {
         .await
 }
 
+/// Waits (up to 30 s) until the run's agents have committed at least `at_least` events in total,
+/// as the attempt snapshot shows them. Returns early only on that observable state.
+async fn await_commits(stack: &Stack, run_id: &str, at_least: u64) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let attempts = stack.get("/api/v1/projects/app/attempts?limit=500").await;
+        let found = attempts
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["run_key"] == format!("loadgen/app:{run_id}"))
+            .and_then(|a| a["id"].as_str().map(str::to_owned));
+        if let Some(id) = found {
+            let snap = stack
+                .get(&format!("/api/v1/projects/app/attempts/{id}"))
+                .await;
+            let committed: u64 = snap["agent_runs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|r| r["committed_seq"].as_u64())
+                .sum();
+            if committed >= at_least {
+                return;
+            }
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{run_id}: fewer than {at_least} events committed 30 s into the run"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
 /// Everything the server holds matches what every agent sent, run by run.
 fn verify(report: &Report, snap: &Value, devices: u32, per_device: u32) {
     let runs: BTreeMap<String, &Value> = snap["agent_runs"]
@@ -184,7 +218,8 @@ async fn a_server_restart_mid_run_loses_no_committed_event() {
         ..opts(&stack, "restart")
     };
     let load = tokio::spawn(fleet_loadgen::run(o));
-    tokio::time::sleep(Duration::from_millis(800)).await;
+    // Restart only once events are committed, so the restart lands mid-run, not before the run.
+    await_commits(&stack, "restart", 20).await;
     stack.restart().await;
     let report = load.await.unwrap().unwrap();
     assert!(
