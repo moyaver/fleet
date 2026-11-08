@@ -11,7 +11,7 @@ use fleet_protocol::rest::TimelineView;
 use fleet_ui::{
     charts::{series::Series, view::TimeSeriesChart},
     components::{
-        display::{EmptyState, ProvenanceBadge, RowProvenance, Skeleton},
+        display::{EmptyState, ProvenanceBadge, RowProvenance, Skeleton, TableBox},
         forms::DateTimeRange,
     },
     provenance::Provenance,
@@ -26,6 +26,7 @@ use crate::{
     remote::Remote,
     screens::{
         common::Fact,
+        device::model::ReadingRow,
         metrics::{ChartBody, Latest, MetricChart, MetricsPanel, RangePreset, RangeSelection},
         timeline::{TimelineScope, timeline_data},
     },
@@ -353,5 +354,53 @@ pub fn TimelineSection(
                 }
             }}
         </section>
+    }
+}
+
+/// The readings of a newest sample as a table: each row its value, or the Missing mark beside the
+/// reason the agent gave (PLAN §6.5). Used by the device and the runner pages.
+#[component]
+pub fn ReadingsTable(
+    /// The rows, in the order the agent reports them.
+    rows: Vec<ReadingRow>,
+    /// The table's accessible name.
+    label: &'static str,
+    /// What the table's caption says to a screen reader.
+    caption: &'static str,
+    /// The `data-testid` of each row.
+    testid: &'static str,
+) -> impl IntoView {
+    view! {
+        <TableBox label=label>
+            <table class="tbl tbl-cards">
+                <caption class="sr-only">{caption}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">"Reading"</th>
+                        <th scope="col">"Value"</th>
+                    </tr>
+                </thead>
+                <tbody>{rows.into_iter().map(|r| reading_row(r, testid)).collect_view()}</tbody>
+            </table>
+        </TableBox>
+    }
+}
+
+fn reading_row(r: ReadingRow, testid: &'static str) -> impl IntoView {
+    let value = match (r.value, r.reason) {
+        (Some(v), _) => view! { <span>{v}</span> }.into_any(),
+        (None, reason) => view! {
+            <span class="flex flex-wrap items-center gap-2">
+                <RowProvenance provenance=Signal::stored(Provenance::Missing) />
+                <span class="text-muted">{reason.unwrap_or_default()}</span>
+            </span>
+        }
+        .into_any(),
+    };
+    view! {
+        <tr data-testid=testid>
+            <td data-label="Reading">{r.label}</td>
+            <td data-label="Value">{value}</td>
+        </tr>
     }
 }

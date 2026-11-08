@@ -24,11 +24,13 @@ use crate::{
         common::Ctx,
         device::model::DeviceSessionRow,
         metrics::{MetricsPanel, RangeSelection},
-        parts::{Fetched, MetricsCharts, PillView, RangePicker, TimelineSection, loaded},
+        parts::{
+            Fetched, MetricsCharts, PillView, RangePicker, ReadingsTable, TimelineSection, loaded,
+        },
         timeline::TimelineScope,
         worker::model::{
-            CHARTED, HealthCell, HealthValue, NextPage, RunRow, RunsList, WorkerHeader,
-            device_rows, health_cells,
+            CHARTED, HealthCell, HealthValue, HostSample, HostSampleView, NextPage, RunRow,
+            RunsList, WorkerHeader, device_rows, health_cells,
         },
     },
 };
@@ -94,11 +96,18 @@ pub fn WorkerPage(
             .get()
             .map(|w| health_cells(&w, panel.read().as_ref()))
     });
+    let host_sample = Memo::new(move |_| {
+        worker
+            .data
+            .get()
+            .map(|w| HostSample::build(&w, &ctx.read()))
+    });
     view! {
         <article class="stack" aria-labelledby="worker-title" data-testid="worker-page">
             <ErrorNotice error=worker_error />
             <HeaderView header=header />
             <HealthCard health=health />
+            <HostSampleCard sample=host_sample />
             <section class="card" aria-labelledby="charts-title">
                 <div class="card-h"><h2 id="charts-title">"Machine health over time"</h2></div>
                 <div class="card-b space-y-4">
@@ -207,6 +216,41 @@ fn HealthCard(
         })
     };
     view! { <Card title="Health now">{body}</Card> }
+}
+
+/// The runner's newest host sample: when it was taken, then each reading. A reading the agent did
+/// not take shows the Missing mark and the reason in words.
+#[component]
+fn HostSampleCard(
+    /// The newest sample, once the runner is loaded.
+    sample: Memo<Option<HostSample>>,
+) -> impl IntoView {
+    let body = move || {
+        sample.get().map(|s| match s {
+            HostSample::Taken(HostSampleView {
+                taken,
+                provenance,
+                rows,
+            }) => view! {
+                <p class="pv-statement">
+                    <ProvenanceBadge provenance=Signal::stored(provenance) />
+                    <span>{taken}</span>
+                </p>
+                <ReadingsTable
+                    rows=rows
+                    label="Readings of the newest host sample"
+                    caption="Readings of the runner's newest host sample"
+                    testid="host-reading"
+                />
+            }
+            .into_any(),
+            HostSample::NoSample => view! {
+                <EmptyState title="No sample in the last hour" description="The agent samples the machine every 5 seconds while it is connected." />
+            }
+            .into_any(),
+        })
+    };
+    view! { <Card title="Newest host sample">{body}</Card> }
 }
 
 fn health_cell(cell: HealthCell) -> impl IntoView {
