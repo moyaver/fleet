@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT b.id, p.slug AS \"project?\", COALESCE(u.display_name, u.email, u.oidc_subject) AS \"user!\",\n                      b.role AS \"role!\", b.created_at\n                 FROM role_bindings b\n                 JOIN users u ON u.id = b.user_id\n                 LEFT JOIN projects p ON p.id = b.project_id\n                ORDER BY p.slug NULLS FIRST, u.oidc_subject, b.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "role_bindings",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "project?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "user!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "role!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "role_bindings",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "role_bindings",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "ce3afbdc2eaf8ef5d4154182ffea07a7157c754e4c02f15e9989bfcc84bdbf2c"
+}

@@ -16,11 +16,14 @@
 //! - [`screens`]: the queries behind the dashboard's screens A–D (overview, timeline, worker and
 //!   device detail, flow investigation).
 //! - [`sweep`]: leader-only liveness sweeps (detach silent runs, abandon expired ones).
+//! - [`admin`]: Screen G's read queries (projects, trust, keys, roles, retention, agents,
+//!   ingestion health, audit history).
 //!
 //! Invariants upheld here: I3 (only the claim lattice decides a flow's outcome, and a `CHECK`
 //! constraint refuses a passed claim from an inferred source) and I5 (gaps are recorded in
 //! `ingest_gaps`, never silent). No `sqlx` type crosses this crate's API.
 
+pub mod admin;
 pub mod artifacts;
 pub mod auth;
 pub mod catalog;

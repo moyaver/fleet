@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ingest_gaps (agent_run_id, stream, from_seq, to_seq, reason)\n             VALUES ($1, 'telemetry', 4, 7, 'spool full')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "883a791a95f546d54bcc372352904089a42909f3dac12816ca165f3b7ca85893"
+}

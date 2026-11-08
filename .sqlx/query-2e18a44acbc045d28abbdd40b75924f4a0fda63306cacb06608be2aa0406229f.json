@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT agent_version AS \"agent_version!\", protocol_version::int AS \"protocol_version!\",\n                      count(*) AS \"runs!\",\n                      count(*) FILTER (WHERE state IN ('active', 'detached', 'finalizing')) AS \"open_runs!\",\n                      max(started_at) AS \"last_started_at!\"\n                 FROM agent_runs\n                GROUP BY agent_version, protocol_version\n                ORDER BY max(started_at) DESC, agent_version, protocol_version",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "agent_version!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "agent_version"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "protocol_version!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "runs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "open_runs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_started_at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "2e18a44acbc045d28abbdd40b75924f4a0fda63306cacb06608be2aa0406229f"
+}

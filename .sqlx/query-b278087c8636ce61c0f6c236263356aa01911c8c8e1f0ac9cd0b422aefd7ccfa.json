@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.slug AS \"project!\", j.agent_run_id, r.agent_version, j.seq, j.code,\n                      j.message, j.rejected_at\n                 FROM ingest_rejections j\n                 JOIN agent_runs r ON r.id = j.agent_run_id\n                 JOIN projects p ON p.id = r.project_id\n                ORDER BY j.rejected_at DESC, j.agent_run_id, j.seq DESC\n                LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "project!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ingest_rejections",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "agent_version"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ingest_rejections",
+            "name": "seq"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ingest_rejections",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ingest_rejections",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "rejected_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ingest_rejections",
+            "name": "rejected_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "b278087c8636ce61c0f6c236263356aa01911c8c8e1f0ac9cd0b422aefd7ccfa"
+}

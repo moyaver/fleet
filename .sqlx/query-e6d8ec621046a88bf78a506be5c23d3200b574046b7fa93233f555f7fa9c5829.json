@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO publisher_trust_policies (project_id, name, issuer, audience,\n                 repository_id, repository_owner_id, trusted_refs)\n             VALUES ($1, 'main', 'https://token.actions.githubusercontent.com', 'fleet', '1', '2',\n                     '{refs/heads/main}')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e6d8ec621046a88bf78a506be5c23d3200b574046b7fa93233f555f7fa9c5829"
+}
