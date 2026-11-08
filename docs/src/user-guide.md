@@ -205,6 +205,29 @@ The agent passes the plan's workspace config to Maestro, so `executionOrder` and
 
 The pipeline page shows each shard's planned time against its actual time (first flow start to last flow end), and the slowest shard against an equal-count split of the same flows by the same estimates. The plan manifest records that baseline; plans published before it existed show no comparison.
 
+## Rerunning failed flows
+
+A failed flow's page (screen D) and its row in the history (screen E) give the Maestro command that runs that flow again. The command is the one the run used, with its flow's own path last, for example `maestro test --device emulator-5554 'flows/login.yaml'`. Copy it from the page (the button, or select the text), then run it in a checkout of the same repository. Fleet never runs it.
+
+What the command leaves out, and why:
+
+- **Env flags** (`-e`, `--env`) keep their name and show their value as `[REDACTED]`. Fleet never shows an env value, even a short one, so put your own value in before you run the command.
+- **Flags Fleet doesn't recognise** are left out, and the page names them (`Left out of the command: --api-key`). Their values are never read or shown; add them yourself if the flow needs them.
+- **Output locations and selection** (`--format`, `--output`, `--debug-output`, `--test-output-dir`, sharding, tag filters, `-c`) are dropped. They describe how the run wrote its files and chose its flows, and a rerun of one flow needs neither.
+- `--device`, `--udid`, `-p`/`--platform` and `--config` keep their values; `--verbose` and `--no-ansi` are kept as they are.
+
+A command is given only when the run's command line is a `maestro test`, and the flow has a repository path. Otherwise the page says why instead of showing a command. A run from an agent older than this feature recorded no command, and its flows say so.
+
+To rerun every failed flow of an attempt, download its **failed flows** manifest. It is on the flow page, in the history rows of failed flows, and on the pipeline page under *Failures*. The manifest is a [plan](#fleet-planner-shards): one shard per run that had a failed flow, listing that run's failed flows once each, in run order. Each job of the rerun takes its own shard, as the original jobs did:
+
+```bash
+fleet-agent run --plan fleet-rerun-<attempt>.json --shard 0 -- maestro test
+```
+
+The manifest has no workspace config, because its digest can't be known from the run. If the original run passed `--config`, add the same `--config` after `maestro test`; the flow's command shows it. The download answers `404` when the attempt has no failed flow, and `409` when a failed flow has no repository path: a manifest that leaves a failed flow out would rerun fewer flows than failed, so Fleet refuses to write one and names the flows.
+
+The data comes from `GET /api/v1/projects/{project}/attempts/{attempt}/failed-flows`, which any reader of the project may call.
+
 ## Example workflow
 
 See [`examples/github-actions/fleet-agent.yml`](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent.yml).
