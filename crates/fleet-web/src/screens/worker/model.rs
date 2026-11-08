@@ -4,13 +4,14 @@
 //! A value the agent doesn't report is a [`Fact`] with no value ("Not reported"), and a host
 //! sample that is too old to trust turns stale instead of passing for current (invariant I4).
 
-use fleet_protocol::rest::{
-    MetricReading, WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
+use fleet_protocol::{
+    live::Liveness,
+    rest::{MetricReading, WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView},
 };
 use fleet_ui::{
     charts::format::{Unit, format_duration},
     mark::Mark,
-    provenance::{Provenance, STALE_AFTER_MS},
+    provenance::Provenance,
 };
 use uuid::Uuid;
 
@@ -19,7 +20,7 @@ use crate::{
     format::time_of_day,
     paths::pipeline_href,
     screens::{
-        common::{Ctx, Fact},
+        common::{Ctx, Fact, sample_freshness},
         device::model::{DeviceSessionRow, ReadingRow, format_value},
         metrics::{Latest, MetricsPanel},
     },
@@ -63,9 +64,11 @@ pub struct WorkerHeader {
 }
 
 impl WorkerHeader {
-    /// The header of `view`, with times in the viewer's zone.
+    /// The header of `view`, with times in the viewer's zone. `updating` says whether the page is
+    /// receiving updates: while it is not, an online runner may have gone quiet, so it reads
+    /// Stale rather than Online, and the sample is stale (issue #149).
     #[must_use]
-    pub fn build(view: &WorkerView, ctx: &Ctx) -> Self {
+    pub fn build(view: &WorkerView, ctx: &Ctx, updating: bool) -> Self {
         let w = &view.worker;
         let title = w.runner_name.clone().unwrap_or_else(|| {
             let id = w.id.simple().to_string();
@@ -80,9 +83,13 @@ impl WorkerHeader {
             Fact::maybe("Memory", memory),
         ];
         let at = w.latest.as_ref().map(|l| unix_ms(l.at));
+        let liveness = match (w.liveness, updating) {
+            (Some(Liveness::Online), false) => Some(Liveness::Stale),
+            (liveness, _) => liveness,
+        };
         Self {
             title,
-            liveness: liveness_pill(w.liveness),
+            liveness: liveness_pill(liveness),
             sampled: at.map(|at| {
                 format!(
                     "sampled {}, {}",
@@ -91,7 +98,7 @@ impl WorkerHeader {
                 )
             }),
             provenance: at.map_or(Provenance::Missing, |at| {
-                Provenance::Observed.displayed(ctx.age_ms(at), STALE_AFTER_MS)
+                sample_freshness(ctx.age_ms(at), updating)
             }),
             meta: facts
                 .iter()
@@ -127,16 +134,16 @@ pub enum HostSample {
 }
 
 impl HostSample {
-    /// The newest host sample in `view`.
+    /// The newest host sample in `view`; `updating` as for [`WorkerHeader::build`].
     #[must_use]
-    pub fn build(view: &WorkerView, ctx: &Ctx) -> Self {
+    pub fn build(view: &WorkerView, ctx: &Ctx, updating: bool) -> Self {
         let Some(latest) = view.worker.latest.as_ref() else {
             return Self::NoSample;
         };
         let at = unix_ms(latest.at);
         Self::Taken(HostSampleView {
             taken: format!("sampled {}", ctx.ago(at)),
-            provenance: Provenance::Observed.displayed(ctx.age_ms(at), STALE_AFTER_MS),
+            provenance: sample_freshness(ctx.age_ms(at), updating),
             rows: latest
                 .readings
                 .iter()
@@ -463,7 +470,7 @@ mod tests {
 
     #[test]
     fn the_header_names_the_machine_and_says_when_it_was_sampled() {
-        let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:00Z"));
+        let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:00Z"), true);
         assert_eq!(h.title, "mac-mini-3");
         assert_eq!(
             (h.liveness.label, h.liveness.mark),
@@ -482,7 +489,7 @@ mod tests {
         v.worker.arch = None;
         v.worker.liveness = None;
         v.worker.latest = None;
-        let h = WorkerHeader::build(&v, &ctx("2026-01-01T11:00:00Z"));
+        let h = WorkerHeader::build(&v, &ctx("2026-01-01T11:00:00Z"), true);
         assert_eq!(h.title, "Worker 00000000");
         assert_eq!(h.liveness.label, "Unknown");
         assert_eq!(h.sampled, None, "no sample, no sampled line");
@@ -579,9 +586,34 @@ mod tests {
     #[test]
     fn an_old_host_sample_is_stale_not_current() {
         // 25 s without an update is stale (fleet_ui::provenance::STALE_AFTER_MS).
-        let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:20Z"));
+        let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:20Z"), true);
         assert_eq!(h.provenance, Provenance::Stale);
         assert_eq!(h.sampled.as_deref(), Some("sampled 10:59:55, 25 s ago"));
+    }
+
+    #[test]
+    fn a_runner_whose_page_is_not_updating_reads_stale_not_online() {
+        // The socket is reconnecting: the liveness and the sample it showed may have changed.
+        let mut v = view(WORKER);
+        v.worker.liveness = Some(fleet_protocol::live::Liveness::Online);
+        let c = ctx("2026-01-01T11:00:02Z");
+        let h = WorkerHeader::build(&v, &c, false);
+        assert_eq!(h.liveness.label, "Stale");
+        assert_eq!(h.provenance, Provenance::Stale);
+        assert!(matches!(
+            HostSample::build(&v, &c, false),
+            HostSample::Taken(s) if s.provenance == Provenance::Stale
+        ));
+        // A runner that has ended keeps its word, and a page that is updating shows the sample's age.
+        v.worker.liveness = Some(fleet_protocol::live::Liveness::Completed);
+        assert_eq!(
+            WorkerHeader::build(&v, &c, false).liveness.label,
+            "Completed"
+        );
+        assert_eq!(
+            WorkerHeader::build(&v, &c, true).provenance,
+            Provenance::Observed
+        );
     }
 
     /// The newest host sample lists each reading the agent reports, with its value or the reason it
@@ -600,7 +632,8 @@ mod tests {
             readings[6].reason =
                 Some("the kernel has no pressure information (PSI), as on macOS".to_owned());
         }
-        let HostSample::Taken(sample) = HostSample::build(&v, &ctx("2026-01-01T11:00:00Z")) else {
+        let HostSample::Taken(sample) = HostSample::build(&v, &ctx("2026-01-01T11:00:00Z"), true)
+        else {
             panic!("the worker was sampled a minute ago");
         };
         assert_eq!(sample.taken, "sampled 5 s ago");
@@ -636,7 +669,7 @@ mod tests {
 
         v.worker.latest = None;
         assert_eq!(
-            HostSample::build(&v, &ctx("2026-01-01T11:00:00Z")),
+            HostSample::build(&v, &ctx("2026-01-01T11:00:00Z"), true),
             HostSample::NoSample,
             "no sample in the last hour, so no card rows"
         );

@@ -45,6 +45,10 @@ pub fn DevicePage(
     /// The viewer's offset from UTC in minutes.
     #[prop(default = 0)]
     utc_offset_minutes: i32,
+    /// Whether the page is receiving updates over its live socket. While it is not, what it shows
+    /// may have changed, so the values that updates refresh read as stale.
+    #[prop(into, default = Signal::stored(true))]
+    updating: Signal<bool>,
     /// The cursor time the charts share; the page makes one when unset.
     #[prop(optional)]
     cursor: Option<RwSignal<Option<i64>>>,
@@ -64,7 +68,7 @@ pub fn DevicePage(
         device
             .data
             .get()
-            .map(|d| DeviceHeader::build(&d, &ctx.read()))
+            .map(|d| DeviceHeader::build(&d, &ctx.read(), updating.get()))
     });
     let panel = Memo::new(move |_| {
         metrics
@@ -82,7 +86,7 @@ pub fn DevicePage(
                     |d| {
                         let ctx = ctx.get_untracked();
                         let execution = ExecutionDetails::build(&d, &ctx);
-                        let readings = ReadingsView::build(&d, &ctx);
+                        let readings = ReadingsView::build(&d, &ctx, updating.get());
                         let flows = FlowRows::build(&d, &ctx);
                         view! {
                             <NowCard execution=execution />
@@ -206,7 +210,13 @@ fn ReadingsSection(
     /// The newest sample, if the agent has sampled the device.
     readings: Option<ReadingsView>,
 ) -> impl IntoView {
-    let Some(ReadingsView { taken, shard, rows }) = readings else {
+    let Some(ReadingsView {
+        taken,
+        provenance,
+        shard,
+        rows,
+    }) = readings
+    else {
         return view! {
             <Card title="Newest sample">
                 <EmptyState title="No sample yet" description="The agent samples a device every 30 seconds while Maestro drives it." />
@@ -221,7 +231,7 @@ fn ReadingsSection(
     view! {
         <Card title="Newest sample">
             <p class="pv-statement">
-                <ProvenanceBadge provenance=Signal::stored(Provenance::Observed) />
+                <ProvenanceBadge provenance=Signal::stored(provenance) />
                 <span>{statement}</span>
             </p>
             <ReadingsTable

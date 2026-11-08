@@ -1482,6 +1482,7 @@ dependencies = [
  "console_error_panic_hook",
  "fleet-protocol",
  "fleet-ui",
+ "futures-channel",
  "futures-util",
  "gloo-net 0.7.0",
  "gloo-timers",

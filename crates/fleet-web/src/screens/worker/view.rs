@@ -61,6 +61,10 @@ pub fn WorkerPage(
     /// The viewer's offset from UTC in minutes.
     #[prop(default = 0)]
     utc_offset_minutes: i32,
+    /// Whether the page is receiving updates over its live socket. While it is not, the runner's
+    /// liveness and its host sample read as stale, since they may have changed.
+    #[prop(into, default = Signal::stored(true))]
+    updating: Signal<bool>,
     /// The cursor time shared by the charts and the timeline; the page makes one when unset.
     #[prop(optional)]
     cursor: Option<RwSignal<Option<i64>>>,
@@ -82,7 +86,7 @@ pub fn WorkerPage(
         worker
             .data
             .get()
-            .map(|w| WorkerHeader::build(&w, &ctx.read()))
+            .map(|w| WorkerHeader::build(&w, &ctx.read(), updating.get()))
     });
     let panel = Memo::new(move |_| {
         metrics
@@ -100,7 +104,7 @@ pub fn WorkerPage(
         worker
             .data
             .get()
-            .map(|w| HostSample::build(&w, &ctx.read()))
+            .map(|w| HostSample::build(&w, &ctx.read(), updating.get()))
     });
     view! {
         <article class="stack" aria-labelledby="worker-title" data-testid="worker-page">
