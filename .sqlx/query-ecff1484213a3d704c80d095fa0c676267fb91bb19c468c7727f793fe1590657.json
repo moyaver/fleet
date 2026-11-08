@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT sample_interval_ms, pressure_sample_interval_ms FROM projects\n              WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sample_interval_ms",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "sample_interval_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "pressure_sample_interval_ms",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "pressure_sample_interval_ms"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "ecff1484213a3d704c80d095fa0c676267fb91bb19c468c7727f793fe1590657"
+}

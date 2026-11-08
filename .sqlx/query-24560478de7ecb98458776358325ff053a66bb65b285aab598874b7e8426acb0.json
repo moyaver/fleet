@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT class, accepted, max_bytes FROM project_artifact_classes\n              WHERE project_id = $1 ORDER BY class",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "class",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "project_artifact_classes",
+            "name": "class"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "accepted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "project_artifact_classes",
+            "name": "accepted"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "max_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "project_artifact_classes",
+            "name": "max_bytes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "24560478de7ecb98458776358325ff053a66bb65b285aab598874b7e8426acb0"
+}

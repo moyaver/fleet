@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT slug, name FROM projects WHERE id = $1 FOR UPDATE",
+  "query": "SELECT slug, name, source FROM projects WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -24,6 +24,17 @@
             "name": "name"
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "source"
+          }
+        }
       }
     ],
     "parameters": {
@@ -33,8 +44,9 @@
     },
     "nullable": [
       false,
+      false,
       false
     ]
   },
-  "hash": "edf75c3bc6bd6353a94f6bd9fd00ab1f6f63e2ff52f3097e0626ea51efec99bb"
+  "hash": "701e58243b74125a48cc26cbf42356d816a2de709eba68adc860f75cf414629a"
 }

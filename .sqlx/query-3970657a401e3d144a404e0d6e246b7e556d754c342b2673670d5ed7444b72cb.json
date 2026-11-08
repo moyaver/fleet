@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.id, p.slug, p.name, p.default_branch, p.created_at, p.archived_at,\n                      (SELECT count(*) FROM api_keys k\n                        WHERE k.project_id = p.id AND k.revoked_at IS NULL\n                          AND (k.expires_at IS NULL OR k.expires_at > now())) AS \"active_api_keys!\",\n                      (SELECT count(*) FROM publisher_trust_policies t\n                        WHERE t.project_id = p.id AND t.revoked_at IS NULL) AS \"active_trust_policies!\"\n                 FROM projects p ORDER BY p.slug",
+  "query": "SELECT p.id, p.slug, p.name, p.source, p.default_branch, p.created_at, p.archived_at,\n                      (SELECT count(*) FROM api_keys k\n                        WHERE k.project_id = p.id AND k.revoked_at IS NULL\n                          AND (k.expires_at IS NULL OR k.expires_at > now())) AS \"active_api_keys!\",\n                      (SELECT count(*) FROM publisher_trust_policies t\n                        WHERE t.project_id = p.id AND t.revoked_at IS NULL) AS \"active_trust_policies!\"\n                 FROM projects p ORDER BY p.slug",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,17 @@
       },
       {
         "ordinal": 3,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "default_branch",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "archived_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -70,13 +81,13 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "active_api_keys!",
         "type_info": "Int8",
         "origin": "Expression"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "active_trust_policies!",
         "type_info": "Int8",
         "origin": "Expression"
@@ -91,10 +102,11 @@
       false,
       false,
       false,
+      false,
       true,
       null,
       null
     ]
   },
-  "hash": "02dc84df456a80be3848c5033f09eacf1cbe07459ca2ac7b36cdddcde3160385"
+  "hash": "3970657a401e3d144a404e0d6e246b7e556d754c342b2673670d5ed7444b72cb"
 }

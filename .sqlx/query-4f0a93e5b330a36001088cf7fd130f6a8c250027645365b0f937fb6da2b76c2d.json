@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE projects SET source = 'dashboard'\n              WHERE source = 'config' AND NOT (slug = ANY($1))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4f0a93e5b330a36001088cf7fd130f6a8c250027645365b0f937fb6da2b76c2d"
+}

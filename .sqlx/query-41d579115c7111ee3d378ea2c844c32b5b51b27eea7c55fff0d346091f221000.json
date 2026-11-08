@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO project_artifact_classes (project_id, class, accepted, max_bytes)\n                 VALUES ($1, $2, $3, $4)\n                 ON CONFLICT (project_id, class)\n                 DO UPDATE SET accepted = EXCLUDED.accepted, max_bytes = EXCLUDED.max_bytes",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "41d579115c7111ee3d378ea2c844c32b5b51b27eea7c55fff0d346091f221000"
+}

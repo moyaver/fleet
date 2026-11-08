@@ -82,7 +82,7 @@ impl From<sqlx::Error> for WriteError {
 /// The result of one administration change.
 pub type WriteResult<T> = std::result::Result<T, WriteError>;
 
-fn refused(r: Refusal) -> WriteError {
+pub(super) fn refused(r: Refusal) -> WriteError {
     WriteError::Refused(r)
 }
 
@@ -118,17 +118,17 @@ pub fn clean_name(value: &str, what: &str, max: usize) -> std::result::Result<St
 }
 
 /// What an audit event records about the change: who, what, and on which row.
-struct Change {
-    actor: AuditActor,
-    project: Option<Uuid>,
-    action: &'static str,
-    target_kind: &'static str,
-    target_id: Option<Uuid>,
+pub(super) struct Change {
+    pub(super) actor: AuditActor,
+    pub(super) project: Option<Uuid>,
+    pub(super) action: &'static str,
+    pub(super) target_kind: &'static str,
+    pub(super) target_id: Option<Uuid>,
 }
 
 /// Writes one audit event inside the change's transaction. `before` and `after` are the row's
 /// state either side of the change: `null` where there was none (a creation has no `before`).
-async fn record(
+pub(super) async fn record(
     tx: &mut Transaction<'_, Postgres>,
     change: Change,
     before: Option<Value>,
@@ -277,12 +277,15 @@ impl Store {
         let name = clean_name(name, "the project's name", MAX_NAME).map_err(refused)?;
         let mut tx = self.pool().begin().await?;
         let old = sqlx::query!(
-            "SELECT slug, name FROM projects WHERE id = $1 FOR UPDATE",
+            "SELECT slug, name, source FROM projects WHERE id = $1 FOR UPDATE",
             project
         )
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| refused(Refusal::NotFound("project")))?;
+        if old.source == "config" {
+            return Err(refused(Refusal::FromConfig("project")));
+        }
         if old.name == name {
             return Err(refused(Refusal::Conflict(
                 "the project already has that name".into(),

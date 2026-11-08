@@ -191,11 +191,12 @@ pub(crate) async fn set_api_key_expiry_in(
 }
 
 impl Store {
-    /// Creates a project, or renames it if the slug exists. Returns its ID.
+    /// Creates a project, or renames it if the slug exists, and marks it as configured: the
+    /// dashboard does not rename a configured project. Returns its ID.
     pub async fn upsert_project(&self, slug: &str, name: &str) -> Result<Uuid> {
         let id = sqlx::query_scalar!(
-            "INSERT INTO projects (slug, name) VALUES ($1, $2)
-             ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+            "INSERT INTO projects (slug, name, source) VALUES ($1, $2, 'config')
+             ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, source = 'config'
              RETURNING id",
             slug,
             name
@@ -203,6 +204,19 @@ impl Store {
         .fetch_one(self.pool())
         .await?;
         Ok(id)
+    }
+
+    /// Hands back to the dashboard the projects the configuration no longer names: they keep
+    /// their name, and the dashboard may rename them from now on.
+    pub async fn release_unconfigured_projects(&self, slugs: &[String]) -> Result<()> {
+        sqlx::query!(
+            "UPDATE projects SET source = 'dashboard'
+              WHERE source = 'config' AND NOT (slug = ANY($1))",
+            slugs
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(())
     }
 
     /// A project's ID by slug.

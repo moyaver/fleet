@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT artifact_bytes_per_day, artifact_files_per_day FROM projects\n              WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "artifact_bytes_per_day",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "artifact_bytes_per_day"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "artifact_files_per_day",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "artifact_files_per_day"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "4ebb27fac9eeacd304470d85ea66966486108ef5906dc6a952981306870ea366"
+}
