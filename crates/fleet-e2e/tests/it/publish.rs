@@ -75,7 +75,7 @@ fn utc_date(ms: i64) -> String {
 
 /// `fleet-agent publish <path>` in a cleared environment (CI sets `GITHUB_*`, which the agent would
 /// read), plus `env`.
-fn publish(path: &Path, env: &[(&str, &str)]) -> Output {
+pub(crate) fn publish(path: &Path, env: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(agent_bin());
     cmd.env_clear();
     for keep in ["PATH", "HOME", "TMPDIR"] {
