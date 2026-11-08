@@ -284,16 +284,19 @@ pub(crate) async fn token(
         Ok(ok) => ok,
         Err(r) => return *r,
     };
-    if let Some(jti) = &claims.jti {
-        let exp = OffsetDateTime::from_unix_timestamp(claims.exp)
-            .unwrap_or_else(|_| OffsetDateTime::now_utc());
-        match state.store.claim_jti(&claims.iss, jti, exp).await {
-            Ok(true) => {}
-            Ok(false) => return error(StatusCode::UNAUTHORIZED, "this token was already used"),
-            Err(e) => {
-                tracing::error!(error = %e, "recording a jti");
-                return error(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
-            }
+    // Without a jti the replay check has nothing to record, so the token would be replayable
+    // until it expires: such a token is refused (research 06 T4).
+    let Some(jti) = &claims.jti else {
+        return error(StatusCode::UNAUTHORIZED, "a token without a jti is refused");
+    };
+    let exp = OffsetDateTime::from_unix_timestamp(claims.exp)
+        .unwrap_or_else(|_| OffsetDateTime::now_utc());
+    match state.store.claim_jti(&claims.iss, jti, exp).await {
+        Ok(true) => {}
+        Ok(false) => return error(StatusCode::UNAUTHORIZED, "this token was already used"),
+        Err(e) => {
+            tracing::error!(error = %e, "recording a jti");
+            return error(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
         }
     }
     let ci = CiClaims {

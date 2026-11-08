@@ -199,6 +199,8 @@ async fn forged_expired_replayed_and_foreign_tokens_are_refused() {
     let ok = issuer.token(&json!({}));
     assert_eq!(exchange(&h, &ok).await.0, 200);
     assert_eq!(exchange(&h, &ok).await.0, 401, "a jti is accepted once");
+    let without_jti = issuer.token(&json!({"jti": null}));
+    assert_eq!(exchange(&h, &without_jti).await.0, 401, "a jti is required");
     let now = OffsetDateTime::now_utc().unix_timestamp();
     for bad in [
         json!({"aud": "someone-else"}),
