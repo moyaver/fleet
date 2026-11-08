@@ -52,7 +52,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `retention.rollup_interval_seconds`, `retention.gc_interval_minutes` | `60`, `10` | How often rollups run, and artifacts expire and blobs are collected |
 | `usercontent.url` | — | The usercontent origin; see [Usercontent domain](#usercontent-domain) |
 | `usercontent.signing_key` | — | HMAC key for signed links, at least 32 bytes (`FLEET_USERCONTENT__SIGNING_KEY_FILE`) |
-| `usercontent.link_ttl_seconds` | `300` | How long a signed link works |
+| `usercontent.link_ttl_seconds` | `300` | How long a signed link works (1 to 300) |
 | `usercontent.listen` | — | Also serve the usercontent origin on its own address |
 | `oidc.issuers` | GitHub, audience `fleet` | CI OIDC issuers accepted by `POST /api/v1/agent/token` |
 | `projects[].trust_policies[]` | — | Who may publish with an OIDC token (repository and owner IDs, trusted refs, PR policy) |
