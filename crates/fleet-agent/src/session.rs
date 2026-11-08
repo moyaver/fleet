@@ -68,7 +68,8 @@ pub(crate) struct Flow {
     pub(crate) started: bool,
     pub(crate) claims: Vec<Claim>,
     pub(crate) steps: u32,
-    /// What the log said about each step, by index: the step's depth and, once it ended, its status.
+    /// What the log said about each step, by index: its depth, command kind and, once it ended, its
+    /// status.
     logged: Vec<LoggedStep>,
     /// Steps Maestro has started and not yet ended, innermost last.
     open_steps: Vec<OpenStep>,
@@ -84,10 +85,12 @@ pub(crate) struct Flow {
     pending_files: Vec<PendingFile>,
 }
 
-/// A step as the live log reported it (issue #148): how deeply it nested, and how it ended.
+/// A step as the live log reported it (issue #148): how deeply it nested, which command kind its
+/// description names, and how it ended.
 #[derive(Debug, Clone, Copy)]
 struct LoggedStep {
     depth: u32,
+    kind: Option<&'static str>,
     status: Option<StepStatus>,
 }
 
@@ -586,11 +589,12 @@ impl Session {
         &mut self,
         at: ClockSample,
         shard: u32,
-        description: &str,
+        raw: &str,
         state: log::StepState,
         parser: String,
     ) {
-        let description = self.redactor.redact(description).into_owned();
+        let kind = log::command_kind(raw);
+        let description = self.redactor.redact(raw).into_owned();
         let Some(idx) = self.step_flow(shard, &description, state) else {
             return;
         };
@@ -604,6 +608,7 @@ impl Session {
                 f.steps += 1;
                 f.logged.push(LoggedStep {
                     depth: u32::try_from(f.open_steps.len()).unwrap_or(u32::MAX),
+                    kind,
                     status: None,
                 });
                 // The steps still open enclose this one: Maestro's log nests them by their RUNNING
@@ -658,6 +663,7 @@ impl Session {
             f.steps += 1;
             f.logged.push(LoggedStep {
                 depth: u32::try_from(f.open_steps.len()).unwrap_or(u32::MAX),
+                kind,
                 status: None,
             });
             i
@@ -890,12 +896,11 @@ impl Session {
         }
     }
 
-    /// Settles the step rows a final `commands.json` covers (issue #148). Command `n` settles the
-    /// step the log numbered `n`, and only when the log nested that step at the command's depth.
-    /// A flow whose log reported a different number of steps than its file has commands cannot be
-    /// lined up at all, so none of its steps settle (I3): a step the log dropped would otherwise
-    /// shift every later position. Steps that do not settle stay provisional. The file's status and
-    /// timing win over the log's, and a step the two disagree on is warned.
+    /// Settles the step rows a final `commands.json` covers (issue #148). Each step the log reported
+    /// is paired with the command that is the same step, by depth and command kind (see
+    /// [`pair_steps`]); a paired step takes the file's status and timing. Steps that do not pair
+    /// stay provisional, and the file never creates a step (I3). A step the two disagree on is
+    /// warned, and the file's status wins.
     fn settle_steps(
         &mut self,
         at: ClockSample,
@@ -906,12 +911,53 @@ impl Session {
         let Some(f) = self.flows.get(idx) else {
             return;
         };
-        if f.logged.len() != cmds.len() {
+        let logged_count = f.logged.len();
+        let logged: Vec<Option<(u32, &str)>> = f
+            .logged
+            .iter()
+            .map(|l| l.kind.map(|k| (l.depth, k)))
+            .collect();
+        let commands: Vec<Option<(u32, &str)>> = cmds
+            .iter()
+            .map(|c| c.kind.as_deref().map(|k| (c.depth, k)))
+            .collect();
+        let mut settled = Vec::new();
+        let mut disagreed = Vec::new();
+        for (log_index, cmd_index) in pair_steps(&logged, &commands) {
+            let (Some(said), Some(c)) = (f.logged.get(log_index), cmds.get(cmd_index)) else {
+                continue;
+            };
+            let Some(status) = command_status(&c.status) else {
+                continue;
+            };
+            if let Some(said) = said.status.filter(|said| *said != status) {
+                disagreed.push((log_index, said, status));
+            }
+            settled.push((log_index, status, step_timing(c)));
+        }
+        let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
+        for (index, status, timing) in &settled {
+            let mut subject = self.flow_subject_at(idx);
+            subject.step = Some(StepRef {
+                index: u32::try_from(*index).unwrap_or(u32::MAX),
+            });
+            self.emit(
+                at,
+                subject,
+                SourceKind::ArtifactFile,
+                Some(parser.clone()),
+                &EventBody::StepEnded(StepEnded {
+                    status: *status,
+                    timing: *timing,
+                }),
+            );
+        }
+        if settled.len() < logged_count || settled.len() < cmds.len() {
             let subject = self.flow_subject_at(idx);
             let message = format!(
-                "{rel} has {} commands but the log reported {} steps, so no step is settled",
+                "{rel} has {} commands and the log reported {logged_count} steps; {} lined up by depth and command kind and settled, the rest stay provisional",
                 cmds.len(),
-                f.logged.len()
+                settled.len()
             );
             self.emit(
                 at,
@@ -922,39 +968,6 @@ impl Session {
                     code: "steps_not_aligned".into(),
                     message,
                 }),
-            );
-            return;
-        }
-        let mut settled = Vec::new();
-        let mut disagreed = Vec::new();
-        for c in cmds {
-            let Some(status) = command_status(&c.status) else {
-                continue;
-            };
-            let Some(logged) = usize::try_from(c.sequence)
-                .ok()
-                .and_then(|i| f.logged.get(i))
-            else {
-                continue;
-            };
-            if logged.depth != c.depth {
-                continue;
-            }
-            if let Some(said) = logged.status.filter(|said| *said != status) {
-                disagreed.push((c.sequence, said, status));
-            }
-            settled.push((c.sequence, status, step_timing(c)));
-        }
-        let parser = format!("maestro-bundle@{}", fleet_maestro::PROFILE);
-        for (index, status, timing) in settled {
-            let mut subject = self.flow_subject_at(idx);
-            subject.step = Some(StepRef { index });
-            self.emit(
-                at,
-                subject,
-                SourceKind::ArtifactFile,
-                Some(parser.clone()),
-                &EventBody::StepEnded(StepEnded { status, timing }),
             );
         }
         for (index, said, filed) in disagreed {
@@ -1551,6 +1564,73 @@ fn command_status(status: &str) -> Option<StepStatus> {
     })
 }
 
+/// The most cells the step alignment's table may hold. A flow past this, whose log and file disagree
+/// on the step count, settles none. ponytail: a quadratic table; Hirschberg's algorithm if a real
+/// flow ever gets this long.
+const MAX_ALIGNMENT_CELLS: usize = 4_000_000;
+
+/// Pairs each step the log reported with the command that is the same step: the same depth and
+/// command kind (issue #148). A step with no known kind pairs with nothing.
+///
+/// Equal counts pair by position, so a same-count shift shows up as mismatches instead of being
+/// silently realigned. Unequal counts pair by the longest common run of matching keys, so one step
+/// the log dropped, or one the file lacks, leaves every other step paired. Returns `(log index,
+/// command index)` pairs in order.
+fn pair_steps(
+    logged: &[Option<(u32, &str)>],
+    commands: &[Option<(u32, &str)>],
+) -> Vec<(usize, usize)> {
+    let same = |l: Option<(u32, &str)>, c: Option<(u32, &str)>| matches!((l, c), (Some(a), Some(b)) if a == b);
+    if logged.len() == commands.len() {
+        return logged
+            .iter()
+            .zip(commands)
+            .enumerate()
+            .filter(|(_, (l, c))| same(**l, **c))
+            .map(|(i, _)| (i, i))
+            .collect();
+    }
+    let (logged_len, command_len) = (logged.len(), commands.len());
+    let width = command_len + 1;
+    if (logged_len + 1).saturating_mul(width) > MAX_ALIGNMENT_CELLS {
+        return Vec::new();
+    }
+    // `runs[row * width + col]`: the longest common run of `logged[row..]` and `commands[col..]`.
+    let mut runs = vec![0u32; (logged_len + 1) * width];
+    let run =
+        |runs: &[u32], row: usize, col: usize| runs.get(row * width + col).copied().unwrap_or(0);
+    for row in (0..logged_len).rev() {
+        for col in (0..command_len).rev() {
+            let skip = run(&runs, row + 1, col).max(run(&runs, row, col + 1));
+            let best = match (logged.get(row), commands.get(col)) {
+                (Some(l), Some(c)) if same(*l, *c) => skip.max(run(&runs, row + 1, col + 1) + 1),
+                _ => skip,
+            };
+            if let Some(cell) = runs.get_mut(row * width + col) {
+                *cell = best;
+            }
+        }
+    }
+    let (mut row, mut col) = (0, 0);
+    let mut pairs = Vec::new();
+    while row < logged_len && col < command_len {
+        let matched = matches!(
+            (logged.get(row), commands.get(col)),
+            (Some(l), Some(c)) if same(*l, *c)
+        );
+        if matched && run(&runs, row, col) == run(&runs, row + 1, col + 1) + 1 {
+            pairs.push((row, col));
+            row += 1;
+            col += 1;
+        } else if run(&runs, row + 1, col) >= run(&runs, row, col + 1) {
+            row += 1;
+        } else {
+            col += 1;
+        }
+    }
+    pairs
+}
+
 /// A command's start and length, when the file gives both.
 fn step_timing(c: &bundle::CommandRecord) -> Option<StepTiming> {
     let (start, duration_ms) = c.timestamp_ms.zip(c.duration_ms)?;
@@ -2100,34 +2180,100 @@ mod tests {
         assert!(s.drain().iter().all(|e| e.kind != "app.crashed"));
     }
 
-    /// The single-flow fixtures: the flow directory's name, the run's `maestro.log` and the flow's
-    /// `commands.json`. A log with several flows is not replayed through one session.
-    fn single_flow_fixtures() -> Vec<(String, String, Vec<u8>)> {
+    /// A captured run: its session `maestro.log`, its stdout and each flow folder's `commands.json`.
+    struct Captured {
+        name: String,
+        log: String,
+        stdout: String,
+        /// `(flow folder, commands.json bytes)`, in folder order.
+        commands: Vec<(String, Vec<u8>)>,
+    }
+
+    /// Every file under `dir`, at any depth.
+    fn files_under(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                files_under(&p, out);
+            } else {
+                out.push(p);
+            }
+        }
+    }
+
+    /// Every captured run under `fixtures/maestro/2.12.1`, whatever its layout (issue #148).
+    fn captured_runs() -> Vec<Captured> {
         let root = std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../fixtures/maestro/2.12.1"
         ));
-        let mut out = Vec::new();
-        for fixture in std::fs::read_dir(root).unwrap() {
-            let debug = fixture.unwrap().path().join("run/debug");
-            let Ok(entries) = std::fs::read_dir(&debug) else {
-                continue;
-            };
-            let flows: Vec<std::path::PathBuf> = entries
-                .filter_map(Result::ok)
-                .map(|e| e.path())
-                .filter(|p| p.join("commands.json").is_file())
-                .collect();
-            let [flow] = flows.as_slice() else {
-                continue;
-            };
-            let name = flow.file_name().unwrap().to_string_lossy().into_owned();
-            let log = std::fs::read_to_string(debug.join("maestro.log")).unwrap();
-            let commands = std::fs::read(flow.join("commands.json")).unwrap();
-            out.push((name, log, commands));
-        }
-        out.sort();
-        out
+        let mut dirs: Vec<std::path::PathBuf> = std::fs::read_dir(root)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .collect();
+        dirs.sort();
+        dirs.iter()
+            .map(|dir| {
+                let mut files = Vec::new();
+                files_under(dir, &mut files);
+                files.sort();
+                // The session log is the one outside any flow's `logs/` folder.
+                let log = files
+                    .iter()
+                    .find(|p| {
+                        p.file_name().is_some_and(|n| n == "maestro.log")
+                            && p.parent().and_then(std::path::Path::file_name)
+                                != Some(std::ffi::OsStr::new("logs"))
+                    })
+                    .map(|p| std::fs::read_to_string(p).unwrap())
+                    .unwrap_or_default();
+                let commands = files
+                    .iter()
+                    .filter(|p| p.file_name().is_some_and(|n| n == "commands.json"))
+                    .map(|p| {
+                        let folder = p.parent().and_then(std::path::Path::file_name).unwrap();
+                        (
+                            folder.to_string_lossy().into_owned(),
+                            std::fs::read(p).unwrap(),
+                        )
+                    })
+                    .collect();
+                Captured {
+                    name: dir.file_name().unwrap().to_string_lossy().into_owned(),
+                    log,
+                    stdout: std::fs::read_to_string(dir.join("stdout.bin")).unwrap_or_default(),
+                    commands,
+                }
+            })
+            .collect()
+    }
+
+    /// The captured run called `name`.
+    fn captured(name: &str) -> Captured {
+        captured_runs()
+            .into_iter()
+            .find(|r| r.name == name)
+            .unwrap_or_else(|| panic!("no captured run {name}"))
+    }
+
+    /// A session with no flow yet: the log and stdout start the flows, as they do live.
+    fn fresh_session() -> Session {
+        let mut n = 0u128;
+        let ids: IdGen = Box::new(move || {
+            n += 1;
+            Uuid::from_u128(n)
+        });
+        Session::new(
+            &["maestro".into(), "test".into()],
+            None,
+            Redactor::new([]),
+            ids,
+            at(),
+        )
     }
 
     /// Feeds a captured `maestro.log` through the session, record by record.
@@ -2143,19 +2289,46 @@ mod tests {
         }
     }
 
-    /// Each step the file settled, as `(step index, the step.ended body)`.
-    fn settled(s: &mut Session) -> Vec<(u32, StepEnded)> {
-        s.drain()
-            .into_iter()
+    /// The step.ended bodies a final file settled, as `(flow, step index, body)`.
+    fn settled_steps(events: &[EventEnvelope]) -> Vec<(Option<Uuid>, u32, StepEnded)> {
+        events
+            .iter()
             .filter(|e| e.kind == "step.ended" && e.src.kind == SourceKind::ArtifactFile)
             .map(|e| {
-                let index = e.subject.step.map_or(u32::MAX, |r| r.index);
-                (index, serde_json::from_value(e.data).unwrap())
+                let index = e.subject.step.as_ref().map_or(u32::MAX, |r| r.index);
+                (
+                    e.subject.flow_execution_id,
+                    index,
+                    serde_json::from_value(e.data.clone()).unwrap(),
+                )
             })
             .collect()
     }
 
-    /// The step.ended body a command settles its step with.
+    /// Each step.ended a file settled, as `(step index, body)`, for a session with one flow.
+    fn settled(s: &mut Session) -> Vec<(u32, StepEnded)> {
+        settled_steps(&s.drain())
+            .into_iter()
+            .map(|(_, index, body)| (index, body))
+            .collect()
+    }
+
+    /// The alignment warnings (`steps_not_aligned`, `step_status_disagrees`) per flow.
+    fn alignment_warnings(events: &[EventEnvelope]) -> Vec<(Option<Uuid>, String)> {
+        events
+            .iter()
+            .filter(|e| e.kind == "agent.warning")
+            .map(|e| {
+                (
+                    e.subject.flow_execution_id,
+                    e.data["code"].as_str().unwrap_or_default().to_owned(),
+                )
+            })
+            .filter(|(_, code)| code == "steps_not_aligned" || code == "step_status_disagrees")
+            .collect()
+    }
+
+    /// Each step.ended a flow's commands settle is its command's status and timing.
     fn settles_with(c: &bundle::CommandRecord) -> StepEnded {
         StepEnded {
             status: command_status(&c.status).unwrap(),
@@ -2163,56 +2336,165 @@ mod tests {
         }
     }
 
-    /// Each captured single-flow log lines up with its final `commands.json`: every command settles
-    /// the step the log numbered the same, with the file's status and timing (issue #148).
+    /// Runs whose console log is in Maestro's default format. The agent reads no step from such a log
+    /// and starts no flow from it (its stdout has no result lines either), so their files settle
+    /// nothing and no flow is found for them.
+    const DEFAULT_FORMAT_RUNS: [&str; 5] = [
+        "paths-debug-and-test-output-same",
+        "paths-debug-output",
+        "paths-none",
+        "paths-test-output-dir",
+        "single-flow-no-format",
+    ];
+
+    /// Every captured run, replayed through one session each: its log, its stdout, then its
+    /// `commands.json` files. Each flow's final file settles each of its steps with the file's status
+    /// and timing, and says nothing about the alignment. The default-format runs settle nothing and
+    /// find no flow. A cut-short or empty file settles nothing (issue #148).
     #[test]
-    fn every_captured_single_flow_settles_each_step_from_its_final_commands_file() {
-        let fixtures = single_flow_fixtures();
-        let names: Vec<&str> = fixtures.iter().map(|f| f.0.as_str()).collect();
-        for known in ["fail", "nested", "pass", "retry-fail"] {
-            assert!(names.contains(&known), "{known} is replayed: {names:?}");
-        }
-        for (name, log, commands) in &fixtures {
-            // A cut-short flow's file is not final, and settles nothing.
-            let bundle::Commands::Final(records) = bundle::parse_commands(commands) else {
-                continue;
-            };
-            let mut s = session_named(name);
-            replay_log(&mut s, log);
+    fn every_captured_run_settles_each_flows_steps_from_its_final_commands_file() {
+        let runs = captured_runs();
+        assert_eq!(runs.len(), 29, "every captured run is replayed");
+        let mut settled_flows = 0;
+        for run in &runs {
+            let default_format = DEFAULT_FORMAT_RUNS.contains(&run.name.as_str());
+            let mut s = fresh_session();
+            replay_log(&mut s, &run.log);
+            for line in run.stdout.lines() {
+                s.observe(at(), Observation::Stdout(line.to_owned()));
+            }
             s.drain();
-            file(&mut s, &format!("{name}/commands.json"), Some(commands));
-            let want: Vec<(u32, StepEnded)> = records
-                .iter()
-                .map(|r| (r.sequence, settles_with(r)))
-                .collect();
-            assert_eq!(settled(&mut s), want, "{name}");
+            for (folder, bytes) in &run.commands {
+                file(
+                    &mut s,
+                    &format!("{folder}/commands.json"),
+                    Some(bytes.as_slice()),
+                );
+            }
+            let events = s.drain();
+            let settled = settled_steps(&events);
+            let warnings = alignment_warnings(&events);
+            for (folder, bytes) in &run.commands {
+                let (name, shard) = bundle::split_shard_suffix(folder);
+                let found = s.find_flow(shard.unwrap_or(1), name);
+                if default_format {
+                    assert_eq!(found, None, "{}: {folder} names no flow", run.name);
+                    continue;
+                }
+                let idx = found.unwrap_or_else(|| panic!("{}: {folder} never started", run.name));
+                let id = s.flows[idx].id;
+                let want: Vec<(u32, StepEnded)> = match bundle::parse_commands(bytes) {
+                    bundle::Commands::Final(records) => records
+                        .iter()
+                        .map(|r| (r.sequence, settles_with(r)))
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                let got: Vec<(u32, StepEnded)> = settled
+                    .iter()
+                    .filter(|(flow, _, _)| *flow == Some(id))
+                    .map(|(_, index, body)| (*index, body.clone()))
+                    .collect();
+                assert_eq!(got, want, "{}: {folder}", run.name);
+                assert!(
+                    warnings.iter().all(|(flow, _)| *flow != Some(id)),
+                    "{}: {folder} is aligned: {warnings:?}",
+                    run.name
+                );
+                if !want.is_empty() {
+                    settled_flows += 1;
+                }
+            }
         }
+        // Every final file of a run whose log the agent reads settles its flow's steps.
+        let final_files = runs
+            .iter()
+            .filter(|r| !DEFAULT_FORMAT_RUNS.contains(&r.name.as_str()))
+            .flat_map(|r| &r.commands)
+            .filter(|(_, bytes)| {
+                matches!(bundle::parse_commands(bytes), bundle::Commands::Final(_))
+            })
+            .count();
+        assert_eq!(settled_flows, final_files);
+        assert_eq!(final_files, 34, "the captured final files");
     }
 
-    /// A log that reported fewer steps than the file has commands cannot be lined up, so no step
-    /// settles, and the agent says why (I3).
+    /// `pair_steps`: the depth and kind rules, and the shapes of a missing or shifted step.
     #[test]
-    fn a_log_that_missed_a_step_settles_none_and_says_why() {
-        let (name, log, commands) = single_flow_fixtures()
-            .into_iter()
-            .find(|f| f.0 == "pass")
-            .unwrap();
-        let log: String = log
+    fn steps_pair_by_depth_and_kind_and_never_across_a_mismatch() {
+        let tap = Some((0, "tapOnElement"));
+        let back = Some((0, "backPressCommand"));
+        let scroll = Some((0, "scrollCommand"));
+        // Equal counts pair by position: a same-count shift pairs nothing.
+        assert_eq!(
+            pair_steps(&[tap, back, scroll], &[back, scroll, tap]),
+            Vec::new()
+        );
+        assert_eq!(
+            pair_steps(&[tap, back, scroll], &[tap, back, scroll]),
+            vec![(0, 0), (1, 1), (2, 2)]
+        );
+        // Unequal counts pair the common run: the file's extra scroll pairs with nothing.
+        assert_eq!(
+            pair_steps(&[tap, back], &[tap, scroll, back]),
+            vec![(0, 0), (1, 2)]
+        );
+        // The log's extra step pairs with nothing either.
+        assert_eq!(
+            pair_steps(&[tap, scroll, back], &[tap, back]),
+            vec![(0, 0), (2, 1)]
+        );
+        // A depth that differs is not the same step.
+        assert_eq!(
+            pair_steps(&[tap, Some((1, "backPressCommand"))], &[tap, back, scroll]),
+            vec![(0, 0)]
+        );
+        // A step whose description names no kind pairs with nothing.
+        let paired: Vec<usize> = pair_steps(&[None, back], &[back, back, back])
+            .iter()
+            .map(|p| p.0)
+            .collect();
+        assert_eq!(paired, vec![1]);
+        assert_eq!(pair_steps(&[None], &[None]), Vec::new());
+    }
+
+    /// A log that dropped one step still settles every step it lines up with its file, and says that
+    /// the others stay provisional (issue #148).
+    #[test]
+    fn a_log_that_missed_a_step_settles_the_rest_and_says_why() {
+        let run = captured("pass");
+        let (folder, commands) = &run.commands[0];
+        let log: String = run
+            .log
             .lines()
             .filter(|l| !l.contains("Apply configuration"))
             .collect::<Vec<_>>()
             .join("\n");
-        let mut s = session_named(&name);
+        let mut s = fresh_session();
         replay_log(&mut s, &log);
         s.drain();
-        file(&mut s, &format!("{name}/commands.json"), Some(&commands));
-        let events = s.drain();
-        assert!(
-            events
-                .iter()
-                .all(|e| e.kind != "step.ended" || e.src.kind != SourceKind::ArtifactFile),
-            "nothing settles"
+        file(
+            &mut s,
+            &format!("{folder}/commands.json"),
+            Some(commands.as_slice()),
         );
+        let events = s.drain();
+        let bundle::Commands::Final(records) = bundle::parse_commands(commands) else {
+            panic!("the captured pass file is final");
+        };
+        // The log's steps are numbered 0..6 without the configuration (command 1), which has no step.
+        // The rest pair up in order, so log step i settles the i-th command that is not command 1.
+        let want: Vec<(u32, StepEnded)> = records
+            .iter()
+            .filter(|r| r.sequence != 1)
+            .enumerate()
+            .map(|(i, r)| (u32::try_from(i).unwrap(), settles_with(r)))
+            .collect();
+        let got: Vec<(u32, StepEnded)> = settled_steps(&events)
+            .into_iter()
+            .map(|(_, index, body)| (index, body))
+            .collect();
+        assert_eq!(got, want);
         assert!(
             events
                 .iter()
@@ -2221,21 +2503,43 @@ mod tests {
         );
     }
 
-    /// A step whose log depth differs from its command's depth stays provisional, and the others
-    /// settle.
+    /// Equal counts with a command kind that changed in place: the shifted step is not paired, and
+    /// the rest of the flow still settles (issue #148).
+    #[test]
+    fn a_same_count_shift_in_command_kind_is_caught() {
+        let run = captured("pass");
+        let (folder, commands) = &run.commands[0];
+        let mut file_json: serde_json::Value = serde_json::from_slice(commands).unwrap();
+        file_json[2]["command"] = serde_json::json!({ "backPressCommand": {} });
+        let edited = serde_json::to_vec(&file_json).unwrap();
+        let mut s = fresh_session();
+        replay_log(&mut s, &run.log);
+        s.drain();
+        file(&mut s, &format!("{folder}/commands.json"), Some(&edited));
+        let events = s.drain();
+        let indexes: Vec<u32> = settled_steps(&events).iter().map(|(_, i, _)| *i).collect();
+        assert_eq!(indexes, vec![0, 1, 3, 4, 5, 6]);
+        assert!(
+            events
+                .iter()
+                .any(|e| e.kind == "agent.warning" && e.data["code"] == "steps_not_aligned"),
+            "the shift is warned"
+        );
+    }
+
+    /// A step the file and the log disagree on, at a depth the file puts elsewhere, stays provisional
+    /// and the others settle.
     #[test]
     fn a_step_at_a_different_depth_stays_provisional() {
-        let (name, log, commands) = single_flow_fixtures()
-            .into_iter()
-            .find(|f| f.0 == "nested")
-            .unwrap();
-        let mut file_json: serde_json::Value = serde_json::from_slice(&commands).unwrap();
+        let run = captured("nested");
+        let (folder, commands) = &run.commands[0];
+        let mut file_json: serde_json::Value = serde_json::from_slice(commands).unwrap();
         file_json[4]["metadata"]["depth"] = serde_json::json!(0);
         let edited = serde_json::to_vec(&file_json).unwrap();
-        let mut s = session_named(&name);
-        replay_log(&mut s, &log);
+        let mut s = fresh_session();
+        replay_log(&mut s, &run.log);
         s.drain();
-        file(&mut s, &format!("{name}/commands.json"), Some(&edited));
+        file(&mut s, &format!("{folder}/commands.json"), Some(&edited));
         let bundle::Commands::Final(records) = bundle::parse_commands(&edited) else {
             panic!("the edited file is still final");
         };
@@ -2251,23 +2555,20 @@ mod tests {
     /// disagreement is warned.
     #[test]
     fn a_file_that_disagrees_with_the_log_wins_and_says_so() {
-        let (name, log, commands) = single_flow_fixtures()
-            .into_iter()
-            .find(|f| f.0 == "fail")
-            .unwrap();
-        let mut file_json: serde_json::Value = serde_json::from_slice(&commands).unwrap();
+        let run = captured("fail");
+        let (folder, commands) = &run.commands[0];
+        let mut file_json: serde_json::Value = serde_json::from_slice(commands).unwrap();
         file_json[4]["metadata"]["status"] = serde_json::json!("COMPLETED");
         let edited = serde_json::to_vec(&file_json).unwrap();
-        let mut s = session_named(&name);
-        replay_log(&mut s, &log);
+        let mut s = fresh_session();
+        replay_log(&mut s, &run.log);
         s.drain();
-        file(&mut s, &format!("{name}/commands.json"), Some(&edited));
+        file(&mut s, &format!("{folder}/commands.json"), Some(&edited));
         let events = s.drain();
-        let step4 = events
-            .iter()
-            .filter(|e| e.kind == "step.ended" && e.src.kind == SourceKind::ArtifactFile)
-            .find(|e| e.subject.step.as_ref().map(|r| r.index) == Some(4))
-            .map(|e| serde_json::from_value::<StepEnded>(e.data.clone()).unwrap());
+        let step4 = settled_steps(&events)
+            .into_iter()
+            .find(|(_, index, _)| *index == 4)
+            .map(|(_, _, body)| body);
         assert_eq!(step4.map(|b| b.status), Some(StepStatus::Completed));
         assert!(
             events
@@ -2275,5 +2576,47 @@ mod tests {
                 .any(|e| e.kind == "agent.warning" && e.data["code"] == "step_status_disagrees"),
             "the disagreement is warned"
         );
+    }
+
+    /// Aborted (device killed, cut short by a signal) or empty files settle no step, and an
+    /// unknown-status file settles none either (I3). The run says why (issue #148).
+    #[test]
+    fn an_unfinished_unknown_or_empty_commands_file_settles_no_step() {
+        let mut cases = Vec::new();
+        for name in ["device-killed", "sigint", "sigterm"] {
+            let run = captured(name);
+            let (folder, bytes) = run.commands[0].clone();
+            cases.push((name, folder, bytes, run.log));
+        }
+        let pass = captured("pass");
+        let (folder, bytes) = pass.commands[0].clone();
+        let mut unknown: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        unknown[2]["metadata"]["status"] = serde_json::json!("ERROR");
+        cases.push((
+            "pass (unknown status)",
+            folder,
+            serde_json::to_vec(&unknown).unwrap(),
+            pass.log,
+        ));
+        for (name, folder, bytes, log) in cases {
+            assert!(
+                !matches!(bundle::parse_commands(&bytes), bundle::Commands::Final(_)),
+                "{name}: the premise is not final"
+            );
+            let mut s = fresh_session();
+            replay_log(&mut s, &log);
+            s.drain();
+            file(&mut s, &format!("{folder}/commands.json"), Some(&bytes));
+            let events = s.drain();
+            assert_eq!(settled_steps(&events), Vec::new(), "{name} settles nothing");
+            assert!(
+                events.iter().any(|e| e.kind == "agent.warning"
+                    && matches!(
+                        e.data["code"].as_str(),
+                        Some("commands_not_final" | "commands_unknown_status")
+                    )),
+                "{name} says why"
+            );
+        }
     }
 }
