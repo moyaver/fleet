@@ -5,7 +5,35 @@
 //! `${{ job.check_run_id }}`), else `GITHUB_JOB` plus a hash of `FLEET_MATRIX` so matrix legs
 //! don't collide. `FLEET_*` variables override every field, for other CIs.
 
+use std::borrow::Cow;
+
 use fleet_protocol::frame::{CiContext, CiProvider};
+
+/// Makes text safe to echo to a CI log (research 06 T13). A runner reads a line that starts with
+/// `::` as a workflow command (`::warning::`, `::add-mask::`, `::stop-commands::`), so on every
+/// line of `text`, after its indentation, the leading colons are removed. Line breaks are both
+/// `\n` and `\r`, because either can start a new command. Text with no `::` is returned as is.
+///
+/// Use it on what the agent prints itself, which can carry app or device text. Maestro's own
+/// output is passed through byte for byte (I1) and is not rewritten.
+#[must_use]
+pub(crate) fn neutralize_workflow_commands(text: &str) -> Cow<'_, str> {
+    if !text.contains("::") {
+        return Cow::Borrowed(text);
+    }
+    let mut out = String::with_capacity(text.len());
+    for segment in text.split_inclusive(['\n', '\r']) {
+        let indent = segment.len() - segment.trim_start().len();
+        let (lead, rest) = segment.split_at(indent);
+        out.push_str(lead);
+        if rest.starts_with("::") {
+            out.push_str(rest.trim_start_matches(':'));
+        } else {
+            out.push_str(rest);
+        }
+    }
+    Cow::Owned(out)
+}
 
 /// Builds the CI context from an environment lookup.
 pub(crate) fn context(env: impl Fn(&str) -> Option<String>) -> CiContext {
@@ -49,6 +77,26 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+
+    #[test]
+    fn a_line_that_starts_with_a_workflow_command_is_neutralized() {
+        assert_eq!(
+            neutralize_workflow_commands("::set-env name=A::x\nok\n"),
+            "set-env name=A::x\nok\n"
+        );
+        assert_eq!(
+            neutralize_workflow_commands("  ::warning::hi"),
+            "  warning::hi"
+        );
+        assert_eq!(neutralize_workflow_commands("a\r::error::x"), "a\rerror::x");
+        assert_eq!(neutralize_workflow_commands("ok\r\n::x\r\n"), "ok\r\nx\r\n");
+        assert_eq!(neutralize_workflow_commands(":::x"), "x");
+        assert_eq!(neutralize_workflow_commands(":x and a::b"), ":x and a::b");
+        assert!(
+            matches!(neutralize_workflow_commands("plain"), Cow::Borrowed(_)),
+            "no allocation when nothing changes"
+        );
+    }
 
     fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         let map: HashMap<String, String> = pairs

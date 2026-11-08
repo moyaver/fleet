@@ -498,7 +498,12 @@ fn outcome(status: Option<ExitStatus>) -> Outcome {
 
 /// One `[fleet-agent]` line on stderr. Only used before the child produced any output.
 fn notice(message: &str) {
-    let _ = writeln!(io::stderr().lock(), "[fleet-agent] {message}");
+    let _ = writeln!(io::stderr().lock(), "{}", notice_line(message));
+}
+
+/// The stderr line for a notice. The message may hold line breaks, so it is neutralized (T13).
+fn notice_line(message: &str) -> String {
+    crate::ci::neutralize_workflow_commands(&format!("[fleet-agent] {message}")).into_owned()
 }
 
 fn now_ms() -> u64 {
@@ -528,7 +533,7 @@ impl Warnings {
             let _ = err.write_all(b"\n");
         }
         for w in v.iter() {
-            let _ = writeln!(err, "[fleet-agent] {w}");
+            let _ = writeln!(err, "{}", notice_line(w));
         }
     }
 }
@@ -741,6 +746,21 @@ fn write_frames(mut stdin: ChildStdin, rx: &Receiver<Frame>) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_notice_with_a_line_break_cannot_start_a_workflow_command() {
+        // A warning can carry text from the app or the device, and a line break in it would
+        // start a new line for the runner to read as a command (research 06 T13).
+        let line = notice_line("bundle failed\n::set-env name=X::y\r::error::z");
+        assert!(
+            !line.split(['\n', '\r']).any(|l| l.starts_with("::")),
+            "{line:?}"
+        );
+        assert!(
+            line.starts_with("[fleet-agent] bundle failed\n"),
+            "{line:?}"
+        );
+    }
+
     use std::collections::VecDeque;
 
     use super::*;
