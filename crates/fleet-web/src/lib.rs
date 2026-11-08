@@ -11,6 +11,7 @@
 //! - [`live`]: the browser live socket, its reconnect policy and the reactive store adapter.
 //! - [`screens`]: the pages.
 
+pub mod announce;
 pub mod api;
 pub mod app;
 pub mod clock;

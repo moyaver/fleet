@@ -14,7 +14,10 @@
 use std::time::Duration;
 
 use fleet_protocol::rest::{TimelineView, WorkerRunPage};
-use fleet_ui::components::{display::EmptyState, live::LiveState};
+use fleet_ui::components::{
+    display::EmptyState,
+    live::{Announcements, LiveState},
+};
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{
     NavigateOptions,
@@ -23,6 +26,7 @@ use leptos_router::{
 use uuid::Uuid;
 
 use crate::{
+    announce::{self, Fact},
     api,
     app::{LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
@@ -225,6 +229,41 @@ fn not_an_address(what: &'static str) -> AnyView {
     .into_any()
 }
 
+/// A runner's run-level facts (issue #149): a run that started, or that ended. Keys name the
+/// state, so each is read out once.
+fn worker_facts(w: &fleet_protocol::rest::WorkerView) -> Vec<Fact> {
+    w.recent_runs
+        .iter()
+        .map(|r| {
+            if r.ended_at.is_some() {
+                Fact::new(
+                    format!("run:{}:ended", r.run.id),
+                    format!("Run {} ended.", r.job_key),
+                )
+            } else {
+                Fact::new(
+                    format!("run:{}:started", r.run.id),
+                    format!("Run {} started.", r.job_key),
+                )
+            }
+        })
+        .collect()
+}
+
+/// A device's facts: each of its flows, by the state it has reached.
+fn device_facts(d: &fleet_protocol::rest::DeviceDetailView) -> Vec<Fact> {
+    d.flows.iter().map(flow_fact).collect()
+}
+
+/// A flow's fact: its name and the word of its state, such as "Flow login: Failed.".
+fn flow_fact(flow: &fleet_protocol::live::FlowView) -> Fact {
+    let label = crate::status::flow_state_pill(&flow.state).label;
+    Fact::new(
+        format!("flow:{}:{label}", flow.id),
+        format!("Flow {}: {label}.", flow.name),
+    )
+}
+
 /// Screen C for a worker, at `/workers/:id?project=<slug>`.
 #[component]
 pub fn WorkerRoute() -> impl IntoView {
@@ -294,7 +333,11 @@ fn WorkerBody(project: String, id: Uuid) -> impl IntoView {
             });
         })
     };
+    let announced = announce::region(Signal::derive(move || {
+        worker.data.with(|w| w.as_ref().map(worker_facts))
+    }));
     view! {
+        <Announcements text=announced />
         <WorkerPage
             worker=Fetched::from(&worker)
             more_runs=more_runs
@@ -350,7 +393,11 @@ fn DeviceBody(project: String, id: Uuid) -> impl IntoView {
         });
     }
     follow_project(project.clone(), tick, now);
+    let announced = announce::region(Signal::derive(move || {
+        device.data.with(|d| d.as_ref().map(device_facts))
+    }));
     view! {
+        <Announcements text=announced />
         <DevicePage
             device=Fetched::from(&device)
             metrics=Fetched::from(&metrics)
@@ -390,7 +437,12 @@ fn FlowBody(project: String, id: Uuid) -> impl IntoView {
     let follower = StoredValue::new_local(flow.clone());
     let live_project = project.clone();
     let feed = evidence_feed(&project, id, &flow);
+    let announced = announce::region(Signal::derive(move || {
+        flow.data
+            .with(|f| f.as_ref().map(|f| vec![flow_fact(&f.flow)]))
+    }));
     view! {
+        <Announcements text=announced />
         {move || {
             attempt
                 .get()

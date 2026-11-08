@@ -48,11 +48,11 @@ pub fn job_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
             // "Completed" says Maestro ran to the end, not that the flows passed (I3): neutral.
             "completed" => Pill::new("Completed", Mark::End),
             "failed" => Pill::new("Failed", Mark::Failed),
-            "cancelled" => Pill::new("Cancelled", Mark::Skipped),
-            "interrupted" => Pill::new("Interrupted", Mark::Interrupted),
+            // Cut short by a person or the runner: the Interrupted vocabulary, not a new word.
+            "cancelled" | "interrupted" => Pill::new("Interrupted", Mark::Interrupted),
             _ => Pill::new("Unknown", Mark::Unknown),
         },
-        ("closed", None) => Pill::new("Closed", Mark::End),
+        ("closed", None) => Pill::new("Completed", Mark::End),
         _ => open_pill(lifecycle),
     }
 }
@@ -60,10 +60,7 @@ pub fn job_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
 /// A job or suite that has not closed.
 fn open_pill(lifecycle: &str) -> Pill {
     match lifecycle {
-        "starting" => Pill::new("Starting", Mark::Running),
-        "running" => Pill::new("Running", Mark::Running),
-        "finalizing" => Pill::new("Finalizing", Mark::Running),
-        "reporting" => Pill::new("Reporting", Mark::Running),
+        "starting" | "running" | "finalizing" | "reporting" => Pill::new("Running", Mark::Running),
         _ => Pill::new("Unknown", Mark::Unknown),
     }
 }
@@ -76,7 +73,7 @@ pub fn suite_pill(lifecycle: &str, outcome: Option<&str>) -> Pill {
         ("closed", Some("failed")) => Pill::new("Failed", Mark::Failed),
         ("closed", Some("interrupted")) => Pill::new("Interrupted", Mark::Interrupted),
         ("closed", Some(_)) => Pill::new("Unknown", Mark::Unknown),
-        ("closed", None) => Pill::new("Closed", Mark::End),
+        ("closed", None) => Pill::new("Completed", Mark::End),
         _ => open_pill(lifecycle),
     }
 }
@@ -101,9 +98,9 @@ pub fn attempt_pill(jobs: &JobCounts) -> Pill {
     } else if jobs.pending > 0 {
         Pill::new("Not started", Mark::NotStarted)
     } else if jobs.closed > 0 {
-        Pill::new("Finished", Mark::End)
+        Pill::new("Completed", Mark::End)
     } else {
-        Pill::new("No jobs yet", Mark::NotStarted)
+        Pill::new("Not started", Mark::NotStarted)
     }
 }
 
@@ -164,11 +161,8 @@ mod tests {
     #[test]
     fn a_job_shows_its_outcome_once_closed_and_its_lifecycle_before() {
         assert_eq!(job_pill("running", None), pill("Running", Mark::Running));
-        assert_eq!(
-            job_pill("finalizing", None),
-            pill("Finalizing", Mark::Running)
-        );
-        assert_eq!(job_pill("starting", None), pill("Starting", Mark::Running));
+        assert_eq!(job_pill("finalizing", None), pill("Running", Mark::Running));
+        assert_eq!(job_pill("starting", None), pill("Running", Mark::Running));
         assert_eq!(
             job_pill("closed", Some("completed")),
             pill("Completed", Mark::End)
@@ -179,7 +173,7 @@ mod tests {
         );
         assert_eq!(
             job_pill("closed", Some("cancelled")),
-            pill("Cancelled", Mark::Skipped)
+            pill("Interrupted", Mark::Interrupted)
         );
         assert_eq!(
             job_pill("closed", Some("interrupted")),
@@ -189,7 +183,7 @@ mod tests {
             job_pill("closed", Some("unknown")),
             pill("Unknown", Mark::Unknown)
         );
-        assert_eq!(job_pill("closed", None), pill("Closed", Mark::End));
+        assert_eq!(job_pill("closed", None), pill("Completed", Mark::End));
         assert_eq!(
             job_pill("closed", Some("odd")),
             pill("Unknown", Mark::Unknown)
@@ -207,7 +201,7 @@ mod tests {
         assert_eq!(suite_pill("running", None), pill("Running", Mark::Running));
         assert_eq!(
             suite_pill("reporting", None),
-            pill("Reporting", Mark::Running)
+            pill("Running", Mark::Running)
         );
         assert_eq!(
             suite_pill("closed", Some("passed")),
@@ -221,7 +215,7 @@ mod tests {
             suite_pill("closed", Some("interrupted")),
             pill("Interrupted", Mark::Interrupted)
         );
-        assert_eq!(suite_pill("closed", None), pill("Closed", Mark::End));
+        assert_eq!(suite_pill("closed", None), pill("Completed", Mark::End));
     }
 
     #[test]
@@ -252,7 +246,7 @@ mod tests {
         };
         assert_eq!(
             attempt_pill(&jobs(0, 0, 0, 0, 0)),
-            pill("No jobs yet", Mark::NotStarted)
+            pill("Not started", Mark::NotStarted)
         );
         assert_eq!(
             attempt_pill(&jobs(1, 0, 0, 0, 0)),
@@ -272,7 +266,7 @@ mod tests {
         );
         assert_eq!(
             attempt_pill(&jobs(0, 0, 0, 0, 3)),
-            pill("Finished", Mark::End)
+            pill("Completed", Mark::End)
         );
     }
 
@@ -331,6 +325,87 @@ mod tests {
         ];
         for (source, expected) in cases {
             assert_eq!(source_provenance(source), expected, "{source:?}");
+        }
+    }
+
+    #[test]
+    fn every_status_word_is_in_the_one_vocabulary() {
+        // The redesign's words (issue #149), with Completed, which a job or suite ends with, and
+        // the agent's liveness words, which name a runner rather than a status.
+        const VOCABULARY: [&str; 9] = [
+            "Passed",
+            "Failed",
+            "Running",
+            "Not started",
+            "Interrupted",
+            "Skipped",
+            "Unknown",
+            "Completed",
+            "No failures",
+        ];
+        const LIVENESS: [&str; 3] = ["Online", "Stale", "Disconnected"];
+        let mut words = Vec::new();
+        for state in [
+            "pending",
+            "running",
+            "passed",
+            "failed",
+            "skipped",
+            "interrupted",
+            "x",
+        ] {
+            words.push(flow_state_pill(state).label);
+        }
+        let outcomes = [
+            None,
+            Some("completed"),
+            Some("failed"),
+            Some("cancelled"),
+            Some("interrupted"),
+            Some("x"),
+        ];
+        for lifecycle in [
+            "starting",
+            "running",
+            "finalizing",
+            "reporting",
+            "closed",
+            "x",
+        ] {
+            for outcome in outcomes {
+                words.push(job_pill(lifecycle, outcome).label);
+                words.push(suite_pill(lifecycle, outcome).label);
+            }
+        }
+        let liveness = [
+            None,
+            Some(Liveness::Online),
+            Some(Liveness::Stale),
+            Some(Liveness::Disconnected),
+            Some(Liveness::Completed),
+        ];
+        for live in liveness {
+            words.push(liveness_pill(live).label);
+        }
+        let jobs = |pending, starting, running, finalizing, closed| JobCounts {
+            pending,
+            starting,
+            running,
+            finalizing,
+            closed,
+        };
+        for counts in [
+            jobs(1, 0, 0, 0, 0),
+            jobs(0, 0, 0, 0, 3),
+            jobs(0, 0, 1, 0, 2),
+        ] {
+            words.push(attempt_pill(&counts).label);
+        }
+        for word in words {
+            assert!(
+                VOCABULARY.contains(&word) || LIVENESS.contains(&word),
+                "{word} is not in the vocabulary"
+            );
         }
     }
 }

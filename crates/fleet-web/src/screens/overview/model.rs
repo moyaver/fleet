@@ -20,6 +20,7 @@ use fleet_ui::{
 use uuid::Uuid;
 
 use crate::{
+    announce::Fact,
     clock::unix_ms,
     format::{platform, ref_name, short_commit},
     live::socket::Connection,
@@ -350,6 +351,33 @@ pub struct OverviewModel {
 }
 
 impl OverviewModel {
+    /// The board's run-level facts for its status region (issue #149): a run that started, a run
+    /// that ended with its verdict, and a failed flow in the last 24 hours. Keys name the state, so
+    /// each is read out once.
+    #[must_use]
+    pub fn facts(&self) -> Vec<Fact> {
+        let runs = self.pipelines.iter().map(|p| {
+            if p.open {
+                Fact::new(
+                    format!("run:{}:started", p.attempt_id),
+                    format!("Run {} started.", p.run_key),
+                )
+            } else {
+                Fact::new(
+                    format!("run:{}:ended", p.attempt_id),
+                    format!("Run {} ended: {}.", p.run_key, p.verdict.pill().label),
+                )
+            }
+        });
+        let flows = self.attention.iter().map(|a| {
+            Fact::new(
+                format!("flow:{}:failed", a.flow_href),
+                format!("Flow {} failed in {}.", a.name, a.run),
+            )
+        });
+        runs.chain(flows).collect()
+    }
+
     /// Builds screen A from the board.
     #[must_use]
     pub fn build(board: &Board) -> Self {
@@ -1025,5 +1053,34 @@ mod tests {
         assert_eq!(freshness(at, 1_000_000 + 24_999), Provenance::Observed);
         assert_eq!(freshness(at, 1_000_000 + 25_000), Provenance::Stale);
         assert_eq!(freshness(None, 1_000_000), Provenance::Missing);
+    }
+
+    #[test]
+    fn the_board_reads_out_each_run_that_started_or_ended_and_each_failed_flow_once() {
+        let facts = model().facts();
+        let texts: Vec<&str> = facts.iter().map(|f| f.text.as_str()).collect();
+        // The fixture has one open run and one finished run, and one failed flow in 24 h.
+        assert_eq!(
+            texts.iter().filter(|t| t.contains(" started.")).count(),
+            model().pipelines.iter().filter(|p| p.open).count(),
+            "{texts:?}"
+        );
+        assert_eq!(
+            texts.iter().filter(|t| t.contains(" ended: ")).count(),
+            model().pipelines.iter().filter(|p| !p.open).count(),
+            "{texts:?}"
+        );
+        assert!(
+            texts
+                .iter()
+                .any(|t| t.starts_with("Flow Sport filter shows the Vespa failed in ")),
+            "{texts:?}"
+        );
+        // A fact is keyed by the state it names: the same board yields the same keys.
+        let keys: Vec<&str> = facts.iter().map(|f| f.key.as_str()).collect();
+        let mut unique = keys.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), keys.len(), "{keys:?}");
     }
 }
