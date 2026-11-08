@@ -1,147 +1,134 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The contract against Garage, the reference S3 store (PLAN D5, ADR-0007).
-//!
-//! Garage runs in Docker, started the way `xtask/src/db.rs` starts Postgres: `docker run`, a free
-//! local port, removed on drop. It uses the reference deployment's own `garage.toml` and the
-//! same `--single-node --default-bucket` flags as `deploy/compose`, so the test also proves that
-//! configuration works. Without Docker the test fails with instructions: it is not skipped,
-//! because S3 is the production backend.
+//! The contract against Garage, the reference S3 store (PLAN D5, ADR-0007), and direct-upload
+//! staging against it: a presigned `PUT` must carry the signed checksum, and what it stores is
+//! what the server reads back.
 
-use std::{
-    net::TcpListener,
-    process::{Command, Stdio},
-    time::{Duration, Instant},
-};
+use std::{collections::BTreeMap, time::Duration};
 
-use fleet_blob::{BlobStore, S3, S3Config};
+use base64::Engine as _;
+use fleet_blob::{BlobStore, Sha256Digest, StagingKey, testing::Garage};
+use futures_util::TryStreamExt;
+use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::contract;
 
-/// Garage v2.5.0, the version in `deploy/compose/docker-compose.yml`, pinned by manifest-list
-/// digest so a re-tagged image cannot change what CI tests.
-const IMAGE: &str =
-    "dxflrs/garage@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5";
-const GARAGE_TOML: &str = include_str!("../../../../deploy/compose/garage.toml");
-/// Garage wants `GK` + 24 hex digits and 64 hex digits; these are throwaway test credentials.
-const ACCESS_KEY: &str = "GK000000000000000000000001";
-const SECRET_KEY: &str = "0000000000000000000000000000000000000000000000000000000000000001";
-const RPC_SECRET: &str = "0000000000000000000000000000000000000000000000000000000000000002";
-const BUCKET: &str = "fleet-artifacts";
-
-/// A running Garage container, removed on drop.
-struct Garage {
-    name: String,
-    endpoint: String,
-}
-
-impl Drop for Garage {
-    fn drop(&mut self) {
-        // -v also removes the container's anonymous volumes (Garage declares a VOLUME).
-        let _ = Command::new("docker")
-            .args(["rm", "-f", "-v", &self.name])
-            .output();
-    }
-}
-
-fn docker(args: &[&str]) -> Result<(), String> {
-    let out = Command::new("docker")
-        .args(args)
-        .stdout(Stdio::null())
-        .output()
-        .map_err(|e| {
-            format!(
-                "cannot run docker ({e}). The S3 half of the blob contract needs Docker: install \
-                 and start it, or run only the filesystem half with \
-                 `cargo nextest run -p fleet-blob -E 'not test(garage)'`"
-            )
-        })?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "docker {} failed: {}",
-            args.first().unwrap_or(&""),
-            String::from_utf8_lossy(&out.stderr)
-        ))
-    }
-}
-
-impl Garage {
-    fn start() -> Result<Self, String> {
-        let port = TcpListener::bind("127.0.0.1:0")
-            .and_then(|l| l.local_addr())
-            .map_err(|e| e.to_string())?
-            .port();
-        let name = format!("fleet-blob-garage-{}-{port}", std::process::id());
-        let toml = std::env::temp_dir().join(format!("{name}.toml"));
-        std::fs::write(&toml, GARAGE_TOML).map_err(|e| e.to_string())?;
-        // Created before it is configured, so a failure below still removes it on drop.
-        let garage = Self {
-            endpoint: format!("http://127.0.0.1:{port}"),
-            name,
-        };
-        let env = |k: &str, v: &str| format!("{k}={v}");
-        docker(&[
-            "create",
-            "--name",
-            &garage.name,
-            "-e",
-            &env("GARAGE_DEFAULT_ACCESS_KEY", ACCESS_KEY),
-            "-e",
-            &env("GARAGE_DEFAULT_SECRET_KEY", SECRET_KEY),
-            "-e",
-            &env("GARAGE_DEFAULT_BUCKET", BUCKET),
-            "-e",
-            &env("GARAGE_RPC_SECRET", RPC_SECRET),
-            "-p",
-            &format!("127.0.0.1:{port}:3900"),
-            IMAGE,
-            "/garage",
-            "server",
-            "--single-node",
-            "--default-bucket",
-        ])?;
-        let copied = docker(&[
-            "cp",
-            toml.to_str().ok_or("temp path is not UTF-8")?,
-            &format!("{}:/etc/garage.toml", garage.name),
-        ]);
-        let _ = std::fs::remove_file(&toml);
-        copied?;
-        docker(&["start", &garage.name])?;
-        Ok(garage)
-    }
-
-    fn config(&self) -> S3Config {
-        S3Config {
-            endpoint: self.endpoint.clone(),
-            region: "garage".into(),
-            bucket: BUCKET.into(),
-            access_key_id: ACCESS_KEY.into(),
-            secret_access_key: SECRET_KEY.into(),
-        }
-    }
-
-    /// Waits until the S3 API answers: Garage needs a few seconds to elect itself and lay out.
-    async fn ready_store(&self) -> S3 {
-        let store = S3::new(&self.config()).expect("S3 config should be valid");
-        let probe = contract::key_of(contract::project(), b"readiness probe");
-        let deadline = Instant::now() + Duration::from_secs(90);
-        loop {
-            match store.head(&probe).await {
-                Ok(_) => return store,
-                Err(e) if Instant::now() > deadline => {
-                    panic!("garage did not become ready within 90 s: {e:#?}")
-                }
-                Err(_) => tokio::time::sleep(Duration::from_millis(500)).await,
-            }
-        }
-    }
+fn checksum_header(bytes: &[u8]) -> (String, String) {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(Sha256Digest::of(bytes).as_bytes());
+    ("x-amz-checksum-sha256".to_owned(), b64)
 }
 
 #[tokio::test]
 async fn garage_meets_the_contract() {
     let garage = Garage::start().unwrap_or_else(|e| panic!("{e}"));
-    let store = garage.ready_store().await;
+    let store = garage.ready_store().await.unwrap();
     contract::run(&store).await;
+}
+
+/// Presigns a `PUT` of `bytes` to a fresh staging key, bound to their checksum.
+async fn presigned(
+    store: &impl BlobStore,
+    bytes: &[u8],
+) -> (StagingKey, String, BTreeMap<String, String>) {
+    let staging = StagingKey::new(Uuid::now_v7());
+    let (name, value) = checksum_header(bytes);
+    let headers = BTreeMap::from([(name, value)]);
+    let url = store
+        .presign_put(&staging, Duration::from_secs(300), &headers)
+        .await
+        .unwrap()
+        .expect("S3 can presign");
+    (staging, url, headers)
+}
+
+#[tokio::test]
+async fn a_presigned_put_stages_the_bytes_it_was_signed_for() {
+    let garage = Garage::start().unwrap_or_else(|e| panic!("{e}"));
+    let store = garage.ready_store().await.unwrap();
+    let bytes = b"hello direct upload".to_vec();
+    let (staging, url, headers) = presigned(&store, &bytes).await;
+
+    let mut put = reqwest::Client::new().put(&url).body(bytes.clone());
+    for (name, value) in &headers {
+        put = put.header(name, value);
+    }
+    let sent = put.send().await.unwrap();
+    assert!(sent.status().is_success(), "{}", sent.status());
+
+    let staged = store.staged(&staging).await.unwrap().expect("staged");
+    assert_eq!(staged.size, bytes.len() as u64);
+    let read = staged
+        .body
+        .try_fold(Vec::new(), |mut all, chunk| async move {
+            all.extend_from_slice(&chunk);
+            Ok(all)
+        })
+        .await
+        .unwrap();
+    assert_eq!(read, bytes);
+
+    store.delete_staged(&staging).await.unwrap();
+    assert!(store.staged(&staging).await.unwrap().is_none());
+    // Deleting what is gone is not an error.
+    store.delete_staged(&staging).await.unwrap();
+}
+
+#[tokio::test]
+async fn bytes_that_do_not_match_the_signed_checksum_are_never_staged() {
+    let garage = Garage::start().unwrap_or_else(|e| panic!("{e}"));
+    let store = garage.ready_store().await.unwrap();
+    let (staging, url, headers) = presigned(&store, b"the declared file").await;
+    let client = reqwest::Client::new();
+
+    // The right header, other bytes: the object store refuses them.
+    let (name, value) = headers.iter().next().unwrap();
+    let wrong = client
+        .put(&url)
+        .header(name, value)
+        .body(b"other bytes".to_vec())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), 400, "{}", wrong.text().await.unwrap());
+
+    // Without the signed header the request is not the one that was signed.
+    let unsigned = client
+        .put(&url)
+        .body(b"the declared file".to_vec())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(unsigned.status(), 400);
+
+    assert!(store.staged(&staging).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn a_sweep_removes_only_stale_unkept_staged_objects() {
+    let garage = Garage::start().unwrap_or_else(|e| panic!("{e}"));
+    let store = garage.ready_store().await.unwrap();
+    let (kept, kept_url, kept_headers) = presigned(&store, b"kept").await;
+    let (gone, gone_url, gone_headers) = presigned(&store, b"abandoned").await;
+    let client = reqwest::Client::new();
+    for (url, headers, body) in [
+        (&kept_url, &kept_headers, &b"kept"[..]),
+        (&gone_url, &gone_headers, &b"abandoned"[..]),
+    ] {
+        let (name, value) = headers.iter().next().unwrap();
+        let sent = client
+            .put(url)
+            .header(name, value)
+            .body(body.to_vec())
+            .send()
+            .await
+            .unwrap();
+        assert!(sent.status().is_success());
+    }
+
+    // "Older than an hour from now" makes both stale; only the unkept one goes.
+    let later = OffsetDateTime::now_utc() + time::Duration::hours(1);
+    let removed = store.sweep_staged(&[kept.artifact()], later).await.unwrap();
+    assert_eq!(removed, 1);
+    assert!(store.staged(&kept).await.unwrap().is_some());
+    assert!(store.staged(&gone).await.unwrap().is_none());
 }

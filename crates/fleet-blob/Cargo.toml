@@ -11,10 +11,15 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Garage in Docker for other crates' tests (see `testing`).
+test-util = ["tokio/time"]
+
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
 futures-util.workspace = true
+http.workspace = true
 infer.workspace = true
 object_store.workspace = true
 # Not called here: object_store's HTTP client needs reqwest's rustls features, which the workspace
@@ -33,5 +38,8 @@ uuid = { workspace = true, features = ["v7"] }
 zip.workspace = true
 
 [dev-dependencies]
+base64.workspace = true
+# Enables `testing` for this crate's own integration tests.
+fleet-blob = { path = ".", features = ["test-util"] }
 proptest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "process", "net", "time"] }

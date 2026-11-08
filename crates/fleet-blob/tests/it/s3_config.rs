@@ -10,6 +10,7 @@ fn config() -> S3Config {
         bucket: "fleet-artifacts".into(),
         access_key_id: "GKaccess-id-123".into(),
         secret_access_key: "very-secret-key-456".into(),
+        public_endpoint: None,
     }
 }
 

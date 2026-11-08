@@ -9,19 +9,23 @@
 //! Larger ones go up as a multipart upload that is aborted if the digest or size is wrong, so a
 //! bad body never becomes visible.
 
-use std::{io, ops::Range, sync::Arc};
+use std::{collections::BTreeMap, io, ops::Range, sync::Arc, time::Duration};
 
 use bytes::BytesMut;
 use futures_util::{StreamExt, stream::BoxStream};
+use http::{HeaderName, HeaderValue, Method};
 use object_store::{
-    GetOptions, GetRange, ObjectStore, ObjectStoreExt, PutPayload, WriteMultipart,
-    aws::AmazonS3Builder, path::Path,
+    GetOptions, GetRange, ObjectMeta, ObjectStore, ObjectStoreExt, PutPayload, WriteMultipart,
+    aws::{AmazonS3, AmazonS3Builder},
+    path::Path,
+    signer::{SignedUrlOptions, Signer},
 };
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{
-    BlobError, BlobInfo, BlobKey, BlobRead, BlobStore, ByteStream, PutOutcome, Scope, check::Check,
-    store::resolve_range,
+    BlobError, BlobInfo, BlobKey, BlobRead, BlobStore, ByteStream, PutOutcome, Scope, StagingKey,
+    check::Check, key::STAGING_PREFIX, store::resolve_range,
 };
 
 /// Largest blob written with a single `PUT`. Also the memory a `put` may hold.
@@ -45,6 +49,10 @@ pub struct S3Config {
     pub access_key_id: String,
     /// Secret access key.
     pub secret_access_key: String,
+    /// Base URL agents reach the bucket at, when that differs from `endpoint` (a Compose
+    /// network name is not reachable from an agent). Presigned direct uploads name this host.
+    /// `None` uses `endpoint`.
+    pub public_endpoint: Option<String>,
 }
 
 impl std::fmt::Debug for S3Config {
@@ -55,6 +63,7 @@ impl std::fmt::Debug for S3Config {
             .field("bucket", &self.bucket)
             .field("access_key_id", &"<redacted>")
             .field("secret_access_key", &"<redacted>")
+            .field("public_endpoint", &self.public_endpoint)
             .finish()
     }
 }
@@ -63,6 +72,9 @@ impl std::fmt::Debug for S3Config {
 #[derive(Clone)]
 pub struct S3 {
     store: Arc<dyn ObjectStore>,
+    /// The same client as `store`, kept concrete: only it can sign URLs. Built for the public
+    /// endpoint, so a presigned URL names the host an agent can reach. It makes no requests.
+    signer: Arc<AmazonS3>,
     bucket: String,
 }
 
@@ -90,25 +102,44 @@ impl S3 {
                 return Err(BlobError::Config(format!("s3 {name} is empty")));
             }
         }
-        let store = AmazonS3Builder::new()
-            .with_endpoint(&config.endpoint)
-            .with_region(&config.region)
-            .with_bucket_name(&config.bucket)
-            .with_access_key_id(&config.access_key_id)
-            .with_secret_access_key(&config.secret_access_key)
-            .with_virtual_hosted_style_request(false)
-            .with_allow_http(config.endpoint.starts_with("http://"))
-            .build()
-            .map_err(|e| BlobError::Config(format!("s3: {e}")))?;
+        let store = Arc::new(client(config, &config.endpoint)?);
+        let public = config
+            .public_endpoint
+            .as_deref()
+            .unwrap_or(&config.endpoint);
+        let signer = if public == config.endpoint {
+            Arc::clone(&store)
+        } else {
+            Arc::new(client(config, public)?)
+        };
         Ok(Self {
-            store: Arc::new(store),
+            store,
+            signer,
             bucket: config.bucket.clone(),
         })
     }
 }
 
+/// An `object_store` client for `endpoint` with the configured bucket and credentials.
+fn client(config: &S3Config, endpoint: &str) -> Result<AmazonS3, BlobError> {
+    AmazonS3Builder::new()
+        .with_endpoint(endpoint)
+        .with_region(&config.region)
+        .with_bucket_name(&config.bucket)
+        .with_access_key_id(&config.access_key_id)
+        .with_secret_access_key(&config.secret_access_key)
+        .with_virtual_hosted_style_request(false)
+        .with_allow_http(endpoint.starts_with("http://"))
+        .build()
+        .map_err(|e| BlobError::Config(format!("s3: {e}")))
+}
+
 fn path(key: &BlobKey) -> Path {
     Path::from(key.path())
+}
+
+fn staging_path(key: &StagingKey) -> Path {
+    Path::from(format!("{STAGING_PREFIX}/{}", key.artifact().hyphenated()))
 }
 
 fn backend(context: &'static str) -> impl FnOnce(object_store::Error) -> BlobError {
@@ -127,15 +158,18 @@ fn found<T>(
     }
 }
 
-fn info(key: BlobKey, meta: &object_store::ObjectMeta) -> BlobInfo {
-    let nanos = i128::from(meta.last_modified.timestamp()) * 1_000_000_000
-        + i128::from(meta.last_modified.timestamp_subsec_nanos());
+fn info(key: BlobKey, meta: &ObjectMeta) -> BlobInfo {
     BlobInfo {
         key,
         size: meta.size,
-        last_modified: OffsetDateTime::from_unix_timestamp_nanos(nanos)
-            .unwrap_or(OffsetDateTime::UNIX_EPOCH),
+        last_modified: offset(meta),
     }
+}
+
+fn offset(meta: &ObjectMeta) -> OffsetDateTime {
+    let nanos = i128::from(meta.last_modified.timestamp()) * 1_000_000_000
+        + i128::from(meta.last_modified.timestamp_subsec_nanos());
+    OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap_or(OffsetDateTime::UNIX_EPOCH)
 }
 
 async fn drain(mut body: ByteStream<'_>, check: &mut Check) -> Result<(), BlobError> {
@@ -259,6 +293,81 @@ impl BlobStore for S3 {
         found(self.store.delete(&path(key)).await, "deleting the blob").map(|_| ())
     }
 
+    async fn presign_put(
+        &self,
+        staging: &StagingKey,
+        ttl: Duration,
+        headers: &BTreeMap<String, String>,
+    ) -> Result<Option<String>, BlobError> {
+        let mut options = SignedUrlOptions::default();
+        for (name, value) in headers {
+            let name = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|e| BlobError::backend("presigning an upload", e))?;
+            let value = HeaderValue::from_str(value)
+                .map_err(|e| BlobError::backend("presigning an upload", e))?;
+            options = options.with_signed_header(name, value);
+        }
+        let url = self
+            .signer
+            .signed_url_opts(Method::PUT, &staging_path(staging), ttl, &options)
+            .await
+            .map_err(backend("presigning an upload"))?;
+        Ok(Some(url.to_string()))
+    }
+
+    async fn staged(&self, staging: &StagingKey) -> Result<Option<BlobRead>, BlobError> {
+        let Some(result) = found(
+            self.store.get(&staging_path(staging)).await,
+            "reading the staged upload",
+        )?
+        else {
+            return Ok(None);
+        };
+        let size = result.meta.size;
+        let body = result
+            .into_stream()
+            .map(|chunk| chunk.map_err(io::Error::other))
+            .boxed();
+        Ok(Some(BlobRead {
+            size,
+            range: 0..size,
+            body,
+        }))
+    }
+
+    async fn delete_staged(&self, staging: &StagingKey) -> Result<(), BlobError> {
+        found(
+            self.store.delete(&staging_path(staging)).await,
+            "deleting the staged upload",
+        )
+        .map(|_| ())
+    }
+
+    async fn sweep_staged(
+        &self,
+        keep: &[Uuid],
+        older_than: OffsetDateTime,
+    ) -> Result<u64, BlobError> {
+        let prefix = Path::from(STAGING_PREFIX);
+        let mut listing = self.store.list(Some(&prefix));
+        let mut removed = 0;
+        while let Some(meta) = listing.next().await {
+            let meta = meta.map_err(backend("listing staged uploads"))?;
+            let Some(staging) = StagingKey::from_path(meta.location.as_ref()) else {
+                continue;
+            };
+            if keep.contains(&staging.artifact()) || offset(&meta) >= older_than {
+                continue;
+            }
+            found(
+                self.store.delete(&meta.location).await,
+                "deleting a stale staged upload",
+            )?;
+            removed += 1;
+        }
+        Ok(removed)
+    }
+
     fn list(&self, scope: Scope) -> BoxStream<'_, Result<BlobInfo, BlobError>> {
         let prefix = match scope {
             Scope::All => None,
@@ -279,5 +388,88 @@ impl BlobStore for S3 {
                 }
             })
             .boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(public: Option<&str>) -> S3Config {
+        S3Config {
+            endpoint: "http://garage:3900".into(),
+            region: "garage".into(),
+            bucket: "fleet-artifacts".into(),
+            access_key_id: "GKexample".into(),
+            secret_access_key: "example-secret".into(),
+            public_endpoint: public.map(str::to_owned),
+        }
+    }
+
+    fn checksum() -> BTreeMap<String, String> {
+        BTreeMap::from([("x-amz-checksum-sha256".to_owned(), "AAAA".to_owned())])
+    }
+
+    #[tokio::test]
+    async fn a_presigned_put_names_the_staging_object_and_binds_the_headers() {
+        let s3 = S3::new(&config(None)).unwrap();
+        let staging = StagingKey::new(Uuid::nil());
+        let url = s3
+            .presign_put(&staging, Duration::from_secs(600), &checksum())
+            .await
+            .unwrap()
+            .expect("S3 presigns");
+        let url = reqwest::Url::parse(&url).unwrap();
+        assert_eq!(url.host_str(), Some("garage"));
+        assert_eq!(
+            url.path(),
+            "/fleet-artifacts/uploads/00000000-0000-0000-0000-000000000000"
+        );
+        let query: BTreeMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(query.get("X-Amz-Expires").map(String::as_str), Some("600"));
+        assert_eq!(
+            query.get("X-Amz-SignedHeaders").map(String::as_str),
+            Some("host;x-amz-checksum-sha256")
+        );
+        assert!(query.contains_key("X-Amz-Signature"));
+    }
+
+    #[tokio::test]
+    async fn the_signing_host_is_the_public_endpoint_when_one_is_set() {
+        let s3 = S3::new(&config(Some("https://files.example.org/store"))).unwrap();
+        let url = s3
+            .presign_put(
+                &StagingKey::new(Uuid::nil()),
+                Duration::from_secs(60),
+                &checksum(),
+            )
+            .await
+            .unwrap()
+            .expect("S3 presigns");
+        let url = reqwest::Url::parse(&url).unwrap();
+        assert_eq!(url.host_str(), Some("files.example.org"));
+        assert_eq!(url.scheme(), "https");
+    }
+
+    #[tokio::test]
+    async fn headers_the_signer_owns_are_refused_not_dropped() {
+        let s3 = S3::new(&config(None)).unwrap();
+        let headers = BTreeMap::from([("content-length".to_owned(), "5".to_owned())]);
+        let err = s3
+            .presign_put(
+                &StagingKey::new(Uuid::nil()),
+                Duration::from_secs(60),
+                &headers,
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, BlobError::Backend { .. }), "{err:?}");
+    }
+
+    #[test]
+    fn the_public_endpoint_is_never_printed_with_secrets() {
+        let shown = format!("{:?}", config(Some("https://files.example.org")));
+        assert!(shown.contains("files.example.org"), "{shown}");
+        assert!(!shown.contains("example-secret"), "{shown}");
     }
 }

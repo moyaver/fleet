@@ -136,3 +136,21 @@ async fn leftover_temp_files_are_swept_once_they_are_old_enough_and_blobs_are_no
     let empty = LocalFs::new(dir.0.join("empty")).unwrap();
     assert_eq!(empty.sweep_stale_uploads(cutoff).await.unwrap(), 0);
 }
+
+#[tokio::test]
+async fn local_disk_cannot_presign_so_direct_uploads_fall_back_to_relaying() {
+    let dir = std::env::temp_dir().join(format!("fleet-blob-presign-{}", uuid::Uuid::now_v7()));
+    let store = fleet_blob::LocalFs::new(&dir).unwrap();
+    let staging = fleet_blob::StagingKey::new(uuid::Uuid::now_v7());
+    let headers = std::collections::BTreeMap::new();
+    let ttl = std::time::Duration::from_secs(60);
+    assert_eq!(
+        store.presign_put(&staging, ttl, &headers).await.unwrap(),
+        None
+    );
+    assert!(store.staged(&staging).await.unwrap().is_none());
+    store.delete_staged(&staging).await.unwrap();
+    let later = time::OffsetDateTime::now_utc() + time::Duration::hours(1);
+    assert_eq!(store.sweep_staged(&[], later).await.unwrap(), 0);
+    let _ = std::fs::remove_dir_all(&dir);
+}
