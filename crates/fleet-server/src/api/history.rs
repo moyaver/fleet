@@ -22,7 +22,7 @@ use fleet_store::screens::{HistoryCursor, HistoryQuery, LOOKBACK};
 use serde::Deserialize;
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 
-use super::{ApiError, error, internal, read_project};
+use super::{ApiError, error, internal, read_project, triage::triage_of};
 use crate::{session::Caller, state::AppState};
 
 /// The window a request gets when it names none.
@@ -145,12 +145,28 @@ pub(super) async fn history(
     };
     match state.store.history(project, &query).await {
         Ok(data) => {
-            let flows: BTreeSet<&str> = data.items.iter().map(|i| i.flow.as_str()).collect();
+            let flows: BTreeSet<String> = data.items.iter().map(|i| i.flow.clone()).collect();
+            let flows = flakiness(&data.runs, flows.iter().map(String::as_str));
+            let mut items = data.items;
+            let fingerprints: Vec<String> = items
+                .iter()
+                .filter_map(|i| i.failure_fingerprint.clone())
+                .collect();
+            let triage = match triage_of(&state, project, &fingerprints).await {
+                Ok(t) => t,
+                Err(r) => return *r,
+            };
+            for item in &mut items {
+                item.triage = item
+                    .failure_fingerprint
+                    .as_ref()
+                    .and_then(|f| triage.get(f).cloned());
+            }
             Json(HistoryPage {
                 from,
                 to,
-                flows: flakiness(&data.runs, flows),
-                items: data.items,
+                flows,
+                items,
                 next_cursor: data.next.map(|c| c.encode()),
             })
             .into_response()
@@ -187,7 +203,19 @@ pub(super) async fn flow_stats(
         Err(r) => return *r,
     };
     match state.store.flow_stats(project, &name, from, to).await {
-        Ok(Some(data)) => {
+        Ok(Some(mut data)) => {
+            let fingerprints: Vec<String> = data
+                .recent_failures
+                .iter()
+                .map(|f| f.fingerprint.clone())
+                .collect();
+            let triage = match triage_of(&state, project, &fingerprints).await {
+                Ok(t) => t,
+                Err(r) => return *r,
+            };
+            for failure in &mut data.recent_failures {
+                failure.triage = triage.get(&failure.fingerprint).cloned();
+            }
             let flakiness = flakiness(&data.runs, [name.as_str()])
                 .pop()
                 .unwrap_or_else(|| FlowFlakinessView {

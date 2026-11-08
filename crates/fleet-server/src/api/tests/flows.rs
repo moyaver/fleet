@@ -225,14 +225,27 @@ async fn a_failed_flow_shows_every_claim_its_steps_and_where_it_went_wrong() {
     assert_eq!(view["steps"][0]["source"], "debug_log");
     assert!(view["steps"][0]["started_at"].is_string() && view["steps"][0]["ended_at"].is_string());
 
+    // The failure names its fingerprint, and that fingerprint is untriaged until a maintainer acts
+    // (issue #84).
+    let fingerprint = view["failure"]["fingerprint"].as_str().unwrap();
+    assert!(fingerprint.starts_with("v1:"), "{fingerprint}");
     assert_eq!(
         view["failure"],
         json!({
             "message": "Element not found: Done",
             "failed_step_index": 2,
-            "last_successful_step_index": 1
+            "last_successful_step_index": 1,
+            "fingerprint": fingerprint,
+            "triage": {
+                "fingerprint": fingerprint,
+                "state": null,
+                "issue_url": null,
+                "first_seen_at": view["failure"]["triage"]["first_seen_at"],
+                "updated_at": null
+            }
         })
     );
+    assert!(view["failure"]["triage"]["first_seen_at"].is_string());
     assert_eq!(view["artifacts"], json!([]), "artifacts arrive with M5");
 }
 

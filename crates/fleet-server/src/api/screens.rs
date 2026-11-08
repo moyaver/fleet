@@ -227,6 +227,17 @@ pub(super) async fn flow(
                 &d.agent_run.state,
                 d.agent_run.last_frame_at,
             ));
+            // A final failure shows its fingerprint and what was recorded about it (issue #84).
+            match state.store.execution_failure_triage(project, flow).await {
+                Ok(Some(triage)) => {
+                    if let Some(failure) = d.failure.as_mut() {
+                        failure.fingerprint = Some(triage.fingerprint.clone());
+                        failure.triage = Some(triage);
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => return internal(&e),
+            }
             Json(d).into_response()
         }
         Ok(None) => error(StatusCode::NOT_FOUND, "no such flow"),
