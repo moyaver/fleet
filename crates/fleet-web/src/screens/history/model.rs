@@ -9,8 +9,8 @@
 use fleet_protocol::{
     frame::RunOrigin,
     rest::history::{
-        FailureTriageView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
-        HistoryEntryView, HistoryPage,
+        FailureTriageView, Flakiness, FlakyEvidenceView, FlowCatalogPage, FlowFlakinessView,
+        FlowStatsView, HistoryEntryView, HistoryPage, HistoryTrendView, TrendDayView,
     },
 };
 use fleet_ui::{
@@ -33,6 +33,9 @@ use crate::{
     status::{Pill, flow_provenance, flow_state_pill},
 };
 
+/// The CI providers screen E's filter offers: the ones the store records.
+pub const CI_PROVIDERS: [&str; 2] = ["github_actions", "generic"];
+
 /// The flow states the outcome filter offers.
 pub const OUTCOMES: [&str; 5] = ["passed", "failed", "skipped", "interrupted", "unknown"];
 
@@ -41,11 +44,23 @@ pub const OUTCOMES: [&str; 5] = ["passed", "failed", "skipped", "interrupted", "
 pub fn filter_spec() -> FilterSpec {
     FilterSpec::new(vec![
         FilterField::new("flow", FilterKind::Text),
+        FilterField::new("tag", FilterKind::Text),
         FilterField::new("branch", FilterKind::Text),
         FilterField::new(
             "outcome",
             FilterKind::Choice(OUTCOMES.iter().map(|o| (*o).to_owned()).collect()),
         ),
+        FilterField::new("device_model", FilterKind::Text),
+        FilterField::new("os_version", FilterKind::Text),
+        FilterField::new("runner", FilterKind::Text),
+        FilterField::new("device", FilterKind::Text),
+        FilterField::new(
+            "ci_provider",
+            FilterKind::Choice(CI_PROVIDERS.iter().map(|c| (*c).to_owned()).collect()),
+        ),
+        FilterField::new("commit", FilterKind::Text),
+        FilterField::new("fingerprint", FilterKind::Text),
+        FilterField::new("suite", FilterKind::Text),
         FilterField::new("from", FilterKind::Instant),
         FilterField::new("to", FilterKind::Instant),
     ])
@@ -59,10 +74,28 @@ pub const STATS_PARAM: &str = "stats";
 pub struct HistoryQuery {
     /// Text the flow's path or name contains.
     pub flow: Option<String>,
+    /// A tag the flow's header carries.
+    pub tag: Option<String>,
     /// A branch.
     pub branch: Option<String>,
     /// A flow state.
     pub outcome: Option<String>,
+    /// Text the device's model contains.
+    pub device_model: Option<String>,
+    /// Text the device's OS version contains.
+    pub os_version: Option<String>,
+    /// Text the runner's name contains.
+    pub runner: Option<String>,
+    /// Text the device's serial contains.
+    pub device: Option<String>,
+    /// The CI provider.
+    pub ci_provider: Option<String>,
+    /// A commit SHA, or the start of one.
+    pub commit: Option<String>,
+    /// A failure fingerprint.
+    pub fingerprint: Option<String>,
+    /// A suite ID.
+    pub suite: Option<String>,
     /// Window start, RFC 3339.
     pub from: Option<String>,
     /// Window end, RFC 3339.
@@ -70,6 +103,22 @@ pub struct HistoryQuery {
     /// The flow whose stats panel is open.
     pub stats: Option<String>,
 }
+
+/// The filter parameters in the order the request and the URL write them.
+const FILTER_PARAMS: [&str; 12] = [
+    "flow",
+    "tag",
+    "branch",
+    "outcome",
+    "device_model",
+    "os_version",
+    "runner",
+    "device",
+    "ci_provider",
+    "commit",
+    "fingerprint",
+    "suite",
+];
 
 impl HistoryQuery {
     /// Reads the page's URL query (`location.search`, with or without `?`). A value a filter
@@ -81,8 +130,17 @@ impl HistoryQuery {
         let get = |key: &str| state.get(&spec, key).map(str::to_owned);
         Self {
             flow: get("flow"),
+            tag: get("tag"),
             branch: get("branch"),
             outcome: get("outcome"),
+            device_model: get("device_model"),
+            os_version: get("os_version"),
+            runner: get("runner"),
+            device: get("device"),
+            ci_provider: get("ci_provider"),
+            commit: get("commit"),
+            fingerprint: get("fingerprint"),
+            suite: get("suite"),
             from: get("from"),
             to: get("to"),
             stats: query_param(query, STATS_PARAM),
@@ -93,13 +151,7 @@ impl HistoryQuery {
     #[must_use]
     pub fn rest_query(&self, cursor: Option<&str>) -> String {
         let mut parts = Vec::new();
-        for (key, value) in [
-            ("flow", &self.flow),
-            ("branch", &self.branch),
-            ("outcome", &self.outcome),
-            ("from", &self.from),
-            ("to", &self.to),
-        ] {
+        for (key, value) in self.params() {
             if let Some(v) = value {
                 parts.push(format!("{key}={}", escape(v)));
             }
@@ -108,6 +160,29 @@ impl HistoryQuery {
             parts.push(format!("cursor={}", escape(c)));
         }
         parts.join("&")
+    }
+
+    /// Every filter and the window, by parameter name, in request order.
+    fn params(&self) -> Vec<(&'static str, &Option<String>)> {
+        let values = [
+            &self.flow,
+            &self.tag,
+            &self.branch,
+            &self.outcome,
+            &self.device_model,
+            &self.os_version,
+            &self.runner,
+            &self.device,
+            &self.ci_provider,
+            &self.commit,
+            &self.fingerprint,
+            &self.suite,
+        ];
+        let mut params: Vec<(&'static str, &Option<String>)> =
+            FILTER_PARAMS.into_iter().zip(values).collect();
+        params.push(("from", &self.from));
+        params.push(("to", &self.to));
+        params
     }
 
     /// The stats request's query string: the same window.
@@ -209,6 +284,10 @@ pub struct HistoryRow {
     pub stats_query: String,
     /// Whether this flow's stats panel is the open one.
     pub stats_open: bool,
+    /// The flow's tags, from its header.
+    pub tags: Vec<String>,
+    /// What the run ran on, as lines: the device, its OS, the runner, the CI and the suite.
+    pub facts: Vec<String>,
     /// For a failed run, how to rerun it (issue #82).
     pub rerun: Option<RerunCell>,
 }
@@ -296,11 +375,37 @@ fn row(
             .map(|i| flow_provenance(&i.finality, "failed", None, None)),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
         stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
+        tags: e.tags.clone(),
+        facts: run_facts(e),
         rerun: (e.state == "failed").then(|| RerunCell {
             repro: e.reproduction.clone(),
             manifest: manifest_href(&ctx.project, e.attempt_id),
         }),
     }
+}
+
+/// What a run ran on, one line each, for the facts the server knows; a fact it doesn't is left out.
+fn run_facts(e: &HistoryEntryView) -> Vec<String> {
+    let mut facts = Vec::new();
+    if let Some(model) = &e.device_model {
+        facts.push(format!("Device model {model}"));
+    }
+    if let Some(os) = &e.os_version {
+        facts.push(format!("OS version {os}"));
+    }
+    if let Some(device) = &e.device {
+        facts.push(format!("Device {device}"));
+    }
+    if let Some(runner) = &e.runner {
+        facts.push(format!("Runner {runner}"));
+    }
+    if let Some(ci) = &e.ci_provider {
+        facts.push(format!("CI {ci}"));
+    }
+    if let Some(suite) = e.suite_id {
+        facts.push(format!("Suite {suite}"));
+    }
+    facts
 }
 
 fn badge(flakiness: Flakiness) -> Option<FlakyBadge> {
@@ -931,5 +1036,343 @@ mod tests {
         );
         assert_eq!(panel.durations, Vec::<String>::new());
         assert_eq!(panel.chart, None);
+    }
+}
+
+/// One flow in the catalog: what it is, its tags, and what it last did.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CatalogRow {
+    /// The flow's identity (its path, or its name).
+    pub flow: String,
+    /// The flow's name, when it differs from its identity.
+    pub name: Option<String>,
+    /// The flow's tags.
+    pub tags: Vec<String>,
+    /// Its latest finished run, or that it has none.
+    pub last: LastRun,
+    /// The URL that opens its stats panel.
+    pub stats_query: String,
+    /// Whether its stats panel is open.
+    pub stats_open: bool,
+}
+
+/// What a catalog row says about a flow's last run.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LastRun {
+    /// No execution of the flow was ever recorded. Plain words, not a mark (issue #149).
+    NeverRun,
+    /// Executions were recorded, but none has finished.
+    NoFinishedRun,
+    /// The latest finished run, with its state and the provenance of that state.
+    Ran {
+        /// The state, as the history names it.
+        pill: Pill,
+        /// When it ended, in the viewer's time.
+        time: String,
+        /// The provenance of the state.
+        provenance: Provenance,
+        /// What the finality means, for a hover title.
+        finality_note: &'static str,
+    },
+}
+
+/// The flow catalog's rows, in the server's order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CatalogTable {
+    /// The flows shown so far.
+    pub rows: Vec<CatalogRow>,
+    /// Pass this as the cursor for the next page; `None` on the last one.
+    pub next_cursor: Option<String>,
+}
+
+impl CatalogTable {
+    /// The rows of the pages shown so far, with the stats links for `current`.
+    #[must_use]
+    pub fn build(pages: &[FlowCatalogPage], ctx: &Ctx, current: &str) -> Self {
+        let rows = pages
+            .iter()
+            .flat_map(|p| p.items.iter())
+            .map(|f| {
+                let name = (f.name != f.flow).then(|| f.name.clone());
+                let last = match &f.last {
+                    _ if f.executions == 0 => LastRun::NeverRun,
+                    None => LastRun::NoFinishedRun,
+                    Some(last) => LastRun::Ran {
+                        pill: flow_state_pill(&last.state),
+                        time: ctx.time(unix_ms(last.at)),
+                        provenance: flow_provenance(
+                            &last.finality,
+                            &last.state,
+                            last.outcome_source.as_deref(),
+                            None,
+                        ),
+                        finality_note: finality_note(&last.finality),
+                    },
+                };
+                CatalogRow {
+                    flow: f.flow.clone(),
+                    name,
+                    tags: f.tags.clone(),
+                    last,
+                    stats_query: with_query_param(current, STATS_PARAM, Some(&f.flow)),
+                    stats_open: query_param(current, STATS_PARAM).as_deref()
+                        == Some(f.flow.as_str()),
+                }
+            })
+            .collect();
+        let next_cursor = pages.last().and_then(|p| p.next_cursor.clone());
+        Self { rows, next_cursor }
+    }
+}
+
+/// One day of the trend, as the table shows it. A figure the server doesn't have reads `—`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrendDayRow {
+    /// The day, `YYYY-MM-DD`, in UTC.
+    pub day: String,
+    /// Settled passes.
+    pub passed: String,
+    /// Settled failures.
+    pub failed: String,
+    /// Flaky runs.
+    pub flaky: String,
+    /// Median duration.
+    pub p50: String,
+    /// 95th percentile duration.
+    pub p95: String,
+}
+
+/// The project trend over the filtered runs: the headline figures, the days, and the duration
+/// charts (drawn from three days on, listed in words before that).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrendPanel {
+    /// The window, in the viewer's time.
+    pub window: String,
+    /// The headline figures.
+    pub tiles: Vec<Tile>,
+    /// One row per day that has a run, oldest first.
+    pub days: Vec<TrendDayRow>,
+    /// The median duration per day, when there are enough days to draw.
+    pub median_chart: Option<Series>,
+    /// The 95th percentile duration per day, when there are enough days to draw.
+    pub p95_chart: Option<Series>,
+}
+
+impl TrendPanel {
+    /// The panel of `view`.
+    #[must_use]
+    pub fn build(view: &HistoryTrendView, ctx: &Ctx) -> Self {
+        let value = |v: Option<i64>| v.map_or_else(|| "—".to_owned(), format_duration);
+        let count = |n: i64| n.to_string();
+        let tiles = vec![
+            tile("Passed", Some(count(view.passed)), "passed"),
+            tile("Failed", Some(count(view.failed)), "failed"),
+            tile("Flaky", Some(count(view.flaky)), "flaky"),
+            tile(
+                "Median duration",
+                view.duration_p50_ms.map(format_duration),
+                "p50",
+            ),
+            tile(
+                "95th percentile",
+                view.duration_p95_ms.map(format_duration),
+                "p95",
+            ),
+        ];
+        let days: Vec<&TrendDayView> = view.days.iter().collect();
+        let median: Vec<Point> = days
+            .iter()
+            .filter_map(|d| {
+                Some(Point {
+                    at_ms: day_ms(&d.day)?,
+                    reading: Reading::Value(duration_value(d.duration_p50_ms?)),
+                })
+            })
+            .collect();
+        let p95: Vec<Point> = days
+            .iter()
+            .filter_map(|d| {
+                Some(Point {
+                    at_ms: day_ms(&d.day)?,
+                    reading: Reading::Value(duration_value(d.duration_p95_ms?)),
+                })
+            })
+            .collect();
+        let chart = |name: &str, points: Vec<Point>| {
+            (points.len() >= CHART_MIN_POINTS).then(|| {
+                Series::new(
+                    Metric {
+                        name: name.to_owned(),
+                        unit: Unit::Millis,
+                    },
+                    points,
+                )
+            })
+        };
+        Self {
+            window: format!(
+                "{} to {}",
+                ctx.time(unix_ms(view.from)),
+                ctx.time(unix_ms(view.to))
+            ),
+            tiles,
+            days: days
+                .into_iter()
+                .map(|d| TrendDayRow {
+                    day: d.day.clone(),
+                    passed: count(d.passed),
+                    failed: count(d.failed),
+                    flaky: count(d.flaky),
+                    p50: value(d.duration_p50_ms),
+                    p95: value(d.duration_p95_ms),
+                })
+                .collect(),
+            median_chart: chart("Median duration", median),
+            p95_chart: chart("95th percentile duration", p95),
+        }
+    }
+}
+
+/// Midnight UTC of a `YYYY-MM-DD` day, in unix ms; `None` for any other text.
+fn day_ms(day: &str) -> Option<i64> {
+    let mut parts = day.split('-');
+    let year: i32 = parts.next()?.parse().ok()?;
+    let month: u8 = parts.next()?.parse().ok()?;
+    let date = time::Date::from_calendar_date(
+        year,
+        time::Month::try_from(month).ok()?,
+        parts.next()?.parse().ok()?,
+    )
+    .ok()?;
+    let at = date.midnight().assume_utc();
+    Some(unix_ms(at))
+}
+
+#[cfg(test)]
+mod catalog_and_trend_tests {
+    use super::*;
+    use time::OffsetDateTime;
+
+    fn ctx() -> Ctx {
+        Ctx {
+            project: "shop".to_owned(),
+            now_ms: 1_767_265_200_000,
+            utc_offset_minutes: 0,
+        }
+    }
+
+    #[test]
+    fn the_filters_of_issue_85_read_from_the_address_and_are_written_back_to_it() {
+        let q = HistoryQuery::parse(
+            "flow=flows%2F&tag=smoke&ci_provider=github_actions&suite=0000&device_model=Pixel&os_version=16&runner=r-1&device=5554&commit=abc&fingerprint=v1%3A0123456789abcdef&from=2026-01-01T00%3A00%3A00Z",
+        );
+        assert_eq!(q.tag.as_deref(), Some("smoke"));
+        assert_eq!(q.ci_provider.as_deref(), Some("github_actions"));
+        let rest = q.rest_query(None);
+        for part in [
+            "flow=flows%2F",
+            "tag=smoke",
+            "ci_provider=github_actions",
+            "device_model=Pixel",
+            "os_version=16",
+            "runner=r-1",
+            "device=5554",
+            "commit=abc",
+            "fingerprint=v1%3A0123456789abcdef",
+            "suite=0000",
+        ] {
+            assert!(rest.contains(part), "{part} is missing from {rest}");
+        }
+        // A CI provider the page doesn't offer is dropped, as the filter bar drops it.
+        assert_eq!(HistoryQuery::parse("ci_provider=bogus").ci_provider, None);
+    }
+
+    fn catalog_flow(
+        flow: &str,
+        executions: i64,
+        last: bool,
+    ) -> fleet_protocol::rest::history::CatalogFlowView {
+        fleet_protocol::rest::history::CatalogFlowView {
+            flow: flow.to_owned(),
+            name: flow.to_owned(),
+            tags: vec!["smoke".to_owned()],
+            executions,
+            last: last.then(|| fleet_protocol::rest::history::CatalogLastRunView {
+                flow_id: Uuid::nil(),
+                state: "failed".to_owned(),
+                finality: "verified".to_owned(),
+                outcome_source: Some("junit_final".to_owned()),
+                at: OffsetDateTime::from_unix_timestamp(1_767_265_000).unwrap(),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_flow_that_never_ran_reads_never_run_in_words_and_a_run_shows_its_provenance() {
+        let page = FlowCatalogPage {
+            items: vec![
+                catalog_flow("flows/new.yaml", 0, false),
+                catalog_flow("flows/old.yaml", 3, true),
+            ],
+            next_cursor: None,
+        };
+        let table = CatalogTable::build(&[page], &ctx(), "");
+        assert!(matches!(table.rows[0].last, LastRun::NeverRun));
+        match &table.rows[1].last {
+            LastRun::Ran { pill, .. } => assert_eq!(pill.label, "Failed"),
+            other => panic!("a finished run is shown as one: {other:?}"),
+        }
+        assert_eq!(table.rows[0].tags, ["smoke"]);
+    }
+
+    #[test]
+    fn the_trend_draws_from_three_days_and_a_day_without_a_duration_reads_a_dash() {
+        let day = |d: &str, p50: Option<i64>| TrendDayView {
+            day: d.to_owned(),
+            passed: 2,
+            failed: 1,
+            flaky: 0,
+            duration_p50_ms: p50,
+            duration_p95_ms: p50.map(|v| v * 2),
+        };
+        let view = |days: Vec<TrendDayView>| HistoryTrendView {
+            from: OffsetDateTime::from_unix_timestamp(1_767_225_600).unwrap(),
+            to: OffsetDateTime::from_unix_timestamp(1_767_571_200).unwrap(),
+            days,
+            passed: 6,
+            failed: 3,
+            flaky: 0,
+            duration_samples: 9,
+            duration_p50_ms: Some(3000),
+            duration_p95_ms: Some(6000),
+        };
+        let two = TrendPanel::build(
+            &view(vec![day("2026-01-01", Some(3000)), day("2026-01-02", None)]),
+            &ctx(),
+        );
+        assert!(two.median_chart.is_none(), "two days are listed, not drawn");
+        assert_eq!(
+            two.days[1].p50, "—",
+            "a figure the server doesn't have is a dash, not 0"
+        );
+        let three = TrendPanel::build(
+            &view(vec![
+                day("2026-01-01", Some(1000)),
+                day("2026-01-02", Some(2000)),
+                day("2026-01-03", Some(3000)),
+            ]),
+            &ctx(),
+        );
+        let chart = three.median_chart.expect("three days are drawn");
+        assert_eq!(chart.points().len(), 3);
+        assert_eq!(
+            chart.points()[0].at_ms,
+            1_767_225_600_000,
+            "midnight UTC of the first day"
+        );
+        assert_eq!(
+            three.p95_chart.expect("p95 too").points()[2].reading,
+            Reading::Value(6000.0)
+        );
     }
 }
