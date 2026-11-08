@@ -390,7 +390,12 @@ fn header(view: &FlowDetailView, ctx: &Ctx) -> FlowHeader {
         title: f.name.clone(),
         path: f.path.clone(),
         state: flow_state_pill(&f.state),
-        provenance: flow_provenance(&f.finality, &f.state, view.agent_run.liveness),
+        provenance: flow_provenance(
+            &f.finality,
+            &f.state,
+            f.outcome_source.as_deref(),
+            view.agent_run.liveness,
+        ),
         finality_note: finality_note(&f.finality),
         origin: f.origin,
         conflict_warning: f.has_conflict.then_some(

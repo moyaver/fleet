@@ -532,7 +532,8 @@ fn weakest_job(jobs: &[JobView]) -> Option<Provenance> {
 
 fn attention_row(f: &FailedFlow) -> AttentionRow {
     let e = &f.entry;
-    let provenance = match flow_provenance(&e.finality, &e.state, None) {
+    let provenance = match flow_provenance(&e.finality, &e.state, e.outcome_source.as_deref(), None)
+    {
         Provenance::Final => None,
         other => Some(other),
     };

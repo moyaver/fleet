@@ -587,22 +587,28 @@ async fn steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so() 
     browser.quit().await;
 }
 
-/// A copy of the captured `paths-none` run whose command names a directory of flows, not its one
-/// flow file: the same log and files, with only the command's last word changed.
-fn unnamed_copy_of_paths_none() -> std::path::PathBuf {
-    fn copy_capture(from: &std::path::Path, to: &std::path::Path) {
+/// A copy of the captured run `name` in a new directory, every file of it.
+fn copy_of_capture(name: &str) -> std::path::PathBuf {
+    fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
         std::fs::create_dir_all(to).unwrap();
         for entry in std::fs::read_dir(from).unwrap().flatten() {
             let target = to.join(entry.file_name());
             if entry.file_type().unwrap().is_dir() {
-                copy_capture(&entry.path(), &target);
+                copy_tree(&entry.path(), &target);
             } else {
                 std::fs::copy(entry.path(), target).unwrap();
             }
         }
     }
-    let dst = std::env::temp_dir().join(format!("fleet-e2e-unnamed-{}", uuid::Uuid::now_v7()));
-    copy_capture(&fixture("paths-none"), &dst);
+    let dst = std::env::temp_dir().join(format!("fleet-e2e-capture-{}", uuid::Uuid::now_v7()));
+    copy_tree(&fixture(name), &dst);
+    dst
+}
+
+/// A copy of the captured `paths-none` run whose command names a directory of flows, not its one
+/// flow file: the same log and files, with only the command's last word changed.
+fn unnamed_copy_of_paths_none() -> std::path::PathBuf {
+    let dst = copy_of_capture("paths-none");
     let meta_path = dst.join("meta.json");
     let mut meta: Value = serde_json::from_slice(&std::fs::read(&meta_path).unwrap()).unwrap();
     let command = meta["command"].as_array_mut().unwrap();
@@ -728,6 +734,92 @@ async fn a_commands_file_no_flow_names_is_said_on_its_job_and_nowhere_else() {
         &format!("{said} === 1"),
     )
     .await;
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// Issue #148 follow-up: a run whose flow started and then the run ended without any verdict for it
+/// (the captured `single-flow-no-format` run with its flow folder removed: its log has the flow's
+/// steps, and nothing else). The flow is not shown as running: its state reads Unknown and its
+/// provenance reads Missing, on its page, and the attempt's pipeline says the same.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_flow_open_when_its_run_ended_shows_missing_not_running() {
+    let stack = stack(|_| {}).await;
+    let dir = copy_of_capture("single-flow-no-format");
+    std::fs::remove_dir_all(dir.join("state/maestro/tests/2026-11-04_022836/pass")).unwrap();
+    let shown = dir.display().to_string();
+    let (ws, key) = (stack.ws_url(), stack.key.clone());
+    let out = tokio::task::spawn_blocking(move || {
+        publish(
+            &dir,
+            &[
+                ("FLEET_SERVER", &ws),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_RUN_ID", "open"),
+                ("FLEET_JOB_KEY", "job-open"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(out.status.code(), Some(0), "publishing {shown}");
+    let snap = stack.await_run_ended("job-open").await;
+    let snap = stack
+        .get(&format!(
+            "/api/v1/projects/app/attempts/{}",
+            snap["attempt"]["id"].as_str().unwrap()
+        ))
+        .await;
+    let flow = snap["flows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["name"] == "pass")
+        .expect("the run's flow is listed");
+    assert_eq!(
+        flow["state"], "unknown",
+        "no verdict, and not running: {flow}"
+    );
+    assert_eq!(flow["finality"], "inferred", "{flow}");
+    let id = flow["id"].as_str().unwrap().to_owned();
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/flows/{id}?project=app", stack.addr()))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait("the flow's name", &has_text(&q("flow-title"), "pass"))
+        .await;
+    let header = q("flow-header");
+    page.wait(
+        "the flow's provenance is Missing",
+        &format!(
+            "{} === 1",
+            count_of("[data-testid=\"flow-header\"] .pv[aria-label=\"Provenance: missing\"]")
+        ),
+    )
+    .await;
+    let running = format!(
+        "Array.from(document.querySelectorAll('{header} .st')).filter(e => e.textContent.includes('Running')).length"
+    );
+    let unknown = format!(
+        "Array.from(document.querySelectorAll('{header} .st')).filter(e => e.textContent.includes('Unknown')).length"
+    );
+    assert_eq!(
+        page.eval(&format!("return {running};"), vec![]).await,
+        serde_json::json!(0),
+        "the header never says running"
+    );
+    assert_eq!(
+        page.eval(&format!("return {unknown};"), vec![]).await,
+        serde_json::json!(1),
+        "the state reads Unknown"
+    );
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }

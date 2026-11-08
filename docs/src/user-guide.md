@@ -96,7 +96,7 @@ Every outcome and reading says where it comes from, so you can tell a settled re
 | **Verified** | Confirmed by Maestro's final report. The result is settled. |
 | **Derived** | Computed from other measurements (a rollup), not a raw reading. |
 | **Inferred** | Fleet's explanation of something it did not see, such as a flow cut short by a signal. Never shown as passed. |
-| **Missing** | Nothing was received for this value. A step the log started and never ended is Missing when the flow's final `commands.json` does not list it either. |
+| **Missing** | Nothing was received for this value. A step the log started and never ended is Missing when the flow's final `commands.json` does not list it either. A flow the log started that has no verdict once its run has ended is Missing too: its state reads **Unknown**, and nothing Fleet received says what it did. It is never shown as running after its run has ended. |
 | **Stale** | No update within 25 seconds; the last known value, not a current one. |
 
 While a run is live, outcomes come from Maestro's log and console (**Provisional**). When Maestro writes its report, the report decides (**Verified**). If Maestro never writes one, the outcomes stay as Fleet saw them, and a run that ends abnormally never shows as passed.

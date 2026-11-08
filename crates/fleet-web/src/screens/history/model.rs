@@ -270,7 +270,7 @@ fn row(
         name: e.name.clone(),
         time: ctx.time(unix_ms(e.at)),
         state: flow_state_pill(&e.state),
-        provenance: flow_provenance(&e.finality, &e.state, None),
+        provenance: flow_provenance(&e.finality, &e.state, e.outcome_source.as_deref(), None),
         finality_note: finality_note(&e.finality),
         origin: e.origin,
         branch: e.git_ref.as_deref().map(|r| ref_name(r).to_owned()),
@@ -290,7 +290,7 @@ fn row(
         infrastructure: e
             .infrastructure
             .as_ref()
-            .map(|i| flow_provenance(&i.finality, "failed", None)),
+            .map(|i| flow_provenance(&i.finality, "failed", None, None)),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
         stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
     }

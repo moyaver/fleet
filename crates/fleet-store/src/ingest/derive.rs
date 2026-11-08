@@ -57,9 +57,14 @@ pub(crate) async fn flows(tx: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Uui
     if ids.is_empty() {
         return Ok(Vec::new());
     }
+    // A flow's evidence is complete once its suite closed (its report parsed) or its agent run
+    // ended: after that, a flow with no verdict has none to come (issue #145's neighbour: Missing).
     let rows = sqlx::query!(
-        "SELECT f.id, f.started, s.lifecycle = 'closed' AS \"closed!\"
-           FROM flow_executions f JOIN suite_executions s ON s.id = f.suite_execution_id
+        "SELECT f.id, f.started,
+                (s.lifecycle = 'closed' OR r.state = 'ended') AS \"run_ended!\"
+           FROM flow_executions f
+           JOIN suite_executions s ON s.id = f.suite_execution_id
+           JOIN agent_runs r ON r.id = f.agent_run_id
           WHERE f.id = ANY($1)",
         ids
     )
@@ -91,7 +96,7 @@ pub(crate) async fn flows(tx: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Uui
         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for row in rows {
         let claims = claims_by_flow.remove(&row.id).unwrap_or_default();
-        let r = claims::resolve(&claims, row.started, row.closed);
+        let r = claims::resolve(&claims, row.started, row.run_ended);
         fid.push(row.id);
         state.push(state_name(r.state));
         source.push(r.source.map(wire));

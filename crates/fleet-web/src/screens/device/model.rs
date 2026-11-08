@@ -279,7 +279,12 @@ impl FlowRows {
             .map(|f| FlowRow {
                 name: f.name.clone(),
                 state: flow_state_pill(&f.state),
-                provenance: flow_provenance(&f.finality, &f.state, None),
+                provenance: flow_provenance(
+                    &f.finality,
+                    &f.state,
+                    f.outcome_source.as_deref(),
+                    None,
+                ),
                 finality_note: crate::screens::common::finality_note(&f.finality),
                 has_conflict: f.has_conflict,
                 duration: f.duration_ms.map(format_duration),

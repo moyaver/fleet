@@ -68,7 +68,12 @@ pub fn timeline_data(
                         outcome: outcome(other),
                     },
                 },
-                provenance: flow_provenance(&b.finality, &b.state, liveness),
+                provenance: flow_provenance(
+                    &b.finality,
+                    &b.state,
+                    b.outcome_source.as_deref(),
+                    liveness,
+                ),
             }
         })
         .collect();

@@ -104,12 +104,21 @@ pub fn attempt_pill(jobs: &JobCounts) -> Pill {
     }
 }
 
-/// The provenance of a flow's displayed outcome. `liveness` is the agent run's: a flow that is
-/// still running but whose agent has gone quiet or away shows as stale, not as live.
+/// The provenance of a flow's displayed outcome. `source` is the outcome's source (`None` when no
+/// claim decided it), and `liveness` is the agent run's: a flow that is still running but whose agent
+/// has gone quiet or away shows as stale, not as live.
 #[must_use]
-pub fn flow_provenance(finality: &str, state: &str, liveness: Option<Liveness>) -> Provenance {
+pub fn flow_provenance(
+    finality: &str,
+    state: &str,
+    source: Option<&str>,
+    liveness: Option<Liveness>,
+) -> Provenance {
     match (state, finality) {
         ("pending", _) => Provenance::Missing,
+        // A started flow whose run ended with no claim: the state reads Unknown, and nothing Fleet
+        // received says what the flow did (I4).
+        ("unknown", "inferred") if source.is_none() => Provenance::Missing,
         ("running", _) if matches!(liveness, Some(Liveness::Stale | Liveness::Disconnected)) => {
             Provenance::Stale
         }
@@ -280,7 +289,6 @@ mod tests {
             ("unverified_final", "passed", online, Provisional),
             ("provisional", "passed", online, Provisional),
             ("provisional", "running", online, Provisional),
-            ("inferred", "unknown", online, Inferred),
             (
                 "inferred",
                 "interrupted",
@@ -296,16 +304,36 @@ mod tests {
                 Stale,
             ),
             ("provisional", "running", None, Provisional),
+            ("inferred", "unknown", None, Missing),
             ("verified", "passed", Some(Liveness::Disconnected), Final),
             ("from-the-future", "passed", online, Provisional),
         ];
         for (finality, state, liveness, expected) in cases {
             assert_eq!(
-                flow_provenance(finality, state, liveness),
+                flow_provenance(finality, state, None, liveness),
                 expected,
                 "{finality} {state} {liveness:?}"
             );
         }
+    }
+
+    #[test]
+    fn an_unknown_inferred_flow_is_missing_only_when_no_source_decided_it() {
+        assert_eq!(
+            flow_provenance("inferred", "unknown", None, Some(Liveness::Online)),
+            Provenance::Missing,
+            "no claim: nothing received says what the flow did"
+        );
+        assert_eq!(
+            flow_provenance(
+                "inferred",
+                "unknown",
+                Some("process_exit"),
+                Some(Liveness::Online)
+            ),
+            Provenance::Inferred,
+            "a claimed unknown is Fleet's explanation, not a gap"
+        );
     }
 
     #[test]

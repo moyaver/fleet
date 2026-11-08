@@ -137,17 +137,21 @@ pub struct Resolution {
 }
 
 /// Resolves a set of claims. Order and duplicates don't matter.
+///
+/// `run_ended` says the run's evidence is complete: its suite closed, or its agent run ended. A
+/// started flow with no claim at that point has no verdict and never will (no source records one),
+/// so it is `unknown` and inferred, not running. A flow that is not started is pending.
 #[must_use]
-pub fn resolve(claims: &[Claim], started: bool, suite_closed: bool) -> Resolution {
+pub fn resolve(claims: &[Claim], started: bool, run_ended: bool) -> Resolution {
     let Some(top) = claims.iter().map(|c| rank(c.source)).max() else {
-        let state = if started {
-            FlowState::Running
-        } else {
-            FlowState::Pending
+        let (state, finality) = match (started, run_ended) {
+            (false, _) => (FlowState::Pending, Finality::Provisional),
+            (true, false) => (FlowState::Running, Finality::Provisional),
+            (true, true) => (FlowState::Ended(FlowOutcome::Unknown), Finality::Inferred),
         };
         return Resolution {
             state,
-            finality: Finality::Provisional,
+            finality,
             source: None,
             conflict: false,
         };
@@ -171,7 +175,7 @@ pub fn resolve(claims: &[Claim], started: bool, suite_closed: bool) -> Resolutio
     });
     let finality = match top {
         40.. => Finality::Verified,
-        30..40 if suite_closed => Finality::UnverifiedFinal,
+        30..40 if run_ended => Finality::UnverifiedFinal,
         30..40 => Finality::Provisional,
         _ => Finality::Inferred,
     };
@@ -217,7 +221,18 @@ mod tests {
     #[test]
     fn no_claims_means_pending_or_running() {
         assert_eq!(resolve(&[], false, false).state, FlowState::Pending);
-        assert_eq!(resolve(&[], true, true).state, FlowState::Running);
+        assert_eq!(resolve(&[], true, false).state, FlowState::Running);
+    }
+
+    /// A started flow that never got a verdict, once its run ended, is unknown and inferred, with no
+    /// source: it is not running, and nothing says it passed or failed (I3).
+    #[test]
+    fn a_started_flow_with_no_verdict_after_its_run_ended_is_unknown_and_inferred() {
+        let r = resolve(&[], true, true);
+        assert_eq!(r.state, FlowState::Ended(FlowOutcome::Unknown));
+        assert_eq!(r.finality, Finality::Inferred);
+        assert_eq!(r.source, None);
+        assert!(!r.conflict);
     }
 
     #[test]
