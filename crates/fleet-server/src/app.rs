@@ -103,6 +103,11 @@ pub(crate) async fn init(config: Config) -> anyhow::Result<AppState> {
             .await
             .with_context(|| format!("storing the trust policies of {}", p.slug))?;
     }
+    let slugs: Vec<String> = config.projects.iter().map(|p| p.slug.clone()).collect();
+    store
+        .release_unconfigured_projects(&slugs)
+        .await
+        .context("releasing projects the configuration no longer names")?;
     if let Some(login) = &config.login {
         sync_group_mappings(&store, login)
             .await

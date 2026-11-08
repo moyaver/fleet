@@ -932,3 +932,283 @@ pub(in crate::api) async fn remove_policy(
         Err(e) => write_failed(via, e),
     }
 }
+
+// ---------------------------------------------------------------- retention, artifact policy, metrics
+
+/// The sections of `/admin` the forms go back to.
+const RETENTION: &str = "retention";
+const ARTIFACTS: &str = "artifacts";
+const METRICS: &str = "metrics";
+
+/// A checkbox: `on`, `true` or `1` in a form, `true` in JSON. Anything else, or none, is `false`.
+fn checkbox<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    Ok(match Option::<serde_json::Value>::deserialize(d)? {
+        Some(serde_json::Value::Bool(b)) => b,
+        Some(serde_json::Value::String(s)) => matches!(s.trim(), "on" | "true" | "1"),
+        _ => false,
+    })
+}
+
+/// A whole number that may be left blank (a form sends `""`): `None` when it is.
+fn blank_as_none<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u64>, D::Error> {
+    use serde::de::Error as _;
+    match Option::<serde_json::Value>::deserialize(d)? {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::String(s)) if s.trim().is_empty() => Ok(None),
+        Some(serde_json::Value::String(s)) => s
+            .trim()
+            .parse()
+            .map(Some)
+            .map_err(|_| D::Error::custom("must be a whole number")),
+        Some(serde_json::Value::Number(n)) => n
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| D::Error::custom("must be a whole number")),
+        Some(_) => Err(D::Error::custom("must be a whole number")),
+    }
+}
+
+/// A retention window to set. 0 keeps the class's artifacts for ever.
+#[derive(Debug, Deserialize, ToSchema)]
+pub(in crate::api) struct RetentionInput {
+    /// Days an artifact of the class is kept, up to 36500; 0 keeps it for ever.
+    days: u32,
+}
+
+/// Sets how long a project keeps artifacts of one retention class. It applies to artifacts that
+/// become available afterwards.
+#[utoipa::path(put, path = "/api/v1/admin/retention/{project}/{class}", request_body = RetentionInput,
+    params(("project" = String, Path, description = "Project slug"),
+           ("class" = String, Path, description = "Retention class")), responses(
+    (status = 200, body = AdminChangedView), (status = 401, body = super::super::ApiError),
+    (status = 403, body = super::super::ApiError), (status = 404, body = super::super::ApiError),
+    (status = 409, body = super::super::ApiError), (status = 422, body = super::super::ApiError)))]
+pub(in crate::api) async fn set_retention(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path((slug, class)): Path<(String, String)>,
+    body: Bytes,
+) -> Response {
+    let via = Via::of(&headers);
+    let by = match administrator(&state, &headers, &body, via).await {
+        Ok(by) => by,
+        Err(r) => return *r,
+    };
+    let project = match project_of(&state, via, &slug).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let input: RetentionInput = match decode(via, &body) {
+        Ok(i) => i,
+        Err(r) => return *r,
+    };
+    let ttl = (input.days > 0).then_some(input.days);
+    match state.store.set_retention(by, project, &class, ttl).await {
+        Ok(()) => made(via, StatusCode::OK, project, RETENTION),
+        Err(e) => write_failed(via, e),
+    }
+}
+
+/// One artifact class's policy. A class left unaccepted with no cap is the configured policy.
+#[derive(Debug, Deserialize, ToSchema)]
+pub(in crate::api) struct ClassInput {
+    /// Whether the project accepts artifacts of the class (a form's checkbox, or `true`).
+    #[serde(default, deserialize_with = "checkbox")]
+    accepted: bool,
+    /// The largest file in bytes, at most the configured cap. Blank keeps the cap.
+    #[serde(default, deserialize_with = "blank_as_none")]
+    max_bytes: Option<u64>,
+}
+
+/// Sets whether a project accepts one artifact class, and its largest file. Refused above the
+/// configured cap: an override can only tighten it.
+#[utoipa::path(put, path = "/api/v1/admin/artifact-classes/{project}/{class}", request_body = ClassInput,
+    params(("project" = String, Path, description = "Project slug"),
+           ("class" = String, Path, description = "Artifact class")), responses(
+    (status = 200, body = AdminChangedView), (status = 401, body = super::super::ApiError),
+    (status = 403, body = super::super::ApiError), (status = 404, body = super::super::ApiError),
+    (status = 409, body = super::super::ApiError), (status = 422, body = super::super::ApiError)))]
+pub(in crate::api) async fn set_artifact_class(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path((slug, class)): Path<(String, String)>,
+    body: Bytes,
+) -> Response {
+    let via = Via::of(&headers);
+    let by = match administrator(&state, &headers, &body, via).await {
+        Ok(by) => by,
+        Err(r) => return *r,
+    };
+    let project = match project_of(&state, via, &slug).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let input: ClassInput = match decode(via, &body) {
+        Ok(i) => i,
+        Err(r) => return *r,
+    };
+    let cap = fleet_protocol::artifact::ArtifactClass::parse(&class)
+        .map(|c| state.config.artifacts.max_bytes.of(c));
+    if let (Some(max), Some(cap)) = (input.max_bytes, cap)
+        && max > cap
+    {
+        return *refuse(
+            via,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &format!("the largest {class} file may be at most {cap} bytes, the configured cap"),
+        );
+    }
+    let Ok(max_bytes) = input.max_bytes.map(i64::try_from).transpose() else {
+        return *refuse(
+            via,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "the largest file is too big",
+        );
+    };
+    match state
+        .store
+        .set_artifact_class(by, project, &class, input.accepted, max_bytes)
+        .await
+    {
+        Ok(()) => made(via, StatusCode::OK, project, ARTIFACTS),
+        Err(e) => write_failed(via, e),
+    }
+}
+
+/// A project's daily upload quota. Blank keeps the configured value.
+#[derive(Debug, Deserialize, ToSchema)]
+pub(in crate::api) struct QuotaInput {
+    /// Most bytes the project may declare in 24 hours, at most `artifacts.max_project_bytes_per_day`.
+    #[serde(default, deserialize_with = "blank_as_none")]
+    bytes_per_day: Option<u64>,
+    /// Most files the project may declare in 24 hours, at most `artifacts.max_project_files_per_day`.
+    #[serde(default, deserialize_with = "blank_as_none")]
+    files_per_day: Option<u64>,
+}
+
+/// Sets a project's daily artifact quota, at most the configured values.
+#[utoipa::path(put, path = "/api/v1/admin/artifact-quota/{project}", request_body = QuotaInput,
+    params(("project" = String, Path, description = "Project slug")), responses(
+    (status = 200, body = AdminChangedView), (status = 401, body = super::super::ApiError),
+    (status = 403, body = super::super::ApiError), (status = 404, body = super::super::ApiError),
+    (status = 409, body = super::super::ApiError), (status = 422, body = super::super::ApiError)))]
+pub(in crate::api) async fn set_artifact_quota(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    body: Bytes,
+) -> Response {
+    let via = Via::of(&headers);
+    let by = match administrator(&state, &headers, &body, via).await {
+        Ok(by) => by,
+        Err(r) => return *r,
+    };
+    let project = match project_of(&state, via, &slug).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let input: QuotaInput = match decode(via, &body) {
+        Ok(i) => i,
+        Err(r) => return *r,
+    };
+    let a = &state.config.artifacts;
+    if input
+        .bytes_per_day
+        .is_some_and(|b| b > a.max_project_bytes_per_day)
+    {
+        return *refuse(
+            via,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &format!(
+                "the daily bytes may be at most {}, the configured artifacts.max_project_bytes_per_day",
+                a.max_project_bytes_per_day
+            ),
+        );
+    }
+    if input
+        .files_per_day
+        .is_some_and(|f| f > u64::from(a.max_project_files_per_day))
+    {
+        return *refuse(
+            via,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &format!(
+                "the daily files may be at most {}, the configured artifacts.max_project_files_per_day",
+                a.max_project_files_per_day
+            ),
+        );
+    }
+    let bytes = input.bytes_per_day.map(i64::try_from).transpose();
+    let files = input.files_per_day.map(i32::try_from).transpose();
+    let (Ok(bytes), Ok(files)) = (bytes, files) else {
+        return *refuse(
+            via,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "the quota is too big",
+        );
+    };
+    match state
+        .store
+        .set_artifact_quota(by, project, bytes, files)
+        .await
+    {
+        Ok(()) => made(via, StatusCode::OK, project, ARTIFACTS),
+        Err(e) => write_failed(via, e),
+    }
+}
+
+/// A project's metric sampling intervals, in seconds. Blank keeps the configured interval.
+#[derive(Debug, Deserialize, ToSchema)]
+pub(in crate::api) struct MetricInput {
+    /// Seconds between samples while the host is calm (1 to 300).
+    #[serde(default, deserialize_with = "blank_as_none")]
+    sample_interval_seconds: Option<u64>,
+    /// Seconds between samples while the host is under pressure (1 to 300).
+    #[serde(default, deserialize_with = "blank_as_none")]
+    pressure_sample_interval_seconds: Option<u64>,
+}
+
+/// Milliseconds for a number of seconds; a value too big for the store is one it refuses.
+fn millis(seconds: Option<u64>) -> Option<i32> {
+    seconds.map(|s| i32::try_from(s.saturating_mul(1000)).unwrap_or(i32::MAX))
+}
+
+/// Sets how often a project's agents sample metrics: calm and under pressure.
+#[utoipa::path(put, path = "/api/v1/admin/metric-policy/{project}", request_body = MetricInput,
+    params(("project" = String, Path, description = "Project slug")), responses(
+    (status = 200, body = AdminChangedView), (status = 401, body = super::super::ApiError),
+    (status = 403, body = super::super::ApiError), (status = 404, body = super::super::ApiError),
+    (status = 409, body = super::super::ApiError), (status = 422, body = super::super::ApiError)))]
+pub(in crate::api) async fn set_metric_policy(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    body: Bytes,
+) -> Response {
+    let via = Via::of(&headers);
+    let by = match administrator(&state, &headers, &body, via).await {
+        Ok(by) => by,
+        Err(r) => return *r,
+    };
+    let project = match project_of(&state, via, &slug).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let input: MetricInput = match decode(via, &body) {
+        Ok(i) => i,
+        Err(r) => return *r,
+    };
+    match state
+        .store
+        .set_metric_policy(
+            by,
+            project,
+            millis(input.sample_interval_seconds),
+            millis(input.pressure_sample_interval_seconds),
+        )
+        .await
+    {
+        Ok(()) => made(via, StatusCode::OK, project, METRICS),
+        Err(e) => write_failed(via, e),
+    }
+}

@@ -29,7 +29,7 @@ use fleet_store::{
     ingest::{ApplyError, Change, OpenError, RunHandle, Transport},
 };
 
-use crate::state::AppState;
+use crate::{project_policy, state::AppState};
 
 pub(crate) fn router(state: &AppState) -> Router<AppState> {
     let body_limit = usize::try_from(state.config.ingest.max_frame_bytes)
@@ -122,6 +122,21 @@ pub(crate) async fn open(
             ));
         }
     }
+    // The project's sampling policy (#139) travels in the welcome: its own, else the configured one.
+    let overrides = match state.store.project_overrides(publisher.project_id).await {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::error!(error = %e, "reading a project's policy");
+            return Err(ServerFrame::Reject {
+                code: ErrorCode::Internal,
+                message: "the server could not open the run".into(),
+                retry_after_ms: Some(1000),
+                fatal: false,
+            });
+        }
+    };
+    let (sample_interval_ms, pressure_sample_interval_ms) =
+        project_policy::sampling(&state.config, &overrides);
     match state.store.open_run(publisher, hello, transport).await {
         Ok(opened) => {
             let i = &state.config.ingest;
@@ -135,6 +150,8 @@ pub(crate) async fn open(
                     max_inflight_events: i.max_inflight_events,
                     max_frame_bytes: i.max_frame_bytes,
                     heartbeat_interval_ms: i.heartbeat_interval_ms,
+                    sample_interval_ms,
+                    pressure_sample_interval_ms,
                 },
             });
             tracing::info!(agent_run_id = %hello.agent_run_id, epoch = opened.handle.epoch,
