@@ -322,11 +322,16 @@ fn filter_control(
 /// A label for a query key: the key with its first letter capitalised, except the outcome, which
 /// the redesign calls its result.
 fn label_of(key: &str) -> String {
-    if key == "outcome" {
-        return "Result".to_owned();
+    match key {
+        "outcome" => "Result".to_owned(),
+        "ci_provider" => "CI provider".to_owned(),
+        "os_version" => "OS version".to_owned(),
+        _ => {
+            let words = key.replace('_', " ");
+            let mut c = words.chars();
+            c.next()
+                .map(|f| f.to_uppercase().chain(c).collect())
+                .unwrap_or_default()
+        }
     }
-    let mut c = key.chars();
-    c.next()
-        .map(|f| f.to_uppercase().chain(c).collect())
-        .unwrap_or_default()
 }
