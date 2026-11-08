@@ -69,6 +69,9 @@ pub struct AdminTrustPolicyView {
     /// When it was revoked, if it was.
     #[serde(default, with = "time::serde::rfc3339::option")]
     pub revoked_at: Option<OffsetDateTime>,
+    /// Where the policy comes from: `config` (the running configuration; locked on the dashboard)
+    /// or `dashboard` (added there: editable and removable).
+    pub source: String,
 }
 
 /// An API key as an operator sees it: what identifies it, never the secret.
@@ -132,6 +135,19 @@ pub struct AdminGroupMappingView {
     pub project: Option<String>,
     /// `viewer`, `maintainer` or `admin`.
     pub role: String,
+    /// Where the mapping comes from: `config` (`login.group_roles`; locked on the dashboard) or
+    /// `dashboard` (added there: editable and removable).
+    pub source: String,
+}
+
+/// A person who has signed in, to bind a role to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdminPersonView {
+    /// The person's ID, as a role binding names them.
+    pub id: Uuid,
+    /// Display name, else email, else subject.
+    pub name: String,
 }
 
 /// Role mappings: the roles bound to people, and the identity-provider groups that grant them.
@@ -140,8 +156,39 @@ pub struct AdminGroupMappingView {
 pub struct AdminRoleMappingsView {
     /// Roles bound to people directly.
     pub bindings: Vec<AdminRoleBindingView>,
-    /// Group → role mappings (synced from `login.group_roles` at start-up).
+    /// Group → role mappings: configured (`login.group_roles`, replaced at start-up) and added on
+    /// the dashboard.
     pub groups: Vec<AdminGroupMappingView>,
+    /// People who have signed in, to bind a role to.
+    pub people: Vec<AdminPersonView>,
+}
+
+/// What a change on Screen G changed: the ID of the row it wrote or removed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdminChangedView {
+    /// The row's ID (a project's, a key's, a binding's, a mapping's or a policy's).
+    pub id: Uuid,
+}
+
+/// A new API key: its metadata, and the secret, which is returned once and never again. The
+/// secret is not in the log, the audit trail or any later read.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdminCreatedKeyView {
+    /// The key as the API keys list shows it.
+    pub key: AdminApiKeyView,
+    /// The secret, `mf_live_…`. Shown once: store it now.
+    pub secret: String,
+}
+
+impl std::fmt::Debug for AdminCreatedKeyView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AdminCreatedKeyView")
+            .field("key", &self.key)
+            .field("secret", &"<redacted>")
+            .finish()
+    }
 }
 
 /// One retention class of one project (`retention_classes`).
@@ -374,6 +421,31 @@ mod tests {
         assert!(
             !keys.iter().any(|k| k.contains("hash") || *k == "secret"),
             "{keys:?}"
+        );
+    }
+
+    #[test]
+    fn a_new_key_s_secret_is_never_in_its_debug_output() {
+        let key = AdminCreatedKeyView {
+            key: AdminApiKeyView {
+                id: Uuid::nil(),
+                project: "app".into(),
+                name: "ci".into(),
+                prefix: "mf_live_abcd".into(),
+                trust_level: "trusted".into(),
+                created_by: None,
+                created_at: OffsetDateTime::UNIX_EPOCH,
+                expires_at: None,
+                revoked_at: None,
+                last_used_at: None,
+            },
+            secret: "mf_live_abcdSECRETVALUE".into(),
+        };
+        let debug = format!("{key:?}");
+        assert!(!debug.contains("SECRETVALUE"), "{debug}");
+        assert!(
+            debug.contains("<redacted>") && debug.contains("mf_live_abcd"),
+            "{debug}"
         );
     }
 }
