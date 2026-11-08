@@ -341,6 +341,18 @@ pub fn message_groups(rows: &[FailureRow]) -> Vec<(String, Vec<FailureRow>)> {
     groups
 }
 
+/// What to say about the warnings an agent run's files raised (issue #148), one line per code.
+#[must_use]
+pub fn file_warning_notes(codes: &[String]) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if codes.iter().any(|c| c == "commands_flow_unnamed") {
+        out.push(
+            "A commands.json names a flow the log never started, so its steps are not settled; no flow page shows it.",
+        );
+    }
+    out
+}
+
 /// The provenance a row shows, when it differs from its group's. A group is Final once the run
 /// has settled and Provisional while it is open. A flow not yet run is a dash while the run is
 /// open, never Missing (Foundations, rule 2).
@@ -766,5 +778,19 @@ mod live_tests {
                 action: None,
             }
         );
+    }
+
+    /// A run whose commands file names no flow the log started says so once, and a run with no
+    /// such file says nothing (issue #148).
+    #[test]
+    fn an_unnamed_commands_file_is_said_once_and_nothing_else_is() {
+        assert_eq!(file_warning_notes(&[]), Vec::<&str>::new());
+        assert_eq!(
+            file_warning_notes(&["steps_not_aligned".to_owned()]),
+            Vec::<&str>::new()
+        );
+        let notes = file_warning_notes(&["commands_flow_unnamed".to_owned()]);
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains("names a flow the log never started"));
     }
 }

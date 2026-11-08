@@ -13,7 +13,8 @@ use crate::{
         Page, before_report, count_of, first_attempt, has_text, held_run_options, q, run_options,
         stack, start_run,
     },
-    support::Stack,
+    publish::publish,
+    support::{Stack, fixture},
 };
 
 /// A finished run: one agent, two devices, three flows each. The script fails exactly the first
@@ -525,6 +526,101 @@ async fn steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so() 
         rows.iter().any(|r| r[0] == serde_json::json!("Failed")),
         "the failed step is among them, got {rows:?}"
     );
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// A default-format Maestro output directory is replayed by `fleet-agent publish` (issue #148): its
+/// log names no flow, so its `commands.json` names none the log started. The run keeps one warning
+/// on itself, and its job's page says so; a run whose file finds its flow says nothing of the kind.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_commands_file_no_flow_names_is_said_on_its_job_and_nowhere_else() {
+    let stack = stack(|_| {}).await;
+    for (fixture_name, job) in [("paths-none", "job-unnamed"), ("pass", "job-named")] {
+        let (ws, key) = (stack.ws_url(), stack.key.clone());
+        let job_key = job.to_owned();
+        let dir = fixture(fixture_name);
+        let out = tokio::task::spawn_blocking(move || {
+            publish(
+                &dir,
+                &[
+                    ("FLEET_SERVER", &ws),
+                    ("FLEET_TOKEN", &key),
+                    ("FLEET_RUN_ID", "unnamed"),
+                    ("FLEET_JOB_KEY", &job_key),
+                ],
+            )
+        })
+        .await
+        .unwrap();
+        assert_eq!(out.status.code(), Some(0), "publishing {fixture_name}");
+    }
+    let snap = stack.await_run_ended("job-unnamed").await;
+    stack.await_run_ended("job-named").await;
+    let snap = stack
+        .get(&format!(
+            "/api/v1/projects/app/attempts/{}",
+            snap["attempt"]["id"].as_str().unwrap()
+        ))
+        .await;
+    let job_id = |key: &str| {
+        snap["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["job_key"] == key)
+            .unwrap_or_else(|| panic!("job {key}"))["id"]
+            .clone()
+    };
+    let run_of = |key: &str| -> Value {
+        let id = job_id(key);
+        snap["agent_runs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["job_id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(
+        run_of("job-unnamed")["file_warnings"],
+        serde_json::json!(["commands_flow_unnamed"]),
+        "the run says its commands file names no flow the log started"
+    );
+    let unnamed_job = job_id("job-unnamed");
+    assert!(
+        snap["flows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| f["job_id"] != unnamed_job),
+        "the file creates no flow (I3)"
+    );
+    assert!(
+        run_of("job-named")["file_warnings"].is_null(),
+        "a run whose files all find their flow keeps no file warning"
+    );
+
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    let attempt = snap["attempt"]["id"].as_str().unwrap();
+    browser
+        .client
+        .goto(&format!(
+            "http://{}/p/app/pipelines/{attempt}",
+            stack.addr()
+        ))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    let said = "Array.from(document.querySelectorAll('[role=status]')).filter(e => e.textContent.includes('names a flow the log never started')).length";
+    page.wait(
+        "the job says its file names no flow",
+        &format!("{said} === 1"),
+    )
+    .await;
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }

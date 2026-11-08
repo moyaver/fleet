@@ -36,13 +36,17 @@ use fleet_ui::{
     },
     provenance::Provenance,
     timeline::{model::TimelineData, view::SwimlaneTimeline},
+    tone::Tone,
 };
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
 use uuid::Uuid;
 
 use self::{
-    model::{FailureRow, LiveInputs, bucket, failure_key, live_view, message_groups, row_mark},
+    model::{
+        FailureRow, LiveInputs, bucket, failure_key, file_warning_notes, live_view, message_groups,
+        row_mark,
+    },
     plans::{PlanComparison, ShardRow, show, signed},
     timeline::timeline_data,
 };
@@ -58,6 +62,7 @@ use crate::{
     paths::{device_href, flow_href},
     progress::Progress,
     remote::remote,
+    screens::parts::Notice,
     status::{flow_provenance, flow_state_pill, job_pill, liveness_pill, source_provenance},
 };
 
@@ -807,6 +812,11 @@ fn JobGroup(
                 />
             </div>
             <For
+                each=runs
+                key=|r| *r
+                children=move |run| view! { <RunFileWarnings model=model id=run /> }
+            />
+            <For
                 each=keyed
                 key=|k| *k
                 children=move |(_, device)| view! {
@@ -825,6 +835,25 @@ fn job_line(progress: &Progress, settled: bool) -> String {
     } else {
         progress.text()
     }
+}
+
+/// What an agent run's own files said, one notice per warning (issue #148): a commands file whose
+/// flow the log never started. Such a file has no flow page, so the job's flows are where it is said.
+#[component]
+fn RunFileWarnings(model: LiveModel, id: Uuid) -> impl IntoView {
+    let Some(cell) = model.runs.cell(id) else {
+        return ().into_any();
+    };
+    let run: RwSignal<_> = cell.into();
+    view! {
+        {move || {
+            run.with(|r| file_warning_notes(&r.file_warnings))
+                .into_iter()
+                .map(|text| view! { <Notice tone=Tone::Warning text=text /> })
+                .collect_view()
+        }}
+    }
+    .into_any()
 }
 
 #[component]
