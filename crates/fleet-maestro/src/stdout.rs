@@ -157,7 +157,9 @@ fn split_result(rest: &str) -> Option<(String, Option<u64>, Option<String>)> {
     None
 }
 
-/// Removes ANSI escape sequences (CSI `ESC [ … letter` and two-byte `ESC x`).
+/// Removes terminal escape sequences: CSI (`ESC [ … final byte`), strings that end at BEL or
+/// `ESC \` (OSC `ESC ]`, and DCS, SOS, PM, APC), and two-byte `ESC x`. Their payloads go too:
+/// an OSC 8 link or OSC 52 clipboard write is text that must not reach a log line (research 06 T13).
 #[must_use]
 pub fn strip_ansi(s: &str) -> std::borrow::Cow<'_, str> {
     if !s.contains('\u{1b}') {
@@ -168,15 +170,34 @@ pub fn strip_ansi(s: &str) -> std::borrow::Cow<'_, str> {
     while let Some(c) = chars.next() {
         if c != '\u{1b}' {
             out.push(c);
-        } else if chars.peek() == Some(&'[') {
-            chars.next();
-            for c in chars.by_ref() {
-                if c.is_ascii_alphabetic() {
-                    break;
+            continue;
+        }
+        match chars.peek() {
+            // CSI: parameters and intermediates, then one final byte in 0x40..=0x7E.
+            Some('[') => {
+                chars.next();
+                for c in chars.by_ref() {
+                    if ('\u{40}'..='\u{7e}').contains(&c) {
+                        break;
+                    }
                 }
             }
-        } else {
-            chars.next();
+            // String sequences: everything up to BEL or the string terminator `ESC \`.
+            Some(']' | 'P' | 'X' | '^' | '_') => {
+                chars.next();
+                let mut after_esc = false;
+                for c in chars.by_ref() {
+                    if c == '\u{7}' || (after_esc && c == '\\') {
+                        break;
+                    }
+                    after_esc = c == '\u{1b}';
+                }
+            }
+            // Any other two-byte escape.
+            Some(_) => {
+                chars.next();
+            }
+            None => {}
         }
     }
     std::borrow::Cow::Owned(out)
@@ -349,6 +370,21 @@ mod tests {
         assert_eq!(strip_ansi("\u{1b}[36mWaiting\u{1b}[m done"), "Waiting done");
         assert!(matches!(strip_ansi("plain"), std::borrow::Cow::Borrowed(_)));
         assert_eq!(strip_ansi("trailing \u{1b}["), "trailing ");
+    }
+
+    #[test]
+    fn strings_are_removed_with_their_payload() {
+        // OSC 8 hyperlink, closed by BEL and by ESC \.
+        assert_eq!(
+            strip_ansi("see \u{1b}]8;;https://evil.example\u{7}here\u{1b}]8;;\u{7}"),
+            "see here"
+        );
+        // OSC 52 clipboard write, closed by ESC \.
+        assert_eq!(strip_ansi("a\u{1b}]52;c;cm0gLXJmIH4v\u{1b}\\b"), "ab");
+        // DCS payload is dropped up to its terminator; a lone ESC inside it does not end it.
+        assert_eq!(strip_ansi("x\u{1b}Pq#0;\u{1b}z\u{1b}\\y"), "xy");
+        // An unterminated string takes the rest of the line, never a panic.
+        assert_eq!(strip_ansi("ok \u{1b}]8;;http://x"), "ok ");
     }
 
     #[test]
