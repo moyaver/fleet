@@ -63,6 +63,7 @@ use crate::{
     progress::Progress,
     remote::remote,
     screens::parts::Notice,
+    screens::rerun::manifest_href,
     status::{flow_provenance, flow_state_pill, job_pill, liveness_pill, source_provenance},
 };
 
@@ -290,7 +291,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
                 <Readouts model=model filter=filter chosen=chosen />
                 <div class=move || if settled.get() { "stack" } else { "grid gap-9 min-[720px]:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)]" }>
                     <div class="stack min-w-0">
-                        <Failures model=model project=project settled=settled />
+                        <Failures model=model project=project attempt=attempt settled=settled />
                         <Flows
                             model=model
                             project=project
@@ -503,9 +504,12 @@ fn FlowReadout(
 fn Failures(
     model: LiveModel,
     project: StoredValue<String>,
+    /// The attempt, whose failed flows the manifest download reruns (issue #82).
+    attempt: Uuid,
     settled: Signal<bool>,
 ) -> impl IntoView {
     let groups = move || model.failures.with(|rows| message_groups(rows));
+    let manifest = manifest_href(&project.get_value(), attempt);
     view! {
         <section class="card" aria-labelledby="fail-h">
             <div class="card-h">
@@ -519,6 +523,11 @@ fn Failures(
                         format!("Grouped by message · {n} {}", if n == 1 { "group" } else { "groups" })
                     }}
                 </span>
+                <Show when=move || model.failures.with(|rows| rows.iter().any(|r| r.state.label == "Failed"))>
+                    <a class="text-sm text-primary underline" data-testid="failed-flows-link" href=manifest.clone()>
+                        "Download failed flows"
+                    </a>
+                </Show>
             </div>
             <Show
                 when=move || !model.failures.with(Vec::is_empty)

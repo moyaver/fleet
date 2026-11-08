@@ -21,6 +21,7 @@ pub mod overview;
 pub mod parts;
 pub mod pipeline;
 pub mod project;
+pub mod rerun;
 pub mod routes;
 pub mod timeline;
 pub mod triage;

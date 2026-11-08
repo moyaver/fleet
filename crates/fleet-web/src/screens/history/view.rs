@@ -27,6 +27,7 @@ use crate::{
         EvidenceLink, FailureGroup, FlakyFlow, HistoryRow, HistoryTable, StatsPanel, filter_spec,
     },
     screens::parts::PillView,
+    screens::rerun::RerunDisclosure,
     screens::triage::TriageControl,
 };
 
@@ -102,8 +103,8 @@ pub fn FailureFingerprint(
 }
 
 /// Puts `text` on the clipboard. The browser may refuse (a page that is not secure): then the
-/// fingerprint is still on screen to copy by hand.
-fn copy_text(text: &str) {
+/// text is still on screen to copy by hand.
+pub(crate) fn copy_text(text: &str) {
     if let Some(window) = web_sys::window() {
         let _ = window.navigator().clipboard().write_text(text);
     }
@@ -314,6 +315,7 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
                 >
                     "Stats"
                 </button>
+                {r.rerun.map(|cell| view! { <RerunDisclosure cell /> })}
             </td>
         </tr>
     }

@@ -29,6 +29,7 @@ use crate::{
     format::{ref_name, short_commit},
     paths::{escape, flow_href, query_param, with_query_param},
     screens::common::{Ctx, finality_note},
+    screens::rerun::{RerunCell, manifest_href},
     status::{Pill, flow_provenance, flow_state_pill},
 };
 
@@ -208,6 +209,8 @@ pub struct HistoryRow {
     pub stats_query: String,
     /// Whether this flow's stats panel is the open one.
     pub stats_open: bool,
+    /// For a failed run, how to rerun it (issue #82).
+    pub rerun: Option<RerunCell>,
 }
 
 /// Screen E's table and the flaky flows on it.
@@ -293,6 +296,10 @@ fn row(
             .map(|i| flow_provenance(&i.finality, "failed", None, None)),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
         stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
+        rerun: (e.state == "failed").then(|| RerunCell {
+            repro: e.reproduction.clone(),
+            manifest: manifest_href(&ctx.project, e.attempt_id),
+        }),
     }
 }
 
