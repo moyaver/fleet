@@ -77,7 +77,8 @@ issuer = "https://login.example.com/realms/corp"   # discovery: <issuer>/.well-k
 client_id = "fleet"
 # client_secret: set FLEET_LOGIN__CLIENT_SECRET_FILE; omit for a public (PKCE-only) client
 group_claims = ["groups", "roles"]                  # "roles" carries Entra ID app roles
-session_ttl_minutes = 480
+session_ttl_minutes = 480                           # a session ends this long after sign-in at most
+session_idle_minutes = 60                           # ...or after this long without a request
 
 [[login.group_roles]]                               # one project
 group = "mobile-qa"
@@ -89,7 +90,7 @@ group = "fleet-admins"
 role = "admin"
 ```
 
-- **Roles come from groups, at sign-in.** A user's effective role on a project is the highest role granted by their groups (or bound to them directly) for that project or for all projects. A user whose groups grant nothing is refused, and so is an ID token with none of the `group_claims`: Fleet never guesses. Entra ID omits `groups` for users in more than 200 groups; use app roles (`roles`) there. A removed group membership takes effect at the next sign-in, within `session_ttl_minutes`.
+- **Roles come from groups, at sign-in.** A user's effective role on a project is the highest role granted by their groups (or bound to them directly) for that project or for all projects. A user whose groups grant nothing is refused, and so is an ID token with none of the `group_claims`: Fleet never guesses. Entra ID omits `groups` for users in more than 200 groups; use app roles (`roles`) there. A removed group membership takes effect at the next sign-in, within `session_ttl_minutes`. A session also ends after `session_idle_minutes` (default 60) without a request, and a request renews it. An open live socket does not renew it: its recheck ends the socket once the session has gone idle (research 06 T21).
 - **Sessions** are an opaque cookie (`__Host-fleet_session`: `HttpOnly`, `Secure`, `SameSite=Lax`) stored in Postgres by hash. Mutating requests made with the cookie must send the session's CSRF token (`X-CSRF-Token`, from `GET /api/v1/auth/session`) and, when the browser sends an `Origin`, the dashboard's own.
 - **Serve the dashboard over HTTPS.** The session cookie is `Secure` and carries the `__Host-` prefix, which browsers accept only from a secure origin, so sign-in cannot work over plain `http://` (browsers treat `localhost` and `127.0.0.1` as secure, which is how the end-to-end tests run). Put TLS in front of Fleet (the Compose file's Caddy does) and set `api.public_url` to the `https://` address people use.
 - A project the user has no role on looks exactly like a project that does not exist.

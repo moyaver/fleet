@@ -193,6 +193,7 @@ async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
         scopes: vec!["profile".into(), "email".into()],
         group_claims: vec!["groups".into(), "roles".into()],
         session_ttl_minutes: 60,
+        session_idle_minutes: 60,
         jwks_hosts: Vec::new(),
         group_roles: vec![
             role("qa", Role::Viewer, Some("app")),
@@ -743,7 +744,7 @@ async fn a_session_stops_working_when_it_expires() {
     let cookie = sign_in(&rig, &json!({"groups": ["qa"]})).await;
     let record = rig
         .store
-        .session(cookie.split_once('=').unwrap().1)
+        .session(cookie.split_once('=').unwrap().1, time::Duration::hours(1))
         .await
         .unwrap()
         .unwrap();

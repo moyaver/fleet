@@ -62,7 +62,7 @@ pub(crate) async fn upgrade(
 async fn still_signed_in(state: &AppState, cookie: &str) -> Result<bool, fleet_store::Error> {
     Ok(state
         .store
-        .session(cookie)
+        .session(cookie, crate::session::idle(&state.config))
         .await?
         .is_some_and(|s| s.user_id.is_some()))
 }

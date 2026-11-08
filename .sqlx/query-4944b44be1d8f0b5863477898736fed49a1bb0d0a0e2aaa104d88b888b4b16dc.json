@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT user_id, data FROM sessions WHERE id = $1 AND expires_at > now()",
+  "query": "SELECT user_id, data FROM sessions\n              WHERE id = $1 AND expires_at > now()\n                AND last_seen_at > now() - make_interval(secs => $2)",
   "describe": {
     "columns": [
       {
@@ -28,7 +28,8 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Float8"
       ]
     },
     "nullable": [
@@ -36,5 +37,5 @@
       false
     ]
   },
-  "hash": "9dcd3fb3c012e160655d2237f56fdf33663d863855803dbb26db9ef019bc71f5"
+  "hash": "4944b44be1d8f0b5863477898736fed49a1bb0d0a0e2aaa104d88b888b4b16dc"
 }

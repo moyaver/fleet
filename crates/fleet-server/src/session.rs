@@ -80,6 +80,12 @@ pub(crate) struct Active {
     pub(crate) cookie: String,
 }
 
+/// How long a browser session may go unused (research 06 T21).
+pub(crate) fn idle(config: &crate::config::Config) -> time::Duration {
+    let minutes = config.login.as_ref().map_or(60, |l| l.session_idle_minutes);
+    time::Duration::minutes(i64::try_from(minutes).unwrap_or(i64::MAX / 60))
+}
+
 /// The signed-in session a request's cookie names. `None` when there is no cookie, it is
 /// unknown or expired, or it is only a sign-in transaction.
 pub(crate) async fn active(
@@ -89,7 +95,11 @@ pub(crate) async fn active(
     let Some(cookie) = read(headers) else {
         return Ok(None);
     };
-    let Some(record) = state.store.session(&cookie).await? else {
+    let Some(record) = state
+        .store
+        .session_use(&cookie, idle(&state.config))
+        .await?
+    else {
         return Ok(None);
     };
     let Some(user_id) = record.user_id else {
