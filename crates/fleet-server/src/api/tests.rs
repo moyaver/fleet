@@ -5,6 +5,7 @@
 //! values come from the spec and from worked literal examples.
 
 mod access;
+mod admin;
 mod artifacts;
 mod authz_matrix;
 mod compare;
