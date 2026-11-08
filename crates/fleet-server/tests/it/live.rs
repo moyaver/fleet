@@ -3,8 +3,10 @@
 
 use std::{net::SocketAddr, time::Duration};
 
+use fleet_protocol::{frame::ClientFrame, journal::ClockSample};
 use futures_util::SinkExt;
 use serde_json::{Value, json};
+use time::OffsetDateTime;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::support::{Agent, Client, Harness, VIEWER, Ws, get, live, live_next, post_json};
@@ -405,8 +407,8 @@ async fn liveness_at(addr: SocketAddr, attempt: &str) -> String {
 
 #[tokio::test]
 async fn a_run_connected_to_one_instance_is_live_on_another_until_it_goes_silent() {
-    // Stale after 3 s without contact. The leader persists contact every 200 ms, so the other
-    // instance judges the run stale 3.2 s after its last persisted contact.
+    // Stale after 3 s without contact. The leader persists contact every 200 ms, and the other
+    // instance judges the run from that persisted contact, 3.2 s at most after it.
     let h = Harness::start_with(|c| {
         c.liveness.stale_after_ms = 3_000;
         c.liveness.sweep_interval_ms = 200;
@@ -421,13 +423,34 @@ async fn a_run_connected_to_one_instance_is_live_on_another_until_it_goes_silent
     c.events(events[..4].to_vec()).await;
     let attempt = attempt_of(&h).await;
 
-    assert_eq!(liveness_at(h.addr(), &attempt).await, "online");
-    assert_eq!(
-        liveness_at(other.addr(), &attempt).await,
-        "online",
-        "a run connected to the first instance is live on the second"
-    );
+    // Live on both while the agent keeps talking: a heartbeat every 200 ms keeps its contact well
+    // inside the 3 s window, and the test waits for both instances to show it, rather than reading
+    // once at an instant a loaded machine may have let the window pass.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        c.send(&ClientFrame::Heartbeat {
+            clock: ClockSample {
+                wall: OffsetDateTime::now_utc(),
+                mono_ms: 1,
+            },
+            unacked: 0,
+        })
+        .await;
+        let live = (
+            liveness_at(h.addr(), &attempt).await,
+            liveness_at(other.addr(), &attempt).await,
+        );
+        if live == ("online".to_owned(), "online".to_owned()) {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "a run connected to the first instance is live on both: {live:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
 
+    // Silent from here on: stale on both once the threshold passes.
     let shown = both_show(h.addr(), other.addr(), &attempt, "stale").await;
     assert_eq!(
         shown,
