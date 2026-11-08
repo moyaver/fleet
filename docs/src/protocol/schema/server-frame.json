@@ -100,6 +100,24 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "pressure_sample_interval_ms": {
+          "description": "How often the agent samples host and process metrics while the host is under pressure.\nAbsent: 15 s. Clamped like `sample_interval_ms`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sample_interval_ms": {
+          "description": "How often the agent samples host and process metrics while the host is calm. Absent (an\nolder server, or none configured): 5 s. The agent clamps it to a sane range and logs it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
