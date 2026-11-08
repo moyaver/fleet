@@ -149,6 +149,43 @@ async fn a_screenshot_opens_inline_with_the_sandbox_headers_and_no_cookies() {
 }
 
 #[tokio::test]
+async fn every_screenshot_and_report_read_through_a_link_is_audited() {
+    // Research 06 T7: a read of media or a report leaves a row, and an unaudited class does not.
+    let (rig, run) = rig_with_usercontent().await;
+    let shot = store(
+        &rig,
+        &run,
+        "failure_screenshot",
+        "checkout/shot.png",
+        "image/png",
+        PNG,
+    )
+    .await;
+    let log = store(&rig, &run, "maestro_log", "m.log", "text/plain", b"ok\n").await;
+    let project = rig.store.project_id("app").await.unwrap().unwrap();
+    let audited = || async {
+        rig.store
+            .audited(project, "artifact.fetched")
+            .await
+            .unwrap()
+    };
+    assert!(audited().await.is_empty(), "nothing read yet");
+
+    let link = link_of(&rig, &run, shot).await;
+    assert_eq!(open(&rig, UC_HOST, &link).await.status_code(), 200);
+    assert_eq!(open(&rig, UC_HOST, &link).await.status_code(), 200);
+    let rows = audited().await;
+    assert_eq!(rows.len(), 2, "one row per read: {rows:?}");
+    assert_eq!(rows[0]["artifact_id"], shot.to_string());
+    assert_eq!(rows[0]["class"], "failure_screenshot");
+    assert_eq!(rows[0]["via"], "signed_link");
+
+    let text_link = link_of(&rig, &run, log).await;
+    assert_eq!(open(&rig, UC_HOST, &text_link).await.status_code(), 200);
+    assert_eq!(audited().await.len(), 2, "text evidence is not audited");
+}
+
+#[tokio::test]
 async fn html_is_shown_sandboxed_and_everything_else_is_a_download() {
     let (rig, run) = rig_with_usercontent().await;
     let cases: [Case<'_>; 4] = [
