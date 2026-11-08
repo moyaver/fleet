@@ -393,7 +393,9 @@ async fn a_browser_without_a_session_signs_in_and_comes_back_to_the_flow() {
             scopes: Vec::new(),
             group_claims: vec!["groups".into()],
             session_ttl_minutes: 60,
+            session_idle_minutes: 60,
             group_roles: Vec::new(),
+            jwks_hosts: Vec::new(),
         });
     })
     .await;
