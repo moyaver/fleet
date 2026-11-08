@@ -15,6 +15,7 @@ workspace = true
 console_error_panic_hook.workspace = true
 fleet-protocol.workspace = true
 fleet-ui.workspace = true
+futures-channel.workspace = true
 futures-util.workspace = true
 gloo-net = { workspace = true, features = ["http", "json", "websocket"] }
 gloo-timers = { workspace = true, features = ["futures"] }

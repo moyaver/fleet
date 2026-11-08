@@ -2,7 +2,22 @@
 //! Wording and mappings shared by the pages.
 
 use fleet_protocol::journal::SourceKind;
-use fleet_ui::charts::format::{format_duration, format_timestamp};
+use fleet_ui::{
+    charts::format::{format_duration, format_timestamp},
+    provenance::{Provenance, STALE_AFTER_MS},
+};
+
+/// How fresh a sample taken `age_ms` ago reads on a live page (invariant I4, issue #149): observed
+/// while it is young and the page is receiving updates, stale once it is old or while the page's
+/// socket is not confirming updates, since a value the page cannot refresh may have changed.
+#[must_use]
+pub fn sample_freshness(age_ms: u64, updating: bool) -> Provenance {
+    if updating {
+        Provenance::Observed.displayed(age_ms, STALE_AFTER_MS)
+    } else {
+        Provenance::Stale
+    }
+}
 
 /// What a page needs to turn data into text: where it is, when it is, and the viewer's clock.
 #[derive(Debug, Clone, PartialEq, Eq)]

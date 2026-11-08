@@ -5,13 +5,17 @@
 //! - [`queue`]: frames wait in a queue that is applied once per animation frame.
 //! - [`versions`]: spots a skipped version, which the socket answers with a new snapshot.
 //! - [`keys`]: which `(epoch, id)` keys a keyed list holds, so a re-snapshot rebuilds rows.
+//! - [`registry`]: the subscriptions the app's one socket carries, and the requests that bring
+//!   each of them up again after a reconnect.
 //!
-//! The pure parts are tested natively. [`socket`] is the browser I/O and [`model`] the reactive
-//! adapter over `fleet_ui::live_store::LiveStore`, both thin layers over them.
+//! The pure parts are tested natively. [`socket`] is the browser I/O (one socket for the whole app,
+//! shared by every page) and [`model`] the reactive adapter over `fleet_ui::live_store::LiveStore`,
+//! both thin layers over them.
 
 pub mod backoff;
 pub mod keys;
 pub mod model;
 pub mod queue;
+pub mod registry;
 pub mod socket;
 pub mod versions;

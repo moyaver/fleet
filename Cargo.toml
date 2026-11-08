@@ -80,6 +80,7 @@ crc32fast = "1.5.4"
 fantoccini = { version = "0.22.1", default-features = false }
 figment = { version = "0.10.19", features = ["toml", "env"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+futures-channel = { version = "0.3.34", default-features = false, features = ["std"] }
 getrandom = "0.4.3"
 glob = "0.3.4"
 # REST and the live WebSocket in the browser; members add the features they use.

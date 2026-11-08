@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::{
     clock::unix_ms,
     paths::{device_href, flow_href, pipeline_href, worker_href},
-    screens::common::Ctx,
+    screens::common::{Ctx, sample_freshness},
     status::{Pill, flow_provenance, flow_state_pill},
 };
 
@@ -106,19 +106,28 @@ fn meta_text(profile: Option<&DeviceProfileView>) -> String {
 }
 
 impl DeviceHeader {
-    /// The header of `view`.
+    /// The header of `view`. `updating` says whether the page is receiving updates: while it is
+    /// not, a device that was live may have changed, so its state reads Stale (issue #149).
     #[must_use]
-    pub fn build(view: &DeviceDetailView, ctx: &Ctx) -> Self {
+    pub fn build(view: &DeviceDetailView, ctx: &Ctx, updating: bool) -> Self {
         let s = &view.session;
         let profile = s.profile.as_ref();
         let title = profile
             .and_then(|p| p.avd_or_runtime.clone())
             .or_else(|| profile.and_then(|p| p.model.clone()))
             .unwrap_or_else(|| s.device.serial.clone());
+        let state = if !updating && !matches!(s.device.state.as_str(), "released" | "lost") {
+            Pill {
+                label: "Stale",
+                mark: Mark::Stale,
+            }
+        } else {
+            device_state_pill(&s.device.state)
+        };
         Self {
             title,
             subtitle: s.device.serial.clone(),
-            state: device_state_pill(&s.device.state),
+            state,
             meta: meta_text(profile),
             runner_name: s.runner_name.clone().unwrap_or_else(|| "Runner".to_owned()),
             worker_href: s.worker_id.map(|w| worker_href(&ctx.project, w)),
@@ -218,6 +227,8 @@ pub(crate) fn format_value(unit: MetricUnit, v: f64) -> String {
 pub struct ReadingsView {
     /// `sampled 12 s ago`.
     pub taken: String,
+    /// Observed while the sample is young and the page is updating, stale otherwise.
+    pub provenance: Provenance,
     /// `Shard 2`, when the agent reported the shard.
     pub shard: Option<String>,
     /// Every reading, in the order the agent reports them.
@@ -225,12 +236,15 @@ pub struct ReadingsView {
 }
 
 impl ReadingsView {
-    /// The newest sample in `view`, or `None` before the agent has sampled the device.
+    /// The newest sample in `view`, or `None` before the agent has sampled the device. `updating`
+    /// is whether the page is receiving updates (see [`DeviceHeader::build`]).
     #[must_use]
-    pub fn build(view: &DeviceDetailView, ctx: &Ctx) -> Option<Self> {
+    pub fn build(view: &DeviceDetailView, ctx: &Ctx, updating: bool) -> Option<Self> {
         let latest = view.latest.as_ref()?;
+        let at = unix_ms(latest.at);
         Some(Self {
-            taken: format!("sampled {}", ctx.ago(unix_ms(latest.at))),
+            taken: format!("sampled {}", ctx.ago(at)),
+            provenance: sample_freshness(ctx.age_ms(at), updating),
             shard: latest.shard.map(|s| format!("Shard {s}")),
             rows: latest.readings.iter().map(ReadingRow::of).collect(),
         })
@@ -416,7 +430,7 @@ mod tests {
 
     #[test]
     fn the_header_names_the_device_and_its_connection_status() {
-        let h = DeviceHeader::build(&view(), &ctx());
+        let h = DeviceHeader::build(&view(), &ctx(), true);
         assert_eq!(h.title, "Pixel_7_API_34");
         assert_eq!(h.subtitle, "emulator-5554");
         assert_eq!((h.state.label, h.state.mark), ("Busy", Mark::Running));
@@ -435,7 +449,7 @@ mod tests {
     fn a_device_without_a_profile_says_so_and_falls_back_to_its_serial() {
         let mut v = view();
         v.session.profile = None;
-        let h = DeviceHeader::build(&v, &ctx());
+        let h = DeviceHeader::build(&v, &ctx(), true);
         assert_eq!(h.title, "emulator-5554");
         assert_eq!(h.meta, "Profile not reported");
     }
@@ -446,7 +460,7 @@ mod tests {
         v.session.profile.as_mut().unwrap().abi = None;
         v.session.profile.as_mut().unwrap().model = None;
         assert_eq!(
-            DeviceHeader::build(&v, &ctx()).meta,
+            DeviceHeader::build(&v, &ctx(), true).meta,
             "Android emulator · Model not reported · Android 14 (API 34) · ABI not reported"
         );
     }
@@ -495,6 +509,33 @@ mod tests {
         let mut v = view();
         v.flows.remove(0);
         assert_eq!(ExecutionDetails::build(&v, &ctx()).current_flow, None);
+    }
+
+    #[test]
+    fn a_device_whose_page_is_not_updating_reads_stale_until_it_is_released() {
+        use fleet_protocol::rest::DeviceLatestView;
+        use time::OffsetDateTime;
+
+        let mut v = view();
+        // Twelve seconds before the context's clock: young, so observed while updates arrive.
+        v.latest = Some(DeviceLatestView {
+            at: OffsetDateTime::from_unix_timestamp(1_767_265_188).unwrap(),
+            shard: None,
+            readings: Vec::new(),
+        });
+        let c = ctx();
+        assert_eq!(DeviceHeader::build(&v, &c, true).state.label, "Busy");
+        assert_eq!(DeviceHeader::build(&v, &c, false).state.label, "Stale");
+        assert_eq!(
+            ReadingsView::build(&v, &c, true).map(|r| r.provenance),
+            Some(Provenance::Observed)
+        );
+        assert_eq!(
+            ReadingsView::build(&v, &c, false).map(|r| r.provenance),
+            Some(Provenance::Stale)
+        );
+        v.session.device.state = "released".to_owned();
+        assert_eq!(DeviceHeader::build(&v, &c, false).state.label, "Released");
     }
 
     #[test]
@@ -555,7 +596,7 @@ mod tests {
         };
         let mut v = view();
         assert!(
-            ReadingsView::build(&v, &ctx()).is_none(),
+            ReadingsView::build(&v, &ctx(), true).is_none(),
             "a device the agent has not sampled has no readings"
         );
         v.latest = Some(DeviceLatestView {
@@ -606,7 +647,7 @@ mod tests {
                 ),
             ],
         });
-        let shown = ReadingsView::build(&v, &ctx()).expect("the device was sampled");
+        let shown = ReadingsView::build(&v, &ctx(), true).expect("the device was sampled");
         assert_eq!(shown.taken, "sampled 12 s ago");
         assert_eq!(shown.shard.as_deref(), Some("Shard 2"));
         let row = |label: &str| {

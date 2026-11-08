@@ -127,7 +127,11 @@ fn load_timelines(project: String, attempts: Vec<Uuid>, into: RwSignal<Vec<Timel
 /// Follows `project`'s live socket while the page is open. Any frame bumps `tick`, which asks the
 /// page for fresh data (the requests are throttled), and the top bar's indicator shows how the feed
 /// stands. Pause holds the frames as they arrive; resuming bumps `tick` once if any came.
-fn follow_project(project: String, tick: RwSignal<u64>, now: RwSignal<i64>) {
+///
+/// The returned signal says whether the page is receiving updates: false while the socket is
+/// reconnecting, or while the person has paused, so the values the page shows are then stale.
+fn follow_project(project: String, tick: RwSignal<u64>, now: RwSignal<i64>) -> RwSignal<bool> {
+    let updating = RwSignal::new(true);
     let paused = RwSignal::new(false);
     let held = RwSignal::new(0_usize);
     let last_update = RwSignal::new(now_ms());
@@ -166,7 +170,9 @@ fn follow_project(project: String, tick: RwSignal<u64>, now: RwSignal<i64>) {
     Effect::new(move |_| {
         let at = now.get();
         let offset = utc_offset_minutes();
-        let (state, detail, action) = match (socket.connection.get(), paused.get(), held.get()) {
+        let connection = socket.connection.get();
+        updating.set(connection != Connection::Reconnecting && !paused.get());
+        let (state, detail, action) = match (connection, paused.get(), held.get()) {
             (Connection::Connecting, _, _) => (LiveState::Connecting, String::new(), None),
             (Connection::Reconnecting, _, _) => (
                 LiveState::Reconnecting,
@@ -207,6 +213,7 @@ fn follow_project(project: String, tick: RwSignal<u64>, now: RwSignal<i64>) {
             }
         });
     });
+    updating
 }
 
 /// Opens a flow's page without reloading.
@@ -315,7 +322,7 @@ fn WorkerBody(project: String, id: Uuid) -> impl IntoView {
             }
         });
     }
-    follow_project(project.clone(), tick, now);
+    let updating = follow_project(project.clone(), tick, now);
     let more_runs: RwSignal<Vec<WorkerRunPage>> = RwSignal::new(Vec::new());
     let on_more_runs = {
         let project = project.clone();
@@ -348,6 +355,7 @@ fn WorkerBody(project: String, id: Uuid) -> impl IntoView {
             project=project.clone()
             now_ms=now
             utc_offset_minutes=utc_offset_minutes()
+            updating=updating
             on_open_flow=open_flow(project)
         />
     }
@@ -392,7 +400,7 @@ fn DeviceBody(project: String, id: Uuid) -> impl IntoView {
             }
         });
     }
-    follow_project(project.clone(), tick, now);
+    let updating = follow_project(project.clone(), tick, now);
     let announced = announce::region(Signal::derive(move || {
         device.data.with(|d| d.as_ref().map(device_facts))
     }));
@@ -405,6 +413,7 @@ fn DeviceBody(project: String, id: Uuid) -> impl IntoView {
             project=project
             now_ms=now
             utc_offset_minutes=utc_offset_minutes()
+            updating=updating
         />
     }
 }
