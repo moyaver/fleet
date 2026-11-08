@@ -352,6 +352,12 @@ pub(crate) fn http_base(ws_url: &str) -> String {
     }
 }
 
+/// Whether this run can authenticate: a `FLEET_TOKEN`, or an OIDC request to exchange. Without
+/// either the run is offline. A fork pull request gets neither (research 06 T1).
+pub(crate) fn has_credential(env: impl Fn(&str) -> Option<String>) -> bool {
+    env("FLEET_TOKEN").is_some_and(|t| !t.is_empty()) || OidcRequest::from_env(&env).is_some()
+}
+
 /// The token-exchange URL next to the agent WebSocket URL.
 pub(crate) fn token_url(ws_url: &str) -> String {
     format!("{}/api/v1/agent/token", http_base(ws_url))

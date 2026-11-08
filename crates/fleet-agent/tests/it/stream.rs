@@ -279,6 +279,8 @@ fn run_agent_on(
         .stdin(Stdio::null());
     if let Some(s) = server {
         cmd.env("FLEET_SERVER", s);
+        // A server run is authenticated unless a test says otherwise (`env` comes after this).
+        cmd.env("FLEET_TOKEN", "fleet-test-token");
     }
     for (k, v) in env {
         cmd.env(k, v);
@@ -503,6 +505,35 @@ fn no_server_black_hole_or_refusal_never_changes_the_result() {
             "{name}: the spool keeps the events"
         );
     }
+}
+
+#[test]
+fn a_run_with_no_credential_is_offline_and_sends_nothing() {
+    // The fork-PR case: the workflow names a server, but the job has no credential. A fork PR's
+    // secret arrives as an empty FLEET_TOKEN, and there is no OIDC request (no `id-token`).
+    let srv = server(Mode::Normal);
+    let (out, _, run_dir) = run_agent(
+        "fail",
+        Some(&format!("ws://{}", srv.addr)),
+        &[],
+        &[("FLEET_TOKEN", "")],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        out.stdout,
+        std::fs::read(fixture("fail/stdout.bin")).unwrap(),
+        "Maestro's output is unchanged"
+    );
+    // The observer's log is in the run directory.
+    let said = std::fs::read_to_string(run_dir.join("observer.log")).unwrap();
+    assert!(said.contains("running offline"), "{said}");
+    let s = srv.state.lock().unwrap();
+    assert_eq!(s.connections, 0, "no connection was attempted");
+    assert!(s.hellos.is_empty() && s.committed.is_empty());
+    assert!(
+        run_dir.join("spool.bin").exists(),
+        "the spool keeps the events"
+    );
 }
 
 #[test]
@@ -800,7 +831,10 @@ fn a_rate_limited_batch_waits_for_retry_after_and_the_run_keeps_maestros_status(
 
 #[test]
 fn unauthorized_upgrade_does_not_trigger_batch() {
-    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
     let posts = Arc::new(Mutex::new(0_u32));
     let observed = Arc::clone(&posts);
     let (tx, rx) = std::sync::mpsc::channel();
@@ -816,6 +850,7 @@ fn unauthorized_upgrade_does_not_trigger_batch() {
                 .mount(&server)
                 .await;
             Mock::given(method("POST"))
+                .and(path("/api/v1/agent/batch"))
                 .respond_with(move |_: &wiremock::Request| {
                     *observed.lock().unwrap() += 1;
                     ResponseTemplate::new(200)
@@ -949,7 +984,10 @@ fn unreachable_server_gets_a_short_finalization_budget() {
 
 #[test]
 fn batch_with_invalid_welcome_stops_without_sending_events() {
-    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
     let requests = Arc::new(Mutex::new(Vec::<Value>::new()));
     let seen = Arc::clone(&requests);
     let (tx, rx) = std::sync::mpsc::channel();
@@ -961,7 +999,7 @@ fn batch_with_invalid_welcome_stops_without_sending_events() {
         runtime.block_on(async move {
             let server = MockServer::start().await;
             Mock::given(method("GET")).respond_with(ResponseTemplate::new(426)).mount(&server).await;
-            Mock::given(method("POST")).respond_with(move |request: &wiremock::Request| {
+            Mock::given(method("POST")).and(path("/api/v1/agent/batch")).respond_with(move |request: &wiremock::Request| {
                 seen.lock().unwrap().push(serde_json::from_slice(&request.body).unwrap());
                 ResponseTemplate::new(200).set_body_json(json!({"frames":[{"op":"welcome", "protocol":99,
                     "connection_id":"00000000-0000-0000-0000-000000000001", "epoch":1, "committed_through":0,

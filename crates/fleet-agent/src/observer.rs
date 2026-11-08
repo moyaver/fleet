@@ -390,7 +390,10 @@ fn start(
     let (telemetry, transport) = match server_url() {
         Some(url) => {
             let (tx, rx) = mpsc::channel(64);
-            uploader = uploads_enabled().then(|| {
+            // No credential, no upload: the uploader would only wait for one (fork pull requests).
+            let can_upload =
+                uploads_enabled() && crate::net::has_credential(|k| std::env::var(k).ok());
+            uploader = can_upload.then(|| {
                 Uploader::new(upload::Config {
                     base: crate::net::http_base(&url),
                     credential: Arc::clone(&shared.credential),
