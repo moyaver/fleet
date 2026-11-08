@@ -411,19 +411,13 @@ impl Replay {
         let meta: Value = serde_json::from_str(
             &fs::read_to_string(dir.join("meta.json")).context("reading meta.json")?,
         )?;
-        let mut argv: Vec<String> = meta["command"]
+        let command: Vec<String> = meta["command"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|v| v.as_str().map(str::to_owned))
             .collect();
-        // Captures under `script` wrap the real command.
-        if let Some(pos) = argv
-            .iter()
-            .position(|a| a.ends_with("/maestro") || a.ends_with("bin/maestro"))
-        {
-            argv.drain(..pos);
-        }
+        let argv = maestro_argv(&command);
         let env: Vec<(String, String)> = meta["env"]
             .as_array()
             .into_iter()
@@ -446,10 +440,14 @@ impl Replay {
             .as_deref()
             .and_then(|p| p.strip_prefix(dir).ok())
             .map(|p| p.to_string_lossy().into_owned());
-        let debug_rel = session_rel
-            .as_deref()
-            .and_then(|r| r.rsplit_once('/'))
-            .map(|(d, _)| format!("{d}/"));
+        // The flow bundles sit where the layout model says, which is not always beside the session
+        // log (`--test-output-dir`, `--debug-output` apart): see [`bundle_dir_rel`].
+        let debug_rel = bundle_dir_rel(dir, &argv, session_rel.as_deref()).or_else(|| {
+            session_rel
+                .as_deref()
+                .and_then(|r| r.rsplit_once('/'))
+                .map(|(d, _)| format!("{d}/"))
+        });
 
         let (mut timeline, last_ms) =
             recorded_timeline(dir, session_rel.as_deref(), debug_rel.as_deref())?;
@@ -619,6 +617,57 @@ fn saved_log(dir: &Path) -> Option<PathBuf> {
 }
 
 /// The observations recorded in a capture's `events.jsonl`, and the last timestamp.
+/// The Maestro command inside a captured command line. Captures under `script` or a shell wrapper
+/// carry more than that: the words from Maestro's program on are the command. A wrapper that runs
+/// Maestro from a script (`… exec maestro …`) keeps the script's words after `exec`.
+pub(crate) fn maestro_argv(command: &[String]) -> Vec<String> {
+    if let Some(pos) = command
+        .iter()
+        .position(|a| Path::new(a).file_name().is_some_and(|n| n == "maestro"))
+    {
+        return command[pos..].to_vec();
+    }
+    command
+        .iter()
+        .find_map(|a| {
+            a.split_once("exec ")
+                .filter(|(_, rest)| rest.starts_with("maestro "))
+                .map(|(_, rest)| rest.split_whitespace().map(str::to_owned).collect())
+        })
+        .unwrap_or_else(|| command.to_vec())
+}
+
+/// The directory, relative to the capture, that holds the captured run's flow bundles, as the live
+/// watcher finds them: the layout model's bundle root (`output_layout`, the rule `watch.rs` follows)
+/// with the session log's stamp, or the root itself when it is flat. The capture's paths are made
+/// absolute, and the workspace config's `testOutputDir` is read from the capture's `run` directory,
+/// the directory the captured wrappers ran Maestro in. `None` when the model cannot say (a flattened
+/// run with no `--debug-output`, whose home the capture does not record).
+fn bundle_dir_rel(dir: &Path, argv: &[String], session_rel: Option<&str>) -> Option<String> {
+    let stamp = session_rel
+        .and_then(|r| Path::new(r).parent())?
+        .file_name()?;
+    let run = dir.join("run");
+    let absolute: Vec<String> = argv
+        .iter()
+        .map(|a| a.replace("<CAPTURE>", &dir.display().to_string()))
+        .collect();
+    let workspace = crate::layout::workspace_test_dir(&absolute, Some(&run))
+        .map(|w| run.join(w).display().to_string());
+    let layout = fleet_maestro::invocation::output_layout(
+        &fleet_maestro::invocation::parse(&absolute),
+        Some(&dir.join("state/maestro/tests")),
+        None,
+        workspace.as_deref(),
+    )?;
+    let root = match layout.bundles {
+        fleet_maestro::invocation::OutputRoot::Flat(root) => root,
+        fleet_maestro::invocation::OutputRoot::Stamped(base) => base.join(stamp),
+    };
+    let rel = root.strip_prefix(dir).ok()?;
+    Some(format!("{}/", rel.display()))
+}
+
 fn recorded_timeline(
     dir: &Path,
     session_rel: Option<&str>,

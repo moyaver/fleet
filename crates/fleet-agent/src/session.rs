@@ -2518,8 +2518,8 @@ mod tests {
             .collect()
     }
 
-    /// The Maestro command a captured run was started with (its `meta.json`), from the `maestro`
-    /// program on: the invocation the agent reads, which names the flow the run executed.
+    /// The Maestro command a captured run was started with (its `meta.json`): the invocation the
+    /// agent reads, which names the flow the run executed.
     fn captured_argv(dir: &std::path::Path) -> Vec<String> {
         let meta: serde_json::Value =
             serde_json::from_slice(&std::fs::read(dir.join("meta.json")).unwrap()).unwrap();
@@ -2529,24 +2529,7 @@ mod tests {
             .iter()
             .map(|a| a.as_str().unwrap().to_owned())
             .collect();
-        let program = command.iter().position(|a| {
-            std::path::Path::new(a)
-                .file_name()
-                .is_some_and(|n| n == "maestro")
-        });
-        if let Some(program) = program {
-            return command[program..].to_vec();
-        }
-        // A wrapper that runs Maestro from a shell script (`exec maestro …`): the script's words after
-        // `exec` are the Maestro command.
-        command
-            .iter()
-            .find_map(|a| {
-                a.split_once("exec ")
-                    .filter(|(_, rest)| rest.starts_with("maestro "))
-                    .map(|(_, rest)| rest.split_whitespace().map(str::to_owned).collect())
-            })
-            .unwrap_or_else(|| panic!("{}: no maestro in the command", dir.display()))
+        crate::inspect::maestro_argv(&command)
     }
 
     /// The captured run called `name`.

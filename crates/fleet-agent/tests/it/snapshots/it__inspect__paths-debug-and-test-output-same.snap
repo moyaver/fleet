@@ -8,16 +8,17 @@ expression: result
       "shard": 1,
       "name": "pass",
       "path": "<REPO>/examples/flows/phase0/pass.yaml",
-      "outcome": "running",
-      "finality": "provisional",
-      "source": null,
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "artifact_file",
       "conflict": false,
       "steps": 7,
       "failure": null
     }
   ],
-  "events": 22,
+  "events": 30,
   "event_types": {
+    "flow.ended": 1,
     "flow.started": 1,
     "maestro.detected": 1,
     "process.exited": 1,
@@ -25,7 +26,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 7,
+    "step.ended": 14,
     "step.started": 7,
     "suite.started": 1
   },
