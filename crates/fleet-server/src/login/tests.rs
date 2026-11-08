@@ -639,6 +639,21 @@ async fn sign_in_returns_to_a_page_on_this_site_and_never_elsewhere() {
     }
 }
 
+/// A browser sent to sign in from a flow's page (`/api/v1/flows/{id}/page`) lands back on that page
+/// once the provider has signed it in.
+#[tokio::test]
+async fn sign_in_from_a_flow_page_lands_back_on_that_page() {
+    let rig = rig().await;
+    let page = "/api/v1/flows/0196f2c0-0000-7000-8000-00000000000a/page";
+    let flow = start_login(&rig, Some(page)).await;
+    rig.idp.issue(
+        "code",
+        rig.idp.id_token(&flow.nonce, &json!({"groups": ["qa"]})),
+    );
+    let res = callback(&rig, &flow, "code").await;
+    assert_eq!(res.header("location"), page);
+}
+
 async fn get_as(rig: &Rig, path: &str, cookie: &str) -> axum_test::TestResponse {
     rig.app.get(path).add_header("cookie", cookie).await
 }

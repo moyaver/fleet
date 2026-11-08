@@ -28,7 +28,7 @@ The summary is included from `v0.1.0-alpha.2`; `v0.1.0-alpha.1` predates it. The
 
 The `command` input is split as a shell splits words for quotes and backslashes, without expansion: `maestro test "my flows/"` passes `my flows/` as one argument. An unterminated quote fails the step before Maestro starts. With `install: "false"` the action runs the `fleet-agent` already on `PATH` (for example one built from the repository) and downloads nothing. The action's `summary-file` output names the file the summary was written to, for a later step that reads it.
 
-The links open the flow page through `/api/v1/flows/{id}/page`, so they need a signed-in dashboard session in the browser. A reader of another project sees the same not-found answer as for a flow that does not exist.
+The links open the flow page through `/api/v1/flows/{id}/page`, so a browser without a signed-in dashboard session is sent to sign in and then comes back to the flow. A reader of another project sees the same not-found answer as for a flow that does not exist.
 
 ## Check the setup
 

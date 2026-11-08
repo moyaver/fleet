@@ -9,7 +9,8 @@ use serde_json::{Value, json};
 
 use fleet_core::policy::Role;
 
-use super::rig::{Agent, Rig, rig};
+use super::rig::{Agent, Rig, rig, rig_with};
+use crate::config::Login;
 
 /// The ID of the only flow named `name` in `attempt`'s snapshot.
 async fn flow_id(rig: &Rig, attempt: &str, name: &str) -> String {
@@ -375,5 +376,62 @@ async fn a_flow_known_only_by_its_id_redirects_to_screen_d_for_a_reader_of_its_p
         anonymous.status_code(),
         401,
         "a credential is still required"
+    );
+}
+
+/// A browser with no session is sent to sign in and comes back to the flow's page; a missing flow
+/// is no different to it (the redirect names no flow it could not read). An API client, or a
+/// server with no browser sign-in, keeps the `401` answer.
+#[tokio::test]
+async fn a_browser_without_a_session_signs_in_and_comes_back_to_the_flow() {
+    let rig = rig_with(|c| {
+        c.api.public_url = Some("https://fleet.test".into());
+        c.login = Some(Login {
+            issuer: "https://idp.test".into(),
+            client_id: "fleet-web".into(),
+            client_secret: None,
+            scopes: Vec::new(),
+            group_claims: vec!["groups".into()],
+            session_ttl_minutes: 60,
+            group_roles: Vec::new(),
+        });
+    })
+    .await;
+    let flow = failed_checkout(&rig, "742").await;
+    let missing = uuid::Uuid::now_v7();
+    for id in [flow.clone(), missing.to_string()] {
+        let res = rig
+            .app
+            .get(&format!("/api/v1/flows/{id}/page"))
+            .add_header("accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
+            .await;
+        assert_eq!(res.status_code(), 303, "{}", res.text());
+        assert_eq!(
+            res.header("location").to_str().unwrap(),
+            format!("/api/v1/auth/login?return_to=%2Fapi%2Fv1%2Fflows%2F{id}%2Fpage")
+        );
+    }
+    let browser = format!("/api/v1/flows/{flow}/page");
+
+    for accept in [None, Some("application/json")] {
+        let mut req = rig.app.get(&browser);
+        if let Some(accept) = accept {
+            req = req.add_header("accept", accept);
+        }
+        let res = req.await;
+        assert_eq!(res.status_code(), 401);
+        assert!(res.json::<Value>()["error"].is_string());
+    }
+
+    let no_login = rig_with(|_| {}).await;
+    let res = no_login
+        .app
+        .get(&browser)
+        .add_header("accept", "text/html")
+        .await;
+    assert_eq!(
+        res.status_code(),
+        401,
+        "no sign-in page to send the browser to"
     );
 }

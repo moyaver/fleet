@@ -129,7 +129,7 @@ The server also limits how often each viewer credential may read (`429 Too Many 
 
 See [Provenance badges](#provenance-badges) above. The agent adds the same information to its own output: `fleet-agent inspect` prints each flow's outcome with its source, and a failure caused by a lost device (the same two signs as the dashboard's label) is prefixed "infrastructure (device lost)".
 
-`GET /api/v1/flows/{id}/page` redirects a signed-in reader to the flow's page (`/flows/{id}?project=<slug>`) when only the flow's ID is known. The job summary links each flow that did not pass through it, because the agent does not know the project's slug. A caller who may not read the flow's project gets the same 404 as for a flow that does not exist.
+`GET /api/v1/flows/{id}/page` redirects a signed-in reader to the flow's page (`/flows/{id}?project=<slug>`) when only the flow's ID is known. A browser without a session is sent to sign in (`/api/v1/auth/login?return_to=…`) and comes back to the flow; an API client gets `401`. The job summary links each flow that did not pass through it, because the agent does not know the project's slug. A caller who may not read the flow's project gets the same 404 as for a flow that does not exist.
 
 ## Investigating a failure
 

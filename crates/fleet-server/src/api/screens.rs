@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screens A–D's REST reads (PLAN §10.3): overview, timeline, worker and device detail, flow
-//! investigation. Every route goes through [`Caller`] and `authorize(ReadRuns, project)`, and a
-//! project the caller can't read looks missing.
+//! investigation. Every route goes through [`Caller`] (the flow page reads its caller with
+//! [`principal`], to redirect a browser) and `authorize(ReadRuns, project)`, and a project the
+//! caller can't read looks missing.
 
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, Method, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
 };
 use fleet_protocol::{
@@ -26,7 +27,11 @@ use super::{
     metrics::{device_latest_view, latest_readings},
     read_project,
 };
-use crate::{live::Hub, session::Caller, state::AppState};
+use crate::{
+    live::Hub,
+    session::{Caller, principal},
+    state::AppState,
+};
 
 /// Workers listed on the overview, most recently seen first.
 const OVERVIEW_WORKERS: usize = 50;
@@ -219,21 +224,57 @@ fn with_run_liveness(hub: &Hub, mut r: WorkerRunView) -> WorkerRunView {
 /// does not know the project's slug): a redirect to `/flows/{id}?project={slug}` for a caller who
 /// may read the flow's project. Any other caller gets the answer for a flow that does not exist, so
 /// the slug is never named to someone who could not read it.
+///
+/// A browser (`Accept: text/html`) with no session is sent to browser sign-in, which comes back to
+/// this address, as the dashboard's own sign-in does. API clients keep their `401`.
 pub(super) async fn flow_page(
     State(state): State<AppState>,
-    Caller(principal): Caller,
+    method: Method,
+    headers: HeaderMap,
     Path(execution_id): Path<Uuid>,
 ) -> Response {
+    let who = match principal(&state, &method, &headers).await {
+        Ok(who) => who,
+        Err(refusal)
+            if refusal.status() == StatusCode::UNAUTHORIZED
+                && wants_html(&headers)
+                && state.config.login.is_some() =>
+        {
+            return Redirect::to(&sign_in_path(execution_id)).into_response();
+        }
+        Err(refusal) => return *refusal,
+    };
     let missing = || error(StatusCode::NOT_FOUND, "no such flow");
     let slug = match state.store.flow_project_slug(execution_id).await {
         Ok(Some(slug)) => slug,
         Ok(None) => return missing(),
         Err(e) => return internal(&e),
     };
-    match read_project(&state, &principal, &slug).await {
+    match read_project(&state, &who, &slug).await {
         Ok(_) => Redirect::to(&format!("/flows/{execution_id}?project={slug}")).into_response(),
         Err(_) => missing(),
     }
+}
+
+/// Browser sign-in for a flow's page: the sign-in route, returning to that page (`return_to` names a
+/// path on this site, which the callback accepts).
+fn sign_in_path(execution_id: Uuid) -> String {
+    format!("/api/v1/auth/login?return_to=%2Fapi%2Fv1%2Fflows%2F{execution_id}%2Fpage")
+}
+
+/// Whether the client asked for a web page (a browser's navigation) rather than an API answer.
+fn wants_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|accept| {
+            accept.split(',').any(|media| {
+                media
+                    .split(';')
+                    .next()
+                    .is_some_and(|m| m.trim().eq_ignore_ascii_case("text/html"))
+            })
+        })
 }
 
 /// Screen D: one flow execution with all its evidence.
