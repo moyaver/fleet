@@ -258,8 +258,15 @@
     font-size: 14px;
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
-    /* Flow names, run ids and URLs break where they must rather than push the page sideways;
-       text still breaks at spaces first. */
+    /* Long unbroken tokens may break anywhere so they cannot push the page sideways; ordinary
+       text breaks at spaces. `anywhere` on every element would shrink table columns to one
+       character, so it is limited to the names and messages below. */
+    overflow-wrap: break-word;
+  }
+
+  .cell-title,
+  .cell-sub,
+  .font-mono {
     overflow-wrap: anywhere;
   }
 
