@@ -67,7 +67,13 @@ impl Sampler {
     /// system information, a process this run does not know (or that exited), a probe that failed,
     /// a first CPU sample with no baseline, or a kernel without pressure information.
     pub(crate) fn sample(&mut self, at: ClockSample) -> Sample {
-        let (agent_cpu, agent_rss) = self.agent_usage();
+        self.sample_at(at, Instant::now())
+    }
+
+    /// [`sample`](Self::sample) with the instant that ends the CPU window, so a test sets the
+    /// window instead of measuring a wall-clock one.
+    fn sample_at(&mut self, at: ClockSample, now: Instant) -> Sample {
+        let (agent_cpu, agent_rss) = self.agent_usage(now);
         let (agent_cpu_pct, agent_cpu_why) = split(agent_cpu);
         let (agent_rss_bytes, agent_rss_why) = split(agent_rss);
         // The core count is read once at start, not from the system information.
@@ -173,8 +179,10 @@ impl Sampler {
     /// of one core (sum of both processes' CPU-time deltas, each against its own baseline), and
     /// the current resident memory of both. When the supervisor is gone or unknown, the numbers
     /// cover the observer only. Each is either the value or its reason.
-    fn agent_usage(&mut self) -> (Result<f32, Unavailable>, Result<u64, Unavailable>) {
-        let now = Instant::now();
+    fn agent_usage(
+        &mut self,
+        now: Instant,
+    ) -> (Result<f32, Unavailable>, Result<u64, Unavailable>) {
         let own = getrusage(UsageWho::RUSAGE_SELF)
             .ok()
             .map(|u| tv(u.user_time()) + tv(u.system_time()));
@@ -400,7 +408,24 @@ mod tests {
         assert!(s.sample(at).agent_cpu_pct.is_some());
     }
 
-    /// A busy child standing in for the supervisor is counted in CPU and RSS.
+    /// The child's accumulated CPU time, from the counter the sampler reads.
+    fn cpu_time_of(pid: u32) -> Duration {
+        let pid = Pid::from_u32(pid);
+        let mut system = System::new_with_specifics(RefreshKind::nothing())
+            .expect("system information should be available in tests");
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[pid]),
+            true,
+            ProcessRefreshKind::nothing().with_cpu(),
+        );
+        system.process(pid).map_or(Duration::ZERO, |p| {
+            Duration::from_millis(p.accumulated_cpu_time())
+        })
+    }
+
+    /// A busy child standing in for the supervisor is counted in CPU and RSS. The CPU window is an
+    /// injected second, and the test waits until the child has used 300 ms of CPU before it ends
+    /// the window: the share the child gets on a loaded machine no longer decides the result.
     #[test]
     fn supervisor_is_included_when_given() {
         let at = ClockSample {
@@ -411,11 +436,21 @@ mod tests {
             .args(["-c", "while :; do :; done"])
             .spawn()
             .expect("sh should spawn");
+        let start = Instant::now();
         let mut with = Sampler::new(None, Some(child.id()));
         let mut without = Sampler::new(None, None);
-        let _ = (with.sample(at), without.sample(at));
-        std::thread::sleep(Duration::from_millis(300));
-        let (w, wo) = (with.sample(at), without.sample(at));
+        let _ = (with.sample_at(at, start), without.sample_at(at, start));
+        let before = cpu_time_of(child.id());
+        let deadline = Instant::now() + Duration::from_secs(120);
+        while cpu_time_of(child.id()) < before + Duration::from_millis(300) {
+            assert!(
+                Instant::now() < deadline,
+                "the busy child never used 300 ms of CPU"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let end = start + Duration::from_secs(1);
+        let (w, wo) = (with.sample_at(at, end), without.sample_at(at, end));
         let _ = child.kill();
         let _ = child.wait();
         assert!(
