@@ -13,7 +13,8 @@ use fleet_protocol::{
     event::{
         AdbState, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome, FlowRef,
         FlowReported, JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed,
-        RunEnded, RunSignal, RunStarted, ShardAssigned, StepEnded, StepStarted, SuiteStarted,
+        RunEnded, RunSignal, RunStarted, ShardAssigned, StepEnded, StepStarted, StepTiming,
+        SuiteStarted,
     },
     journal::{EventEnvelope, SourceKind},
 };
@@ -538,8 +539,59 @@ impl<'a> Ctx<'a> {
         e: &EventEnvelope,
         b: &StepEnded,
     ) -> Result<Effect, sqlx::Error> {
+        if e.src.kind == SourceKind::ArtifactFile {
+            return self.step_settled(tx, e, b).await;
+        }
         self.step(tx, e, None, &wire(b.status), Nesting::default())
             .await
+    }
+
+    /// Settles a step a final `commands.json` covers (issue #148): the file's status, and its start
+    /// and length when it gives them. Only a row the log already wrote is settled, so a file never
+    /// creates a step, and a step the file does not cover keeps what the log said (I3).
+    async fn step_settled(
+        &mut self,
+        tx: &mut PgConnection,
+        e: &EventEnvelope,
+        b: &StepEnded,
+    ) -> Result<Effect, sqlx::Error> {
+        let Some(step) = &e.subject.step else {
+            return Ok(reject("invalid", format!("{} needs a step", e.kind)));
+        };
+        let flow = match self.owned_flow(tx, e).await? {
+            Ok(f) => f,
+            Err(effect) => return Ok(effect),
+        };
+        let span = b.timing.as_ref().and_then(settled_span);
+        let (started, ended) = span.unzip();
+        let rows = sqlx::query!(
+            "UPDATE step_executions
+                SET status = $4,
+                    source = $5,
+                    started_at = coalesce($6::timestamptz, started_at),
+                    ended_at = coalesce($7::timestamptz, ended_at)
+              WHERE run_day = $1 AND flow_execution_id = $2 AND step_index = $3",
+            self.run.run_day,
+            flow,
+            i32::try_from(step.index).unwrap_or(i32::MAX),
+            wire(b.status),
+            wire(e.src.kind),
+            started,
+            ended
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if rows > 0 {
+            sqlx::query!(
+                "UPDATE flow_executions SET rev = rev + 1 WHERE id = $1",
+                flow
+            )
+            .execute(&mut *tx)
+            .await?;
+            self.changed.insert(EntityRef::Flow(flow));
+        }
+        Ok(Effect::Applied)
     }
 
     async fn step(
@@ -567,10 +619,16 @@ impl<'a> Ctx<'a> {
                      $9, $10, $11)
              ON CONFLICT (run_day, flow_execution_id, step_index) DO UPDATE
                SET label = coalesce(EXCLUDED.label, step_executions.label),
-                   status = CASE WHEN $7 THEN step_executions.status ELSE EXCLUDED.status END,
-                   source = EXCLUDED.source,
-                   started_at = coalesce(step_executions.started_at, EXCLUDED.started_at),
-                   ended_at = coalesce(EXCLUDED.ended_at, step_executions.ended_at),
+                   status = CASE WHEN $7 OR step_executions.source = 'artifact_file'
+                                 THEN step_executions.status ELSE EXCLUDED.status END,
+                   source = CASE WHEN step_executions.source = 'artifact_file'
+                                 THEN step_executions.source ELSE EXCLUDED.source END,
+                   started_at = CASE WHEN step_executions.source = 'artifact_file'
+                                     THEN step_executions.started_at
+                                     ELSE coalesce(step_executions.started_at, EXCLUDED.started_at) END,
+                   ended_at = CASE WHEN step_executions.source = 'artifact_file'
+                                   THEN step_executions.ended_at
+                                   ELSE coalesce(EXCLUDED.ended_at, step_executions.ended_at) END,
                    depth = coalesce(EXCLUDED.depth, step_executions.depth),
                    parent_step_index = coalesce(EXCLUDED.parent_step_index, step_executions.parent_step_index),
                    attempt = coalesce(EXCLUDED.attempt, step_executions.attempt)",
@@ -1003,4 +1061,13 @@ fn foreign(id: Uuid) -> Effect {
         "foreign_entity",
         format!("{id} belongs to another agent run"),
     )
+}
+
+/// A settled step's start and end, from the file's start and length. `None` when the times do not
+/// fit a timestamp.
+fn settled_span(t: &StepTiming) -> Option<(OffsetDateTime, OffsetDateTime)> {
+    let started =
+        OffsetDateTime::from_unix_timestamp_nanos(i128::from(t.started_ms) * 1_000_000).ok()?;
+    let length = time::Duration::milliseconds(i64::try_from(t.duration_ms).ok()?);
+    Some((started, started.checked_add(length)?))
 }
