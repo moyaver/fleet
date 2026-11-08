@@ -16,11 +16,16 @@ use axum::{
 };
 use fleet_core::flaky::{self, Evidence, Flakiness, FlakyConfig, HistoryRun};
 use fleet_protocol::rest::history::{
-    Flakiness as FlakinessView, FlakyEvidenceView, FlowFlakinessView, FlowStatsView, HistoryPage,
+    Flakiness as FlakinessView, FlakyEvidenceView, FlowCatalogPage, FlowFlakinessView,
+    FlowStatsView, HistoryPage, HistoryTrendView,
 };
-use fleet_store::screens::{HistoryCursor, HistoryQuery, LOOKBACK};
+use fleet_store::{
+    catalog::CatalogQuery,
+    screens::{Filters, HistoryCursor, HistoryQuery, LOOKBACK},
+};
 use serde::Deserialize;
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
+use uuid::Uuid;
 
 use super::{ApiError, error, internal, read_project, triage::triage_of};
 use crate::{session::Caller, state::AppState};
@@ -29,20 +34,145 @@ use crate::{session::Caller, state::AppState};
 const DEFAULT_WINDOW: Duration = Duration::days(30);
 /// The most executions one page carries.
 const MAX_PAGE: i64 = 200;
+/// The flows a catalog page carries when a request names none, and the most it carries.
+const CATALOG_PAGE: i64 = 100;
+const CATALOG_MAX_PAGE: i64 = 500;
 /// The page size when a request names none.
 const DEFAULT_PAGE: i64 = 50;
 /// The flow states a client can filter on.
 const OUTCOMES: [&str; 5] = ["passed", "failed", "skipped", "interrupted", "unknown"];
 
+/// The filters every screen E read takes (issue #85), as URL parameters. A parameter that is
+/// present but empty is absent.
 #[derive(Debug, Deserialize)]
-pub(super) struct HistoryParams {
+pub(super) struct FilterParams {
     flow: Option<String>,
+    tag: Option<String>,
     branch: Option<String>,
     outcome: Option<String>,
+    device_model: Option<String>,
+    os_version: Option<String>,
+    runner: Option<String>,
+    device: Option<String>,
+    ci_provider: Option<String>,
+    commit: Option<String>,
+    fingerprint: Option<String>,
+    suite: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct HistoryParams {
+    #[serde(flatten)]
+    filters: FilterParams,
     from: Option<String>,
     to: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct CatalogParams {
+    #[serde(flatten)]
+    filters: FilterParams,
+    from: Option<String>,
+    to: Option<String>,
+    cursor: Option<String>,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct TrendParams {
+    #[serde(flatten)]
+    filters: FilterParams,
+    from: Option<String>,
+    to: Option<String>,
+}
+
+/// The longest text a filter takes, in bytes.
+const MAX_FILTER_BYTES: usize = 200;
+/// The CI providers a filter can name: the ones the store records.
+const CI_PROVIDERS: [&str; 2] = ["github_actions", "generic"];
+
+/// The request's filters, or a 400 naming the one that is wrong.
+fn filters_of(p: &FilterParams) -> Result<Filters<'_>, Box<Response>> {
+    fn text<'a>(name: &str, value: Option<&'a str>) -> Result<Option<&'a str>, Box<Response>> {
+        match value.filter(|v| !v.is_empty()) {
+            Some(v) if v.len() > MAX_FILTER_BYTES => Err(Box::new(error(
+                StatusCode::BAD_REQUEST,
+                format!("`{name}` is longer than {MAX_FILTER_BYTES} bytes"),
+            ))),
+            other => Ok(other),
+        }
+    }
+    if let Some(o) = p.outcome.as_deref().filter(|o| !o.is_empty())
+        && !OUTCOMES.contains(&o)
+    {
+        return Err(Box::new(error(StatusCode::BAD_REQUEST, "unknown outcome")));
+    }
+    let ci_provider = match text("ci_provider", p.ci_provider.as_deref())? {
+        Some(c) if !CI_PROVIDERS.contains(&c) => {
+            return Err(Box::new(error(
+                StatusCode::BAD_REQUEST,
+                "`ci_provider` is `github_actions` or `generic`",
+            )));
+        }
+        other => other,
+    };
+    let commit = match text("commit", p.commit.as_deref())? {
+        Some(c) if c.len() > 64 || !c.bytes().all(|b| b.is_ascii_hexdigit()) => {
+            return Err(Box::new(error(
+                StatusCode::BAD_REQUEST,
+                "`commit` is a commit SHA, or the start of one",
+            )));
+        }
+        other => other,
+    };
+    let fingerprint = match text("fingerprint", p.fingerprint.as_deref())? {
+        Some(f) if !is_fingerprint(f) => {
+            return Err(Box::new(error(
+                StatusCode::BAD_REQUEST,
+                "`fingerprint` is `v<n>:` and 16 hex digits",
+            )));
+        }
+        other => other,
+    };
+    let suite = match text("suite", p.suite.as_deref())? {
+        Some(s) => Some(Uuid::parse_str(s).map_err(|_| {
+            Box::new(error(
+                StatusCode::BAD_REQUEST,
+                "`suite` is a suite ID (a UUID)",
+            ))
+        })?),
+        None => None,
+    };
+    Ok(Filters {
+        flow: text("flow", p.flow.as_deref())?,
+        tag: text("tag", p.tag.as_deref())?,
+        branch: text("branch", p.branch.as_deref())?,
+        outcome: p.outcome.as_deref().filter(|o| !o.is_empty()),
+        device_model: text("device_model", p.device_model.as_deref())?,
+        os_version: text("os_version", p.os_version.as_deref())?,
+        runner: text("runner", p.runner.as_deref())?,
+        device: text("device", p.device.as_deref())?,
+        ci_provider,
+        commit,
+        fingerprint,
+        suite,
+    })
+}
+
+/// `v<digits>:` and 16 lowercase hex digits, as the fingerprints the store writes.
+fn is_fingerprint(text: &str) -> bool {
+    let Some((version, digits)) = text.split_once(':') else {
+        return false;
+    };
+    version
+        .strip_prefix('v')
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        && digits.len() == 16
+        && digits
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,11 +249,10 @@ pub(super) async fn history(
         Ok(w) => w,
         Err(r) => return *r,
     };
-    if let Some(o) = q.outcome.as_deref()
-        && !OUTCOMES.contains(&o)
-    {
-        return error(StatusCode::BAD_REQUEST, "unknown outcome");
-    }
+    let filters = match filters_of(&q.filters) {
+        Ok(f) => f,
+        Err(r) => return *r,
+    };
     let after = match q
         .cursor
         .as_deref()
@@ -135,9 +264,7 @@ pub(super) async fn history(
         None => None,
     };
     let query = HistoryQuery {
-        flow: q.flow.as_deref().filter(|f| !f.is_empty()),
-        branch: q.branch.as_deref().filter(|b| !b.is_empty()),
-        outcome: q.outcome.as_deref(),
+        filters,
         from,
         to,
         after,
@@ -171,6 +298,90 @@ pub(super) async fn history(
             })
             .into_response()
         }
+        Err(e) => internal(&e),
+    }
+}
+
+/// Screen E's flow catalog (issue #85): every flow the project knows, run or not, sorted by flow,
+/// with its tags, its execution count and its latest finished run. A flow narrowed by an execution
+/// filter is listed only with a matching execution in the window.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/flows",
+    params(("project" = String, Path, description = "Project slug"),
+           ("flow" = Option<String>, Query, description = "Text the flow's path or name contains"),
+           ("tag" = Option<String>, Query, description = "A tag the flow's header carries"),
+           ("cursor" = Option<String>, Query, description = "`next_cursor` of the previous page"),
+           ("limit" = Option<i64>, Query, description = "Flows per page (default 100, max 500)"),
+           ("from" = Option<String>, Query, description = "Window start for the execution filters, RFC 3339"),
+           ("to" = Option<String>, Query, description = "Window end, RFC 3339 (default: now)")),
+    responses((status = 200, body = FlowCatalogPage), (status = 400, body = ApiError),
+              (status = 404, body = ApiError)))]
+pub(super) async fn catalog(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path(project): Path<String>,
+    Query(q): Query<CatalogParams>,
+) -> Response {
+    let project = match read_project(&state, &principal, &project).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let (from, to) = match window(
+        q.from.as_deref(),
+        q.to.as_deref(),
+        OffsetDateTime::now_utc(),
+    ) {
+        Ok(w) => w,
+        Err(r) => return *r,
+    };
+    let filters = match filters_of(&q.filters) {
+        Ok(f) => f,
+        Err(r) => return *r,
+    };
+    let query = CatalogQuery {
+        filters,
+        from,
+        to,
+        after: q.cursor.as_deref().filter(|c| !c.is_empty()),
+        limit: q.limit.unwrap_or(CATALOG_PAGE).clamp(1, CATALOG_MAX_PAGE),
+    };
+    match state.store.flow_catalog(project, &query).await {
+        Ok(page) => Json(page).into_response(),
+        Err(e) => internal(&e),
+    }
+}
+
+/// Screen E's trend (issue #85): per UTC day, the passes, failures and flaky runs of the filtered
+/// trusted runs, with duration percentiles, and the same over the window.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/history/trend",
+    params(("project" = String, Path, description = "Project slug"),
+           ("from" = Option<String>, Query, description = "Window start, RFC 3339 (default: 30 days before `to`)"),
+           ("to" = Option<String>, Query, description = "Window end, RFC 3339 (default: now); at most 90 days after `from`")),
+    responses((status = 200, body = HistoryTrendView), (status = 400, body = ApiError),
+              (status = 404, body = ApiError)))]
+pub(super) async fn trend(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path(project): Path<String>,
+    Query(q): Query<TrendParams>,
+) -> Response {
+    let project = match read_project(&state, &principal, &project).await {
+        Ok(p) => p,
+        Err(r) => return *r,
+    };
+    let (from, to) = match window(
+        q.from.as_deref(),
+        q.to.as_deref(),
+        OffsetDateTime::now_utc(),
+    ) {
+        Ok(w) => w,
+        Err(r) => return *r,
+    };
+    let filters = match filters_of(&q.filters) {
+        Ok(f) => f,
+        Err(r) => return *r,
+    };
+    match state.store.history_trend(project, &filters, from, to).await {
+        Ok(view) => Json(view).into_response(),
         Err(e) => internal(&e),
     }
 }

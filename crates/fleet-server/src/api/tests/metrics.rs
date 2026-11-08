@@ -508,6 +508,8 @@ async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
         .expect("a shard names its device session");
     let t0 = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap() - Duration::minutes(5);
     let device_at = |secs: i64| DeviceSample {
+        model: None,
+        os_version: None,
         at: ClockSample {
             wall: t0 + Duration::seconds(secs),
             mono_ms: 0,
@@ -526,12 +528,16 @@ async fn device_samples_the_agent_sent_are_served_for_their_device_session() {
         unavailable: DeviceUnavailable::default(),
     };
     let later = DeviceSample {
+        model: None,
+        os_version: None,
         guest_cpu_pct: Some(40.0),
         guest_mem_available_bytes: None,
         ..device_at(30)
     };
     // A probe that did not answer: adb's state only, every reading unknown.
     let unknown = DeviceSample {
+        model: None,
+        os_version: None,
         adb_state: None,
         boot_completed: None,
         guest_cpu_pct: None,
@@ -609,6 +615,8 @@ async fn the_overview_counts_the_emulators_online_now() {
     let stale = session("emulator-5588");
     let now = OffsetDateTime::now_utc();
     let at = |session, adb_state, seconds_ago: i64| DeviceSample {
+        model: None,
+        os_version: None,
         at: ClockSample {
             wall: now - Duration::seconds(seconds_ago),
             mono_ms: 0,
@@ -806,6 +814,8 @@ async fn a_device_detail_shows_its_newest_sample_with_the_shard_and_a_reason_per
         .expect("a shard names its device session");
     let t0 = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap() - Duration::minutes(5);
     let older = DeviceSample {
+        model: None,
+        os_version: None,
         at: ClockSample {
             wall: t0,
             mono_ms: 0,
@@ -826,6 +836,8 @@ async fn a_device_detail_shows_its_newest_sample_with_the_shard_and_a_reason_per
     // Newest: the host was under pressure, so the guest was not read; the emulator's process could
     // not be found, and its API level could not be read.
     let newest = DeviceSample {
+        model: None,
+        os_version: None,
         at: ClockSample {
             wall: t0 + Duration::seconds(30),
             mono_ms: 0,
