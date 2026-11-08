@@ -27,6 +27,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Dashboard: a flow's step rows stay Provisional after the flow is Verified. Its steps are now settled from its final `commands.json` once the flow ends. Each step row takes the file's result and timing and is Verified; a step the file does not list stays Provisional, and the Steps section shows its weakest row's provenance (#148). `step.ended` carries the file's start and duration as an optional `timing` (protocol additive change; schema regenerated).
 - Server: `fleet api-key create --project <slug>` on a configured project keeps the project's name; it used to rename the project to its slug until the next `serve` start.
+- Server: the dashboard CSP forbids `<object>` and `<base>`, and open browser sockets close when their sign-in ends (`api.session_recheck_ms`, 30 s by default). Signed artifact links last at most 300 s. CI OIDC tokens without a `jti` are refused.
+- Blob: an SVG with an XML prolog is refused as a JUnit report.
+- Maestro: escape strings (OSC, DCS and others) are removed with their payload, so an OSC 8 link or OSC 52 clipboard write never reaches a log line.
+- Xtask lint: raw HTML injection (`inner_html`) is refused in Rust sources.
 - Dashboard: no page scrolls sideways at 1440 px or 390 px. Long flow names, run ids and URLs wrap, wide tables scroll inside their own box, and the phone's navigation shrinks instead of pushing the account off the screen (#149).
 
 ## [0.1.0-alpha.3] - 2026-11-07
