@@ -7,6 +7,7 @@
     reason = "test helpers: an unexpected error should fail the test right there"
 )]
 
+mod cli;
 mod ingest;
 mod live;
 mod oidc;
