@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use fleet_core::{
     claims::{self, Claim, Resolution},
     reconcile::{self, FlowKey},
-    redact::Redactor,
+    redact::{Redactor, redact_argv},
 };
 use fleet_maestro::{ReportState, bundle, crash, junit, log, logcat, stdout};
 use fleet_protocol::{
@@ -318,10 +318,15 @@ impl Session {
             out: Vec::new(),
             uploads: Vec::new(),
         };
-        let argv_redacted = argv
-            .iter()
-            .map(|a| s.redactor.redact(a).into_owned())
-            .collect();
+        // Values of flags nobody classified, and `-e`/`--env` values, never leave (research 06 T5).
+        let argv_redacted = redact_argv(
+            argv,
+            fleet_maestro::invocation::is_safe_value_flag,
+            fleet_maestro::invocation::is_boolean_flag,
+        )
+        .iter()
+        .map(|a| s.redactor.redact(a).into_owned())
+        .collect();
         s.emit(
             at,
             Subject::default(),
@@ -1770,6 +1775,33 @@ mod tests {
             wall: OffsetDateTime::UNIX_EPOCH,
             mono_ms: 0,
         }
+    }
+
+    #[test]
+    fn run_started_argv_never_carries_an_unclassified_flag_value() {
+        let argv: Vec<String> = [
+            "maestro",
+            "test",
+            "--api-key",
+            "sekret-key-123",
+            "flow.yaml",
+        ]
+        .map(String::from)
+        .to_vec();
+        let mut s = Session::new(
+            &argv,
+            None,
+            Redactor::new([]),
+            Box::new(|| Uuid::from_u128(1)),
+            at(),
+        );
+        let first = s.drain().remove(0);
+        let json = serde_json::to_string(&first).unwrap();
+        assert!(!json.contains("sekret-key-123"), "I6: {json}");
+        assert!(
+            json.contains("--api-key") && json.contains("flow.yaml"),
+            "{json}"
+        );
     }
 
     #[test]

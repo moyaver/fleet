@@ -119,6 +119,22 @@ const VALUE_OPTIONS: &[&str] = &[
     "--screen-size",
 ];
 
+/// Whether a flag's value is known not to be a secret, so the recorded command line keeps it
+/// (research 06 T5). Every other flag's value is redacted before the argv leaves the host.
+#[must_use]
+pub fn is_safe_value_flag(name: &str) -> bool {
+    VALUE_OPTIONS.contains(&name) && !matches!(name, "-e" | "--env" | "--api-key" | "--api-url")
+}
+
+/// Maestro flags that take no value, so the word after them is not theirs.
+#[must_use]
+pub fn is_boolean_flag(name: &str) -> bool {
+    matches!(
+        name,
+        "-c" | "--continuous" | "-h" | "--help" | "--version" | "--flatten-debug-output"
+    ) || is_short_cluster(name)
+}
+
 /// Reads a `maestro …` argv (`argv[0]` is the program).
 #[must_use]
 pub fn parse(argv: &[String]) -> Invocation {
