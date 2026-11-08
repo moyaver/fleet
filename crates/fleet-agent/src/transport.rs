@@ -26,7 +26,10 @@ use tokio::sync::{Notify, mpsc};
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest, http::HeaderValue};
 use uuid::Uuid;
 
-use crate::outbox::Outbox;
+use crate::{
+    metrics::{Cadence, clamp_interval_ms},
+    outbox::Outbox,
+};
 
 /// Where and how to connect.
 #[derive(Debug, Clone)]
@@ -98,6 +101,52 @@ pub(crate) struct Shared {
     /// The bearer credential in use (`FLEET_TOKEN`, or the token the OIDC exchange returned),
     /// for the artifact uploader, which speaks as the same agent.
     pub(crate) credential: Arc<Mutex<Option<String>>>,
+    /// The server's calm sampling interval in ms, clamped; 0 when the welcome did not set one.
+    pub(crate) sample_interval_ms: std::sync::atomic::AtomicU64,
+    /// The server's sampling interval under pressure in ms, clamped; 0 when absent.
+    pub(crate) pressure_sample_interval_ms: std::sync::atomic::AtomicU64,
+}
+
+impl Shared {
+    /// The sampling intervals in force: the server's, or the defaults while it has not set them.
+    pub(crate) fn cadence(&self) -> Cadence {
+        Cadence::from_stored(
+            self.sample_interval_ms
+                .load(std::sync::atomic::Ordering::SeqCst),
+            self.pressure_sample_interval_ms
+                .load(std::sync::atomic::Ordering::SeqCst),
+        )
+    }
+}
+
+/// Stores the sampling intervals of a welcome for the observer. A value outside [1 s, 300 s] is
+/// clamped and logged once per welcome.
+fn share_intervals(shared: &Shared, limits: &Limits) {
+    store_interval(
+        &shared.sample_interval_ms,
+        "sample_interval_ms",
+        limits.sample_interval_ms,
+    );
+    store_interval(
+        &shared.pressure_sample_interval_ms,
+        "pressure_sample_interval_ms",
+        limits.pressure_sample_interval_ms,
+    );
+}
+
+fn store_interval(slot: &std::sync::atomic::AtomicU64, setting: &'static str, ms: Option<u64>) {
+    let stored = ms.map_or(0, |ms| {
+        let clamped = clamp_interval_ms(ms);
+        if clamped != ms {
+            tracing::warn!(
+                setting,
+                clamped_to_ms = clamped,
+                "server sampling interval clamped"
+            );
+        }
+        clamped
+    });
+    slot.store(stored, std::sync::atomic::Ordering::SeqCst);
 }
 
 /// How the transport ended.
@@ -356,6 +405,7 @@ async fn batch(
                     max_events =
                         BATCH.min(usize::try_from(welcome.limits.max_inflight_events).unwrap_or(0));
                     max_frame_bytes = welcome.limits.max_frame_bytes;
+                    share_intervals(shared, &welcome.limits);
                     sent = welcome.committed_through;
                     if let Ok(mut o) = shared.outbox.lock() {
                         o.ack(sent);
@@ -524,6 +574,7 @@ async fn connection(
         "agent connected"
     );
     let limits: Limits = welcome.limits;
+    share_intervals(shared, &limits);
     let mut sent = welcome.committed_through;
     shared
         .outbox
@@ -757,6 +808,42 @@ mod tests {
         bad.limits.max_inflight_events = 0;
         assert!(validate_welcome(&bad, 0).is_err());
         assert!(validate_welcome(&valid, 3).is_err());
+    }
+
+    #[test]
+    fn a_welcomes_limits_set_the_sampling_intervals() {
+        let shared = Shared::default();
+        share_intervals(&shared, &Limits::default());
+        assert_eq!(shared.cadence(), Cadence::default(), "absent: 5 s and 15 s");
+
+        let shared = Shared::default();
+        share_intervals(
+            &shared,
+            &Limits {
+                sample_interval_ms: Some(2_000),
+                ..Limits::default()
+            },
+        );
+        assert_eq!(shared.cadence().calm, Duration::from_secs(2));
+        assert_eq!(shared.cadence().pressure, Duration::from_secs(15));
+
+        let shared = Shared::default();
+        share_intervals(
+            &shared,
+            &Limits {
+                sample_interval_ms: Some(0),
+                pressure_sample_interval_ms: Some(999_999_999),
+                ..Limits::default()
+            },
+        );
+        assert_eq!(
+            shared.cadence(),
+            Cadence {
+                calm: Duration::from_secs(1),
+                pressure: Duration::from_secs(300),
+            },
+            "out of bounds: clamped to 1 s and 300 s"
+        );
     }
 
     #[tokio::test]
