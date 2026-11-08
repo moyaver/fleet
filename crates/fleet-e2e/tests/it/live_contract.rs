@@ -268,9 +268,12 @@ const AUDIT: &str = r"
       if (settled.includes(m.getAttribute('aria-label'))) problems.push('a settled row is marked: ' + r.textContent.trim().slice(0, 60));
     }
   }
+  // Each section says Verified once and Observed once; a row says neither.
   for (const s of document.querySelectorAll('section')) {
-    const inside = Array.from(s.querySelectorAll('[aria-label^=\'Provenance: \']')).filter(m => settled.includes(m.getAttribute('aria-label')) && !m.closest(row));
-    if (inside.length > 1) problems.push('stated more than once in ' + (s.getAttribute('aria-labelledby') || s.getAttribute('aria-label') || s.className));
+    for (const label of settled) {
+      const inside = Array.from(s.querySelectorAll('[aria-label=\'' + label + '\']')).filter(m => !m.closest(row));
+      if (inside.length > 1) problems.push(label + ' stated more than once in ' + (s.getAttribute('aria-labelledby') || s.getAttribute('aria-label') || s.className));
+    }
   }
   return problems;
 ";
@@ -359,6 +362,15 @@ async fn settled_results_carry_no_mark_each_group_states_its_label_once_and_no_p
         page.wait(&format!("the {screen} page"), ready).await;
         let problems = page.eval(AUDIT, vec![]).await;
         assert_eq!(problems, json!([]), "{screen}: provenance");
+        if *screen == "pipeline" {
+            // The flows' group says Verified, and the job outcomes the runner observed say Observed:
+            // once each, in the Flows section's heading line.
+            assert_eq!(
+                page.count("section[aria-labelledby=flows-h] [data-testid=job-outcomes-provenance] [aria-label='Provenance: observed']").await,
+                1,
+                "the job outcomes are stated once"
+            );
+        }
         let cards = page.eval(CARDS, vec![]).await;
         assert_eq!(cards, json!([]), "{screen}: bordered cards");
     }

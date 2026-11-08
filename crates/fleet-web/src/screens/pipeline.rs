@@ -638,6 +638,19 @@ fn Flows(
     };
     // A timeline of two devices or more is worth seeing at once; one device's is a click away.
     let two_devices = move || timeline.with(|t| t.lanes().len() >= 2);
+    // A job's outcome the runner observed (its exit) is settled, so its rows carry no mark; the
+    // group says once that those outcomes are observed (issue #149).
+    let observed_outcome = move || {
+        model.tree.with(|t| {
+            t.jobs.iter().any(|j| {
+                model.jobs.cell(j.id).is_some_and(|c| {
+                    let job = c.get();
+                    job.outcome.is_some()
+                        && source_provenance(job.outcome_source.as_deref()) == Provenance::Observed
+                })
+            })
+        })
+    };
     view! {
         <section class="card" aria-labelledby="flows-h">
             <div class="card-h">
@@ -650,6 +663,12 @@ fn Flows(
                         view! { <ProvenanceBadge provenance=Signal::stored(Provenance::Provisional) /> " until the final report" }.into_any()
                     }}
                 </p>
+                <Show when=observed_outcome>
+                    <p class="pv-statement" data-testid="job-outcomes-provenance">
+                        <ProvenanceBadge provenance=Signal::stored(Provenance::Observed) />
+                        " job outcomes, as each runner saw them"
+                    </p>
+                </Show>
             </div>
             <For
                 each=jobs
