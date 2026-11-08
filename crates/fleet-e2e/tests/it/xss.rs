@@ -3,8 +3,9 @@
 //! reaches the dashboard, rendered in a real browser on every screen that shows them.
 //!
 //! The fields are flow names, step text, failure messages, the crash exception and the branch or
-//! tag of a run (seeded by `fleet-loadgen` with [`CORPUS`]), and the artifacts a flow uploads: the
-//! Maestro log with ANSI and OSC sequences, the device logcat excerpt and a UI hierarchy, whose
+//! tag of a run (seeded by `fleet-loadgen` with [`CORPUS`]), the flow catalog's tags on screen E
+//! and a device's model and OS version on its page (issue #85), and the artifacts a flow uploads:
+//! the Maestro log with ANSI and OSC sequences, the device logcat excerpt and a UI hierarchy, whose
 //! file names are hostile too (uploaded here over the artifact protocol, as an agent would).
 //!
 //! Screen G (the administration pages, issue #139) shows the user-controlled fields of the
@@ -454,6 +455,20 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
     let worker = worker_of(&stack, &snapshot).await;
     let branch = BRANCH.trim_start_matches("refs/heads/").to_owned();
     let tag = TAG.trim_start_matches("refs/tags/").to_owned();
+    // The device's model and OS version came from the corpus (issue #85): the device page shows
+    // them in its header, so they are checked there as text.
+    let detail = stack
+        .get(&format!("/api/v1/projects/app/devices/{device}"))
+        .await;
+    let profile = &detail["session"]["profile"];
+    let model = profile["model"]
+        .as_str()
+        .expect("the corpus gives the device a model")
+        .to_owned();
+    let os_version = profile["os_version"]
+        .as_str()
+        .expect("the corpus gives the device an OS version")
+        .to_owned();
 
     // The flow page shows the flow's own name, its failure message and its artifacts, and the
     // log lines whose text is plain.
@@ -520,6 +535,14 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
             ready: format!("{} >= 1", count_of(&q("history-row"))),
             shows: [literal_shows(), vec![branch.clone(), tag.clone()]].concat(),
         },
+        // Screen E's flow catalog lists the workspace's flows with their tags. Loadgen tags the
+        // first four corpus items that fit a tag (64 bytes), which here are the first four items.
+        Screen {
+            name: "flow catalog",
+            path: "/history?project=app&flow=flows%2F".into(),
+            ready: format!("{} >= 1", count_of(&q("catalog-row"))),
+            shows: CORPUS[..4].iter().map(|s| (*s).to_owned()).collect(),
+        },
         Screen {
             name: "compare",
             path: format!("/compare?project=app&a={a}&b={b}"),
@@ -576,8 +599,9 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
                 count_of(&q("device-page")),
                 count_of(&q("device-flow"))
             ),
-            // The device's flows are the first shard's: the first corpus items among them.
-            shows: literal_shows()[..3].to_vec(),
+            // The device's flows are the first shard's: the first corpus items among them. Its
+            // header names its model and OS version.
+            shows: [literal_shows()[..3].to_vec(), vec![model, os_version]].concat(),
         },
     ];
 
