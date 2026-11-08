@@ -12,7 +12,7 @@ The reference deployment is Docker Compose: Caddy (TLS, WebSocket-friendly), the
 | `fleet migrate` | Applies database migrations and exits |
 | `fleet check-config` | Validates the configuration and prints it, secrets redacted |
 | `fleet healthcheck` | Exits 0 if the local server is ready (`/readyz`); for Docker `HEALTHCHECK` |
-| `fleet api-key create --project <slug> --name <n>` | Prints a new API key once (`mf_live_…`); only its hash is stored |
+| `fleet api-key create --project <slug> --name <n> [--expires-in-days <d>]` | Prints a new API key once (`mf_live_…`); only its hash is stored. It expires after `d` days, or `api.api_key_ttl_days` (90) when omitted |
 
 ## Configuration
 
@@ -33,6 +33,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
 | `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown` |
 | `api.viewer_tokens` | — | Bearer tokens that may read every project (scripts, tests); people sign in with `[login]` |
+| `api.api_key_ttl_days` | `90` | Days until a new API key expires when `fleet api-key create` gets no `--expires-in-days`. Keys made before this setting have no expiry; set `expires_at` on them in SQL |
 | `api.public_url` | — | The dashboard's origin: browser sockets from other origins are refused, and the sign-in redirect URI is built from it (required with `[login]`) |
 | `login.*` | — | Browser sign-in with your identity provider; see [Browser sign-in](#browser-sign-in) |
 | `storage.backend` | `local_fs` | Where artifacts live: `local_fs` or `s3`; see [Artifact storage](#artifact-storage) |

@@ -159,23 +159,27 @@ impl Store {
         )
     }
 
-    /// Creates an API key. The returned secret is shown once; only its hash is kept.
+    /// Creates an API key that stops working at `expires_at`. The returned secret is shown once;
+    /// only its hash is kept. Callers choose the expiry: the server's CLI defaults it to
+    /// `api.api_key_ttl_days` (research 06 T3).
     pub async fn create_api_key(
         &self,
         project_id: Uuid,
         name: &str,
         trust: TrustLevel,
+        expires_at: OffsetDateTime,
     ) -> Result<(Uuid, Secret)> {
         let secret = random_secret(API_KEY_PREFIX)?;
         let prefix: String = secret.chars().take(API_KEY_PREFIX.len() + 4).collect();
         let id = sqlx::query_scalar!(
-            "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level)
-             VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level, expires_at)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
             project_id,
             name,
             prefix,
             sha256(&secret),
-            trust.as_str()
+            trust.as_str(),
+            expires_at
         )
         .fetch_one(self.pool())
         .await?;
@@ -491,6 +495,42 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../migrations")]
+    async fn a_key_past_its_expiry_authenticates_nothing(pool: sqlx::PgPool) {
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
+        let project = store.upsert_project("app", "App").await.unwrap();
+        let now = OffsetDateTime::now_utc();
+        let (_, expired) = store
+            .create_api_key(
+                project,
+                "old",
+                TrustLevel::Trusted,
+                now - time::Duration::minutes(1),
+            )
+            .await
+            .unwrap();
+        let (_, live) = store
+            .create_api_key(
+                project,
+                "new",
+                TrustLevel::Trusted,
+                now + time::Duration::days(90),
+            )
+            .await
+            .unwrap();
+        assert!(
+            store
+                .authenticate(expired.expose())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.authenticate(live.expose()).await.unwrap().is_some());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
     async fn keys_authenticate_until_revoked(pool: sqlx::PgPool) {
         let store = Store {
             pool,
@@ -498,7 +538,12 @@ mod tests {
         };
         let project = store.upsert_project("app", "App").await.unwrap();
         let (id, key) = store
-            .create_api_key(project, "ci", TrustLevel::Trusted)
+            .create_api_key(
+                project,
+                "ci",
+                TrustLevel::Trusted,
+                time::OffsetDateTime::now_utc() + time::Duration::days(90),
+            )
             .await
             .unwrap();
         let p = store.authenticate(key.expose()).await.unwrap().unwrap();
