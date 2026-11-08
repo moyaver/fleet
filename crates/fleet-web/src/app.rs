@@ -135,7 +135,7 @@ fn Header() -> impl IntoView {
                     <span>{p}</span>
                 </span>
             })}
-            <nav aria-label="Primary">
+            <nav aria-label="Primary" class="hide-phone-top">
                 <ul class="nav">
                     <li>
                         <A href="/" exact=true>"Overview"</A>
@@ -166,14 +166,33 @@ fn Header() -> impl IntoView {
                         type="button"
                         class="inline-flex min-h-11 items-center px-2 text-lg text-muted"
                         popovertarget="more-menu"
-                        aria-haspopup="menu"
                         aria-label="More"
                     >
                         "⋯"
                     </button>
-                    <div id="more-menu" popover="auto" role="menu" aria-label="Account" class="min-w-48 rounded border border-line-strong bg-bg p-3">
-                        <div class="flex flex-col gap-2">
-                            <Account compact=true />
+                    // On a phone the bar holds the brand mark only: the project, the pages and the
+                    // account are all here, one tap away.
+                    <div id="more-menu" popover="auto" aria-label="More" class="min-w-56 rounded border border-line-strong bg-bg p-3">
+                        <div class="flex flex-col gap-3">
+                            {move || project().map(|p| view! {
+                                <p class="text-sm text-muted">"Project " <span class="text-fg">{p}</span></p>
+                            })}
+                            <nav aria-label="Pages">
+                                <ul class="flex flex-col">
+                                    <li>
+                                        <A href="/" exact=true attr:class="flex min-h-11 items-center">"Overview"</A>
+                                    </li>
+                                    <li>
+                                        <A href="/history" attr:class="flex min-h-11 items-center">"History"</A>
+                                    </li>
+                                    <li>
+                                        <A href="/compare" attr:class="flex min-h-11 items-center">"Compare"</A>
+                                    </li>
+                                </ul>
+                            </nav>
+                            <div class="flex flex-col gap-2 border-t border-line pt-3">
+                                <Account compact=true />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -266,7 +285,7 @@ pub fn ErrorNotice(
                     location.search.get()
                 ));
                 view! {
-                    <div role="alert" data-testid="sign-in-required" class="rounded-lg border border-border bg-surface p-4">
+                    <div role="alert" data-testid="sign-in-required" class="border-t border-line pt-4">
                         <p class="font-semibold">"Sign in to see this"</p>
                         <p class="mt-1 text-muted">
                             "Fleet shows private test data to signed-in people only."
@@ -282,7 +301,7 @@ pub fn ErrorNotice(
             }
             other => {
                 view! {
-                    <p role="alert" data-testid="error" class="rounded-lg border border-tone-danger-fg/30 bg-tone-danger-bg p-3 text-tone-danger-fg">
+                    <p role="alert" data-testid="error" class="border-l-2 border-tone-danger-fg py-1 pl-3 text-tone-danger-fg">
                         {other.to_string()}
                     </p>
                 }
