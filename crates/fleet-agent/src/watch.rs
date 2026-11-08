@@ -455,6 +455,31 @@ mod tests {
         d
     }
 
+    /// A run start read from the file system's own clock, strictly after everything already in
+    /// `dir`. Linux stamps files from a coarse clock that can lag `SystemTime::now()` by a few
+    /// milliseconds, so a directory made just after `now()` could look older than the run.
+    fn fs_started(dir: &Path) -> SystemTime {
+        let born = |p: &Path| {
+            let m = std::fs::metadata(p).unwrap();
+            m.created().or_else(|_| m.modified()).unwrap()
+        };
+        let latest = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| born(&e.unwrap().path()))
+            .max()
+            .unwrap_or(UNIX_EPOCH);
+        let probe = dir.with_extension("probe");
+        loop {
+            File::create(&probe).unwrap();
+            let t = born(&probe);
+            std::fs::remove_file(&probe).unwrap();
+            if t > latest {
+                return t;
+            }
+            std::thread::yield_now();
+        }
+    }
+
     #[test]
     fn the_tailer_returns_complete_records_as_they_grow() {
         let d = tmp("tail");
@@ -666,7 +691,7 @@ mod tests {
         std::fs::create_dir_all(d.join("2020-01-01_000000")).unwrap();
         File::create(d.join("2020-01-01_000000").join(SESSION_LOG)).unwrap();
         std::fs::create_dir_all(d.join("not-a-run")).unwrap();
-        let started = SystemTime::now();
+        let started = fs_started(&d);
         let t = Instant::now();
         let mut l = Located::new(OutputRoot::Stamped(d.clone()), started);
         assert_eq!(l.log_dir(None, t), None, "an older run is not this one");
@@ -707,7 +732,7 @@ mod tests {
         for i in 0..2000 {
             std::fs::create_dir_all(home.join(format!("old-{i}"))).unwrap();
         }
-        let started = SystemTime::now();
+        let started = fs_started(&home);
         let mut s = BundleScanner::new(home.clone(), started);
         let t = Instant::now();
         let polls = 200u64;
