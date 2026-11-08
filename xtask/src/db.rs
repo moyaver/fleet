@@ -32,8 +32,13 @@ impl Drop for Throwaway {
 
 /// Starts Postgres 18 on a free local port and waits until it accepts TCP connections.
 pub(crate) fn start() -> anyhow::Result<Throwaway> {
+    start_named("fleet-xtask-pg")
+}
+
+/// [`start`], with the container named `<prefix>-<pid>`.
+pub(crate) fn start_named(prefix: &str) -> anyhow::Result<Throwaway> {
     let port = TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
-    let name = format!("fleet-xtask-pg-{}", std::process::id());
+    let name = format!("{prefix}-{}", std::process::id());
     let status = Command::new("docker")
         .args([
             "run",
