@@ -31,9 +31,10 @@ use fleet_protocol::{
     PROTOCOL_VERSION,
     brand::WS_SUBPROTOCOL,
     event::{
-        EventBody, ExitClass, FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted,
-        JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus, RunEnded,
-        RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus, SuiteStarted,
+        AppCrashed, EventBody, ExitClass, FlowEnded, FlowOutcome, FlowRef, FlowReported,
+        FlowStarted, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
+        RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
+        SuiteStarted,
     },
     frame::{
         AgentInfo, CiContext, CiProvider, ClientFrame, Hello, ProtocolRange, ResumeState, Sample,
@@ -86,6 +87,10 @@ pub struct Options {
     pub wide: bool,
     /// Stop at points of the script until released.
     pub hold: Option<Hold>,
+    /// Hostile strings (the XSS corpus): when non-empty, every flow name, step description and
+    /// failure message is one of these, every flow fails with an app crash whose exception is one
+    /// of these, and the pattern of [`fails`] is not used. Items are used in order, wrapping around.
+    pub corpus: Vec<String>,
 }
 
 impl Default for Options {
@@ -109,6 +114,7 @@ impl Default for Options {
             first_agent: 0,
             wide: false,
             hold: None,
+            corpus: Vec::new(),
         }
     }
 }
@@ -230,8 +236,16 @@ pub fn fails(agent: usize, device: u32, flow: u32) -> bool {
 /// Steps per flow in a [`Options::wide`] suite.
 const WIDE_STEPS: u32 = 24;
 
-fn flow_name(device: u32, flow: u32, wide: bool) -> String {
-    if wide {
+/// The `n`th item of the hostile corpus, when the run has one.
+fn corpus_item(opts: &Options, n: usize) -> Option<&str> {
+    (!opts.corpus.is_empty()).then(|| opts.corpus[n % opts.corpus.len()].as_str())
+}
+
+fn flow_name(device: u32, flow: u32, opts: &Options) -> String {
+    if let Some(item) = corpus_item(opts, (device * opts.flows + flow) as usize) {
+        return format!("{item} {device}-{flow}");
+    }
+    if opts.wide {
         format!(
             "flow-{device}-{flow}-checkout-with-saved-card-promo-code-and-gift-wrap-then-receipt-email"
         )
@@ -240,8 +254,11 @@ fn flow_name(device: u32, flow: u32, wide: bool) -> String {
     }
 }
 
-fn step_description(step: u32, wide: bool) -> String {
-    if wide {
+fn step_description(step: u32, n: usize, opts: &Options) -> String {
+    if let Some(item) = corpus_item(opts, n) {
+        return item.to_owned();
+    }
+    if opts.wide {
         format!(
             "Tap on \"step {step}\" and wait until the order summary shows the total with tax and shipping"
         )
@@ -250,11 +267,14 @@ fn step_description(step: u32, wide: bool) -> String {
     }
 }
 
-fn failure_message(wide: bool) -> &'static str {
-    if wide {
-        "Assertion is false: \"Order total\" was expected to read \"$84.10\" but read \"$0.00\" after the promo code was applied; the checkout screen stayed on https://shop.example.test/checkout/review?session=7f3c9d1e2ab4455f8e0c1d9a6b2e7f40&promo=SPRING-FREE-SHIPPING-2026 and the tax request timed out after 30000 ms"
+fn failure_message(n: usize, opts: &Options) -> String {
+    if let Some(item) = corpus_item(opts, n) {
+        return item.to_owned();
+    }
+    if opts.wide {
+        "Assertion is false: \"Order total\" was expected to read \"$84.10\" but read \"$0.00\" after the promo code was applied; the checkout screen stayed on https://shop.example.test/checkout/review?session=7f3c9d1e2ab4455f8e0c1d9a6b2e7f40&promo=SPRING-FREE-SHIPPING-2026 and the tax request timed out after 30000 ms".to_owned()
     } else {
-        "Assertion is false"
+        "Assertion is false".to_owned()
     }
 }
 
@@ -354,7 +374,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                 device_serial: serial.clone(),
                 planned: (0..opts.flows)
                     .map(|f| {
-                        let name = flow_name(d, f, opts.wide);
+                        let name = flow_name(d, f, opts);
                         FlowRef {
                             path: Some(format!("flows/{name}.yaml")),
                             name,
@@ -376,7 +396,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                 flow_execution_id: Some(Uuid::now_v7()),
                 ..shard.clone()
             };
-            let name = flow_name(d, f, opts.wide);
+            let name = flow_name(d, f, opts);
             push(
                 flow.clone(),
                 SourceKind::DebugLog,
@@ -390,7 +410,8 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                 }),
             );
             // A failing flow fails its last step, as the scripted failure does.
-            let fail = fails(i, d, f);
+            // A corpus run fails every flow, so every flow's failure and crash carry an item.
+            let fail = !opts.corpus.is_empty() || fails(i, d, f);
             let status = |s: u32| {
                 if fail && s + 1 == steps {
                     StepStatus::Failed
@@ -403,11 +424,12 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     step: Some(StepRef { index: s }),
                     ..flow.clone()
                 };
+                let n = (d * opts.flows + f) as usize * steps as usize + s as usize;
                 push(
                     step.clone(),
                     SourceKind::DebugLog,
                     &EventBody::StepStarted(StepStarted {
-                        description: step_description(s, opts.wide),
+                        description: step_description(s, n, opts),
                         depth: None,
                         parent: None,
                         attempt: None,
@@ -423,6 +445,16 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                 );
             }
             failed += u32::from(fail);
+            if let (true, Some(item)) = (fail, corpus_item(opts, (d * opts.flows + f) as usize)) {
+                push(
+                    flow.clone(),
+                    SourceKind::ArtifactFile,
+                    &EventBody::AppCrashed(AppCrashed {
+                        package: "com.example.app".into(),
+                        exception: item.to_owned(),
+                    }),
+                );
+            }
             push(
                 flow.clone(),
                 SourceKind::LiveConsole,
@@ -495,7 +527,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     time_ms: Some(1000),
                     timestamp_local: None,
                     status: Some(if fail { "ERROR" } else { "SUCCESS" }.into()),
-                    failure: fail.then(|| failure_message(opts.wide).to_owned()),
+                    failure: fail.then(|| failure_message((d * opts.flows + f) as usize, opts)),
                 },
                 outcome: if fail {
                     FlowOutcome::Failed

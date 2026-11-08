@@ -19,3 +19,4 @@ mod publish;
 mod responsive;
 mod scenarios;
 mod support;
+mod xss;
