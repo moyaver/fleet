@@ -137,6 +137,106 @@ pub fn secrets_from<'a>(
     out
 }
 
+/// Where the reader of a command line is, for [`redact_argv`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Expect {
+    /// A fresh word: a flag, a subcommand or a positional.
+    Word,
+    /// The value of a flag whose value is known to be safe: kept as it is.
+    Keep,
+    /// The value of `-e`/`--env`: rewritten to `KEY=[REDACTED]`.
+    Env,
+    /// The value of a flag nobody has classified: redacted.
+    Unknown,
+}
+
+/// Records a command line without its secrets (I6, research 06 T5).
+///
+/// `safe_value_flag` names the flags whose value is known not to be a secret; `boolean_flag`
+/// names the flags that take no value, so the word after them is not theirs. The value of any
+/// other flag is replaced with [`MARKER`]. The value of `-e`/`--env` is replaced with
+/// `KEY=[REDACTED]`, whatever it holds. Words that are not flags are kept, and so is everything
+/// after `--`. The program name is kept.
+#[must_use]
+pub fn redact_argv(
+    argv: &[String],
+    safe_value_flag: impl Fn(&str) -> bool,
+    boolean_flag: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    let flag_like = |word: &str| {
+        let name = word.split_once('=').map_or(word, |(n, _)| n);
+        name.starts_with("--") || name == "-e" || boolean_flag(name) || safe_value_flag(name)
+    };
+    let mut out = Vec::with_capacity(argv.len());
+    let mut words = argv.iter();
+    out.extend(words.next().cloned());
+    let mut expect = Expect::Word;
+    let mut literal = false;
+    for word in words {
+        match expect {
+            Expect::Keep => {
+                out.push(word.clone());
+                expect = Expect::Word;
+                continue;
+            }
+            Expect::Env => {
+                out.push(env_pair(word));
+                expect = Expect::Word;
+                continue;
+            }
+            Expect::Unknown if !flag_like(word) => {
+                out.push(MARKER.to_owned());
+                expect = Expect::Word;
+                continue;
+            }
+            Expect::Unknown | Expect::Word => expect = Expect::Word,
+        }
+        if literal || !word.starts_with('-') || word == "-" {
+            out.push(word.clone());
+            continue;
+        }
+        if word == "--" {
+            literal = true;
+            out.push(word.clone());
+            continue;
+        }
+        let (name, inline) = word
+            .split_once('=')
+            .map_or((word.as_str(), None), |(n, v)| (n, Some(v)));
+        if name == "-e" || name == "--env" {
+            if let Some(kv) = inline {
+                out.push(format!("{name}={}", env_pair(kv)));
+            } else {
+                out.push(word.clone());
+                expect = Expect::Env;
+            }
+        } else if boolean_flag(name) && inline.is_none() {
+            out.push(word.clone());
+        } else if safe_value_flag(name) {
+            out.push(word.clone());
+            expect = if inline.is_none() {
+                Expect::Keep
+            } else {
+                Expect::Word
+            };
+        } else if inline.is_some() {
+            out.push(format!("{name}={MARKER}"));
+        } else {
+            out.push(word.clone());
+            expect = Expect::Unknown;
+        }
+    }
+    out
+}
+
+/// `KEY=value` as `KEY=[REDACTED]`; a word with no `=` is wholly redacted.
+fn env_pair(kv: &str) -> String {
+    match kv.split_once('=') {
+        Some((key, _)) => format!("{key}={MARKER}"),
+        None => MARKER.to_owned(),
+    }
+}
+
 /// `MAESTRO_*` variables that configure the CLI rather than carry flow data.
 fn is_maestro_setting(upper: &str) -> bool {
     upper.starts_with("MAESTRO_CLI_")
@@ -253,6 +353,99 @@ mod tests {
         ] {
             assert_eq!(redactor.redact(text), MARKER, "{text}");
         }
+    }
+
+    fn words(list: &[&str]) -> Vec<String> {
+        list.iter().map(|w| (*w).to_owned()).collect()
+    }
+
+    fn safe_value(name: &str) -> bool {
+        matches!(name, "--format" | "--device" | "--output")
+    }
+
+    fn boolean(name: &str) -> bool {
+        matches!(name, "--flatten-debug-output" | "-c")
+    }
+
+    #[test]
+    fn unknown_flag_values_are_redacted_and_known_flags_keep_theirs() {
+        let argv = words(&[
+            "maestro",
+            "test",
+            "--api-key",
+            "k-12345678",
+            "--format",
+            "junit",
+            "--device=emulator-5554",
+            "--mystery=hunter22-value",
+            "--flatten-debug-output",
+            "flow.yaml",
+        ]);
+        assert_eq!(
+            redact_argv(&argv, safe_value, boolean),
+            words(&[
+                "maestro",
+                "test",
+                "--api-key",
+                MARKER,
+                "--format",
+                "junit",
+                "--device=emulator-5554",
+                "--mystery=[REDACTED]",
+                "--flatten-debug-output",
+                "flow.yaml",
+            ])
+        );
+    }
+
+    #[test]
+    fn env_values_are_rewritten_to_key_and_marker() {
+        let argv = words(&[
+            "maestro",
+            "test",
+            "-e",
+            "PIN=1234",
+            "--env=TOKEN=abc",
+            "-e",
+            "FLAG",
+        ]);
+        assert_eq!(
+            redact_argv(&argv, safe_value, boolean),
+            words(&[
+                "maestro",
+                "test",
+                "-e",
+                "PIN=[REDACTED]",
+                "--env=TOKEN=[REDACTED]",
+                "-e",
+                "[REDACTED]",
+            ])
+        );
+    }
+
+    #[test]
+    fn an_unknown_flag_without_a_value_does_not_swallow_the_next_flag() {
+        let argv = words(&[
+            "maestro",
+            "test",
+            "--mystery",
+            "--format",
+            "junit",
+            "--",
+            "-x",
+        ]);
+        assert_eq!(
+            redact_argv(&argv, safe_value, boolean),
+            words(&[
+                "maestro",
+                "test",
+                "--mystery",
+                "--format",
+                "junit",
+                "--",
+                "-x"
+            ])
+        );
     }
 
     #[test]
