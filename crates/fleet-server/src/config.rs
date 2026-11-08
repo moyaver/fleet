@@ -684,6 +684,9 @@ pub struct Api {
     pub public_url: Option<String>,
     /// Live messages buffered per project for slow browsers; beyond that they `resync`.
     pub live_buffer: usize,
+    /// How often an open browser socket checks that its sign-in is still live. Logout or expiry
+    /// closes the socket within this time (research 06 T17, T21).
+    pub session_recheck_ms: u64,
 }
 
 impl Default for Api {
@@ -693,6 +696,7 @@ impl Default for Api {
             anonymous_read: false,
             public_url: None,
             live_buffer: 1024,
+            session_recheck_ms: 30_000,
         }
     }
 }
