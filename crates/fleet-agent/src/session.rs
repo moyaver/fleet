@@ -2754,6 +2754,64 @@ mod tests {
         }
     }
 
+    /// Issue #148, I3: a single-flow run whose log carries no command lines names its flow in its
+    /// argument only. Nothing starts the flow, so its commands file is warned as unnamed on the run and
+    /// settles nothing, and the file creates no flow.
+    #[test]
+    fn a_single_flow_run_whose_log_has_no_command_lines_keeps_the_unnamed_warning() {
+        let run = captured("single-flow-no-format");
+        let mut log = String::new();
+        for line in run.log.lines() {
+            if !line.contains("maestro.cli.runner.MaestroCommandRunner") {
+                log.push_str(line);
+                log.push('\n');
+            }
+        }
+        assert!(
+            !log.contains("RUNNING") && !log.contains("COMPLETED"),
+            "no command line is left in the log"
+        );
+        let argv: Vec<String> = [
+            "maestro",
+            "--device",
+            "emulator-5600",
+            "test",
+            "examples/pass.yaml",
+        ]
+        .iter()
+        .map(|a| (*a).to_owned())
+        .collect();
+        let mut s = session_for(&argv);
+        replay_log(&mut s, &log);
+        s.drain();
+        file(
+            &mut s,
+            "pass/commands.json",
+            Some(run.commands[0].1.as_slice()),
+        );
+        let events = s.drain();
+        let unnamed = events
+            .iter()
+            .filter(|e| e.kind == "agent.warning" && e.data["code"] == "commands_flow_unnamed")
+            .count();
+        assert_eq!(unnamed, 1, "the file is warned on the run, once");
+        assert!(
+            events
+                .iter()
+                .filter(|e| e.kind == "agent.warning")
+                .all(|e| e.subject.flow_execution_id.is_none()),
+            "the warning belongs to the run, not to a flow"
+        );
+        assert!(settled_steps(&events).is_empty(), "nothing settles");
+        assert!(
+            events
+                .iter()
+                .all(|e| e.kind != "flow.started" && e.kind != "flow.ended"),
+            "no flow is created from the file alone"
+        );
+        assert_eq!(s.find_flow(1, "pass"), None);
+    }
+
     /// Issue #148: the same captured console and commands settle only when the command names their
     /// flow. A directory, another flow's name, or a report format leaves the file unnamed, warned on
     /// the run and settling nothing.
