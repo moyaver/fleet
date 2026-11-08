@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: an *Active emulators* tile on the overview counts emulators seen in the last two minutes that adb reports online (#123).
 - Agent: while the host is under pressure (PSI CPU `some avg10` at least 40, PSI memory at least 20, or host CPU at least 95 %, CPU alone on macOS), host and process metrics are sampled every 15 s instead of 5 s and the devices' guest CPU and memory reads are skipped. The agent leaves that state after three calm samples (#39).
 - Dashboard: a flow whose app crashed shows "App crashed: <exception> in <package>" above Maestro's failure, with a link to the device logcat excerpt (or a note that none was uploaded); the flow's result and failure message stay Maestro's (#152).
+- Server: API keys expire after `api.api_key_ttl_days` (90 by default) unless `fleet api-key create --expires-in-days` says otherwise. `api.api_key_ttl_days` must be above 0.
 - Dashboard: a flow whose device was lost during it (Maestro's `DeviceServerDiedException`) is labelled "Infrastructure, not the app" above Maestro's failure, and the label says the failure is excluded from flakiness; the flow stays failed. Its history row and `fleet-agent inspect` carry the same label (#145).
 - Failure triage: a maintainer marks a failure fingerprint Known (with the issue that tracks it) or Resolved, or clears it. The state shows on history rows, on the failure groups of a flow's stats and on the flow page's failure band. Every fingerprint records when it was first seen, and every change is audited (`PUT` and `DELETE /api/v1/projects/{project}/failures/{fingerprint}/triage`; migration 0020, #84).
 
@@ -27,6 +28,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - Dashboard: a flow's step rows stay Provisional after the flow is Verified. Its steps are now settled from its final `commands.json` once the flow ends. Each step row takes the file's result and timing and is Verified; a step the file does not list stays Provisional, and the Steps section shows its weakest row's provenance (#148). `step.ended` carries the file's start and duration as an optional `timing` (protocol additive change; schema regenerated).
 - Server: `fleet api-key create --project <slug>` on a configured project keeps the project's name; it used to rename the project to its slug until the next `serve` start.
+- Server: pull request runs (trust `pr`) and untrusted runs are kept out of flow stats, the duration summary and chart, failure groups and flakiness verdicts. They stay in the history and on their own run pages.
+- Agent: a run with no credential (no `FLEET_TOKEN`, or an empty one, and no OIDC request) runs offline. It no longer attempts an unauthenticated connection, which sent the run's CI facts to the server.
+- Server: the OIDC key-set client no longer follows redirects, so a redirected discovery document is refused.
+- Server: token-shaped text in step, flow, report and app-crash events is redacted on ingest, before it is journaled or stored.
 - Server: the dashboard CSP forbids `<object>` and `<base>`, and open browser sockets close when their sign-in ends (`api.session_recheck_ms`, 30 s by default). Signed artifact links last at most 300 s. CI OIDC tokens without a `jti` are refused.
 - Blob: an SVG with an XML prolog is refused as a JUnit report.
 - Maestro: escape strings (OSC, DCS and others) are removed with their payload, so an OSC 8 link or OSC 52 clipboard write never reaches a log line.
