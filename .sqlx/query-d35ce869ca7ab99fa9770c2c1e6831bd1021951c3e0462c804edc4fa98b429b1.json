@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state, issue_url FROM failure_triage\n          WHERE project_id = $1 AND fingerprint = $2\n          FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "issue_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "issue_url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "d35ce869ca7ab99fa9770c2c1e6831bd1021951c3e0462c804edc4fa98b429b1"
+}

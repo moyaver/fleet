@@ -59,6 +59,8 @@ pub enum Action {
     ReadArtifacts,
     /// Change project settings and flow tags.
     ManageProject,
+    /// Mark a failure fingerprint known (with its issue) or resolved, or clear that.
+    TriageFailures,
     /// Create and revoke a project's publisher credentials.
     ManageCredentials,
     /// Change retention within limits.
@@ -123,9 +125,10 @@ impl Action {
         match self {
             Self::ListProjects => Needs::AnyGrant,
             Self::ReadRuns | Self::ReadArtifacts => Needs::Project(Role::Viewer),
-            Self::ManageProject | Self::ManageCredentials | Self::ManageRetention => {
-                Needs::Project(Role::Maintainer)
-            }
+            Self::ManageProject
+            | Self::TriageFailures
+            | Self::ManageCredentials
+            | Self::ManageRetention => Needs::Project(Role::Maintainer),
             Self::ManageRoles => Needs::Project(Role::Admin),
             Self::ViewAudit | Self::ManageGlobalSettings => Needs::Global(Role::Admin),
             Self::Ingest | Self::UploadArtifact => Needs::Publisher,
@@ -209,12 +212,14 @@ mod tests {
     #[test]
     fn every_role_and_action_on_a_project() {
         use Action::{
-            ManageCredentials, ManageProject, ManageRetention, ManageRoles, ReadArtifacts, ReadRuns,
+            ManageCredentials, ManageProject, ManageRetention, ManageRoles, ReadArtifacts,
+            ReadRuns, TriageFailures,
         };
         let project_actions = [
             ReadRuns,
             ReadArtifacts,
             ManageProject,
+            TriageFailures,
             ManageCredentials,
             ManageRetention,
             ManageRoles,
@@ -227,6 +232,7 @@ mod tests {
                     ReadRuns,
                     ReadArtifacts,
                     ManageProject,
+                    TriageFailures,
                     ManageCredentials,
                     ManageRetention,
                 ],
@@ -313,6 +319,7 @@ mod tests {
             Action::ReadRuns,
             Action::ReadArtifacts,
             Action::ManageProject,
+            Action::TriageFailures,
             Action::ManageCredentials,
             Action::ManageRetention,
             Action::ManageRoles,

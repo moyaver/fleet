@@ -17,6 +17,48 @@ use crate::{
     rest::{FlowCounts, InfrastructureView},
 };
 
+/// Whether a failure fingerprint is known (tracked by an issue) or resolved (issue #84). A
+/// fingerprint with no state is untriaged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum TriageState {
+    /// Tracked by an issue, named by `issue_url`.
+    Known,
+    /// Fixed; `issue_url` may name the change that fixed it.
+    Resolved,
+}
+
+/// What a maintainer recorded about one failure fingerprint. Every fingerprint has one, from the
+/// first time it was seen, so `first_seen_at` is always known.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct FailureTriageView {
+    /// `v1:` and 16 hex digits.
+    pub fingerprint: String,
+    /// `known` or `resolved`; `None` while untriaged.
+    pub state: Option<TriageState>,
+    /// The issue (or change) the state points at.
+    pub issue_url: Option<String>,
+    /// When the fingerprint was first seen in this project.
+    #[serde(with = "time::serde::rfc3339")]
+    pub first_seen_at: OffsetDateTime,
+    /// When the state last changed; `None` while untriaged.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub updated_at: Option<OffsetDateTime>,
+}
+
+/// The body of `PUT .../failures/{fingerprint}/triage`. Clearing the triage is a `DELETE`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct FailureTriageRequest {
+    /// The new state.
+    pub state: TriageState,
+    /// The issue URL (`http` or `https`). Required for `known`.
+    #[serde(default)]
+    pub issue_url: Option<String>,
+}
+
 /// How flaky a flow is, by the rules of ADR-0009 (`fleet_core::flaky::Flakiness`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -112,6 +154,9 @@ pub struct HistoryEntryView {
     /// reads as failed, and the flow's flakiness leaves it out.
     #[serde(default)]
     pub infrastructure: Option<InfrastructureView>,
+    /// What was recorded about the failure fingerprint, on a final failure.
+    #[serde(default)]
+    pub triage: Option<FailureTriageView>,
 }
 
 /// A page of the history, newest first, with the flakiness of the flows on it.
@@ -192,6 +237,9 @@ pub struct FailureGroupView {
     pub last_at: OffsetDateTime,
     /// Up to five of them, newest first.
     pub flow_ids: Vec<Uuid>,
+    /// What was recorded about this fingerprint; `None` only from an older server.
+    #[serde(default)]
+    pub triage: Option<FailureTriageView>,
 }
 
 /// Screen E's per-flow panel.

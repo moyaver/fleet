@@ -36,6 +36,7 @@ pub mod sweep;
 pub mod telemetry;
 #[cfg(feature = "test-util")]
 pub mod testing;
+pub mod triage;
 
 use std::time::Duration;
 

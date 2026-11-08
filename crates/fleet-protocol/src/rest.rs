@@ -586,6 +586,12 @@ pub struct FailureView {
     pub failed_step_index: Option<i32>,
     /// The last completed step before it (or the last one, when none failed).
     pub last_successful_step_index: Option<i32>,
+    /// The failure's fingerprint (`v1:…`), when the failure is final (issue #84).
+    #[serde(default)]
+    pub fingerprint: Option<String>,
+    /// What was recorded about that fingerprint.
+    #[serde(default)]
+    pub triage: Option<history::FailureTriageView>,
 }
 
 /// The app crash Maestro recorded during a flow (`app.crashed`, issue #152). Evidence only: the
