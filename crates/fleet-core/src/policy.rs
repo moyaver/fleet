@@ -73,6 +73,10 @@ pub enum Action {
     /// retention, artifact and metric policy, agent compatibility and ingestion health (Screen G;
     /// a [`Resource::Global`] action).
     ViewAdministration,
+    /// Change installation-wide administration: create projects, rename them, issue and revoke API
+    /// keys, bind roles and group mappings, and manage publisher trust (Screen G's writes; a
+    /// [`Resource::Global`] action).
+    ManageAdministration,
     /// Change installation-wide settings (a [`Resource::Global`] action).
     ManageGlobalSettings,
     /// Publish events and telemetry (publishers only).
@@ -134,9 +138,10 @@ impl Action {
             | Self::ManageCredentials
             | Self::ManageRetention => Needs::Project(Role::Maintainer),
             Self::ManageRoles => Needs::Project(Role::Admin),
-            Self::ViewAudit | Self::ViewAdministration | Self::ManageGlobalSettings => {
-                Needs::Global(Role::Admin)
-            }
+            Self::ViewAudit
+            | Self::ViewAdministration
+            | Self::ManageAdministration
+            | Self::ManageGlobalSettings => Needs::Global(Role::Admin),
             Self::Ingest | Self::UploadArtifact => Needs::Publisher,
         }
     }
@@ -262,6 +267,7 @@ mod tests {
         for action in [
             Action::ViewAudit,
             Action::ViewAdministration,
+            Action::ManageAdministration,
             Action::ManageGlobalSettings,
         ] {
             assert!(allowed(
@@ -338,6 +344,7 @@ mod tests {
         }
         assert!(!allowed(&p, Action::ViewAudit, Resource::Global));
         assert!(!allowed(&p, Action::ViewAdministration, Resource::Global));
+        assert!(!allowed(&p, Action::ManageAdministration, Resource::Global));
     }
 
     #[test]
