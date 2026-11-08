@@ -680,6 +680,10 @@
 }
 .pg-inferred { border: 2px dotted var(--muted); border-radius: 50%; }
 .pg-missing { border: 1.5px dashed var(--muted); }
+.pg-published {
+  border: 1px solid var(--muted);
+  background: linear-gradient(90deg, var(--muted) 50%, transparent 50%);
+}
 .pg-stale {
   width: 11px;
   height: 11px;

@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use fleet_protocol::{
     event::StepStatus,
+    frame::RunOrigin,
     live::AgentRunView,
     rest::{
         ClaimView, CrashView, FlowDetailView, InfrastructureView, StepView,
@@ -58,6 +59,8 @@ pub struct FlowHeader {
     pub provenance: Provenance,
     /// How settled it is, in words.
     pub finality_note: &'static str,
+    /// Whether the run that produced the flow was published after the fact.
+    pub origin: RunOrigin,
     /// Set when two parsed sources disagree: a Maestro compatibility alarm.
     pub conflict_warning: Option<&'static str>,
     /// Start, end and duration.
@@ -386,6 +389,7 @@ fn header(view: &FlowDetailView, ctx: &Ctx) -> FlowHeader {
         state: flow_state_pill(&f.state),
         provenance: flow_provenance(&f.finality, &f.state, view.agent_run.liveness),
         finality_note: finality_note(&f.finality),
+        origin: f.origin,
         conflict_warning: f.has_conflict.then_some(
             "Two parsed sources disagree about this flow: possible Maestro compatibility problem",
         ),

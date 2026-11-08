@@ -6,9 +6,12 @@
 //! because the server's verdict names runs that show it (the links are those runs), and a figure
 //! the server doesn't have (no duration samples, no percentile) reads as unavailable, never as 0.
 
-use fleet_protocol::rest::history::{
-    FailureTriageView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
-    HistoryEntryView, HistoryPage,
+use fleet_protocol::{
+    frame::RunOrigin,
+    rest::history::{
+        FailureTriageView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
+        HistoryEntryView, HistoryPage,
+    },
 };
 use fleet_ui::{
     charts::{
@@ -184,6 +187,8 @@ pub struct HistoryRow {
     pub provenance: Provenance,
     /// How settled it is, in words.
     pub finality_note: &'static str,
+    /// Whether the run was published after the fact (shown as a label, never as live).
+    pub origin: RunOrigin,
     /// The branch, or the ref when it isn't a branch or tag.
     pub branch: Option<String>,
     /// The commit, shortened.
@@ -266,6 +271,7 @@ fn row(
         state: flow_state_pill(&e.state),
         provenance: flow_provenance(&e.finality, &e.state, None),
         finality_note: finality_note(&e.finality),
+        origin: e.origin,
         branch: e.git_ref.as_deref().map(|r| ref_name(r).to_owned()),
         commit: e.commit_sha.as_deref().map(short_commit),
         duration: e.duration_ms.map(format_duration),

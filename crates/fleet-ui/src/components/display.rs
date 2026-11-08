@@ -4,7 +4,13 @@
 
 use leptos::prelude::*;
 
-use crate::{mark::Mark, provenance::Provenance, tone::Tone};
+use fleet_protocol::frame::RunOrigin;
+
+use crate::{
+    mark::Mark,
+    provenance::{PUBLISHED, Provenance},
+    tone::Tone,
+};
 
 fn pill_class(tone: Tone) -> String {
     format!(
@@ -76,6 +82,32 @@ pub fn RowProvenance(
         let p = provenance.get();
         p.marks_a_row()
             .then(|| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })
+    }
+}
+
+/// The origin label of a published run (issue #83). A live run shows nothing: the label marks only
+/// the runs that were imported after the fact, so they never read as live.
+#[component]
+pub fn OriginBadge(
+    /// The run's origin, for the value this badge sits beside.
+    #[prop(into)]
+    origin: Signal<RunOrigin>,
+) -> impl IntoView {
+    move || {
+        (origin.get() == RunOrigin::Published).then(|| {
+            view! {
+                <span
+                    role="img"
+                    class="pv"
+                    data-testid="origin-badge"
+                    aria-label=PUBLISHED.aria_label
+                    title=PUBLISHED.description
+                >
+                    <i class=format!("pg {}", PUBLISHED.glyph) aria-hidden="true"></i>
+                    {PUBLISHED.label}
+                </span>
+            }
+        })
     }
 }
 

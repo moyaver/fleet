@@ -12,7 +12,7 @@
 
 use fleet_protocol::rest::{CrashView, FlowDetailView};
 use fleet_ui::{
-    components::display::{Card, ProvenanceBadge, RowProvenance, StatusPill, TableBox},
+    components::display::{Card, OriginBadge, ProvenanceBadge, RowProvenance, StatusPill, TableBox},
     mark::Mark,
     provenance::Provenance,
     steps::view::StepTreeView,
@@ -183,6 +183,7 @@ fn HeaderView(
         state,
         provenance,
         finality_note,
+        origin,
         ..
     } = header;
     view! {
@@ -193,6 +194,7 @@ fn HeaderView(
                 <a href="#why" class="no-underline" title=finality_note>
                     <ProvenanceBadge provenance=Signal::stored(provenance) />
                 </a>
+                <OriginBadge origin=Signal::stored(origin) />
             </div>
             <p class="row gap-x-4 gap-y-1 text-sm text-muted">
                 {path
