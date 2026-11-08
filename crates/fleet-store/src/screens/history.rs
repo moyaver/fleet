@@ -9,6 +9,7 @@ use fleet_core::{
     claims::Finality,
     fingerprint::ConditionFingerprint,
     flaky::{HistoryRun, exclusion_of},
+    reproduce::command_for,
 };
 use fleet_protocol::{
     event::FlowOutcome,
@@ -20,7 +21,10 @@ use fleet_protocol::{
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
-use super::{flow::infrastructure_of, workers::RunCursor};
+use super::{
+    flow::{infrastructure_of, reproduction_of},
+    workers::RunCursor,
+};
 use crate::{Result, Store, live};
 
 /// The history rows classified per flow: at most this many, the latest.
@@ -83,11 +87,18 @@ struct HistoryRow {
     condition_fingerprint: Option<String>,
     origin: String,
     cut_short: Option<String>,
+    flow_path: Option<String>,
+    reproduction: Option<serde_json::Value>,
 }
 
 impl HistoryRow {
     fn into_entry(self) -> Result<HistoryEntryView> {
+        let reproduction = command_for(
+            reproduction_of(self.reproduction).as_ref(),
+            self.flow_path.as_deref(),
+        );
         Ok(HistoryEntryView {
+            reproduction,
             infrastructure: infrastructure_of(
                 &self.state,
                 self.outcome_source.as_deref(),
@@ -144,7 +155,8 @@ impl Store {
                     coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,
                     ff.fingerprint AS \"failure_fingerprint?\",
                     encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,
-                    f.cut_short AS \"cut_short?\"
+                    f.cut_short AS \"cut_short?\",
+                    f.flow_path, r.reproduction AS \"reproduction?: serde_json::Value\"
                FROM flow_executions f
                JOIN agent_runs r ON r.id = f.agent_run_id
                JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id

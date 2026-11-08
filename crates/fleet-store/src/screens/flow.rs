@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Screen D: one flow execution with its claims, steps and failure.
 
-use fleet_core::flaky::{DEVICE_LOST, Exclusion, exclusion_of};
+use fleet_core::{
+    flaky::{DEVICE_LOST, Exclusion, exclusion_of},
+    reproduce::command_for,
+};
 use fleet_protocol::{
-    event::FlowOutcome,
+    event::{FlowOutcome, Reproduction},
     live::FlowView,
     rest::{
         ArtifactRefView, ClaimView, CrashView, FailureView, FlowDetailView, InfrastructureView,
@@ -94,6 +97,13 @@ impl Store {
                 .pop(),
             None => None,
         };
+        let stored_reproduction = sqlx::query_scalar!(
+            "SELECT reproduction AS \"reproduction?: serde_json::Value\" FROM agent_runs WHERE id = $1",
+            head.agent_run_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .flatten();
         let claims = claims_of(&mut tx, flow_id, &flow).await?;
         let steps = steps_of(&mut tx, flow_id).await?;
         let previous = sqlx::query_as!(
@@ -154,8 +164,17 @@ impl Store {
             step_warnings: head.step_warnings,
             previous,
             artifacts,
+            reproduction: command_for(
+                reproduction_of(stored_reproduction).as_ref(),
+                head.flow_path.as_deref(),
+            ),
         }))
     }
+}
+
+/// The rerun words a run stored, if it stored a readable set (issue #82).
+pub(super) fn reproduction_of(stored: Option<serde_json::Value>) -> Option<Reproduction> {
+    stored.and_then(|v| serde_json::from_value(v).ok())
 }
 
 /// Every claim about a flow's outcome in arrival order, with the winner marked.

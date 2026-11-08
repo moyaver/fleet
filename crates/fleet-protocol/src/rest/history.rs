@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     frame::RunOrigin,
     live::AttemptView,
-    rest::{FlowCounts, InfrastructureView},
+    rest::{FlowCounts, InfrastructureView, ReproCommandView},
 };
 
 /// Whether a failure fingerprint is known (tracked by an issue) or resolved (issue #84). A
@@ -161,6 +161,9 @@ pub struct HistoryEntryView {
     /// What was recorded about the failure fingerprint, on a final failure.
     #[serde(default)]
     pub triage: Option<FailureTriageView>,
+    /// How to rerun this flow (issue #82). Absent from older servers: then there is no command.
+    #[serde(default)]
+    pub reproduction: ReproCommandView,
 }
 
 /// A page of the history, newest first, with the flakiness of the flows on it.

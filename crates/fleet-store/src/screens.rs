@@ -11,6 +11,7 @@ mod compare;
 mod flow;
 mod history;
 mod overview;
+mod rerun;
 mod samples;
 mod timeline;
 mod workers;
