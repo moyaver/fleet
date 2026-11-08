@@ -267,9 +267,18 @@ async fn pipeline_page_shows_the_live_flows_before_the_report(page: &Page<'_>) {
         ),
     )
     .await;
+    // A failed flow reads Failed at once, even while the run is still in progress (issue #149); the
+    // header still says the run is running.
     assert!(
-        page.texts(&q("pipeline-result")).await[0].contains("Running"),
-        "the run is still in progress while its flows already show"
+        page.texts(&q("pipeline-result")).await[0].contains("Failed"),
+        "a failed flow reads Failed while the run is still in progress"
+    );
+    assert!(
+        page.texts(&q("pipeline-header"))
+            .await
+            .concat()
+            .contains("running for"),
+        "the run is still in progress"
     );
     // The Flows heading says once that the outcomes are provisional; no row repeats it.
     page.wait(
@@ -345,14 +354,12 @@ async fn pipeline_page_settles_and_leads_to_the_failure(page: &Page<'_>) {
             vec![],
         )
         .await;
+    // Settled claims (the artifacts' and the report's) carry no badge of their own; only the live
+    // console's provisional claim is marked (issue #149).
     assert_eq!(
         badges,
-        json!([
-            "Provenance: provisional",
-            "Provenance: verified",
-            "Provenance: verified"
-        ]),
-        "the live console's claim is provisional; the artifacts' and the report's are verified"
+        json!(["Provenance: provisional"]),
+        "the live console's claim is provisional; the settled claims carry no badge"
     );
     let winner = page.texts(&format!("{}[data-winning]", q("claim"))).await;
     assert_eq!(winner.len(), 1, "exactly one claim decided");
@@ -580,7 +587,8 @@ async fn ac06_a_real_agent_running_a_plan_shows_its_count_while_maestro_runs() {
         "the live log's four flows counted against the plan, with Maestro still running",
         &format!(
             "{}.startsWith('4 of 4 flows finished') \
-             && (document.querySelector('{}') || {{}}).textContent.includes('Running')",
+             && (document.querySelector('{}') || {{}}).textContent.includes('Failed') \
+             && document.body.textContent.includes('running for')",
             progress_sentence(),
             q("pipeline-result"),
         ),

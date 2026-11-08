@@ -168,12 +168,18 @@ async fn a_failed_flows_page_shows_the_failure_and_every_claim_with_its_provenan
         .await;
     assert_eq!(page.texts(&q("failure-message")).await, [message.as_str()]);
 
-    // I4: every claim is listed, none without a provenance badge, and exactly one decided.
+    // I4: every claim is listed, and each claim that is not settled says so in a badge. A verified
+    // claim carries none of its own: the flow says Verified once (issue #149).
     page.wait(
         "every claim",
         &format!("{} === {}", count_of(&q("claim")), claims.len()),
     )
     .await;
+    // A claim from the live console is provisional; the report's and the artifacts' are settled.
+    let unsettled = claims
+        .iter()
+        .filter(|c| c["source"] == "live_console")
+        .count();
     assert_eq!(
         page.count(&format!(
             "{} {} [role=img]",
@@ -181,8 +187,8 @@ async fn a_failed_flows_page_shows_the_failure_and_every_claim_with_its_provenan
             q("claim-provenance")
         ))
         .await,
-        claims.len(),
-        "a provenance badge on every claim"
+        unsettled,
+        "a badge on each claim that is not settled, and none on a settled one"
     );
     assert_eq!(
         page.count(&format!("{}[data-winning]", q("claim"))).await,
@@ -200,9 +206,12 @@ async fn a_failed_flows_page_shows_the_failure_and_every_claim_with_its_provenan
         .await;
     let badges: Vec<String> = serde_json::from_value(badges).unwrap();
     assert!(
-        badges.contains(&"Provenance: verified".to_owned())
-            && badges.contains(&"Provenance: provisional".to_owned()),
-        "the final report is verified and the live console provisional, got {badges:?}"
+        badges.contains(&"Provenance: provisional".to_owned()),
+        "the live console's claim is provisional, got {badges:?}"
+    );
+    assert!(
+        !badges.contains(&"Provenance: verified".to_owned()),
+        "the final report's claim is settled and carries no badge, got {badges:?}"
     );
     // The header carries the winner's provenance too, and the steps are there in order.
     assert!(
