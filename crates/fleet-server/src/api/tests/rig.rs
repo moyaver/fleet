@@ -73,7 +73,12 @@ pub(super) async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
     let store = state.store.clone();
     let project = store.project_id("app").await.unwrap().unwrap();
     let (_, key) = store
-        .create_api_key(project, "ci", TrustLevel::Trusted)
+        .create_api_key(
+            project,
+            "ci",
+            TrustLevel::Trusted,
+            time::OffsetDateTime::now_utc() + time::Duration::days(90),
+        )
         .await
         .unwrap();
     // A real socket, so agent WebSockets work too.

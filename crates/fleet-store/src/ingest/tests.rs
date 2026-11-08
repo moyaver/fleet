@@ -318,7 +318,12 @@ pub(crate) fn suite_run_scripted(
 pub(crate) async fn publisher(store: &Store) -> Publisher {
     let project = store.upsert_project("app", "App").await.unwrap();
     let (key, _) = store
-        .create_api_key(project, "ci", TrustLevel::Trusted)
+        .create_api_key(
+            project,
+            "ci",
+            TrustLevel::Trusted,
+            time::OffsetDateTime::now_utc() + time::Duration::days(90),
+        )
         .await
         .unwrap();
     Publisher {

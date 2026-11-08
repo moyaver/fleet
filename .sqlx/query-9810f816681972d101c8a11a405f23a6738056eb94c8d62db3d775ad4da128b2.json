@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level)\n             VALUES ($1, $2, $3, $4, $5) RETURNING id",
+  "query": "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level, expires_at)\n             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
   "describe": {
     "columns": [
       {
@@ -35,12 +35,13 @@
               "Domain": "Text"
             }
           }
-        }
+        },
+        "Timestamptz"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "f0ec4fa9893318491882c8a71b3ce321c598a4540099623bd3afd54156f687f0"
+  "hash": "9810f816681972d101c8a11a405f23a6738056eb94c8d62db3d775ad4da128b2"
 }

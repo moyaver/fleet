@@ -334,7 +334,12 @@ async fn asking_again_is_idempotent_and_the_same_bytes_are_stored_once_per_proje
     let other_project = rig.store.project_id("other").await.unwrap().unwrap();
     let (_, other_key) = rig
         .store
-        .create_api_key(other_project, "ci", fleet_store::auth::TrustLevel::Trusted)
+        .create_api_key(
+            other_project,
+            "ci",
+            fleet_store::auth::TrustLevel::Trusted,
+            time::OffsetDateTime::now_utc() + time::Duration::days(90),
+        )
         .await
         .unwrap();
     let mut agent = Agent::new("912", "build", "runner-b");
@@ -562,7 +567,12 @@ async fn other_key(rig: &Rig, project: &str) -> String {
     let id = rig.store.project_id(project).await.unwrap().unwrap();
     let (_, key) = rig
         .store
-        .create_api_key(id, "ci", fleet_store::auth::TrustLevel::Trusted)
+        .create_api_key(
+            id,
+            "ci",
+            fleet_store::auth::TrustLevel::Trusted,
+            time::OffsetDateTime::now_utc() + time::Duration::days(90),
+        )
         .await
         .unwrap();
     key.expose().to_owned()

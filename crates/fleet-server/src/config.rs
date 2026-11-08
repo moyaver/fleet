@@ -687,6 +687,9 @@ pub struct Api {
     /// How often an open browser socket checks that its sign-in is still live. Logout or expiry
     /// closes the socket within this time (research 06 T17, T21).
     pub session_recheck_ms: u64,
+    /// Days until a new API key expires when `fleet-server api-key create` is not given
+    /// `--expires-in-days` (research 06 T3). Above 0.
+    pub api_key_ttl_days: u32,
 }
 
 impl Default for Api {
@@ -697,6 +700,7 @@ impl Default for Api {
             public_url: None,
             live_buffer: 1024,
             session_recheck_ms: 30_000,
+            api_key_ttl_days: 90,
         }
     }
 }
@@ -895,6 +899,10 @@ impl Config {
     }
 
     fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.api.api_key_ttl_days > 0,
+            "api.api_key_ttl_days must be above 0"
+        );
         let i = &self.ingest;
         anyhow::ensure!(
             i.telemetry_flush_ms >= 100,
@@ -1185,6 +1193,18 @@ mod tests {
         let all =
             Config::load(None, &env(&[("FLEET_TRUSTED_PROXIES", r#"["0.0.0.0/0"]"#)])).unwrap_err();
         assert!(format!("{all:#}").contains("forge"), "{all:#}");
+    }
+
+    #[test]
+    fn api_keys_expire_in_90_days_unless_configured_otherwise() {
+        assert_eq!(Config::load(None, &[]).unwrap().api.api_key_ttl_days, 90);
+        let tuned = Config::load(None, &env(&[("FLEET_API__API_KEY_TTL_DAYS", "30")])).unwrap();
+        assert_eq!(tuned.api.api_key_ttl_days, 30);
+        let zero = Config::load(None, &env(&[("FLEET_API__API_KEY_TTL_DAYS", "0")])).unwrap_err();
+        assert!(
+            format!("{zero:#}").contains("api.api_key_ttl_days"),
+            "{zero:#}"
+        );
     }
 
     #[test]

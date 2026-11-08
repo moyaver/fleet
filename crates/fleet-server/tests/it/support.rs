@@ -70,7 +70,12 @@ impl Harness {
         let server = fleet_server::start(config.clone()).await.unwrap();
         let project = store.project_id("app").await.unwrap().unwrap();
         let (_, key) = store
-            .create_api_key(project, "ci", fleet_store::auth::TrustLevel::Trusted)
+            .create_api_key(
+                project,
+                "ci",
+                fleet_store::auth::TrustLevel::Trusted,
+                time::OffsetDateTime::now_utc() + time::Duration::days(90),
+            )
             .await
             .unwrap();
         Self {

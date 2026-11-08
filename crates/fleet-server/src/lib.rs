@@ -37,6 +37,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use fleet_store::{PoolOptions, Store, auth::TrustLevel};
+use time::{Duration, OffsetDateTime};
 
 pub use crate::app::{Server, start};
 use crate::config::Config;
@@ -83,6 +84,9 @@ pub enum ApiKeyAction {
         /// A name to recognise the key by.
         #[arg(long)]
         name: String,
+        /// Days until the key expires. Defaults to `api.api_key_ttl_days` (90).
+        #[arg(long)]
+        expires_in_days: Option<u32>,
     },
 }
 
@@ -103,7 +107,12 @@ pub async fn run(cli: Cli, env: Vec<(String, String)>) -> anyhow::Result<()> {
             Ok(())
         }
         Command::ApiKey {
-            action: ApiKeyAction::Create { project, name },
+            action:
+                ApiKeyAction::Create {
+                    project,
+                    name,
+                    expires_in_days,
+                },
         } => {
             let store = connect(&config)?;
             // A project that exists keeps its name; only a new one takes its slug as its name.
@@ -111,14 +120,29 @@ pub async fn run(cli: Cli, env: Vec<(String, String)>) -> anyhow::Result<()> {
                 Some(id) => id,
                 None => store.upsert_project(&project, &project).await?,
             };
+            let expires_at = key_expiry(
+                OffsetDateTime::now_utc(),
+                expires_in_days,
+                config.api.api_key_ttl_days,
+            );
             let (id, key) = store
-                .create_api_key(project_id, &name, TrustLevel::Trusted)
+                .create_api_key(project_id, &name, TrustLevel::Trusted, expires_at)
                 .await?;
             tracing::info!(%id, project, "api key created; it is shown once on stdout");
             app::print_once(key.expose())
         }
         Command::Serve => app::serve(config).await,
     }
+}
+
+/// When a new API key expires: `days` from `now` when given, else the configured default.
+#[must_use]
+pub(crate) fn key_expiry(
+    now: OffsetDateTime,
+    days: Option<u32>,
+    default_days: u32,
+) -> OffsetDateTime {
+    now + Duration::days(i64::from(days.unwrap_or(default_days)))
 }
 
 pub(crate) fn connect(config: &Config) -> anyhow::Result<Store> {
@@ -134,4 +158,18 @@ pub(crate) fn connect(config: &Config) -> anyhow::Result<Store> {
             ..PoolOptions::default()
         },
     )?)
+}
+
+#[cfg(test)]
+mod tests {
+    use time::{Duration, OffsetDateTime};
+
+    use super::key_expiry;
+
+    #[test]
+    fn a_new_key_expires_in_the_configured_days_unless_asked_otherwise() {
+        let now = OffsetDateTime::UNIX_EPOCH;
+        assert_eq!(key_expiry(now, None, 90), now + Duration::days(90));
+        assert_eq!(key_expiry(now, Some(7), 90), now + Duration::days(7));
+    }
 }
