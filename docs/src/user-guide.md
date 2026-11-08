@@ -135,7 +135,9 @@ A failed flow's page (open it from the pipeline page, from the pipeline's list o
 
 **Compare** (`/compare?project=<slug>&a=<attempt>&b=<attempt>`) sets two attempts side by side: newly failing, recovered, changed, only in A, only in B and unchanged flows. A difference is explained only from what the evidence says: the conditions differ (and in which facts), the two failed differently, the flow is missing on one side, or one outcome rests on weaker evidence (provisional, inferred). A duration change is shown, never called a regression, and carries a note when the conditions differ. When the evidence says nothing differs, the row has no explanation.
 
-The data comes from `GET /api/v1/projects/{project}/history`, `…/flows/{name}/stats` and `…/compare?a=&b=`; see `/api/v1/openapi.json`.
+**Failure triage** keeps a known failure from being investigated twice. Each failure fingerprint is *untriaged* until a maintainer (or an admin) marks it **Known**, with the link to the issue that tracks it, or **Resolved**, optionally with the link to the change that fixed it; choosing *Untriaged* again clears it. The state shows on the history rows, on each group in a flow's stats panel and on the failure band of the flow page, so every failure with that fingerprint carries it. Fleet records when each fingerprint was first seen, and every change of state writes an audit event naming who made it and the state it changed from and to. A viewer sees the state and the link, but no controls.
+
+The data comes from `GET /api/v1/projects/{project}/history`, `…/flows/{name}/stats` and `…/compare?a=&b=`; see `/api/v1/openapi.json`. Triage is `PUT /api/v1/projects/{project}/failures/{fingerprint}/triage` (body `{"state": "known" | "resolved", "issue_url": "https://…"}`, the link required for `known`) and `DELETE` on the same path, from a signed-in maintainer's browser session with its CSRF token.
 
 ## Offline mode and `inspect`
 
