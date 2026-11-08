@@ -19,10 +19,10 @@ use fleet_ui::{
     components::{
         display::{
             EmptyState, ProvenanceBadge, ProvenanceStatement, ReadoutChoice, ReadoutStrip,
-            Skeleton, StatTile, StatusPill, TableBox,
+            RowProvenance, Skeleton, StatTile, StatusPill, TableBox,
         },
         forms::use_url_query,
-        live::LiveState,
+        live::{Announcements, LiveState},
     },
     mark::Mark,
     provenance::Provenance,
@@ -37,6 +37,7 @@ use self::model::{
     RunnerCounts, WorkerRow, composition, failed_step, feed, freshness,
 };
 use crate::{
+    announce,
     api::{self, ApiError},
     app::{ErrorNotice, LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
@@ -275,6 +276,9 @@ pub fn Overview() -> impl IntoView {
     }
     top_bar(&data, feed_state, pause, now);
 
+    let announced = announce::region(Signal::derive(move || {
+        model.with(|m| m.as_ref().map(OverviewModel::facts))
+    }));
     let (query, set_query) = use_url_query();
     let filter =
         Memo::new(move |_| Filter::parse(query_param(&query.get(), FILTER_PARAM).as_deref()));
@@ -288,6 +292,7 @@ pub fn Overview() -> impl IntoView {
     });
     view! {
         <div>
+            <Announcements text=announced />
             <h2 class="mb-4 text-xl font-semibold">"Overview"</h2>
             <ErrorNotice error=data.error />
             {move || match model.get() {
@@ -310,6 +315,7 @@ fn overview_body(
     now: RwSignal<i64>,
 ) -> impl IntoView {
     let pipelines = StoredValue::new(m.pipelines);
+    let emulators = m.readouts.emulators;
     view! {
         {readout_strip(m.readouts, filter, choose)}
         <div class="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-9 min-[721px]:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
@@ -324,6 +330,7 @@ fn overview_body(
                 }}
             </div>
             <aside class="stack" aria-label="Runners">
+                {emulators_tile(emulators)}
                 {runners_section(m.runners, m.workers, now)}
             </aside>
         </div>
@@ -382,13 +389,6 @@ fn readout_strip(r: Readouts, filter: Memo<Filter>, choose: Callback<Filter>) ->
                 on_select=pick(Filter::NoFailures)
                 test_id="tile-no-failures"
             />
-            <div data-testid="tile-emulators">
-                <StatTile
-                    label="Active emulators"
-                    value=r.emulators.to_string()
-                    provenance=Provenance::Observed
-                />
-            </div>
         </ReadoutStrip>
     }
 }
@@ -427,7 +427,7 @@ fn attention_item(r: AttentionRow, offset: i32) -> impl IntoView {
             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <div class="row min-w-0">
                     <StatusPill mark=Mark::Failed label="Failed" />
-                    {r.provenance.map(|p| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })}
+                    {r.provenance.map(|p| view! { <RowProvenance provenance=Signal::stored(p) /> })}
                     <A href=r.flow_href attr:class=format!("cell-title {LINK}")>{r.name}</A>
                 </div>
                 <span class="note num">{time_of_day(r.at_ms, offset)}</span>
@@ -543,7 +543,7 @@ fn pipeline_row(r: PipelineRow, now: RwSignal<i64>, offset: i32) -> impl IntoVie
 fn results(r: &PipelineRow) -> AnyView {
     let mark = r
         .provenance
-        .map(|p| view! { <ProvenanceBadge provenance=Signal::stored(p) /> });
+        .map(|p| view! { <RowProvenance provenance=Signal::stored(p) /> });
     let counts = view! {
         <span class="small">
             <span class="num" data-testid="passed">{r.progress.passed}</span>" passed · "
@@ -647,6 +647,20 @@ fn usize_of(n: u64) -> usize {
     usize::try_from(n).unwrap_or(usize::MAX)
 }
 
+/// The active emulators, beside the runners that run them (issue #123): a count of the emulators
+/// the server saw in the last two minutes with adb state online, observed as each agent reported.
+fn emulators_tile(count: u64) -> impl IntoView {
+    view! {
+        <div class="border-b border-line pb-4" data-testid="tile-emulators">
+            <StatTile
+                label="Active emulators"
+                value=count.to_string()
+                provenance=Provenance::Observed
+            />
+        </div>
+    }
+}
+
 fn runners_section(
     counts: RunnerCounts,
     rows: Vec<WorkerRow>,
@@ -713,7 +727,7 @@ fn runner_item(w: WorkerRow, now: RwSignal<i64>) -> impl IntoView {
                         let p = provenance.get();
                         let age = at.map(|at| format!(" · {} ago", format_duration((now.get() - at).max(0))));
                         view! {
-                            {(p != Provenance::Observed).then(|| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })}
+                            {(p != Provenance::Observed).then(|| view! { <RowProvenance provenance=Signal::stored(p) /> })}
                             {age.unwrap_or_else(|| " · no readings reported".to_owned())}
                         }
                     }}

@@ -219,15 +219,21 @@ pub fn live_view(i: LiveInputs) -> LiveView {
     }
 }
 
-/// The pipeline's verdict, derived from its flows (Foundations rule 4). While a job is open it is
-/// Running and provisional. Once every job has closed it is Failed if any flow failed; Passed only
-/// when a plan's total is known, every planned flow has been seen and each one is Verified Passed;
-/// otherwise No failures. Always derived, never a verdict the job outcome sets.
+/// The pipeline's verdict, derived from its flows (Foundations rule 4, issue #149): Failed if any
+/// flow failed, whether or not the jobs have closed; Passed only when a plan's total is known,
+/// every planned flow has been seen and each one is Verified Passed; otherwise No failures. While
+/// a job is still open and no flow has failed, it reads Running and is provisional. Always derived,
+/// never a verdict the job outcome sets.
 fn verdict(jobs: &[&JobView], flows: &[&FlowView], planned: Option<i64>) -> (Pill, Provenance) {
     if jobs.is_empty() {
         return (attempt_pill(&JobCounts::default()), Provenance::Missing);
     }
-    if jobs.iter().any(|j| j.lifecycle != "closed") {
+    let pill = if flows.iter().any(|f| f.state == "failed") {
+        Pill {
+            label: "Failed",
+            mark: Mark::Failed,
+        }
+    } else if jobs.iter().any(|j| j.lifecycle != "closed") {
         return (
             Pill {
                 label: "Running",
@@ -235,12 +241,6 @@ fn verdict(jobs: &[&JobView], flows: &[&FlowView], planned: Option<i64>) -> (Pil
             },
             Provenance::Provisional,
         );
-    }
-    let pill = if flows.iter().any(|f| f.state == "failed") {
-        Pill {
-            label: "Failed",
-            mark: Mark::Failed,
-        }
     } else if accounted_for(flows, planned) {
         Pill {
             label: "Passed",
@@ -488,6 +488,31 @@ mod tests {
             (h.result.label, h.result.mark),
             ("No failures", Mark::End),
             "no plan and no failed flow: the job's failure is shown separately"
+        );
+    }
+
+    #[test]
+    fn a_failed_flow_reads_failed_even_while_the_pipeline_is_still_open() {
+        let open_with = |flows: Vec<FlowView>| {
+            header(&state(snapshot(
+                1,
+                vec![job(JOB, "a", "running", None, None)],
+                vec![],
+                vec![suite(SUITE, JOB, None)],
+                flows,
+            )))
+        };
+        let failed = open_with(vec![flow(51, SUITE, "login", "failed", "verified")]);
+        assert_eq!(
+            (failed.result.label, failed.result.mark),
+            ("Failed", Mark::Failed),
+            "the flows decide the verdict; open or closed"
+        );
+        let clean = open_with(vec![flow(52, SUITE, "wait", "passed", "verified")]);
+        assert_eq!(
+            (clean.result.label, clean.result.mark),
+            ("Running", Mark::Running),
+            "open with no failure yet: still running, never Passed"
         );
     }
 

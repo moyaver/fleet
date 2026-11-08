@@ -28,8 +28,11 @@ use fleet_protocol::live::{FlowView, LiveFrame, PlanView};
 use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
     components::{
-        display::{EmptyState, ProvenanceBadge, ReadoutStrip, Skeleton, StatusPill, TableBox},
-        live::LiveState,
+        display::{
+            EmptyState, ProvenanceBadge, ReadoutStrip, RowProvenance, Skeleton, StatusPill,
+            TableBox,
+        },
+        live::{Announcements, LiveState},
     },
     provenance::Provenance,
     timeline::{model::TimelineData, view::SwimlaneTimeline},
@@ -44,6 +47,7 @@ use self::{
     timeline::timeline_data,
 };
 use crate::{
+    announce::{self, Fact},
     api,
     app::{ErrorNotice, LiveBar, LiveSlot},
     clock::{now_ms, utc_offset_minutes},
@@ -231,24 +235,29 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     let settled =
         Signal::derive(move || model.header.with(|h| h.as_ref().is_some_and(|h| h.settled)));
     let filter: RwSignal<Option<&'static str>> = RwSignal::new(None);
-    // The one polite announcement on the page: the verdict, when it changes. Cells update silently.
-    let announce = RwSignal::new(String::new());
-    Effect::new(move |prev: Option<Option<&'static str>>| {
-        let current = model
-            .header
-            .with(|h| h.as_ref().map(|h| (h.title.clone(), h.result.label)));
-        match current {
-            None => prev.flatten(),
-            Some((title, label)) => {
-                if let Some(Some(before)) = prev
-                    && before != label
-                {
-                    announce.set(format!("{title}: {label}."));
-                }
-                Some(label)
-            }
-        }
-    });
+    // The page's one status region (issue #149): the verdict when it changes, and each flow that
+    // fails or is interrupted. Cells update silently.
+    let announced = announce::region(Signal::derive(move || {
+        model.header.with(|h| {
+            h.as_ref().map(|h| {
+                let verdict = Fact::new(
+                    format!("verdict:{}", h.result.label),
+                    format!("{}: {}.", h.title, h.result.label),
+                );
+                let flows = model.failures.with(|rows| {
+                    rows.iter()
+                        .map(|r| {
+                            Fact::new(
+                                format!("flow:{}:{}", r.flow_id, r.state.label),
+                                format!("Flow {}: {}.", r.name, r.state.label),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                });
+                std::iter::once(verdict).chain(flows).collect()
+            })
+        })
+    }));
     let chosen = Memo::new(move |_| {
         filter
             .get()
@@ -256,7 +265,7 @@ fn PipelineBody(project: String, attempt: Uuid) -> impl IntoView {
     });
     view! {
         <div class="stack" data-testid="pipeline-page">
-            <p class="sr-only" role="status">{move || announce.get()}</p>
+            <Announcements text=announced />
             <ErrorNotice error=timeline.error />
             <ErrorNotice error=plans.error />
             {move || model.error.get().map(|e| view! {
@@ -333,7 +342,9 @@ fn count_testid(state: &str) -> &'static str {
 fn PageHeader(model: LiveModel, now: RwSignal<i64>) -> impl IntoView {
     move || {
         model.header.get().map(|header| {
-            let running = header.result.label == "Running";
+            // The run is open until every job has ended, whatever its verdict says (a failed flow
+            // reads Failed while the run is still going, issue #149).
+            let running = !header.settled;
             let started = header.started_ms;
             let offset = utc_offset_minutes();
             let facts = {
@@ -598,7 +609,7 @@ fn FailureLine(
             <td data-label="Result">
                 <StatusPill mark=row.state.mark label=row.state.label />
                 {move || mark().map(|p| view! {
-                    <span data-testid="flow-provenance"><ProvenanceBadge provenance=Signal::stored(p) /></span>
+                    <span data-testid="flow-provenance"><RowProvenance provenance=Signal::stored(p) /></span>
                 })}
             </td>
             <td data-label="Device">{device}</td>
@@ -761,7 +772,7 @@ fn JobGroup(
                         <StatusPill mark=pill.mark label=pill.label />
                         {outcome
                             .filter(|p| *p != Provenance::Final)
-                            .map(|p| view! { <ProvenanceBadge provenance=Signal::stored(p) /> })}
+                            .map(|p| view! { <RowProvenance provenance=Signal::stored(p) /> })}
                     }
                 }}
                 <span class="note" data-testid="suite-progress" data-progress=move || if job_progress(&model, id).is_uncertain() { "uncertain" } else { "known" }>
@@ -983,7 +994,7 @@ fn FlowRow(
                     view! { <StatusPill mark=pill.mark label=pill.label /> }
                 }}
                 {move || mark().map(|p| view! {
-                    <span data-testid="flow-provenance"><ProvenanceBadge provenance=Signal::stored(p) /></span>
+                    <span data-testid="flow-provenance"><RowProvenance provenance=Signal::stored(p) /></span>
                 })}
             </td>
             <td data-label="Duration" class="num">
