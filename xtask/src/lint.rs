@@ -209,6 +209,15 @@ fn file_problem(rel: &str, name: &str, contents: impl FnOnce() -> String) -> Opt
             "{rel}: only {UNSAFE_FILE} may opt out of unsafe_code"
         ));
     }
+    // T8 (research 06): user strings are text nodes. Raw HTML injection is banned in Rust
+    // sources. Built at runtime so this file doesn't match its own pattern.
+    let raw_html = ["inner", "_html"].concat();
+    let raw_html_api = ["dangerously", "SetInnerHtml"].concat();
+    if text.contains(&raw_html) || text.contains(&raw_html_api) {
+        return Some(format!(
+            "{rel}: raw HTML injection is not allowed; render user text as text nodes (research 06 T8)"
+        ));
+    }
     None
 }
 
@@ -369,6 +378,14 @@ mod tests {
         };
         assert!(file_problem("crates/fleet-core/src/lib.rs", "lib.rs", opt_out).is_some());
         assert_eq!(file_problem(UNSAFE_FILE, "sys.rs", opt_out), None);
+        // T8: raw HTML injection is refused wherever it is spelled (Leptos attribute or React).
+        let inject = || {
+            format!(
+                "{SPDX_HEADER}\nview! {{ <p {}=\"x\"/> }}\n",
+                ["inner", "_html"].concat()
+            )
+        };
+        assert!(file_problem("crates/fleet-ui/src/a.rs", "a.rs", inject).is_some());
     }
 
     /// Builds minimal `cargo metadata` output from (crate, normal deps) pairs.
