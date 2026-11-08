@@ -84,6 +84,8 @@ Every outcome and reading carries a badge saying where it comes from, so you can
 
 While a run is live, outcomes come from Maestro's log and console (**Provisional**). When Maestro writes its report, the report decides (**Verified**). If Maestro never writes one, the outcomes stay as Fleet saw them, and a run that ends abnormally never shows as passed.
 
+Steps settle the same way, one row at a time. A step's row is **Provisional** while it is read from the log. When the flow ends with a final `commands.json`, each command settles the step the log numbered the same, at the same nesting depth: the row takes the file's result and, from the file, its start and duration, and becomes **Verified**. A step the file does not cover (for example, when the log and the file list a different number of steps, or the depths disagree) stays **Provisional**. The Steps section shows the weakest of its rows, so one step still read from the log keeps the whole section Provisional. A flow cut short has no final `commands.json`, so its steps stay Provisional.
+
 ### Progress, and when it is uncertain
 
 *Test progress* reads **"N of M flows finished"** when Fleet knows the total: when a [Fleet plan](https://github.com/moyaver/fleet/blob/main/docs/decisions/0013-fleet-planner.md) was uploaded for the CI run, M is the plan's flows across all shards, known before the first job starts. M never changes while flows finish (unless more flows run than were planned, which raises it), and N never goes down.
