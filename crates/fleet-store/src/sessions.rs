@@ -80,11 +80,44 @@ impl Store {
         Ok(Secret::new(cookie))
     }
 
-    /// The live session for a cookie value; `None` if unknown or expired.
-    pub async fn session(&self, cookie: &str) -> Result<Option<SessionRecord>> {
+    /// The live session for a cookie value, as a request uses it: marks it used now, so the
+    /// idle window starts again. `None` if unknown, expired, or unused for longer than `idle`
+    /// (research 06 T21).
+    pub async fn session_use(
+        &self,
+        cookie: &str,
+        idle: time::Duration,
+    ) -> Result<Option<SessionRecord>> {
         let row = sqlx::query!(
-            "SELECT user_id, data FROM sessions WHERE id = $1 AND expires_at > now()",
-            key(cookie)
+            "UPDATE sessions SET last_seen_at = now()
+              WHERE id = $1 AND expires_at > now()
+                AND last_seen_at > now() - make_interval(secs => $2)
+              RETURNING user_id, data",
+            key(cookie),
+            idle.as_seconds_f64()
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        Ok(row.map(|r| SessionRecord {
+            user_id: r.user_id,
+            data: r.data,
+        }))
+    }
+
+    /// The live session for a cookie value, read without marking it used; `None` if unknown,
+    /// expired, or idle for longer than `idle`. Checks that a session still stands (a live
+    /// socket's recheck) without keeping it alive.
+    pub async fn session(
+        &self,
+        cookie: &str,
+        idle: time::Duration,
+    ) -> Result<Option<SessionRecord>> {
+        let row = sqlx::query!(
+            "SELECT user_id, data FROM sessions
+              WHERE id = $1 AND expires_at > now()
+                AND last_seen_at > now() - make_interval(secs => $2)",
+            key(cookie),
+            idle.as_seconds_f64()
         )
         .fetch_optional(self.pool())
         .await?;
@@ -222,8 +255,92 @@ mod tests {
         let removed = store.cleanup_credentials().await.unwrap();
 
         assert_eq!(removed, 1);
-        assert!(store.session(live.expose()).await.unwrap().is_some());
+        let hour = time::Duration::hours(1);
+        assert!(store.session(live.expose(), hour).await.unwrap().is_some());
         assert!(store.take_session(old.expose()).await.unwrap().is_none());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_idle_session_ends_and_a_used_one_does_not(pool: sqlx::PgPool) {
+        // Research 06 T21: a session unused for the idle window ends even before its absolute
+        // lifetime, and a request keeps it going. A read that is not a request does not.
+        let store = Store {
+            pool: pool.clone(),
+            origin: uuid::Uuid::now_v7(),
+        };
+        let now = OffsetDateTime::now_utc();
+        let data = serde_json::json!({});
+        let idle = time::Duration::hours(1);
+        let long = now + time::Duration::hours(8);
+        let abandoned = store.create_session(None, &data, long).await.unwrap();
+        let used = store.create_session(None, &data, long).await.unwrap();
+        let expired = store
+            .create_session(None, &data, now - time::Duration::minutes(1))
+            .await
+            .unwrap();
+        for (cookie, ago) in [(&abandoned, 120), (&used, 50), (&expired, 1)] {
+            sqlx::query("UPDATE sessions SET last_seen_at = now() - make_interval(mins => $2) WHERE id = $1")
+                .bind(key(cookie.expose()))
+                .bind(ago)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+
+        assert!(
+            store
+                .session(abandoned.expose(), idle)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .session_use(abandoned.expose(), idle)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store.session(used.expose(), idle).await.unwrap().is_some(),
+            "a read"
+        );
+        let last = |cookie: &Secret| {
+            let pool = pool.clone();
+            let id = key(cookie.expose());
+            async move {
+                sqlx::query_scalar::<_, OffsetDateTime>(
+                    "SELECT last_seen_at FROM sessions WHERE id = $1",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let before = last(&used).await;
+        assert!(store.session(used.expose(), idle).await.unwrap().is_some());
+        assert_eq!(
+            last(&used).await,
+            before,
+            "a read does not mark the session used"
+        );
+        assert!(
+            store
+                .session_use(used.expose(), idle)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(last(&used).await > before, "a request does");
+        assert!(
+            store
+                .session_use(expired.expose(), idle)
+                .await
+                .unwrap()
+                .is_none(),
+            "absolute lifetime still applies"
+        );
     }
 
     #[test]

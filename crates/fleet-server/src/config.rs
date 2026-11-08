@@ -810,6 +810,10 @@ pub struct Login {
     /// revoked group membership keeps working.
     #[serde(default = "default_session_minutes")]
     pub session_ttl_minutes: u64,
+    /// How long a session may go unused before it ends, however much of `session_ttl_minutes`
+    /// is left (research 06 T21). A request renews it; an open live socket does not.
+    #[serde(default = "default_session_idle_minutes")]
+    pub session_idle_minutes: u64,
     /// Other hosts this provider's `jwks_uri` may name, besides the issuer's own (research 06
     /// T14). Most providers need none.
     #[serde(default)]
@@ -829,6 +833,12 @@ fn default_group_claims() -> Vec<String> {
 
 fn default_session_minutes() -> u64 {
     8 * 60
+}
+
+/// An hour without a request ends a browser session. Research 06 suggests 8 h idle, but here the
+/// absolute lifetime is 8 h, so that idle timeout would never fire.
+fn default_session_idle_minutes() -> u64 {
+    60
 }
 
 /// One identity-provider group and the role it grants.
@@ -936,6 +946,12 @@ impl Config {
             self.api.api_key_ttl_days > 0,
             "api.api_key_ttl_days must be above 0"
         );
+        if let Some(login) = &self.login {
+            anyhow::ensure!(
+                login.session_idle_minutes > 0,
+                "login.session_idle_minutes must be above 0"
+            );
+        }
         let i = &self.ingest;
         anyhow::ensure!(
             i.telemetry_flush_ms >= 100,

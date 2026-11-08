@@ -676,7 +676,13 @@ async fn without_a_login_the_dashboard_links_to_sign_in_and_with_one_it_signs_ou
     .await;
     let url = stack.config.database.url.as_ref().unwrap().expose();
     let store = fleet_store::Store::connect_lazy(url, fleet_store::PoolOptions::default()).unwrap();
-    assert!(store.session(&cookie).await.unwrap().is_none());
+    assert!(
+        store
+            .session(&cookie, time::Duration::hours(1))
+            .await
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }
