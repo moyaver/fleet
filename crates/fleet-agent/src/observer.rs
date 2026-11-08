@@ -137,7 +137,8 @@ struct Live {
     tailer: Option<LogTailer>,
     scanner: Option<BundleScanner>,
     report: Option<PathBuf>,
-    /// The HTML report the command asked for with `--format html --output`, if any (issue #43).
+    /// The HTML report the command asks for (`--format html` or `html-detailed`): its `--output`,
+    /// or Maestro's default `report.html` in the working directory (issue #43).
     html: Option<PathBuf>,
     /// When Maestro was spawned: a report older than this (less [`MTIME_TOLERANCE`]) is not ours.
     started: SystemTime,
