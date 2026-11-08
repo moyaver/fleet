@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO publisher_trust_policies (project_id, name, issuer, audience,\n                 repository_id, repository_owner_id, trusted_refs, allowed_events, environment,\n                 pr_policy, revoked_at)\n             VALUES ($1, 'release', 'https://issuer.test', 'fleet', '11', '22',\n                     '{refs/heads/main,refs/tags/*}', '{push}', 'prod', 'deny', now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6e249e0b09ce432c6b0f7297ee35c17d35ebfa4f05d9ea07b354ce289d221b88"
+}

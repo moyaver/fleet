@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE retention_classes SET ttl = NULL WHERE project_id = $1 AND class = 'report'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f1b690793f0e1f4ee98eb3628fa3de6e45f59d32c8157c92895dc933150da4f1"
+}

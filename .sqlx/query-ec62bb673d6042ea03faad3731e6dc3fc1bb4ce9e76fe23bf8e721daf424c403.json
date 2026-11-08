@@ -1,0 +1,114 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.slug AS \"project!\", r.id AS agent_run_id, r.agent_version, r.state,\n                      r.started_at, r.last_frame_at,\n                      EXTRACT(EPOCH FROM (now() - r.last_frame_at))::bigint AS \"seconds_since_frame!\",\n                      r.committed_seq,\n                      (SELECT (EXTRACT(EPOCH FROM (e.received_at - e.occurred_at)) * 1000)::bigint\n                         FROM agent_events e\n                        WHERE e.run_day = r.run_day AND e.agent_run_id = r.id\n                        ORDER BY e.seq DESC LIMIT 1) AS newest_event_lag_ms\n                 FROM agent_runs r\n                 JOIN projects p ON p.id = r.project_id\n                WHERE r.state IN ('active', 'detached', 'finalizing')\n                ORDER BY r.last_frame_at ASC, r.id\n                LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "project!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "agent_version"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "last_frame_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "last_frame_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "seconds_since_frame!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "committed_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "committed_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "newest_event_lag_ms",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "ec62bb673d6042ea03faad3731e6dc3fc1bb4ce9e76fe23bf8e721daf424c403"
+}

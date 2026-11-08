@@ -1,0 +1,182 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.id, p.slug AS project, t.name, t.issuer, t.audience, t.repository_id,\n                      t.repository_owner_id, t.trusted_refs, t.allowed_events, t.job_workflow_ref,\n                      t.environment, t.pr_policy, t.created_at, t.revoked_at\n                 FROM publisher_trust_policies t JOIN projects p ON p.id = t.project_id\n                ORDER BY p.slug, t.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "project",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "issuer",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "issuer"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "audience",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "audience"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "repository_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "repository_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "repository_owner_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "repository_owner_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "trusted_refs",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "trusted_refs"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "allowed_events",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "allowed_events"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "job_workflow_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "job_workflow_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "environment",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "environment"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "pr_policy",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "pr_policy"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "revoked_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "revoked_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "c00ae21af64aef6c011096ae52e917eee0c0300ece1e7d3b75045db6a034f7fe"
+}

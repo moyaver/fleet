@@ -136,6 +136,88 @@ fn with_database(base: &str, name: &str) -> Result<String> {
     Ok(url)
 }
 
+/// Binds `user` to `role` on `project` (`None`: every project), as a stored role binding. Tests of
+/// the administration pages use it to have a person with a role of their own.
+///
+/// # Errors
+/// Fails when the database refuses the row (an unknown user, or a role the schema does not name).
+pub async fn seed_role_binding(
+    store: &Store,
+    project: Option<Uuid>,
+    user: Uuid,
+    role: &str,
+) -> Result<()> {
+    sqlx::query("INSERT INTO role_bindings (project_id, user_id, role) VALUES ($1, $2, $3)")
+        .bind(project)
+        .bind(user)
+        .bind(role)
+        .execute(store.pool())
+        .await?;
+    Ok(())
+}
+
+/// Sets the agent version an agent run reported, to show how a version reads on the pages.
+///
+/// # Errors
+/// Fails when the database refuses the change.
+pub async fn seed_agent_version(store: &Store, agent_run: Uuid, version: &str) -> Result<()> {
+    sqlx::query("UPDATE agent_runs SET agent_version = $2 WHERE id = $1")
+        .bind(agent_run)
+        .bind(version)
+        .execute(store.pool())
+        .await?;
+    Ok(())
+}
+
+/// Stores a refused event of an agent run, as ingest does when it refuses one.
+///
+/// # Errors
+/// Fails when the database refuses the row (an unknown run, or a duplicate sequence number).
+pub async fn seed_ingest_rejection(
+    store: &Store,
+    agent_run: Uuid,
+    seq: i64,
+    code: &str,
+    message: &str,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO ingest_rejections (agent_run_id, seq, code, message) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(agent_run)
+    .bind(seq)
+    .bind(code)
+    .bind(message)
+    .execute(store.pool())
+    .await?;
+    Ok(())
+}
+
+/// Stores a loss an agent reported (`journal` or `telemetry`), as ingest does.
+///
+/// # Errors
+/// Fails when the database refuses the row (an unknown run, or an overlapping gap).
+pub async fn seed_ingest_gap(
+    store: &Store,
+    agent_run: Uuid,
+    stream: &str,
+    from_seq: i64,
+    to_seq: i64,
+    reason: &str,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO ingest_gaps (agent_run_id, stream, from_seq, to_seq, reason)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(agent_run)
+    .bind(stream)
+    .bind(from_seq)
+    .bind(to_seq)
+    .bind(reason)
+    .execute(store.pool())
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{TestDatabase, drop_database, fresh_database, with_database};

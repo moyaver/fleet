@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.slug AS \"project!\", g.agent_run_id, g.stream, g.from_seq, g.to_seq,\n                      g.reason, g.recorded_at\n                 FROM ingest_gaps g\n                 JOIN agent_runs r ON r.id = g.agent_run_id\n                 JOIN projects p ON p.id = r.project_id\n                ORDER BY g.recorded_at DESC, g.agent_run_id, g.from_seq DESC\n                LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "project!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "from_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "from_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "to_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "to_seq"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "recorded_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ingest_gaps",
+            "name": "recorded_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3f04ea9e2a807bc56ecd39e2f45397eba60cb83f75cfb96ac51535ebc7c655f6"
+}
