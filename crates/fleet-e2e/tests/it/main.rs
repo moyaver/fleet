@@ -20,5 +20,6 @@ mod network;
 mod publish;
 mod responsive;
 mod scenarios;
+mod step_marks;
 mod support;
 mod xss;
