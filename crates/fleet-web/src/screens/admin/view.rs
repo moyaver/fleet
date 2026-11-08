@@ -11,7 +11,9 @@ use fleet_protocol::rest::admin::{
 use fleet_ui::components::display::{EmptyState, TableBox};
 use leptos::prelude::*;
 
-use super::model::{key_status, lag_text, scope_text, seconds_ago_text, seq_range, ttl_text};
+use super::model::{
+    key_status, lag_text, scope_text, seconds_ago_text, seq_range, source_text, ttl_text,
+};
 use crate::{
     app::ErrorNotice,
     clock::{now_ms, unix_ms, utc_offset_minutes},
@@ -70,6 +72,68 @@ pub fn grid(
         </TableBox>
     }
     .into_any()
+}
+
+/// A table whose last column holds each row's actions (a form or a disclosure), under the
+/// `headers`' last name. `actions` has one entry per row.
+#[must_use]
+pub fn grid_actions(
+    caption: &'static str,
+    headers: &'static [&'static str],
+    rows: Vec<Vec<String>>,
+    actions: Vec<AnyView>,
+) -> AnyView {
+    view! {
+        <TableBox label=caption>
+            <table class="tbl tbl-cards">
+                <caption class="sr-only">{caption}</caption>
+                <thead>
+                    <tr>
+                        {headers
+                            .iter()
+                            .map(|h| view! { <th scope="col">{*h}</th> })
+                            .collect_view()}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows
+                        .into_iter()
+                        .zip(actions)
+                        .map(|(row, action)| {
+                            let last = headers.last().copied().unwrap_or_default();
+                            view! {
+                                <tr>
+                                    {row
+                                        .into_iter()
+                                        .zip(headers.iter())
+                                        .map(|(cell, h)| view! { <td data-label=*h>{cell}</td> })
+                                        .collect_view()}
+                                    <td data-label=last>{action}</td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </tbody>
+            </table>
+        </TableBox>
+    }
+    .into_any()
+}
+
+/// [`grid_actions`], or an empty state saying what would fill the table.
+#[must_use]
+pub fn grid_actions_or_empty(
+    caption: &'static str,
+    headers: &'static [&'static str],
+    rows: Vec<Vec<String>>,
+    actions: Vec<AnyView>,
+    empty: &'static str,
+) -> AnyView {
+    if rows.is_empty() {
+        view! { <EmptyState title=empty /> }.into_any()
+    } else {
+        grid_actions(caption, headers, rows, actions)
+    }
 }
 
 /// A table, or an empty state saying what would fill it.
@@ -165,6 +229,7 @@ pub fn trust_rows(rows: &[AdminTrustPolicyView], ctx: &Ctx) -> Vec<Vec<String>> 
                     "active"
                 }
                 .to_owned(),
+                source_text(&t.source),
                 ctx.time(unix_ms(t.created_at)),
             ]
         })
@@ -220,6 +285,7 @@ pub fn group_rows(rows: &[AdminGroupMappingView]) -> Vec<Vec<String>> {
                 g.group.clone(),
                 scope_text(g.project.as_deref()),
                 g.role.clone(),
+                source_text(&g.source),
             ]
         })
         .collect()
