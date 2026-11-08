@@ -325,6 +325,29 @@ async fn a_device_page_lists_its_flows_with_links_and_leaves_out_the_sensor_it_n
         &format!("{} === {on_device}", count_of(&q("device-flow"))),
     )
     .await;
+    // The newest sample: all nine readings, each with its value or its reason and the Missing mark
+    // beside every reason (PLAN §6.5). The load generator takes no probe, so its readings say so.
+    page.wait(
+        "the newest sample's readings",
+        &format!("{} === 9", count_of(&q("device-reading"))),
+    )
+    .await;
+    page.wait(
+        "every reading shows a value or a reason",
+        &format!(
+            "[...document.querySelectorAll('{}')].every(r => r.querySelector(\"td[data-label='Value']\").textContent.trim() !== '')",
+            q("device-reading")
+        ),
+    )
+    .await;
+    page.wait(
+        "a reading the sample does not take says why",
+        &format!(
+            "[...document.querySelectorAll('{}')].some(r => r.textContent.includes('not read in this sample'))",
+            q("device-reading")
+        ),
+    )
+    .await;
     // AC5: no device reports a temperature (the agent has no thermal collector), so the device
     // page has no chart or tile for it, the same as the runner page.
     assert_eq!(

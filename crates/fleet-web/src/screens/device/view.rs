@@ -21,7 +21,9 @@ use crate::{
     paths::history_href,
     screens::{
         common::Ctx,
-        device::model::{CHARTED, DeviceHeader, ExecutionDetails, FlowRow, FlowRows},
+        device::model::{
+            CHARTED, DeviceHeader, ExecutionDetails, FlowRow, FlowRows, ReadingRow, ReadingsView,
+        },
         metrics::{MetricsPanel, RangeSelection},
         parts::{Fetched, MetricsCharts, Notice, PillView, RangePicker, loaded},
     },
@@ -82,9 +84,11 @@ pub fn DevicePage(
                     |d| {
                         let ctx = ctx.get_untracked();
                         let execution = ExecutionDetails::build(&d, &ctx);
+                        let readings = ReadingsView::build(&d, &ctx);
                         let flows = FlowRows::build(&d, &ctx);
                         view! {
                             <NowCard execution=execution />
+                            <ReadingsSection readings=readings />
                             <FlowsSection flows=flows />
                         }
                             .into_any()
@@ -194,6 +198,67 @@ fn NowCard(
                 <a class="underline" href=job_href>{job_key}</a>
             </p>
         </Card>
+    }
+}
+
+/// The device's newest sample: when it was taken and the shard it ran as, then each reading. A
+/// reading the agent did not take shows its reason, marked as missing.
+#[component]
+fn ReadingsSection(
+    /// The newest sample, if the agent has sampled the device.
+    readings: Option<ReadingsView>,
+) -> impl IntoView {
+    let Some(ReadingsView { taken, shard, rows }) = readings else {
+        return view! {
+            <Card title="Newest sample">
+                <EmptyState title="No sample yet" description="The agent samples a device every 30 seconds while Maestro drives it." />
+            </Card>
+        }
+        .into_any();
+    };
+    let statement = std::iter::once(taken)
+        .chain(shard)
+        .collect::<Vec<_>>()
+        .join(" · ");
+    view! {
+        <Card title="Newest sample">
+            <p class="pv-statement">
+                <ProvenanceBadge provenance=Signal::stored(Provenance::Observed) />
+                <span>{statement}</span>
+            </p>
+            <TableBox label="Readings of the newest sample">
+                <table class="tbl tbl-cards">
+                    <caption class="sr-only">"Readings of the device's newest sample"</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">"Reading"</th>
+                            <th scope="col">"Value"</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows.into_iter().map(reading_row).collect_view()}</tbody>
+                </table>
+            </TableBox>
+        </Card>
+    }
+    .into_any()
+}
+
+fn reading_row(r: ReadingRow) -> impl IntoView {
+    let value = match (r.value, r.reason) {
+        (Some(v), _) => view! { <span>{v}</span> }.into_any(),
+        (None, reason) => view! {
+            <span class="flex flex-wrap items-center gap-2">
+                <RowProvenance provenance=Signal::stored(Provenance::Missing) />
+                <span class="text-muted">{reason.unwrap_or_default()}</span>
+            </span>
+        }
+        .into_any(),
+    };
+    view! {
+        <tr data-testid="device-reading">
+            <td data-label="Reading">{r.label}</td>
+            <td data-label="Value">{value}</td>
+        </tr>
     }
 }
 
