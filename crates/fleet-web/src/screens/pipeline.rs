@@ -29,8 +29,8 @@ use fleet_ui::{
     charts::format::{format_duration, format_timestamp},
     components::{
         display::{
-            EmptyState, OriginBadge, ProvenanceBadge, ReadoutStrip, RowProvenance, Skeleton, StatusPill,
-            TableBox,
+            EmptyState, OriginBadge, ProvenanceBadge, ReadoutStrip, RowProvenance, Skeleton,
+            StatusPill, TableBox,
         },
         live::{Announcements, LiveState},
     },
