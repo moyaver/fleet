@@ -138,7 +138,7 @@ bucket = "fleet-artifacts"          # must already exist
 # credentials: set FLEET_STORAGE__S3__ACCESS_KEY_ID_FILE and FLEET_STORAGE__S3__SECRET_ACCESS_KEY_FILE
 ```
 
-Fleet speaks only the generic S3 API, path-style, with static credentials, so any S3-compatible store works. **Garage** is the reference (the Compose file runs it; its S3 port is `3900` and its credentials are `GARAGE_ACCESS_KEY` and `GARAGE_SECRET_KEY` from `.env`, bucket `fleet-artifacts`, region `garage`). **SeaweedFS** (Apache-2.0) is the alternative if AGPL is unacceptable for the store. Garage is a separate service reached over the network: its AGPL obligations apply to Garage only.
+Fleet speaks only the generic S3 API, path-style, with static credentials, so any S3-compatible store works. **Garage** is the reference (the Compose file runs it; its S3 port is `3900` and its credentials are the key pair in `secrets/s3_access_key_id` and `secrets/s3_secret_access_key` (Docker secrets, read by Fleet through `FLEET_STORAGE__S3__*_FILE`), bucket `fleet-artifacts`, region `garage`). **SeaweedFS** (Apache-2.0) is the alternative if AGPL is unacceptable for the store. Garage is a separate service reached over the network: its AGPL obligations apply to Garage only.
 
 - The bucket needs no versioning. Give it a lifecycle rule that aborts incomplete multipart uploads after a day: an upload cut off mid-way (server restart, client gone) leaves its uploaded parts there until then. Blobs up to 8 MiB are written with one request and never leave parts behind.
 - Fleet makes no request when it starts, so a wrong endpoint or key shows on the first upload, not in `check-config`.
@@ -342,7 +342,7 @@ Do not back up `artifacts.spool_dir` (the `fleet_spool` volume). It holds upload
 
 The secrets a restore needs:
 
-- **`.env`**: `GARAGE_ACCESS_KEY` and `GARAGE_SECRET_KEY` (Fleet's S3 credentials, and the key the bucket is created with) and `GARAGE_RPC_SECRET`. Without them the copied bucket cannot be read.
+- **`secrets/s3_access_key_id` and `secrets/s3_secret_access_key`** (Fleet's S3 credentials, the key the bucket is created with, also in `secrets/garage.env`) and **`secrets/garage_rpc_secret`**. Without them the copied bucket cannot be read.
 - **`secrets/postgres_password` and `secrets/database_url`**: the restored Postgres takes its password from `postgres_password` when its volume is first created, and `database_url` must match it.
 - **`secrets/viewer_token`**: the bearer token for the REST API and CI scripts. Keep it, or every script that uses it breaks.
 - **`secrets/usercontent_key`**: signs links to uploaded files. A new key works but invalidates links in flight (they last `usercontent.link_ttl_seconds`, 5 minutes by default).
@@ -369,8 +369,7 @@ Run this in `deploy/compose`. The server keeps running; the Garage container is 
 
 ```bash
 cd deploy/compose
-set -a; . ./.env; set +a
-export AWS_ACCESS_KEY_ID="$GARAGE_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$GARAGE_SECRET_KEY"
+export AWS_ACCESS_KEY_ID="$(cat secrets/s3_access_key_id)" AWS_SECRET_ACCESS_KEY="$(cat secrets/s3_secret_access_key)"
 BACKUP=/var/backups/fleet/$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$BACKUP/blobs"
 
@@ -393,8 +392,7 @@ Restore into a new stack under its own Compose project name (`-p`), so it gets i
 
 ```bash
 cd deploy/compose
-set -a; . ./.env; set +a
-export AWS_ACCESS_KEY_ID="$GARAGE_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$GARAGE_SECRET_KEY"
+export AWS_ACCESS_KEY_ID="$(cat secrets/s3_access_key_id)" AWS_SECRET_ACCESS_KEY="$(cat secrets/s3_secret_access_key)"
 BACKUP=/var/backups/fleet/20260101T000000Z        # the backup to restore
 
 docker compose -p fleet-restore up -d --wait postgres garage

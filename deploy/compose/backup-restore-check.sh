@@ -21,12 +21,8 @@ DST=${DST_PROJECT:-fleet-backup-dst}
 AWS_IMAGE=amazon/aws-cli:latest
 
 die() { echo "backup-restore-check: $*" >&2; exit 1; }
-[ -f .env ] && [ -f secrets/viewer_token ] && [ -f secrets/database_url ] || die "missing .env or secrets/ (see README.md)"
-set -a
-# shellcheck source=/dev/null
-. ./.env
-set +a
-export AWS_ACCESS_KEY_ID="$GARAGE_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$GARAGE_SECRET_KEY" AWS_DEFAULT_REGION=garage
+[ -f .env ] && [ -f secrets/viewer_token ] && [ -f secrets/database_url ] && [ -f secrets/s3_access_key_id ] || die "missing .env or secrets/ (see README.md)"
+export AWS_ACCESS_KEY_ID="$(cat secrets/s3_access_key_id)" AWS_SECRET_ACCESS_KEY="$(cat secrets/s3_secret_access_key)" AWS_DEFAULT_REGION=garage
 export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 TOKEN=$(cat secrets/viewer_token)
 export TOKEN
