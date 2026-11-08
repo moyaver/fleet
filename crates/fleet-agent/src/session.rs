@@ -81,6 +81,9 @@ pub(crate) struct Flow {
     /// A fully terminal, failure-free `commands.json` waiting for the manifest before it may
     /// claim `passed` (I3).
     pending_pass: Option<String>,
+    /// The `commands_not_final` warning the flow's `commands.json` drew, when it did: the flow was
+    /// cut short, the recorded half of device-loss evidence (issue #145).
+    pub(crate) cut_short: Option<String>,
     /// Which step produced each of the flow's files, once its `commands.json` has commands.
     produced: Produced,
     /// Step-bound files seen before `produced` was known: their step waits for it.
@@ -899,6 +902,12 @@ impl Session {
                     ),
                 };
                 let subject = self.flow_subject_at(idx);
+                let message = format!("{rel} {why}");
+                if code == fleet_core::flaky::CUT_SHORT
+                    && let Some(f) = self.flows.get_mut(idx)
+                {
+                    f.cut_short = Some(message.clone());
+                }
                 self.emit(
                     at,
                     subject,
@@ -906,7 +915,7 @@ impl Session {
                     None,
                     &EventBody::AgentWarning(AgentWarning {
                         code: code.into(),
-                        message: format!("{rel} {why}"),
+                        message,
                     }),
                 );
             }
@@ -1471,6 +1480,7 @@ impl Session {
             failure: None,
             manifest_seen: false,
             pending_pass: None,
+            cut_short: None,
             produced: Produced::Unknown,
             pending_files: Vec::new(),
         });

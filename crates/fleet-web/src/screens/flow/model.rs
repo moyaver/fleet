@@ -1048,6 +1048,10 @@ mod tests {
         let mut v = view();
         v.infrastructure = Some(InfrastructureView {
             evidence: "maestro.android.DeviceServerDiedException".to_owned(),
+            warning: "run/debug/slow/commands.json is incomplete: the flow was cut short"
+                .to_owned(),
+            source: Some("junit_final".to_owned()),
+            finality: "verified".to_owned(),
         });
         let Failure::Failed(f) = FlowPage::build(&v, &ctx()).failure else {
             panic!("the flow failed");

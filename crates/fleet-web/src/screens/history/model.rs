@@ -201,8 +201,9 @@ pub struct HistoryRow {
     pub condition: Option<String>,
     /// The flaky marker, when the flow is judged flaky.
     pub flaky: Option<FlakyBadge>,
-    /// Set when the device was lost during the run, so the failure is the device's (issue #145).
-    pub infrastructure: bool,
+    /// Set when the device was lost during the run, so the failure is the device's (issue #145):
+    /// the label's provenance, which is the failure's.
+    pub infrastructure: Option<Provenance>,
     /// The page address that opens this flow's stats panel.
     pub stats_query: String,
     /// Whether this flow's stats panel is the open one.
@@ -286,7 +287,10 @@ fn row(
             .as_deref()
             .map(|c| c.chars().take(8).collect()),
         flaky: verdict.and_then(|v| badge(v.flakiness)),
-        infrastructure: e.infrastructure.is_some(),
+        infrastructure: e
+            .infrastructure
+            .as_ref()
+            .map(|i| flow_provenance(&i.finality, "failed", None)),
         stats_query: with_query_param(current, STATS_PARAM, Some(&e.flow)),
         stats_open: query_param(current, STATS_PARAM).as_deref() == Some(e.flow.as_str()),
     }
@@ -661,7 +665,7 @@ mod tests {
             })
         );
         assert_eq!(failed.condition.as_deref(), Some("474c43fe"));
-        assert!(!failed.infrastructure, "an assertion is the app's");
+        assert_eq!(failed.infrastructure, None, "an assertion is the app's");
         assert_eq!(passed.failure, None);
         assert_eq!(passed.duration, None, "no duration is not a zero duration");
         assert_eq!(passed.condition, None);
@@ -686,7 +690,9 @@ mod tests {
                  "failure_message": "maestro.android.DeviceServerDiedException: Device server died",
                  "failure_fingerprint": "v1:0123456789abcdef",
                  "condition_fingerprint": null,
-                 "infrastructure": {"evidence": "maestro.android.DeviceServerDiedException"}}
+                 "infrastructure": {"evidence": "maestro.android.DeviceServerDiedException",
+                                    "warning": "run/debug/slow/commands.json is incomplete: the flow was cut short",
+                                    "source": "junit_final", "finality": "verified"}}
             ],
             "next_cursor": null,
             "flows": []
@@ -696,11 +702,48 @@ mod tests {
         let [row] = table.rows.as_slice() else {
             panic!("one row");
         };
-        assert!(row.infrastructure);
+        assert_eq!(
+            row.infrastructure,
+            Some(Provenance::Final),
+            "the label carries the failure's provenance"
+        );
         assert_eq!(
             (row.state.label, row.state.mark),
             ("Failed", Mark::Failed),
             "the label does not change the status"
+        );
+    }
+
+    #[test]
+    fn a_lost_device_label_carries_its_failures_provenance_and_marks_only_an_exception() {
+        // A failure still read from the live console is provisional: the label says so with a mark.
+        let page: HistoryPage = serde_json::from_value(serde_json::json!({
+            "from": "2025-12-02T11:00:00Z",
+            "to": "2026-01-01T11:00:00Z",
+            "items": [
+                {"flow_id": A, "flow": "flows/slow.yaml", "name": "slow",
+                 "attempt_id": C, "repository": "o/r", "commit_sha": null,
+                 "git_ref": null, "state": "failed",
+                 "outcome_source": "process_exit", "finality": "provisional",
+                 "at": "2026-01-01T10:30:00Z", "duration_ms": 37790,
+                 "failure_message": "maestro.android.DeviceServerDiedException: Device server died",
+                 "failure_fingerprint": null, "condition_fingerprint": null,
+                 "infrastructure": {"evidence": "maestro.android.DeviceServerDiedException",
+                                    "warning": "run/debug/slow/commands.json is incomplete: the flow was cut short",
+                                    "source": "process_exit", "finality": "provisional"}}
+            ],
+            "next_cursor": null,
+            "flows": []
+        }))
+        .unwrap();
+        let table = HistoryTable::build(&page, &[], &ctx(), "project=shop");
+        let [row] = table.rows.as_slice() else {
+            panic!("one row");
+        };
+        assert_eq!(row.infrastructure, Some(Provenance::Provisional));
+        assert!(
+            row.infrastructure.is_some_and(Provenance::marks_a_row),
+            "an exception carries its own mark"
         );
     }
 
