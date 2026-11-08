@@ -81,6 +81,48 @@ async fn overflow(page: &Page<'_>, width: u32) -> Option<String> {
     })
 }
 
+/// Single words broken letter by letter. A word of four or more characters with no space in it,
+/// drawn on two or more lines, whose widest line is narrower than four characters of its own font:
+/// the word has been squeezed to its min-content width. `overflow-wrap: anywhere` on a wide element
+/// does that (it lowers min-content to one character), so a table column or a nav link shrinks
+/// until the word breaks per character instead of the box scrolling. Words with spaces are skipped:
+/// the browser breaks those at the spaces first. Visually hidden text is skipped.
+async fn letter_broken_words(page: &Page<'_>) -> Vec<String> {
+    let found = page
+        .eval(
+            r#"const ctx = document.createElement('canvas').getContext('2d');
+               const out = [];
+               for (const el of document.querySelectorAll('body *')) {
+                   if (el.children.length > 0) continue;
+                   const text = (el.textContent || '').trim();
+                   if (text.length < 4 || /\s/.test(text)) continue;
+                   // Visually hidden (sr-only) text is clipped to a pixel; it is not squeezed.
+                   if (el.getBoundingClientRect().width < 2) continue;
+                   const range = document.createRange();
+                   range.selectNodeContents(el);
+                   const boxes = Array.from(range.getClientRects()).filter(r => r.width > 0 && r.height > 0);
+                   const lines = new Set(boxes.map(r => Math.round(r.top))).size;
+                   if (lines < 2) continue;
+                   const widest = Math.max(...boxes.map(r => r.width));
+                   ctx.font = getComputedStyle(el).font;
+                   const natural = ctx.measureText(text).width;
+                   if (widest * text.length < 4 * natural) {
+                       out.push(el.tagName.toLowerCase() + ' "' + text.slice(0, 40) + '" is drawn on '
+                           + lines + ' lines, widest ' + widest.toFixed(1) + ' px of ' + natural.toFixed(1) + ' px');
+                   }
+               }
+               return out.slice(0, 12);"#,
+            vec![],
+        )
+        .await;
+    found
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_str().unwrap().to_owned())
+        .collect()
+}
+
 #[tokio::test]
 async fn every_screen_fits_a_desktop_and_a_phone_without_sideways_page_scroll() {
     let stack = stack(|_| {}).await;
@@ -172,6 +214,9 @@ async fn every_screen_fits_a_desktop_and_a_phone_without_sideways_page_scroll() 
                 .await;
             if let Some(problem) = overflow(&page, width).await {
                 problems.push(format!("{screen}: {problem}"));
+            }
+            for squeezed in letter_broken_words(&page).await {
+                problems.push(format!("{screen} at {width} px: {squeezed}"));
             }
         }
     }
