@@ -63,6 +63,10 @@ const LOG_LINES: &[&str] = &[
     "&lt;b&gt; stays entities",
 ];
 
+/// A logcat line of the failed flow, as the logcat viewer shows it: the logcat prefix, then the
+/// corpus item. Only the logcat carries this prefix with an `<svg` in it.
+const LOGCAT_MARK: &str = "E/AndroidRuntime: <svg onload=\"window.__xss = 1\"></svg>";
+
 /// Branch of run A (a `refs/heads/` name shown by the pipeline header and the history) and tag of
 /// run B (shown the same way by `ref_name`). Git refs have no spaces, so the payloads have none.
 const BRANCH: &str = "refs/heads/feat/<img/src=x/onerror=\"window.__xss = 1\">";
@@ -361,14 +365,17 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
         Screen {
             name: "flow",
             path: format!("/flows/{flow}?project=app"),
+            // The logcat's own line is the one that shows it has loaded: the Maestro log has no
+            // `<svg` after its logcat prefix.
             ready: format!(
-                "{} === 1 && {} >= 2 && {} === 1 && document.body.textContent.includes({})",
+                "{} === 1 && {} >= 2 && {} === 1 && document.body.textContent.includes({}) && document.body.textContent.includes({})",
                 count_of(&q("flow-page")),
                 count_of("[role=treeitem]"),
                 count_of(&q("crash-logcat")),
                 serde_json::to_string(LOG_LINES[0]).unwrap(),
+                serde_json::to_string(LOGCAT_MARK).unwrap(),
             ),
-            shows: flow_shows,
+            shows: [flow_shows, literal_shows()].concat(),
         },
         Screen {
             name: "history",
