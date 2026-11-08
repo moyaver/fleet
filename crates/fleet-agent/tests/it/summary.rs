@@ -43,6 +43,10 @@ fn the_summary_lists_counts_and_failed_flows_and_maestro_is_unchanged() {
         "{summary}"
     );
     assert!(
+        !summary.contains("/api/v1/flows/"),
+        "no server, no link to a flow: {summary}"
+    );
+    assert!(
         !summary.contains("| alpha |"),
         "passed flows are counted, not listed: {summary}"
     );
@@ -73,8 +77,46 @@ fn a_configured_server_adds_a_link_to_its_dashboard() {
         "{summary}"
     );
     assert!(
-        summary.contains("| fail | failed | verified (junit_final) |"),
-        "{summary}"
+        summary.contains(&format!("| [fail](http://{closed}/api/v1/flows/")),
+        "the failed flow links to its screen D: {summary}"
+    );
+}
+
+/// Issue #71: with a server, each flow that did not pass links to its screen D through the
+/// server's `flows/{id}/page` redirect, which names the project. Passed flows are not listed.
+#[test]
+fn a_configured_server_links_each_failed_flow_to_its_screen_d() {
+    let closed = TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let path = summary_path("flow-links");
+    let server = format!("http://{closed}");
+    let (out, _, _) = run_agent(
+        "suite",
+        Some(&server),
+        &[],
+        &[("GITHUB_STEP_SUMMARY", path.to_str().unwrap())],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let summary = fs::read_to_string(&path).expect("the summary is written");
+    let prefix = format!("| [delta-fails](http://{closed}/api/v1/flows/");
+    let row = summary
+        .lines()
+        .find(|l| l.starts_with(&prefix))
+        .unwrap_or_else(|| panic!("no linked row for delta-fails: {summary}"));
+    let id = row[prefix.len()..].split('/').next().unwrap_or_default();
+    assert!(
+        uuid::Uuid::parse_str(id).is_ok(),
+        "the link names the flow execution: {row}"
+    );
+    assert!(
+        row.ends_with("/page) | failed | verified (junit_final) | Assertion is false: \"Fleet never shows this\" is visible |"),
+        "{row}"
+    );
+    assert!(
+        !summary.contains("[alpha]"),
+        "passed flows are not linked: {summary}"
     );
 }
 

@@ -39,6 +39,9 @@ use crate::{
 /// One flow in the result.
 #[derive(Debug, Clone, Serialize)]
 pub struct FlowResult {
+    /// The flow execution's ID, which the dashboard's screen D is addressed by. Not printed.
+    #[serde(skip)]
+    pub(crate) id: Uuid,
     /// 1-based shard.
     pub shard: u32,
     /// Flow name.
@@ -192,6 +195,7 @@ pub(crate) fn flow_results(session: &Session) -> Vec<FlowResult> {
             } == Some(Exclusion::Infrastructure)
                 && f.cut_short.is_some();
             FlowResult {
+                id: f.id,
                 shard: f.shard,
                 name: f.name,
                 path: f.path,
@@ -223,10 +227,12 @@ fn reason_of(f: &FlowResult) -> String {
 /// Most flows the job summary lists; the rest are counted, not listed.
 const SUMMARY_ROWS: usize = 50;
 
-/// The job summary: Markdown for `GITHUB_STEP_SUMMARY`. It has the outcome counts, the flows that
-/// did not pass with their provenance and reason, and a link to the dashboard when there is one.
+/// The job summary: Markdown for `GITHUB_STEP_SUMMARY`. It has the outcome counts and the flows
+/// that did not pass with their provenance and reason. With a server (`server`, its address ending
+/// in `/`), each flow links to its screen D through the server's `flows/{id}/page` redirect, and
+/// the summary links to the dashboard.
 #[must_use]
-pub(crate) fn job_summary(flows: &[FlowResult], dashboard: Option<&str>) -> String {
+pub(crate) fn job_summary(flows: &[FlowResult], server: Option<&str>) -> String {
     use std::fmt::Write as _;
     let mut out = String::from("## Fleet\n\n");
     if flows.is_empty() {
@@ -255,10 +261,19 @@ pub(crate) fn job_summary(flows: &[FlowResult], dashboard: Option<&str>) -> Stri
                 Some(source) => format!("{} ({source})", f.finality),
                 None => f.finality.clone(),
             };
+            let name = table_cell(&f.name, 80);
+            let name = match server {
+                Some(server) => format!(
+                    "[{}]({server}api/v1/flows/{}/page)",
+                    name.replace('[', "\\[").replace(']', "\\]"),
+                    f.id
+                ),
+                None => name,
+            };
             let _ = writeln!(
                 out,
                 "| {} | {} | {} | {} |",
-                table_cell(&f.name, 80),
+                name,
                 f.outcome,
                 provenance,
                 table_cell(&reason_of(f), 200),
@@ -268,8 +283,8 @@ pub(crate) fn job_summary(flows: &[FlowResult], dashboard: Option<&str>) -> Stri
             let _ = writeln!(out, "\n{} more not listed.", open.len() - SUMMARY_ROWS);
         }
     }
-    if let Some(url) = dashboard {
-        let _ = writeln!(out, "\n[Open the Fleet dashboard]({url})");
+    if let Some(server) = server {
+        let _ = writeln!(out, "\n[Open the Fleet dashboard]({server})");
     }
     out
 }
