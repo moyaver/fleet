@@ -389,6 +389,15 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     ordinal: f,
                 }),
             );
+            // A failing flow fails its last step, as the scripted failure does.
+            let fail = fails(i, d, f);
+            let status = |s: u32| {
+                if fail && s + 1 == steps {
+                    StepStatus::Failed
+                } else {
+                    StepStatus::Completed
+                }
+            };
             for s in 0..steps {
                 let step = Subject {
                     step: Some(StepRef { index: s }),
@@ -408,12 +417,11 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     step,
                     SourceKind::DebugLog,
                     &EventBody::StepEnded(StepEnded {
-                        status: StepStatus::Completed,
+                        status: status(s),
                         timing: None,
                     }),
                 );
             }
-            let fail = fails(i, d, f);
             failed += u32::from(fail);
             push(
                 flow.clone(),
@@ -429,6 +437,20 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     flow: None,
                 }),
             );
+            // The final commands.json settles every step the log reported (issue #148).
+            for s in 0..steps {
+                push(
+                    Subject {
+                        step: Some(StepRef { index: s }),
+                        ..flow.clone()
+                    },
+                    SourceKind::ArtifactFile,
+                    &EventBody::StepEnded(StepEnded {
+                        status: status(s),
+                        timing: None,
+                    }),
+                );
+            }
             flow_ends.push(pushed.get());
             flow_ids.push((flow, name, d, f, fail));
         }
@@ -851,10 +873,17 @@ mod tests {
         // AfterFlows(0) is no stop; the others come out in script order.
         assert_eq!(at.len(), 2);
         assert!(at[0] < at[1]);
+        // The third flow's steps are settled from its final file before the hold (issue #148),
+        // so the hold comes after its last settle.
         assert_eq!(
             s.events[at[0] - 1].kind,
-            "flow.ended",
-            "after the third flow ended"
+            "step.ended",
+            "after the third flow's last settle"
+        );
+        assert_eq!(
+            s.events[at[0] - 1].src.kind,
+            SourceKind::ArtifactFile,
+            "the settle comes from the final file"
         );
         assert_eq!(s.events[at[1]].kind, "process.exited", "before the exit");
         assert_eq!(
