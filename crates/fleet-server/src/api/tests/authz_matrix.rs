@@ -81,6 +81,8 @@ fn class_of(route: &str) -> Option<Class> {
         "/api/v1/plans" => Class::Agent,
         "/api/v1/projects/{project}/failures/{fingerprint}/triage" => Class::ProjectTriage,
         "/api/v1/flows/{execution_id}/page" => Class::FlowPage,
+        // The rerun manifest (#82): a download a project reader gets, as the project's screens.
+        "/api/v1/projects/{project}/attempts/{attempt}/failed-flows" => Class::ProjectRead,
         "/api/v1/openapi.json"
         | "/livez"
         | "/readyz"
@@ -209,6 +211,9 @@ async fn seed(rig: &Rig) -> Ids {
     let login = agent.flow_started(&shard, "login", 0);
     agent.step(&login, 0, "Launch app", StepStatus::Completed);
     agent.flow_ended(&login, FlowOutcome::Passed, None);
+    // A failed flow, so the rerun manifest (#82) has something to answer with.
+    let checkout = agent.flow_started(&shard, "checkout", 1);
+    agent.flow_ended(&checkout, FlowOutcome::Failed, Some("Element not found"));
     let at = OffsetDateTime::now_utc() - Duration::minutes(1);
     rig.publish(&mut agent, vec![telemetry(1, vec![sample(at, 10.0)])])
         .await;

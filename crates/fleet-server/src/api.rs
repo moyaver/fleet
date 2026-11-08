@@ -10,6 +10,7 @@ mod compare;
 mod history;
 pub(crate) mod live_ws;
 mod metrics;
+mod rerun;
 mod screens;
 mod triage;
 
@@ -221,6 +222,10 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/projects/{project}/flows/{execution_id}/artifacts",
             get(crate::artifacts::list::flow_artifacts),
+        )
+        .route(
+            "/api/v1/projects/{project}/attempts/{attempt}/failed-flows",
+            get(rerun::failed_flows),
         )
         .route("/api/v1/projects/{project}/history", get(history::history))
         .route("/api/v1/projects/{project}/compare", get(compare::compare))

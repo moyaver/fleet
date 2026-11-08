@@ -11,8 +11,8 @@ use fleet_protocol::{
     event::{
         EventBody, ExitClass, FailureInfo, FlowEnded, FlowOutcome, FlowRef, FlowReported,
         FlowStarted, JunitTestcase, MatchMethod, PlanAssigned, ProcessExited, ReportParsed,
-        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
-        StepStatus, SuiteStarted,
+        ReportStatus, Reproduction, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded,
+        StepStarted, StepStatus, SuiteStarted,
     },
     frame::{
         AgentInfo, BatchRequest, BatchResponse, CiContext, CiProvider, ClientFrame, Hello,
@@ -373,14 +373,42 @@ impl Agent {
     }
 
     pub(super) fn started(&mut self) {
+        self.started_with(&["maestro", "test"], None);
+    }
+
+    /// The run start with its command line and the rerun words the agent built from it (#82).
+    pub(super) fn started_with(&mut self, argv: &[&str], reproduction: Option<Reproduction>) {
         self.push(
             Subject::default(),
             SourceKind::AgentObserved,
             &EventBody::RunStarted(RunStarted {
-                argv: vec!["maestro".into(), "test".into()],
+                argv: argv.iter().map(|a| (*a).into()).collect(),
                 agent_version: "0.0.0".into(),
-                reproduction: None,
+                reproduction,
                 evidence: None,
+            }),
+        );
+    }
+
+    /// A flow that ended without ever starting, with no path: nothing in the run names its file.
+    pub(super) fn flow_ended_without_path(&mut self, shard: &Subject, name: &str) {
+        let subject = Subject {
+            flow_execution_id: Some(Uuid::now_v7()),
+            ..shard.clone()
+        };
+        self.push(
+            subject,
+            SourceKind::LiveConsole,
+            &EventBody::FlowEnded(FlowEnded {
+                outcome: FlowOutcome::Failed,
+                duration_ms: Some(self.flow_ms),
+                failure: Some(FailureInfo {
+                    message: "boom".into(),
+                }),
+                flow: Some(FlowRef {
+                    name: name.into(),
+                    path: None,
+                }),
             }),
         );
     }
