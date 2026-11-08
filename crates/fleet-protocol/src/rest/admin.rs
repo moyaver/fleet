@@ -21,6 +21,9 @@ pub struct AdminProjectView {
     pub slug: String,
     /// Display name.
     pub name: String,
+    /// Who created it: `config` (the configuration names it, so it is not renamed here) or
+    /// `dashboard`.
+    pub source: String,
     /// The branch treated as the default.
     pub default_branch: String,
     /// When it was created.
@@ -215,6 +218,64 @@ pub struct AdminSettingView {
     /// Where it comes from: `config` (the running configuration), or `agent` (built into
     /// `fleet-agent`, not a server setting).
     pub source: String,
+}
+
+/// One artifact class of one project, as the upload policy applies it: the configured value, or
+/// the project's override where it has one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdminArtifactClassView {
+    /// The project's slug.
+    pub project: String,
+    /// The artifact class.
+    pub class: String,
+    /// Whether the project accepts it.
+    pub accepted: bool,
+    /// The largest file it accepts, in bytes: the lower of the override and the configured cap.
+    pub max_bytes: i64,
+    /// The configured cap (`artifacts.max_bytes.*`), which an override cannot exceed.
+    pub configured_max_bytes: i64,
+    /// Whether the project overrides the configuration for this class.
+    pub overridden: bool,
+}
+
+/// One project's limits and metric collection, each with the value in force and whether the
+/// project overrides the configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one overridden flag beside each of the four settings the page shows"
+)]
+pub struct AdminProjectLimitsView {
+    /// The project's slug.
+    pub project: String,
+    /// Most bytes it may declare in 24 hours (at most `artifacts.max_project_bytes_per_day`).
+    pub bytes_per_day: i64,
+    /// Whether `bytes_per_day` is the project's own.
+    pub bytes_per_day_overridden: bool,
+    /// Most files it may declare in 24 hours (at most `artifacts.max_project_files_per_day`).
+    pub files_per_day: i64,
+    /// Whether `files_per_day` is the project's own.
+    pub files_per_day_overridden: bool,
+    /// Metric sampling interval while the host is calm, in milliseconds (5 000 by default).
+    pub sample_interval_ms: i64,
+    /// Whether `sample_interval_ms` is the project's own.
+    pub sample_interval_overridden: bool,
+    /// Metric sampling interval under host pressure, in milliseconds (15 000 by default).
+    pub pressure_sample_interval_ms: i64,
+    /// Whether `pressure_sample_interval_ms` is the project's own.
+    pub pressure_sample_interval_overridden: bool,
+}
+
+/// The per-project policy: every project's artifact classes and limits, as they apply now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdminProjectPolicyView {
+    /// Each project's artifact classes (one row per project and class).
+    pub classes: Vec<AdminArtifactClassView>,
+    /// Each project's daily quota and metric collection.
+    pub projects: Vec<AdminProjectLimitsView>,
 }
 
 /// The retention page: each project's classes, and the server's retention windows.

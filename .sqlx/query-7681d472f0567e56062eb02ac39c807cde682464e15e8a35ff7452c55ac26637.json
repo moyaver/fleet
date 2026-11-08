@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE retention_classes SET ttl = make_interval(days => $3)\n              WHERE project_id = $1 AND class = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7681d472f0567e56062eb02ac39c807cde682464e15e8a35ff7452c55ac26637"
+}

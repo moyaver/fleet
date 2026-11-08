@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM project_artifact_classes WHERE project_id = $1 AND class = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e44fe29427378b726b7419651c9fe19e38a182107dddff5c8b1afc134a4e75eb"
+}

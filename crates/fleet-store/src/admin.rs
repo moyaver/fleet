@@ -11,6 +11,7 @@
 //! hash (invariant I6). Audit history is paged newest first with a keyset cursor, so a page is
 //! stable while new events arrive.
 
+pub mod policy;
 pub mod write;
 
 use base64::Engine as _;
@@ -80,7 +81,7 @@ impl Store {
     /// Every project, by slug, with what is attached to it.
     pub async fn admin_projects(&self) -> Result<Vec<AdminProjectView>> {
         let rows = sqlx::query!(
-            r#"SELECT p.id, p.slug, p.name, p.default_branch, p.created_at, p.archived_at,
+            r#"SELECT p.id, p.slug, p.name, p.source, p.default_branch, p.created_at, p.archived_at,
                       (SELECT count(*) FROM api_keys k
                         WHERE k.project_id = p.id AND k.revoked_at IS NULL
                           AND (k.expires_at IS NULL OR k.expires_at > now())) AS "active_api_keys!",
@@ -96,6 +97,7 @@ impl Store {
                 id: r.id,
                 slug: r.slug,
                 name: r.name,
+                source: r.source,
                 default_branch: r.default_branch,
                 created_at: r.created_at,
                 archived_at: r.archived_at,

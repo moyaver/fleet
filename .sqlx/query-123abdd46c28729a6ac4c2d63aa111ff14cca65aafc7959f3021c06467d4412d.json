@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT accepted, max_bytes FROM project_artifact_classes\n              WHERE project_id = $1 AND class = $2 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "accepted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "project_artifact_classes",
+            "name": "accepted"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "max_bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "project_artifact_classes",
+            "name": "max_bytes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "123abdd46c28729a6ac4c2d63aa111ff14cca65aafc7959f3021c06467d4412d"
+}

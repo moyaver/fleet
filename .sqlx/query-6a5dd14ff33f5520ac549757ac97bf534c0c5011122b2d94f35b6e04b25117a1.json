@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, slug, artifact_bytes_per_day, artifact_files_per_day,\n                    sample_interval_ms, pressure_sample_interval_ms\n               FROM projects ORDER BY slug",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "artifact_bytes_per_day",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "artifact_bytes_per_day"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "artifact_files_per_day",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "artifact_files_per_day"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "sample_interval_ms",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "sample_interval_ms"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "pressure_sample_interval_ms",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "pressure_sample_interval_ms"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6a5dd14ff33f5520ac549757ac97bf534c0c5011122b2d94f35b6e04b25117a1"
+}

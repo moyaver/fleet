@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXTRACT(EPOCH FROM ttl)::bigint AS ttl_seconds\n               FROM retention_classes WHERE project_id = $1 AND class = $2 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ttl_seconds",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5a23c72317b48464d23f0bf3f01376a09039a254b1d9cc1c755320c711cc5171"
+}
