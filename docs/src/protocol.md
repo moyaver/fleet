@@ -7,6 +7,7 @@ The agent ↔ server wire protocol ([ADR-0005](https://github.com/moyaver/fleet/
 - **WebSocket** `GET /api/v1/agent/ws`, subprotocol `fleet.v1+json`, `Authorization: Bearer <API key or agent token>`. One JSON object per text frame, tagged by `op`.
 - **HTTPS batch** `POST /api/v1/agent/batch` for networks that block WebSockets: `{hello, events, telemetry}` in, `{frames}` out (the frames a socket would have carried).
 - **Credentials** `POST /api/v1/agent/token`: `{id_token}` (a CI OIDC token) or an API key as the bearer, out comes a short-lived agent token.
+- **Browser live socket** `GET /api/v1/live`, for the dashboard only: [described below](#live-socket).
 
 ## Artifact uploads
 
@@ -34,3 +35,35 @@ The agent journals the outcome in its own event stream: `artifact.uploaded` (`cl
 Gaps are never silent: lost prefixes and `journal.gap` events are stored as gaps and shown as missing evidence.
 
 The agent's outbox is bounded (a 64 MiB spool, a small in-memory window). If it runs out of room it stops storing event bodies but keeps their `seq` numbers: the dropped events leave a hole, and the next event it stores (or the end of the run) is preceded by a `journal.gap` sequenced in that hole, at `seq == to_seq`. Its `from_seq..=to_seq` cover the dropped events and the marker's own slot. The server accepts such a marker when `from_seq` is the next `seq` it expects and advances past the hole; any other skip is still a `seq_gap`. So `seq` is gap-free except for holes a `journal.gap` covers, and the numbers in a gap are the same ones the agent's `journal.jsonl` and the stored events carry.
+
+## Live socket
+
+The dashboard follows its data over `GET /api/v1/live` (a browser session, or a viewer token). One socket carries every subscription of the page that opened it, and the dashboard keeps one socket for the whole app. Every JSON text frame is tagged by `op`. Frames are JSON objects, and a frame that a client cannot read is skipped, so a server can add frames and fields without breaking an older dashboard.
+
+**Requests** (client to server):
+
+- `{"op":"subscribe","id"?,"project":"<slug>","attempt"?:"<uuid>"}` subscribes to a project's changes, and to one attempt's snapshot when `attempt` is given. The socket answers with that attempt's `snapshot` (when asked), then `subscribed`, then deltas.
+- `{"op":"unsubscribe","id":"<key>"}` stops one subscription. The socket answers `unsubscribed` under the same key, and no frame of that key follows.
+
+`id` is the key the subscription is known by on this socket: the id the client chose (at most 64 bytes, not empty). A subscribe without an `id` is keyed by its topic: `<slug>` for a project, `<slug>/<attempt>` for an attempt. Keys and ids share one namespace, and a subscribe under a key the socket already holds replaces that subscription and sends a fresh snapshot. A socket holds at most 32 subscriptions. A client that sends one subscribe and nothing else still works: its frames carry the topic key as `sub`, which it may ignore.
+
+**Frames** (server to client): every frame of a subscription carries its key as `sub`, and a frame that answers no subscription (a request the socket could not read) has none.
+
+| `op` | Meaning |
+|---|---|
+| `subscribed` | The subscription is live; `project_id` names the project. |
+| `snapshot` | The attempt's full state at `snapshot.attempt.version`. |
+| `delta` | The entities that changed at `version`. Apply it only when `version` is the last applied version plus one; on a gap, subscribe again under the same key. |
+| `liveness` | A run's liveness crossed a threshold (display only, not versioned). |
+| `samples` | Telemetry was committed for the project: runners' host and device samples changed. Carries no state; re-read what the page shows. |
+| `resync` | The subscriber fell behind: subscribe again under the same key. |
+| `unsubscribed` | The subscription was removed at the client's request. |
+| `error` | A request was refused, with `message`. A refused subscription is refused alone: the socket and the other subscriptions stay open. |
+
+A project subscription receives every frame of its project. An attempt subscription receives its own attempt's deltas past its snapshot and its own liveness, plus the frames that apply to the whole socket (`resync`, `error`); it does not receive `samples`.
+
+**Authorization.** Each subscribe is authorized on its own, with the same rule as before: the caller needs read access to the project (`ReadRuns`), and a project the caller cannot read answers `no such project <slug>`, the same answer as a missing one. The socket closes when its browser sign-in ends (within `api.session_recheck_ms`), when the server shuts down (1012), or when the client closes it. The `Origin` must be the dashboard's own.
+
+**Limits.** A client message is at most 16 KiB. A socket holds at most 32 subscriptions. Upgrades are limited per viewer credential (`rate_limits.viewer_requests_per_minute`).
+
+The agent never uses this socket: it writes through `/api/v1/agent/ws` and `/api/v1/agent/batch`.
