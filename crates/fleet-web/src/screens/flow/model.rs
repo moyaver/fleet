@@ -148,6 +148,9 @@ pub struct StepsSection {
     pub note: Option<&'static str>,
     /// How the steps are known: observed once the flow has ended, provisional while it runs.
     pub provenance: Provenance,
+    /// Set when the steps could not all be lined up with the flow's `commands.json`, or the file
+    /// disagrees with the log on a step (issue #148). One line each.
+    pub warnings: Vec<&'static str>,
 }
 
 /// The step a running flow is on.
@@ -598,7 +601,25 @@ fn steps(
         } else {
             Provenance::Provisional
         }),
+        warnings: step_warnings(&view.step_warnings),
     }
+}
+
+/// What to say about the step alignment warnings a flow's final file raised (issue #148).
+fn step_warnings(codes: &[String]) -> Vec<&'static str> {
+    let has = |code: &str| codes.iter().any(|c| c == code);
+    let mut out = Vec::new();
+    if has("steps_not_aligned") {
+        out.push(
+            "Some steps could not be matched to the flow's commands.json, so they stay provisional.",
+        );
+    }
+    if has("step_status_disagrees") {
+        out.push(
+            "The log and commands.json disagree on a step's status; the file's status is shown.",
+        );
+    }
+    out
 }
 
 /// How far a provenance can be relied on, lowest first: a section takes its weakest row's.
@@ -859,6 +880,23 @@ mod tests {
                 "Two parsed sources disagree about this flow: possible Maestro compatibility problem"
             )
         );
+    }
+
+    /// The steps section says what its file could not line up, one line per code (issue #148).
+    #[test]
+    fn the_steps_section_names_each_alignment_warning_its_file_raised() {
+        assert_eq!(page().steps.warnings, Vec::<&str>::new());
+        let mut v = view();
+        v.step_warnings = vec!["step_status_disagrees".into()];
+        assert_eq!(
+            FlowPage::build(&v, &ctx()).steps.warnings,
+            ["The log and commands.json disagree on a step's status; the file's status is shown."]
+        );
+        v.step_warnings = vec!["steps_not_aligned".into(), "step_status_disagrees".into()];
+        let warnings = FlowPage::build(&v, &ctx()).steps.warnings;
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings[0].contains("could not be matched to the flow's commands.json"));
+        assert!(warnings[1].contains("disagree"));
     }
 
     #[test]

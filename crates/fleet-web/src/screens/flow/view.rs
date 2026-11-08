@@ -432,6 +432,7 @@ fn StepsPane(
         summary,
         note,
         provenance,
+        warnings,
     } = steps;
     view! {
         <section class="card flow-steps" aria-labelledby="st-h">
@@ -441,6 +442,10 @@ fn StepsPane(
                 <ProvenanceBadge provenance=Signal::stored(provenance) />
             </div>
             {note.map(|n| view! { <p class="mb-2 text-xs text-muted">{n}</p> })}
+            {warnings
+                .into_iter()
+                .map(|w| view! { <Notice tone=Tone::Warning text=w /> })
+                .collect_view()}
             <button
                 type="button"
                 class="only-phone min-h-11 text-sm underline"
