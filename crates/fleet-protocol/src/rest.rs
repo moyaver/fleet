@@ -769,6 +769,21 @@ pub struct ArtifactListView {
     pub usercontent_url: Option<String>,
 }
 
+/// How to rerun one flow from its run's command line (issue #82). Built on the server from the
+/// run's redacted command and the flow's own path: `command` is a shell line a user can copy.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct ReproCommandView {
+    /// The copyable command, or `None` when a safe one can't be given.
+    pub command: Option<String>,
+    /// Why there is no command.
+    pub unavailable: Option<String>,
+    /// Flags left out of the command, by name (an env flag with its key). Their values are never
+    /// shown; a `[REDACTED]` env value is a placeholder to fill in.
+    #[serde(default)]
+    pub left_out: Vec<String>,
+}
+
 /// Screen D: everything about one flow execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -809,6 +824,9 @@ pub struct FlowDetailView {
     /// steps lined up.
     #[serde(default)]
     pub step_warnings: Vec<String>,
+    /// How to rerun this flow (issue #82). Absent from older servers: then there is no command.
+    #[serde(default)]
+    pub reproduction: ReproCommandView,
     /// Up to 10 earlier executions of the same flow, newest first.
     pub previous: Vec<PreviousExecutionView>,
     /// Related artifacts that are available; [`ArtifactListView`] has their links.

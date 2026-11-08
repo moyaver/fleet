@@ -11,6 +11,7 @@
 //! - [`flaky`]: flaky v1 classification over a run history (ADR-0009).
 //! - [`trust`]: publisher trust policies for CI OIDC identities (ADR-0008).
 //! - [`plan`]: what an equal-count split of a plan would have produced (ADR-0013, #81).
+//! - [`reproduce`]: the rerun command of a flow and the manifest of a run's failed flows (#82).
 #![warn(
     clippy::indexing_slicing,
     clippy::string_slice,
@@ -27,4 +28,5 @@ pub mod plan;
 pub mod policy;
 pub mod reconcile;
 pub mod redact;
+pub mod reproduce;
 pub mod trust;

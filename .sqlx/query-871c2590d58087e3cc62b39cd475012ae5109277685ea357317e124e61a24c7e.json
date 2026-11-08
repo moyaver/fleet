@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT f.id AS flow_id, coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.flow_name AS name,\n                    f.pipeline_attempt_id AS attempt_id, pr.repository, pr.commit_sha, pr.git_ref,\n                    f.state, f.outcome_source::text AS outcome_source,\n                    f.finality::text AS \"finality!\",\n                    coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,\n                    ff.fingerprint AS \"failure_fingerprint?\",\n                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,\n                    f.cut_short AS \"cut_short?\"\n               FROM flow_executions f\n               JOIN agent_runs r ON r.id = f.agent_run_id\n               JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n               JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n               LEFT JOIN failure_fingerprints ff ON ff.flow_execution_id = f.id\n               LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n              WHERE f.project_id = $1\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(f.ended_at, f.started_at) >= $2\n                AND coalesce(f.ended_at, f.started_at) < $3\n                AND ($4::text IS NULL\n                     OR strpos(lower(coalesce(d.repo_path, f.flow_name)), lower($4)) > 0\n                     OR strpos(lower(f.flow_name), lower($4)) > 0)\n                AND ($5::text IS NULL OR pr.git_ref IN ($5, 'refs/heads/' || $5))\n                AND ($6::text IS NULL OR f.state = $6)\n                AND ($7::timestamptz IS NULL\n                     OR (coalesce(f.ended_at, f.started_at), f.id) < ($7, $8))\n              ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC\n              LIMIT $9",
+  "query": "SELECT f.id AS flow_id, coalesce(d.repo_path, f.flow_name) AS \"flow!\", f.flow_name AS name,\n                    f.pipeline_attempt_id AS attempt_id, pr.repository, pr.commit_sha, pr.git_ref,\n                    f.state, f.outcome_source::text AS outcome_source,\n                    f.finality::text AS \"finality!\",\n                    coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,\n                    ff.fingerprint AS \"failure_fingerprint?\",\n                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin,\n                    f.cut_short AS \"cut_short?\",\n                    f.flow_path, r.reproduction AS \"reproduction?: serde_json::Value\"\n               FROM flow_executions f\n               JOIN agent_runs r ON r.id = f.agent_run_id\n               JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id\n               JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id\n               LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n               LEFT JOIN failure_fingerprints ff ON ff.flow_execution_id = f.id\n               LEFT JOIN condition_fingerprints c ON c.id = f.condition_fingerprint_id\n              WHERE f.project_id = $1\n                AND f.state NOT IN ('pending', 'running')\n                AND coalesce(f.ended_at, f.started_at) >= $2\n                AND coalesce(f.ended_at, f.started_at) < $3\n                AND ($4::text IS NULL\n                     OR strpos(lower(coalesce(d.repo_path, f.flow_name)), lower($4)) > 0\n                     OR strpos(lower(f.flow_name), lower($4)) > 0)\n                AND ($5::text IS NULL OR pr.git_ref IN ($5, 'refs/heads/' || $5))\n                AND ($6::text IS NULL OR f.state = $6)\n                AND ($7::timestamptz IS NULL\n                     OR (coalesce(f.ended_at, f.started_at), f.id) < ($7, $8))\n              ORDER BY coalesce(f.ended_at, f.started_at) DESC, f.id DESC\n              LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -164,6 +164,28 @@
             "name": "cut_short"
           }
         }
+      },
+      {
+        "ordinal": 17,
+        "name": "flow_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_path"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "reproduction?: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "reproduction"
+          }
+        }
       }
     ],
     "parameters": {
@@ -196,8 +218,10 @@
       false,
       null,
       false,
+      true,
+      true,
       true
     ]
   },
-  "hash": "03bd25c8c13ad8419197ad96dc7519851719c539b4432df0002b9b61c3e9fe5a"
+  "hash": "871c2590d58087e3cc62b39cd475012ae5109277685ea357317e124e61a24c7e"
 }

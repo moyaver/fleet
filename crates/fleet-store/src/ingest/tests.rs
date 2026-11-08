@@ -2055,6 +2055,7 @@ async fn device_lost_run(store: &Store, a: &mut Agent, p: &Publisher) -> Uuid {
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
                 evidence: None,
+                reproduction: None,
             }),
         ),
         a.event(
@@ -2266,6 +2267,7 @@ async fn run_with_an_open_flow(
                 argv: vec!["maestro".into(), "test".into()],
                 agent_version: "0.0.0".into(),
                 evidence: None,
+                reproduction: None,
             }),
         ),
         a.event(

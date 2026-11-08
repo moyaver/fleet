@@ -250,14 +250,18 @@ impl<'a> Ctx<'a> {
         b: &RunStarted,
     ) -> Result<Effect, sqlx::Error> {
         sqlx::query!(
-            "UPDATE agent_runs SET argv = $2, agent_version = $3, evidence = $4, rev = rev + 1
+            "UPDATE agent_runs SET argv = $2, agent_version = $3, evidence = $4, reproduction = $5,
+                                   rev = rev + 1
              WHERE id = $1",
             self.run.agent_run_id,
             serde_json::to_value(&b.argv).unwrap_or_default(),
             b.agent_version,
             b.evidence
                 .as_ref()
-                .and_then(|e| serde_json::to_value(e).ok())
+                .and_then(|e| serde_json::to_value(e).ok()),
+            b.reproduction
+                .as_ref()
+                .and_then(|r| serde_json::to_value(r).ok())
         )
         .execute(&mut *tx)
         .await?;

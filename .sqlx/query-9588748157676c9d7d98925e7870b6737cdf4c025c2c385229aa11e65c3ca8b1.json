@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.agent_run_id, f.flow_path, f.flow_name\n               FROM flow_executions f\n               JOIN agent_runs r ON r.id = f.agent_run_id\n              WHERE f.project_id = $1 AND f.pipeline_attempt_id = $2 AND f.state = 'failed'\n              ORDER BY r.started_at, r.id, f.shard_number NULLS LAST, f.ordinal NULLS LAST,\n                       f.started_at NULLS LAST, f.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "agent_run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "agent_run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "flow_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_path"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "flow_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "flow_name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "9588748157676c9d7d98925e7870b6737cdf4c025c2c385229aa11e65c3ca8b1"
+}
