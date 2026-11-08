@@ -1,6 +1,10 @@
 {
   "db_name": "PostgreSQL",
+<<<<<<<< HEAD:.sqlx/query-60078c15439369ac79ebc84fb2ba1584a37a3822f4f1c59e28be3ed61844498d.json
   "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.maestro_version, r.maestro_profile_supported, r.rev, r.origin, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
+========
+  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.maestro_version, r.maestro_profile_supported, r.file_warnings, r.rev, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
+>>>>>>>> cfe2704 (feat(store): keep a run's file warnings on the agent run):.sqlx/query-a6f13c6615a2bb359b4078b9182deb28b606040d02734bd32b71289c7412bdf1.json
   "describe": {
     "columns": [
       {
@@ -160,6 +164,17 @@
       },
       {
         "ordinal": 15,
+        "name": "file_warnings",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "agent_runs",
+            "name": "file_warnings"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
         "name": "rev",
         "type_info": "Int8",
         "origin": {
@@ -170,6 +185,7 @@
         }
       },
       {
+<<<<<<<< HEAD:.sqlx/query-60078c15439369ac79ebc84fb2ba1584a37a3822f4f1c59e28be3ed61844498d.json
         "ordinal": 16,
         "name": "origin",
         "type_info": "Text",
@@ -181,6 +197,8 @@
         }
       },
       {
+========
+>>>>>>>> cfe2704 (feat(store): keep a run's file warnings on the agent run):.sqlx/query-a6f13c6615a2bb359b4078b9182deb28b606040d02734bd32b71289c7412bdf1.json
         "ordinal": 17,
         "name": "liveness",
         "type_info": "Text",
@@ -215,5 +233,9 @@
       null
     ]
   },
+<<<<<<<< HEAD:.sqlx/query-60078c15439369ac79ebc84fb2ba1584a37a3822f4f1c59e28be3ed61844498d.json
   "hash": "60078c15439369ac79ebc84fb2ba1584a37a3822f4f1c59e28be3ed61844498d"
+========
+  "hash": "a6f13c6615a2bb359b4078b9182deb28b606040d02734bd32b71289c7412bdf1"
+>>>>>>>> cfe2704 (feat(store): keep a run's file warnings on the agent run):.sqlx/query-a6f13c6615a2bb359b4078b9182deb28b606040d02734bd32b71289c7412bdf1.json
 }

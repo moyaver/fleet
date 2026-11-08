@@ -69,6 +69,10 @@ pub(crate) fn wire<T: serde::Serialize>(v: T) -> String {
 /// The `agent.warning` codes a flow keeps for its page: the step alignment warnings (issue #148).
 const STEP_WARNINGS: [&str; 2] = ["steps_not_aligned", "step_status_disagrees"];
 
+/// The `agent.warning` code a run keeps for its own files: a commands file whose flow the log never
+/// started (issue #148). It carries no flow, so it is kept on the agent run.
+const RUN_FILE_WARNING: &str = "commands_flow_unnamed";
+
 /// What one batch touched, so derivation and broadcasts cover exactly that.
 #[derive(Debug, Clone)]
 pub(crate) struct Ctx<'a> {
@@ -482,14 +486,32 @@ impl<'a> Ctx<'a> {
     }
 
     /// Keeps the step alignment warnings a flow's final `commands.json` raised, so its page says how
-    /// far its steps are verified (issue #148). The flow's verdict never depends on them (I3). Other
-    /// warnings stay in the journal.
+    /// far its steps are verified (issue #148). The flow's verdict never depends on them (I3). A
+    /// commands file whose flow was never named is kept on its agent run instead. Other warnings
+    /// stay in the journal.
     async fn agent_warning(
         &mut self,
         tx: &mut PgConnection,
         e: &EventEnvelope,
         b: &AgentWarning,
     ) -> Result<Effect, sqlx::Error> {
+        if b.code == RUN_FILE_WARNING && e.subject.flow_execution_id.is_none() {
+            let rows = sqlx::query!(
+                "UPDATE agent_runs
+                    SET file_warnings = array_append(file_warnings, $2), rev = rev + 1
+                  WHERE id = $1 AND NOT ($2 = ANY(file_warnings))",
+                self.run.agent_run_id,
+                b.code
+            )
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+            if rows > 0 {
+                self.changed
+                    .insert(EntityRef::AgentRun(self.run.agent_run_id));
+            }
+            return Ok(Effect::Applied);
+        }
         if !STEP_WARNINGS.contains(&b.code.as_str()) || e.subject.flow_execution_id.is_none() {
             return Ok(Effect::Applied);
         }
