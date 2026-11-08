@@ -71,6 +71,9 @@ pub(crate) struct Hub {
     capacity: usize,
     #[cfg(test)]
     pub(crate) fail_entity_load: std::sync::atomic::AtomicBool,
+    /// Test clock: when set, liveness reads this instant instead of the monotonic clock.
+    #[cfg(test)]
+    frozen_now: Mutex<Option<Instant>>,
 }
 
 fn json(frame: &LiveFrame) -> Arc<str> {
@@ -84,6 +87,8 @@ impl Hub {
             capacity: capacity.max(1),
             #[cfg(test)]
             fail_entity_load: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(test)]
+            frozen_now: Mutex::new(None),
             channels: Mutex::new(HashMap::new()),
             order: Mutex::new(HashMap::new()),
             runs: Mutex::new(HashMap::new()),
@@ -94,6 +99,54 @@ impl Hub {
             .unwrap_or(time::Duration::MAX),
             booted: OffsetDateTime::now_utc(),
         }
+    }
+
+    /// What liveness reads as "now": the monotonic clock, or a test's frozen instant.
+    #[cfg_attr(
+        not(test),
+        expect(
+            clippy::unused_self,
+            reason = "only a test's frozen clock reads the hub"
+        )
+    )]
+    fn now(&self) -> Instant {
+        #[cfg(test)]
+        {
+            let frozen = self
+                .frozen_now
+                .lock()
+                .expect("clock lock should not be poisoned: nothing panics while holding it");
+            if let Some(at) = *frozen {
+                return at;
+            }
+        }
+        Instant::now()
+    }
+
+    /// Stops liveness's clock at the current instant, so contact made from now on stays fresh
+    /// until [`Self::advance_clock`] moves it. Makes the stale threshold a test's own step.
+    #[cfg(test)]
+    pub(crate) fn freeze_clock(&self) {
+        *self
+            .frozen_now
+            .lock()
+            .expect("clock lock should not be poisoned: nothing panics while holding it") =
+            Some(Instant::now());
+    }
+
+    /// Moves a frozen clock forward by `by`, as silence would.
+    ///
+    /// # Panics
+    ///
+    /// When the clock is not frozen: call [`Self::freeze_clock`] first.
+    #[cfg(test)]
+    pub(crate) fn advance_clock(&self, by: Duration) {
+        let mut frozen = self
+            .frozen_now
+            .lock()
+            .expect("clock lock should not be poisoned: nothing panics while holding it");
+        let at = frozen.expect("freeze_clock should run before advance_clock");
+        *frozen = Some(at + by);
     }
 
     /// A project's channel. Subscribe before reading a snapshot, so nothing falls in between.
@@ -261,11 +314,12 @@ impl Hub {
             .runs
             .lock()
             .expect("hub lock should not be poisoned: no code panics while holding it");
+        let now = self.now();
         let e = runs.entry(run.agent_run_id).or_insert(RunLive {
             project: run.project_id,
             attempt: run.pipeline_attempt_id,
             epoch: run.epoch,
-            last_seen: Instant::now(),
+            last_seen: now,
             last_seen_wall: OffsetDateTime::now_utc(),
             connected: true,
             ended: false,
@@ -278,7 +332,7 @@ impl Hub {
             e.epoch = run.epoch;
             e.ended = false;
         }
-        e.last_seen = Instant::now();
+        e.last_seen = now;
         e.last_seen_wall = OffsetDateTime::now_utc();
         e.connected = true;
     }
@@ -302,7 +356,7 @@ impl Hub {
             Liveness::Completed
         } else if !r.connected {
             Liveness::Disconnected
-        } else if r.last_seen.elapsed() > self.stale_after {
+        } else if self.now().saturating_duration_since(r.last_seen) > self.stale_after {
             Liveness::Stale
         } else {
             Liveness::Online
