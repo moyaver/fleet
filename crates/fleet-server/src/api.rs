@@ -41,11 +41,12 @@ use fleet_protocol::{
         PreviousExecutionView, RecentAttemptView, SeriesView, StepView, TimelineView, WorkerCounts,
         WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
         history::{
-            ChangeKind, CompareFlowView, CompareRowView, CompareSideView, CompareView,
-            DimChangeView, DurationPoint, DurationSummary, EvidenceView, Explanation,
-            FailureGroupView, FailureTriageRequest, FailureTriageView, Flakiness,
-            FlakyEvidenceView, FlowFlakinessView, FlowStatsView, HistoryEntryView, HistoryPage,
-            OutcomeCounts, Side, TriageState,
+            CatalogFlowView, CatalogLastRunView, ChangeKind, CompareFlowView, CompareRowView,
+            CompareSideView, CompareView, DimChangeView, DurationPoint, DurationSummary,
+            EvidenceView, Explanation, FailureGroupView, FailureTriageRequest, FailureTriageView,
+            Flakiness, FlakyEvidenceView, FlowCatalogPage, FlowFlakinessView, FlowStatsView,
+            HistoryEntryView, HistoryPage, HistoryTrendView, OutcomeCounts, Side, TrendDayView,
+            TriageState,
         },
     },
 };
@@ -84,6 +85,8 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         crate::artifacts::upload::complete,
         history::history,
         history::flow_stats,
+        history::catalog,
+        history::trend,
         compare::compare,
         triage::set,
         triage::clear
@@ -146,6 +149,11 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         RejectReason,
         HistoryPage,
         HistoryEntryView,
+        HistoryTrendView,
+        TrendDayView,
+        FlowCatalogPage,
+        CatalogFlowView,
+        CatalogLastRunView,
         FlowStatsView,
         CompareView,
         CompareSideView,
@@ -228,6 +236,11 @@ pub(crate) fn router() -> Router<AppState> {
             get(rerun::failed_flows),
         )
         .route("/api/v1/projects/{project}/history", get(history::history))
+        .route(
+            "/api/v1/projects/{project}/history/trend",
+            get(history::trend),
+        )
+        .route("/api/v1/projects/{project}/flows", get(history::catalog))
         .route("/api/v1/projects/{project}/compare", get(compare::compare))
         .route(
             "/api/v1/projects/{project}/flows/{name}/stats",

@@ -629,3 +629,60 @@ async fn stats_of_an_unknown_flow_are_missing_and_of_a_quiet_window_are_empty() 
     assert_eq!(quiet["recent_failures"], json!([]));
     assert_eq!(quiet["flakiness"]["flakiness"], "not_flaky");
 }
+
+#[tokio::test]
+async fn screen_e_lists_the_flows_the_project_knows_answers_its_trend_and_refuses_bad_filters() {
+    let rig = rig().await;
+    Run::passed("990", "t1", "login").publish(&rig).await;
+    // A stored plan names a flow that has not run: it is known, and has no outcome.
+    let plan = json!({
+        "manifest": {"planId": "catalog-1", "totalFlows": 1,
+                     "shards": [{"id": 0, "flows": ["flows/checkout.yaml"]}]},
+        "pipeline": {"repository": "o/r", "run_id": "991", "run_attempt": 1}
+    });
+    let stored = rig
+        .app
+        .post("/api/v1/plans")
+        .authorization_bearer(&rig.key)
+        .json(&plan)
+        .await;
+    assert_eq!(stored.status_code(), 201, "{}", stored.text());
+
+    let catalog = rig.json("/api/v1/projects/app/flows").await;
+    let items = catalog["items"].as_array().unwrap();
+    let by = |flow: &str| {
+        items
+            .iter()
+            .find(|i| i["flow"] == flow)
+            .unwrap_or_else(|| panic!("no catalog entry for {flow}: {catalog}"))
+    };
+    assert_eq!(by("flows/login.yaml")["executions"], 1);
+    assert_eq!(by("flows/checkout.yaml")["executions"], 0);
+    assert_eq!(by("flows/checkout.yaml")["last"], Value::Null);
+    // An execution filter lists only the flows with a matching execution.
+    let narrowed = rig
+        .json("/api/v1/projects/app/flows?device_model=pixel")
+        .await;
+    assert_eq!(narrowed["items"], json!([]), "{narrowed}");
+
+    let trend = rig.json("/api/v1/projects/app/history/trend").await;
+    assert_eq!(
+        (trend["passed"].clone(), trend["failed"].clone()),
+        (json!(1), json!(0))
+    );
+    assert_eq!(trend["days"].as_array().unwrap().len(), 1, "{trend}");
+
+    for query in [
+        "ci_provider=bogus",
+        "suite=not-a-uuid",
+        "fingerprint=v1:xyz",
+        "commit=zz",
+    ] {
+        for path in ["history", "history/trend", "flows"] {
+            let response = rig
+                .get(&format!("/api/v1/projects/app/{path}?{query}"))
+                .await;
+            assert_eq!(response.status_code(), 400, "{path}?{query}");
+        }
+    }
+}

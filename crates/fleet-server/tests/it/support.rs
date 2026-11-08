@@ -277,6 +277,7 @@ impl Agent {
             clock: now(),
             origin: RunOrigin::Live,
             started_at: None,
+            catalog: fleet_protocol::frame::FlowCatalog::default(),
         }
     }
 
