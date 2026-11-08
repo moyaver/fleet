@@ -11,6 +11,7 @@ mod history;
 pub(crate) mod live_ws;
 mod metrics;
 mod screens;
+mod triage;
 
 #[cfg(test)]
 mod tests;
@@ -20,7 +21,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use fleet_core::policy::{Action, Decision, Denied, Principal, Resource, authorize};
 use fleet_protocol::{
@@ -41,8 +42,9 @@ use fleet_protocol::{
         history::{
             ChangeKind, CompareFlowView, CompareRowView, CompareSideView, CompareView,
             DimChangeView, DurationPoint, DurationSummary, EvidenceView, Explanation,
-            FailureGroupView, Flakiness, FlakyEvidenceView, FlowFlakinessView, FlowStatsView,
-            HistoryEntryView, HistoryPage, OutcomeCounts, Side,
+            FailureGroupView, FailureTriageRequest, FailureTriageView, Flakiness,
+            FlakyEvidenceView, FlowFlakinessView, FlowStatsView, HistoryEntryView, HistoryPage,
+            OutcomeCounts, Side, TriageState,
         },
     },
 };
@@ -81,7 +83,9 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         crate::artifacts::upload::complete,
         history::history,
         history::flow_stats,
-        compare::compare
+        compare::compare,
+        triage::set,
+        triage::clear
     ),
     components(schemas(
         ProjectView,
@@ -153,6 +157,9 @@ use crate::{ingest::bearer, session::Caller, state::AppState};
         DurationSummary,
         DurationPoint,
         FailureGroupView,
+        FailureTriageView,
+        FailureTriageRequest,
+        TriageState,
         FlowFlakinessView,
         FlakyEvidenceView,
         Flakiness,
@@ -217,6 +224,10 @@ pub(crate) fn router() -> Router<AppState> {
         .route(
             "/api/v1/projects/{project}/flows/{name}/stats",
             get(history::flow_stats),
+        )
+        .route(
+            "/api/v1/projects/{project}/failures/{fingerprint}/triage",
+            put(triage::set).delete(triage::clear),
         )
         .route("/api/v1/plans", post(store_plan))
         .route("/api/v1/live", get(live_ws::upgrade))
