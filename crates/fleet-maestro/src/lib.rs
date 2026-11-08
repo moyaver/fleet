@@ -19,6 +19,7 @@ pub mod log;
 pub mod logcat;
 pub mod reproduce;
 pub mod stdout;
+pub mod workspace;
 
 use fleet_protocol::event::ExitClass;
 
