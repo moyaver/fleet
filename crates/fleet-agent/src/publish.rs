@@ -161,7 +161,7 @@ async fn publish_bundle(
     };
     let run = Uuid::now_v7();
     let before = events.len();
-    let sender = Sender::start(url, run, manifest.ci, events, work, start)?;
+    let mut sender = Sender::start(url, run, manifest.ci, events, work, start)?;
     let dones = sender.upload(uploads).await;
     let mut next = sender.next_seq();
     let mut post = Vec::new();
@@ -201,7 +201,7 @@ async fn publish_saved(
     let ci = crate::ci::context(|k| std::env::var(k).ok());
     let run = Uuid::now_v7();
     let pending = saved_uploads(replayed, dir);
-    let sender = Sender::start(url, run, ci, events, work, start)?;
+    let mut sender = Sender::start(url, run, ci, events, work, start)?;
     let dones = sender.upload(pending).await;
     let last = replayed.last_ms;
     for done in dones.iter().cloned() {
@@ -491,6 +491,8 @@ fn summary(run: Uuid, events: usize, dones: &[Done]) -> Published {
 struct Sender {
     shared: Arc<Shared>,
     transport: JoinHandle<transport::End>,
+    /// How the transport ended, if it ended during the uploads (a refusal).
+    ended: Option<Result<transport::End, tokio::task::JoinError>>,
     uploader: Uploader,
     run: Uuid,
     start: Instant,
@@ -543,6 +545,7 @@ impl Sender {
         Ok(Self {
             shared,
             transport,
+            ended: None,
             uploader,
             run,
             start,
@@ -562,8 +565,9 @@ impl Sender {
     }
 
     /// Uploads `pending` and waits for the results, within the upload budget. Refused artifacts
-    /// come back as they are.
-    async fn upload(&self, pending: Vec<Pending>) -> Vec<Done> {
+    /// come back as they are. If the server refuses the run meanwhile, its uploads can never be
+    /// taken: they are abandoned at once, and [`Self::finish`] reports the refusal.
+    async fn upload(&mut self, pending: Vec<Pending>) -> Vec<Done> {
         let mut dones = Vec::new();
         for p in pending {
             match p {
@@ -571,11 +575,18 @@ impl Sender {
                 Pending::Refused(done) => dones.push(done),
             }
         }
-        dones.extend(
-            self.uploader
-                .finish(budget("FLEET_UPLOAD_TIMEOUT", DEFAULT_UPLOAD_BUDGET))
-                .await,
-        );
+        let finished = self
+            .uploader
+            .finish(budget("FLEET_UPLOAD_TIMEOUT", DEFAULT_UPLOAD_BUDGET));
+        tokio::pin!(finished);
+        tokio::select! {
+            found = &mut finished => dones.extend(found),
+            ended = &mut self.transport => {
+                self.ended = Some(ended);
+                // Nothing is left to wait for: a zero budget abandons what is still running.
+                dones.extend(self.uploader.finish(Duration::ZERO).await);
+            }
+        }
         dones
     }
 
@@ -593,14 +604,21 @@ impl Sender {
         self.shared.finishing.store(true, Ordering::SeqCst);
         self.shared.wake.notify_one();
         let run = self.run;
-        match tokio::time::timeout(budget, self.transport).await {
-            Ok(Ok(transport::End::Flushed)) => Ok(()),
-            Ok(Ok(transport::End::Refused(why))) => bail!("the server refused run {run}: {why}"),
-            Ok(Err(e)) => bail!("sending run {run}: {e}"),
-            Err(_) => bail!(
-                "the server did not take every event of run {run} within {}s",
-                budget.as_secs()
-            ),
+        // The transport may already have ended during the uploads, when the server refused the run.
+        let ended = match self.ended {
+            Some(ended) => ended,
+            None => match tokio::time::timeout(budget, self.transport).await {
+                Ok(ended) => ended,
+                Err(_) => bail!(
+                    "the server did not take every event of run {run} within {}s",
+                    budget.as_secs()
+                ),
+            },
+        };
+        match ended {
+            Ok(transport::End::Flushed) => Ok(()),
+            Ok(transport::End::Refused(why)) => bail!("the server refused run {run}: {why}"),
+            Err(e) => bail!("sending run {run}: {e}"),
         }
     }
 }

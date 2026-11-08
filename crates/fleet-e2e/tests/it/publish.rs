@@ -6,6 +6,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
+    time::{Duration, Instant},
 };
 
 use serde_json::Value;
@@ -270,23 +271,31 @@ async fn a_published_run_older_than_the_journal_keeps_is_refused_with_the_reason
     let stack = stack().await;
     let (ws, key) = (stack.ws_url(), stack.key.clone());
     let dir = run_days_ago(30);
+    // The upload budget is long on purpose: a refused run's uploads never finish, and the
+    // refusal must end the publish long before that budget runs out.
+    let budget = Duration::from_secs(60);
+    let started = Instant::now();
     let out = tokio::task::spawn_blocking(move || {
         publish(
             &dir,
             &[
                 ("FLEET_SERVER", &ws),
                 ("FLEET_TOKEN", &key),
-                // A refused run's uploads never finish: keep that wait short.
-                ("FLEET_UPLOAD_TIMEOUT", "5"),
+                ("FLEET_UPLOAD_TIMEOUT", &budget.as_secs().to_string()),
                 ("FLEET_FLUSH_TIMEOUT", "15"),
             ],
         )
     })
     .await
     .unwrap();
+    let elapsed = started.elapsed();
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_ne!(out.status.code(), Some(0), "{stderr}");
     assert!(stderr.contains("removed at once"), "{stderr}");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "a refused publish took {elapsed:?}, the upload budget is {budget:?}: {stderr}"
+    );
     // The refused run never got an attempt.
     let attempts = stack.get("/api/v1/projects/app/attempts").await;
     assert_eq!(attempts, serde_json::json!([]), "nothing was kept");
