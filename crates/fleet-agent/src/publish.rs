@@ -659,6 +659,32 @@ mod tests {
     }
 
     #[test]
+    fn a_saved_directory_without_meta_publishes_with_the_times_its_files_record() {
+        // A Maestro debug directory: no meta.json, so no capture clock. Its log's first record is
+        // at 1793751906337 (Unix ms): the run started then, not at the epoch.
+        let debug = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/maestro/2.12.1/fail/run/debug");
+        let mut replayed = inspect::replay(&debug, Box::new(Uuid::now_v7)).unwrap();
+        let events = replayed.session.drain();
+        let first = events.first().expect("the run started");
+        let started =
+            OffsetDateTime::from_unix_timestamp_nanos(1_793_751_906_337 * 1_000_000).unwrap();
+        assert_eq!(
+            first.at.wall, started,
+            "the run starts when its log says it did"
+        );
+        let last = events.last().expect("the run has events");
+        assert!(
+            last.at.wall > started,
+            "the run's events span its time, not one instant"
+        );
+        assert!(
+            events.iter().all(|e| e.at.wall.year() >= 2026),
+            "no event is at the replay epoch"
+        );
+    }
+
+    #[test]
     fn a_captured_run_publishes_its_screenshot_commands_log_and_report() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1/fail");
         let mut replayed = inspect::replay(&dir, Box::new(Uuid::now_v7)).unwrap();

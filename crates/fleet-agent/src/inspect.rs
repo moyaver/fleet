@@ -15,6 +15,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 use anyhow::Context;
@@ -23,7 +24,7 @@ use fleet_core::{
     flaky::{DEVICE_LOST, Exclusion, exclusion_of},
     redact::Redactor,
 };
-use fleet_maestro::{ReportState, log};
+use fleet_maestro::{ReportState, bundle::Commands, log};
 use fleet_protocol::journal::{ClockSample, EventEnvelope};
 use serde::Serialize;
 use serde_json::Value;
@@ -463,35 +464,58 @@ impl Replay {
         })
     }
 
-    /// A saved debug output directory.
+    /// A saved debug output directory. Its observations carry the times the run's own files
+    /// record: each `maestro.log` record's Unix milliseconds (when the log has the machine
+    /// pattern), and a flow's `commands.json` at the end of its last command, since the file is
+    /// final by then. The run starts at the earliest of those. A directory that records no time at
+    /// all falls back to the modification time of its log, and then to the Unix epoch.
     fn from_saved_run(dir: &Path) -> anyhow::Result<Self> {
         let log_path =
             saved_log(dir).with_context(|| format!("{} has no maestro.log", dir.display()))?;
         let debug = log_path.parent().unwrap_or(dir).to_path_buf();
-        let mut timeline = Vec::new();
+        // Each observation with the Unix milliseconds its own file records, when it records any.
+        let mut timed: Vec<(Option<u64>, Observation)> = Vec::new();
         let mut asm = log::Assembler::default();
-        for line in fs::read_to_string(&log_path)?.lines() {
-            if let Some(r) = asm.push(line) {
-                timeline.push((0, Observation::Log(r)));
-            }
+        let mut records: Vec<log::Record> = fs::read_to_string(&log_path)?
+            .lines()
+            .filter_map(|line| asm.push(line))
+            .collect();
+        records.extend(asm.finish());
+        let mut at = None;
+        for record in records {
+            // A record without the machine pattern takes the time of the record before it.
+            at = record.unix_ms.or(at);
+            timed.push((at, Observation::Log(record)));
         }
-        timeline.extend(asm.finish().map(|r| (0, Observation::Log(r))));
-        for e in fs::read_dir(&debug)?
+
+        let mut flows: Vec<PathBuf> = fs::read_dir(&debug)?
             .flatten()
-            .filter(|e| e.path().is_dir())
-        {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if let Ok(bytes) = fs::read(e.path().join("commands.json")) {
-                timeline.push((
-                    0,
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        flows.sort_unstable();
+        for flow in flows {
+            let name = flow
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let commands = fs::read(flow.join("commands.json")).ok();
+            // A flow's files are final once its last command has ended.
+            let flow_at = commands
+                .as_deref()
+                .and_then(command_end_ms)
+                .or_else(|| modified_ms(&flow.join("commands.json")));
+            if let Some(bytes) = commands {
+                timed.push((
+                    flow_at,
                     Observation::File {
                         rel: format!("{name}/commands.json"),
                         contents: Some(bytes),
                     },
                 ));
-                if e.path().join("manifest.json").exists() {
-                    timeline.push((
-                        0,
+                if flow.join("manifest.json").exists() {
+                    timed.push((
+                        flow_at,
                         Observation::File {
                             rel: format!("{name}/manifest.json"),
                             contents: None,
@@ -499,9 +523,9 @@ impl Replay {
                     ));
                 }
             }
-            if let Ok(bytes) = fs::read(e.path().join("logs").join("crash-report.txt")) {
-                timeline.push((
-                    0,
+            if let Ok(bytes) = fs::read(flow.join("logs").join("crash-report.txt")) {
+                timed.push((
+                    flow_at,
                     Observation::File {
                         rel: format!("{name}/logs/crash-report.txt"),
                         contents: Some(bytes),
@@ -512,15 +536,61 @@ impl Replay {
         let report = [dir.join("report.xml"), debug.join("report.xml")]
             .into_iter()
             .find_map(|p| fs::read(p).ok());
-        timeline.push((0, Observation::Report(report)));
+
+        let known = timed.iter().filter_map(|(t, _)| *t);
+        let start_ms = known
+            .clone()
+            .min()
+            .or_else(|| modified_ms(&log_path))
+            .unwrap_or(0);
+        let end_ms = known.max().unwrap_or(start_ms);
+        // Relative to the start, a record without a time keeps the one before it, so the clock
+        // never runs backwards in the list. The sort is stable: observations at one moment keep
+        // their order (the log's records, then the flows' files in name order).
+        let mut last = start_ms;
+        let mut timeline: Vec<(u64, Observation)> = timed
+            .into_iter()
+            .map(|(t, obs)| {
+                let abs = t.unwrap_or(last);
+                last = abs;
+                (abs.saturating_sub(start_ms), obs)
+            })
+            .collect();
+        timeline.sort_by_key(|(ms, _)| *ms);
+        timeline.push((end_ms.saturating_sub(start_ms), Observation::Report(report)));
         Ok(Self {
             argv: vec!["maestro".into(), "test".into()],
             redactor: Redactor::new([]),
-            start: OffsetDateTime::UNIX_EPOCH,
+            start: unix_ms_time(start_ms),
             timeline,
             debug: Some(debug),
         })
     }
+}
+
+/// The time `ms` Unix milliseconds after the epoch.
+fn unix_ms_time(ms: u64) -> OffsetDateTime {
+    OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000)
+        .unwrap_or(OffsetDateTime::UNIX_EPOCH)
+}
+
+/// When a file was last modified, in Unix milliseconds, if the file system says.
+fn modified_ms(path: &Path) -> Option<u64> {
+    let modified = fs::metadata(path).ok()?.modified().ok()?;
+    u64::try_from(modified.duration_since(UNIX_EPOCH).ok()?.as_millis()).ok()
+}
+
+/// When a flow's last command ended, in Unix milliseconds: the latest `timestamp + duration` in its
+/// `commands.json`. `None` when the file has no command with a timestamp.
+fn command_end_ms(bytes: &[u8]) -> Option<u64> {
+    let records = match fleet_maestro::bundle::parse_commands(bytes) {
+        Commands::Final(r) | Commands::Aborted(r) | Commands::Unverified(r) => r,
+        Commands::Empty | Commands::Invalid => return None,
+    };
+    records
+        .iter()
+        .filter_map(|c| Some(c.timestamp_ms? + c.duration_ms.unwrap_or(0)))
+        .max()
 }
 
 /// A saved debug output directory's `maestro.log`, at the top or under `debug/`.
