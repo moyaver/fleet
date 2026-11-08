@@ -42,7 +42,7 @@ fn key(cookie: &str) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(cookie.as_bytes()))
 }
 
-fn role_name(role: Role) -> &'static str {
+pub(crate) fn role_name(role: Role) -> &'static str {
     match role {
         Role::Viewer => "viewer",
         Role::Maintainer => "maintainer",
@@ -50,7 +50,7 @@ fn role_name(role: Role) -> &'static str {
     }
 }
 
-fn parse_role(name: &str) -> Result<Role> {
+pub(crate) fn parse_role(name: &str) -> Result<Role> {
     match name {
         "viewer" => Ok(Role::Viewer),
         "maintainer" => Ok(Role::Maintainer),
@@ -172,16 +172,38 @@ impl Store {
         .await?)
     }
 
-    /// Makes the stored group mappings of an issuer equal the configured ones.
+    /// Makes the configured group mappings of an issuer equal `rows`. Rows added on the dashboard
+    /// are left alone: a configured mapping that a dashboard row already holds is refused, and
+    /// nothing is stored. Takes effect at each person's next sign-in (roles are resolved then).
     pub async fn sync_group_mappings(&self, issuer: &str, rows: &[GroupMapping]) -> Result<()> {
         let mut tx = self.pool().begin().await?;
-        sqlx::query!("DELETE FROM group_mappings WHERE oidc_issuer = $1", issuer)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query!(
+            "DELETE FROM group_mappings WHERE oidc_issuer = $1 AND source = 'config'",
+            issuer
+        )
+        .execute(&mut *tx)
+        .await?;
         for r in rows {
+            let clash = sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM group_mappings
+                                   WHERE oidc_issuer = $1 AND group_claim = $2 AND source = 'dashboard'
+                                     AND project_id IS NOT DISTINCT FROM $3::uuid) AS "clash!""#,
+                issuer,
+                r.group,
+                r.project
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            if clash {
+                return Err(Error::Conflict(format!(
+                    "the configuration maps group {:?} here, which the dashboard already maps: \
+                     remove the dashboard mapping, or drop the configured one",
+                    r.group
+                )));
+            }
             sqlx::query!(
-                "INSERT INTO group_mappings (project_id, oidc_issuer, group_claim, role)
-                 VALUES ($1, $2, $3, $4)
+                "INSERT INTO group_mappings (project_id, oidc_issuer, group_claim, role, source)
+                 VALUES ($1, $2, $3, $4, 'config')
                  ON CONFLICT (project_id, oidc_issuer, group_claim) DO UPDATE SET role = EXCLUDED.role",
                 r.project,
                 issuer,

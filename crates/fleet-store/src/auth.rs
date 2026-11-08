@@ -135,6 +135,61 @@ pub(crate) fn random_secret(prefix: &str) -> Result<String> {
     ))
 }
 
+/// Inserts an API key and returns its ID and the secret, which only the caller ever sees. `exec`
+/// is the pool, or a transaction the caller commits with its audit row (Screen G's writes).
+pub(crate) async fn insert_api_key(
+    exec: impl sqlx::PgExecutor<'_>,
+    project_id: Uuid,
+    name: &str,
+    trust: TrustLevel,
+    expires_at: OffsetDateTime,
+    created_by: Option<Uuid>,
+) -> Result<(Uuid, Secret)> {
+    let secret = random_secret(API_KEY_PREFIX)?;
+    let prefix: String = secret.chars().take(API_KEY_PREFIX.len() + 4).collect();
+    let id = sqlx::query_scalar!(
+        "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level, expires_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        project_id,
+        name,
+        prefix,
+        sha256(&secret),
+        trust.as_str(),
+        expires_at,
+        created_by
+    )
+    .fetch_one(exec)
+    .await?;
+    Ok((id, Secret(secret)))
+}
+
+/// Revokes an API key (see [`Store::revoke_api_key`]). `exec` as for [`insert_api_key`].
+pub(crate) async fn revoke_api_key_in(exec: impl sqlx::PgExecutor<'_>, id: Uuid) -> Result<bool> {
+    let done = sqlx::query!(
+        "UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1",
+        id
+    )
+    .execute(exec)
+    .await?;
+    Ok(done.rows_affected() > 0)
+}
+
+/// Sets an API key's expiry (see [`Store::set_api_key_expiry`]). `exec` as for [`insert_api_key`].
+pub(crate) async fn set_api_key_expiry_in(
+    exec: impl sqlx::PgExecutor<'_>,
+    id: Uuid,
+    expires_at: OffsetDateTime,
+) -> Result<bool> {
+    let done = sqlx::query!(
+        "UPDATE api_keys SET expires_at = $2 WHERE id = $1 AND revoked_at IS NULL",
+        id,
+        expires_at
+    )
+    .execute(exec)
+    .await?;
+    Ok(done.rows_affected() > 0)
+}
+
 impl Store {
     /// Creates a project, or renames it if the slug exists. Returns its ID.
     pub async fn upsert_project(&self, slug: &str, name: &str) -> Result<Uuid> {
@@ -169,47 +224,20 @@ impl Store {
         trust: TrustLevel,
         expires_at: OffsetDateTime,
     ) -> Result<(Uuid, Secret)> {
-        let secret = random_secret(API_KEY_PREFIX)?;
-        let prefix: String = secret.chars().take(API_KEY_PREFIX.len() + 4).collect();
-        let id = sqlx::query_scalar!(
-            "INSERT INTO api_keys (project_id, name, prefix, token_hash, trust_level, expires_at)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            project_id,
-            name,
-            prefix,
-            sha256(&secret),
-            trust.as_str(),
-            expires_at
-        )
-        .fetch_one(self.pool())
-        .await?;
-        Ok((id, Secret(secret)))
+        insert_api_key(self.pool(), project_id, name, trust, expires_at, None).await
     }
 
     /// Revokes an API key, and every agent token minted from it stops working with it. Returns
     /// `false` when no key has that ID. A key already revoked keeps its first revocation time.
     pub async fn revoke_api_key(&self, id: Uuid) -> Result<bool> {
-        let done = sqlx::query!(
-            "UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1",
-            id
-        )
-        .execute(self.pool())
-        .await?;
-        Ok(done.rows_affected() > 0)
+        revoke_api_key_in(self.pool(), id).await
     }
 
     /// Sets when an API key stops working: `expires_at` may be in the past, to end it now. Works
     /// on keys made before expiry existed (they have none). Returns `false` when no active key
     /// has that ID. Agent tokens minted from the key stop with it.
     pub async fn set_api_key_expiry(&self, id: Uuid, expires_at: OffsetDateTime) -> Result<bool> {
-        let done = sqlx::query!(
-            "UPDATE api_keys SET expires_at = $2 WHERE id = $1 AND revoked_at IS NULL",
-            id,
-            expires_at
-        )
-        .execute(self.pool())
-        .await?;
-        Ok(done.rows_affected() > 0)
+        set_api_key_expiry_in(self.pool(), id, expires_at).await
     }
 
     /// The API keys of a project, newest first. Secrets are never stored, so none is returned.
@@ -432,18 +460,54 @@ fn pr_policy_name(p: fleet_core::trust::PrPolicy) -> &'static str {
     }
 }
 
+/// Ends now every agent token minted from a revoked policy of `project_id`, so revoking a policy
+/// stops what it granted (a token outlives its policy otherwise, until it expires).
+pub(crate) async fn end_tokens_of_revoked_policies(
+    exec: impl sqlx::PgExecutor<'_>,
+    project_id: Uuid,
+) -> Result<()> {
+    sqlx::query!(
+        "UPDATE agent_tokens t SET expires_at = now()
+           FROM publisher_trust_policies p
+          WHERE t.policy_id = p.id AND p.project_id = $1 AND p.revoked_at IS NOT NULL
+            AND t.expires_at > now()",
+        project_id
+    )
+    .execute(exec)
+    .await?;
+    Ok(())
+}
+
 impl Store {
-    /// Makes a project's stored trust policies equal the configured ones: upserts by name,
-    /// revokes the rest.
+    /// Makes a project's configured trust policies equal `rows`: upserts them by name and revokes
+    /// the configured ones that are no longer listed. Rows added on the dashboard are left alone;
+    /// a configured name that a dashboard row already holds is refused, and nothing is stored.
+    /// A policy revoked here ends the agent tokens minted from it (as the dashboard's revoke does).
     pub async fn sync_trust_policies(&self, project_id: Uuid, rows: &[PolicyRow]) -> Result<()> {
         let mut tx = self.pool().begin().await?;
+        let names: Vec<String> = rows.iter().map(|r| r.name.clone()).collect();
+        let clash = sqlx::query_scalar!(
+            "SELECT name FROM publisher_trust_policies
+              WHERE project_id = $1 AND source = 'dashboard' AND name = ANY($2)
+              ORDER BY name LIMIT 1",
+            project_id,
+            &names
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(name) = clash {
+            return Err(Error::Conflict(format!(
+                "the configuration names trust policy {name:?}, which the dashboard already has on \
+                 this project: remove the dashboard policy, or rename the configured one"
+            )));
+        }
         for r in rows {
             let p = &r.policy;
             sqlx::query!(
                 "INSERT INTO publisher_trust_policies
                    (project_id, name, issuer, audience, repository_id, repository_owner_id,
-                    trusted_refs, allowed_events, job_workflow_ref, environment, pr_policy)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    trusted_refs, allowed_events, job_workflow_ref, environment, pr_policy, source)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'config')
                  ON CONFLICT (project_id, name) DO UPDATE SET
                    issuer = EXCLUDED.issuer, audience = EXCLUDED.audience,
                    repository_id = EXCLUDED.repository_id,
@@ -466,15 +530,16 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         }
-        let names: Vec<String> = rows.iter().map(|r| r.name.clone()).collect();
         sqlx::query!(
             "UPDATE publisher_trust_policies SET revoked_at = now()
-              WHERE project_id = $1 AND revoked_at IS NULL AND NOT (name = ANY($2))",
+              WHERE project_id = $1 AND source = 'config' AND revoked_at IS NULL
+                AND NOT (name = ANY($2))",
             project_id,
             &names
         )
         .execute(&mut *tx)
         .await?;
+        end_tokens_of_revoked_policies(&mut *tx, project_id).await?;
         tx.commit().await?;
         Ok(())
     }

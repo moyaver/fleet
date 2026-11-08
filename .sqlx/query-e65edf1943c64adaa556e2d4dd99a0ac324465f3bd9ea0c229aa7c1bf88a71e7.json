@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM group_mappings WHERE oidc_issuer = $1 AND source = 'config'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e65edf1943c64adaa556e2d4dd99a0ac324465f3bd9ea0c229aa7c1bf88a71e7"
+}

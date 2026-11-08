@@ -136,6 +136,32 @@ fn with_database(base: &str, name: &str) -> Result<String> {
     Ok(url)
 }
 
+/// How many audit events the database holds, across every project and the installation.
+///
+/// # Errors
+/// Fails when the database refuses the query.
+pub async fn audit_count(store: &Store) -> Result<i64> {
+    Ok(
+        sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM audit_events"#)
+            .fetch_one(store.pool())
+            .await?,
+    )
+}
+
+/// The ID of the binding of `user` on `project` (`None` for every project), if there is one.
+///
+/// # Errors
+/// Fails when the database refuses the query.
+pub async fn binding_of(store: &Store, user: Uuid, project: Option<Uuid>) -> Result<Option<Uuid>> {
+    Ok(sqlx::query_scalar!(
+        "SELECT id FROM role_bindings WHERE user_id = $1 AND project_id IS NOT DISTINCT FROM $2",
+        user,
+        project
+    )
+    .fetch_optional(store.pool())
+    .await?)
+}
+
 /// Binds `user` to `role` on `project` (`None`: every project), as a stored role binding. Tests of
 /// the administration pages use it to have a person with a role of their own.
 ///

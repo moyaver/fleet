@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT group_claim, source FROM group_mappings ORDER BY group_claim",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "group_claim",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "group_claim"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "source"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a9212cd4a49c7564ef3790aed8e069e9ec85c87f1526c14ec81e01576ff0954d"
+}

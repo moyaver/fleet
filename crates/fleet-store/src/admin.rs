@@ -4,15 +4,20 @@
 //! configuration (artifact policy, metric collection, retention windows) have no table, so the
 //! server builds those from its configuration; this module reads only what is stored.
 //!
+//! The writes (add, change, revoke, remove, each audited in its own transaction) are in
+//! [`mod@write`].
+//!
 //! Nothing here returns a secret: API keys come back by ID, name, prefix and dates, never by their
 //! hash (invariant I6). Audit history is paged newest first with a keyset cursor, so a page is
 //! stable while new events arrive.
 
+pub mod write;
+
 use base64::Engine as _;
 use fleet_protocol::rest::admin::{
     AdminAgentRow, AdminApiKeyView, AdminAuditEventView, AdminGapRow, AdminGroupMappingView,
-    AdminIngestionView, AdminLagRow, AdminProjectView, AdminRejectionRow, AdminRetentionClassView,
-    AdminRoleBindingView, AdminRoleMappingsView, AdminTrustPolicyView,
+    AdminIngestionView, AdminLagRow, AdminPersonView, AdminProjectView, AdminRejectionRow,
+    AdminRetentionClassView, AdminRoleBindingView, AdminRoleMappingsView, AdminTrustPolicyView,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -105,7 +110,7 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT t.id, p.slug AS project, t.name, t.issuer, t.audience, t.repository_id,
                       t.repository_owner_id, t.trusted_refs, t.allowed_events, t.job_workflow_ref,
-                      t.environment, t.pr_policy, t.created_at, t.revoked_at
+                      t.environment, t.pr_policy, t.created_at, t.revoked_at, t.source AS "source!"
                  FROM publisher_trust_policies t JOIN projects p ON p.id = t.project_id
                 ORDER BY p.slug, t.name"#
         )
@@ -128,6 +133,7 @@ impl Store {
                 pr_policy: r.pr_policy,
                 created_at: r.created_at,
                 revoked_at: r.revoked_at,
+                source: r.source,
             })
             .collect())
     }
@@ -162,6 +168,34 @@ impl Store {
             .collect())
     }
 
+    /// One API key's metadata, or `None` when there is no such key. Metadata only, as above.
+    pub async fn admin_api_key(&self, id: Uuid) -> Result<Option<AdminApiKeyView>> {
+        let row = sqlx::query!(
+            r#"SELECT k.id, p.slug AS project, k.name, k.prefix, k.trust_level AS "trust_level!",
+                      COALESCE(u.display_name, u.email) AS created_by, k.created_at, k.expires_at,
+                      k.revoked_at, k.last_used_at
+                 FROM api_keys k
+                 JOIN projects p ON p.id = k.project_id
+                 LEFT JOIN users u ON u.id = k.created_by
+                WHERE k.id = $1"#,
+            id
+        )
+        .fetch_optional(self.pool())
+        .await?;
+        Ok(row.map(|r| AdminApiKeyView {
+            id: r.id,
+            project: r.project,
+            name: r.name,
+            prefix: r.prefix,
+            trust_level: r.trust_level,
+            created_by: r.created_by,
+            created_at: r.created_at,
+            expires_at: r.expires_at,
+            revoked_at: r.revoked_at,
+            last_used_at: r.last_used_at,
+        }))
+    }
+
     /// Roles bound to people, and the identity-provider groups that grant roles.
     pub async fn admin_role_mappings(&self) -> Result<AdminRoleMappingsView> {
         let bindings = sqlx::query!(
@@ -176,10 +210,16 @@ impl Store {
         .await?;
         let groups = sqlx::query!(
             r#"SELECT g.id, g.oidc_issuer AS issuer, g.group_claim AS "group!", p.slug AS "project?",
-                      g.role AS "role!"
+                      g.role AS "role!", g.source AS "source!"
                  FROM group_mappings g
                  LEFT JOIN projects p ON p.id = g.project_id
                 ORDER BY g.oidc_issuer, g.group_claim, p.slug NULLS FIRST"#
+        )
+        .fetch_all(self.pool())
+        .await?;
+        let people = sqlx::query!(
+            r#"SELECT id, COALESCE(display_name, email, oidc_subject) AS "name!"
+                 FROM users ORDER BY COALESCE(display_name, email, oidc_subject), id"#
         )
         .fetch_all(self.pool())
         .await?;
@@ -202,6 +242,14 @@ impl Store {
                     group: r.group,
                     project: r.project,
                     role: r.role,
+                    source: r.source,
+                })
+                .collect(),
+            people: people
+                .into_iter()
+                .map(|r| AdminPersonView {
+                    id: r.id,
+                    name: r.name,
                 })
                 .collect(),
         })

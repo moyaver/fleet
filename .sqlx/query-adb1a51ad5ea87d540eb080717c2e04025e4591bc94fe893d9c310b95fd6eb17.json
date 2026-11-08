@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE publisher_trust_policies SET name = $2, issuer = $3, audience = $4,\n                    repository_id = $5, repository_owner_id = $6, trusted_refs = $7,\n                    allowed_events = $8, job_workflow_ref = $9, environment = $10, pr_policy = $11\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "adb1a51ad5ea87d540eb080717c2e04025e4591bc94fe893d9c310b95fd6eb17"
+}

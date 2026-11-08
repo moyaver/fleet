@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT details::text AS \"d!\" FROM audit_events WHERE action = 'api_key.create'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "d!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "46bff3b4ddfdd2916ff6fd60389eb1486e1e6994dcd736e9f46909cd504aeb97"
+}

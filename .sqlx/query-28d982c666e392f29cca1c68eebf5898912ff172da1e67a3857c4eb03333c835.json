@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO group_mappings (project_id, oidc_issuer, group_claim, role)\n                 VALUES ($1, $2, $3, $4)\n                 ON CONFLICT (project_id, oidc_issuer, group_claim) DO UPDATE SET role = EXCLUDED.role",
+  "query": "INSERT INTO group_mappings (project_id, oidc_issuer, group_claim, role, source)\n                 VALUES ($1, $2, $3, $4, 'config')\n                 ON CONFLICT (project_id, oidc_issuer, group_claim) DO UPDATE SET role = EXCLUDED.role",
   "describe": {
     "columns": [],
     "parameters": {
@@ -20,5 +20,5 @@
     },
     "nullable": []
   },
-  "hash": "15f8f116665047ed73949d23e068a7e7171a6ccc9dbcb70962b31814004d68ca"
+  "hash": "28d982c666e392f29cca1c68eebf5898912ff172da1e67a3857c4eb03333c835"
 }

@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT g.oidc_issuer, g.group_claim, g.project_id, p.slug AS \"slug?\", g.role AS \"role!\",\n                  g.source AS \"source!\"\n             FROM group_mappings g LEFT JOIN projects p ON p.id = g.project_id\n            WHERE g.id = $1 FOR UPDATE OF g",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "oidc_issuer",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "oidc_issuer"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "group_claim",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "group_claim"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "project_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "slug?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "role!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "source!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "source"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "82de5c0742b0404a3cf1eadfeb5bbaf4c38fb66f670b636e79b5750279ffb5a5"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT g.id, g.oidc_issuer AS issuer, g.group_claim AS \"group!\", p.slug AS \"project?\",\n                      g.role AS \"role!\"\n                 FROM group_mappings g\n                 LEFT JOIN projects p ON p.id = g.project_id\n                ORDER BY g.oidc_issuer, g.group_claim, p.slug NULLS FIRST",
+  "query": "SELECT g.id, g.oidc_issuer AS issuer, g.group_claim AS \"group!\", p.slug AS \"project?\",\n                      g.role AS \"role!\", g.source AS \"source!\"\n                 FROM group_mappings g\n                 LEFT JOIN projects p ON p.id = g.project_id\n                ORDER BY g.oidc_issuer, g.group_claim, p.slug NULLS FIRST",
   "describe": {
     "columns": [
       {
@@ -57,6 +57,17 @@
             "name": "role"
           }
         }
+      },
+      {
+        "ordinal": 5,
+        "name": "source!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "group_mappings",
+            "name": "source"
+          }
+        }
       }
     ],
     "parameters": {
@@ -67,8 +78,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "34dd856de651d3e28bb323f842a28761bc08c64a1d3611b2a92b23d047302648"
+  "hash": "df59622065a6bc891601d957f07105f04c1aa0eaa30b46c5a13752b7440cb3e9"
 }
