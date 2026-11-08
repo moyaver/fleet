@@ -24,6 +24,24 @@ pub fn is_global_admin(session: &SessionView) -> bool {
         .any(|r| r.project.is_none() && r.role == "admin")
 }
 
+/// The roles an administrator may bind or map.
+pub const ROLE_OPTIONS: [&str; 3] = ["viewer", "maintainer", "admin"];
+/// The trust levels an API key's runs may get.
+pub const TRUST_OPTIONS: [&str; 3] = ["trusted", "pr", "untrusted"];
+/// The pull-request policies of a trust policy.
+pub const PR_POLICY_OPTIONS: [&str; 3] = ["restricted", "full", "deny"];
+
+/// Where a row comes from, as the page says it: a row from the configuration is `from config`
+/// (locked on the dashboard), and one added on the dashboard is `dashboard`.
+#[must_use]
+pub fn source_text(source: &str) -> String {
+    if source == "config" {
+        "from config".to_owned()
+    } else {
+        "dashboard".to_owned()
+    }
+}
+
 /// A project, or every project when the binding has none.
 #[must_use]
 pub fn scope_text(project: Option<&str>) -> String {
@@ -235,5 +253,11 @@ mod tests {
             cells[7].contains(hostile),
             "the details keep the text as stored"
         );
+    }
+
+    #[test]
+    fn a_row_says_whether_the_configuration_or_the_dashboard_holds_it() {
+        assert_eq!(super::source_text("config"), "from config");
+        assert_eq!(super::source_text("dashboard"), "dashboard");
     }
 }

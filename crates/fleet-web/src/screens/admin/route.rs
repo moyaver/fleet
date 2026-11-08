@@ -16,16 +16,18 @@ use fleet_ui::components::{
 use leptos::{prelude::*, task::spawn_local};
 
 use super::{
+    forms,
     model::{ADMIN_PATH, AUDIT_HEADERS, AUDIT_PAGE, AUDIT_PATH, audit_cells},
     view::{
-        agent_rows, binding_rows, class_rows, ctx, grid, grid_or_empty, group_rows, ingestion_view,
-        key_rows, projects_rows, section, setting_rows, trust_rows,
+        agent_rows, binding_rows, class_rows, ctx, grid, grid_actions_or_empty, grid_or_empty,
+        group_rows, ingestion_view, key_rows, projects_rows, section, setting_rows, trust_rows,
     },
 };
 use crate::remote::remote;
 use crate::{api, api::ApiError, app::ErrorNotice, screens::parts::Fetched};
 
-/// The administration page: every area, in the order of the spec's list.
+/// The administration page: every area, in the order of the spec's list. The areas that can be
+/// changed carry their forms beside their tables; the server decides who may change them.
 #[component]
 #[expect(
     clippy::too_many_lines,
@@ -41,6 +43,8 @@ pub fn AdminRoute() -> impl IntoView {
     let metrics = remote(1000, api::admin_metric_policy);
     let agents = remote(1000, api::admin_agents);
     let ingestion = remote(1000, api::admin_ingestion);
+    // The project choices of the forms, read where each form is shown.
+    let choices = projects.data;
 
     view! {
         <div class="page-h">
@@ -70,27 +74,39 @@ pub fn AdminRoute() -> impl IntoView {
             Fetched::from(&projects),
             |rows| {
                 let ctx = ctx();
-                grid_or_empty(
-                    "Projects",
-                    &["Slug", "Name", "Default branch", "Working API keys", "Trust policies", "Status", "Created"],
-                    projects_rows(&rows, &ctx),
-                    "No project yet",
-                )
+                let actions = rows.iter().map(forms::rename_project).collect();
+                view! {
+                    {grid_actions_or_empty(
+                        "Projects",
+                        &PROJECT_HEADERS,
+                        projects_rows(&rows, &ctx),
+                        actions,
+                        "No project yet",
+                    )}
+                    {forms::add_project()}
+                }
+                .into_any()
             },
         )}
         {section(
             "trust",
             "Publisher trust",
-            "Who may publish into a project with a CI token. Set in the configuration",
+            "Who may publish into a project with a CI token. Set in the configuration, or added here",
             Fetched::from(&trust),
-            |rows| {
+            move |rows| {
                 let ctx = ctx();
-                grid_or_empty(
-                    "Publisher trust policies",
-                    &["Project", "Name", "Issuer", "Repository ID", "Owner ID", "Trusted refs", "Events", "Environment", "PR policy", "Status", "Created"],
-                    trust_rows(&rows, &ctx),
-                    "No publisher trust policy",
-                )
+                let actions = rows.iter().map(forms::policy_actions).collect();
+                view! {
+                    {grid_actions_or_empty(
+                        "Publisher trust policies",
+                        &TRUST_HEADERS,
+                        trust_rows(&rows, &ctx),
+                        actions,
+                        "No publisher trust policy",
+                    )}
+                    {move || forms::add_policy(&choices.get().unwrap_or_default())}
+                }
+                .into_any()
             },
         )}
         {section(
@@ -98,14 +114,29 @@ pub fn AdminRoute() -> impl IntoView {
             "API keys",
             "Metadata only: the secret is shown once, when a key is made, and never again",
             Fetched::from(&keys),
-            |rows| {
+            move |rows| {
                 let ctx = ctx();
-                grid_or_empty(
-                    "API keys",
-                    &["Project", "Name", "Prefix", "Trust", "Status", "Expires", "Created by", "Last used", "Created"],
-                    key_rows(&rows, &ctx),
-                    "No API key yet",
-                )
+                let actions = rows
+                    .iter()
+                    .map(|k| {
+                        if k.revoked_at.is_some() {
+                            ().into_any()
+                        } else {
+                            forms::key_actions(k)
+                        }
+                    })
+                    .collect();
+                view! {
+                    {grid_actions_or_empty(
+                        "API keys",
+                        &KEY_HEADERS,
+                        key_rows(&rows, &ctx),
+                        actions,
+                        "No API key yet",
+                    )}
+                    {move || forms::add_key(&choices.get().unwrap_or_default())}
+                }
+                .into_any()
             },
         )}
         {section(
@@ -113,27 +144,34 @@ pub fn AdminRoute() -> impl IntoView {
             "Role mappings",
             "Roles bound to people, and the identity-provider groups that grant them",
             Fetched::from(&roles),
-            |mappings| {
+            move |mappings| {
                 let ctx = ctx();
+                let binding_actions = mappings.bindings.iter().map(forms::binding_actions).collect();
+                let group_actions = mappings.groups.iter().map(forms::group_actions).collect();
+                let people = mappings.people.clone();
                 view! {
                     <div class="space-y-6">
                         <div>
                             <h4 class="pb-2 text-sm font-semibold">"Bound to people"</h4>
-                            {grid_or_empty(
+                            {grid_actions_or_empty(
                                 "Roles bound to people",
-                                &["Person", "Scope", "Role", "Granted"],
+                                &BINDING_HEADERS,
                                 binding_rows(&mappings.bindings, &ctx),
+                                binding_actions,
                                 "No role is bound to a person",
                             )}
+                            {move || forms::add_binding(&choices.get().unwrap_or_default(), &people)}
                         </div>
                         <div>
                             <h4 class="pb-2 text-sm font-semibold">"Groups"</h4>
-                            {grid_or_empty(
+                            {grid_actions_or_empty(
                                 "Identity-provider groups and their roles",
-                                &["Issuer", "Group", "Scope", "Role"],
+                                &GROUP_HEADERS,
                                 group_rows(&mappings.groups),
+                                group_actions,
                                 "No group grants a role",
                             )}
+                            {move || forms::add_group(&choices.get().unwrap_or_default())}
                         </div>
                     </div>
                 }
@@ -231,6 +269,47 @@ pub fn AdminRoute() -> impl IntoView {
         </section>
     }
 }
+
+/// The column headers of each area's table. The last one is the row's actions.
+const PROJECT_HEADERS: [&str; 8] = [
+    "Slug",
+    "Name",
+    "Default branch",
+    "Working API keys",
+    "Trust policies",
+    "Status",
+    "Created",
+    "Change",
+];
+const TRUST_HEADERS: [&str; 13] = [
+    "Project",
+    "Name",
+    "Issuer",
+    "Repository ID",
+    "Owner ID",
+    "Trusted refs",
+    "Events",
+    "Environment",
+    "PR policy",
+    "Status",
+    "Source",
+    "Created",
+    "Change",
+];
+const KEY_HEADERS: [&str; 10] = [
+    "Project",
+    "Name",
+    "Prefix",
+    "Trust",
+    "Status",
+    "Expires",
+    "Created by",
+    "Last used",
+    "Created",
+    "Change",
+];
+const BINDING_HEADERS: [&str; 5] = ["Person", "Scope", "Role", "Granted", "Change"];
+const GROUP_HEADERS: [&str; 6] = ["Issuer", "Group", "Scope", "Role", "Source", "Change"];
 
 /// The audit history, newest first, a page at a time.
 #[component]
