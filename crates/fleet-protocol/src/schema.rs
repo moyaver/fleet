@@ -21,6 +21,11 @@ pub(crate) fn rfc3339(_: &mut SchemaGenerator) -> Schema {
     json_schema!({ "type": "string", "format": "date-time" })
 }
 
+/// Schema of an optional RFC 3339 timestamp (`time::serde::rfc3339::option` fields).
+pub(crate) fn rfc3339_option(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "type": ["string", "null"], "format": "date-time" })
+}
+
 fn root<T: JsonSchema>() -> serde_json::Value {
     let generator = SchemaSettings::draft2020_12().into_generator();
     generator.into_root_schema_for::<T>().to_value()

@@ -12,7 +12,7 @@ use fleet_protocol::{
         ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
         StepStatus, StepTiming, SuiteStarted,
     },
-    frame::{AgentInfo, CiContext, ProtocolRange, ResumeState},
+    frame::{AgentInfo, CiContext, ProtocolRange, ResumeState, RunOrigin},
     journal::{ClockSample, Provenance, SourceKind, StepRef, Subject},
     rest::CrashView,
 };
@@ -75,6 +75,8 @@ impl Agent {
                 oldest_unacked_seq: oldest_unacked,
             },
             clock: now(),
+            origin: RunOrigin::Live,
+            started_at: None,
         }
     }
 
@@ -1831,4 +1833,45 @@ async fn a_token_in_log_text_is_stored_redacted_though_the_agent_sent_it_raw(poo
         journal.iter().all(|d| !d.contains(token)),
         "the journal kept the token"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_published_run_keeps_the_day_it_started_and_says_it_was_published(pool: PgPool) {
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    // Published three days after it started: its day is the day it ran, not the day it arrived.
+    let started = OffsetDateTime::now_utc() - time::Duration::days(3);
+    let published = Agent::new("301", "pub");
+    let mut hello = published.hello(None);
+    hello.origin = RunOrigin::Published;
+    hello.started_at = Some(started);
+    store
+        .open_run(&p, &hello, Transport::WebSocket)
+        .await
+        .unwrap();
+    let live = Agent::new("302", "live");
+    store
+        .open_run(&p, &live.hello(None), Transport::WebSocket)
+        .await
+        .unwrap();
+
+    let runs: Vec<(Uuid, time::Date, String)> =
+        sqlx::query_as("SELECT id, run_day, origin FROM agent_runs ORDER BY job_id, id")
+            .fetch_all(store.pool())
+            .await
+            .unwrap();
+    let day = |id: Uuid| runs.iter().find(|r| r.0 == id).unwrap();
+    let (_, run_day, origin) = day(published.id);
+    assert_eq!(*run_day, started.date(), "the day the run started");
+    assert_eq!(origin, "published");
+    let (_, run_day, origin) = day(live.id);
+    assert_eq!(
+        *run_day,
+        OffsetDateTime::now_utc().date(),
+        "a live run starts today"
+    );
+    assert_eq!(origin, "live");
 }

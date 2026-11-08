@@ -21,7 +21,7 @@ use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 use super::{flow::infrastructure_of, workers::RunCursor};
-use crate::{Result, Store};
+use crate::{Result, Store, live};
 
 /// The history rows classified per flow: at most this many, the latest.
 const CLASSIFIED_RUNS_PER_FLOW: i64 = 200;
@@ -81,12 +81,14 @@ struct HistoryRow {
     failure_message: Option<String>,
     failure_fingerprint: Option<String>,
     condition_fingerprint: Option<String>,
+    origin: String,
 }
 
 impl HistoryRow {
-    fn into_entry(self) -> HistoryEntryView {
-        HistoryEntryView {
+    fn into_entry(self) -> Result<HistoryEntryView> {
+        Ok(HistoryEntryView {
             infrastructure: infrastructure_of(&self.state, self.failure_message.as_deref()),
+            origin: live::origin_of(&self.origin)?,
             flow_id: self.flow_id,
             flow: self.flow,
             name: self.name,
@@ -103,7 +105,7 @@ impl HistoryRow {
             failure_fingerprint: self.failure_fingerprint,
             condition_fingerprint: self.condition_fingerprint,
             triage: None,
-        }
+        })
     }
 }
 
@@ -134,8 +136,9 @@ impl Store {
                     f.finality::text AS \"finality!\",
                     coalesce(f.ended_at, f.started_at) AS \"at!\", f.duration_ms, f.failure_message,
                     ff.fingerprint AS \"failure_fingerprint?\",
-                    encode(c.fingerprint, 'hex') AS condition_fingerprint
+                    encode(c.fingerprint, 'hex') AS condition_fingerprint, r.origin
                FROM flow_executions f
+               JOIN agent_runs r ON r.id = f.agent_run_id
                JOIN pipeline_attempts pa ON pa.id = f.pipeline_attempt_id
                JOIN pipeline_runs pr ON pr.id = pa.pipeline_run_id
                LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id
@@ -166,8 +169,10 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
-        let mut items: Vec<HistoryEntryView> =
-            rows.into_iter().map(HistoryRow::into_entry).collect();
+        let mut items: Vec<HistoryEntryView> = rows
+            .into_iter()
+            .map(HistoryRow::into_entry)
+            .collect::<Result<_>>()?;
         let more = usize::try_from(query.limit).is_ok_and(|l| items.len() > l);
         if more {
             items.truncate(usize::try_from(query.limit).unwrap_or(0));

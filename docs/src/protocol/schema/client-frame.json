@@ -327,6 +327,10 @@
           "$ref": "#/$defs/ClockSample",
           "description": "Agent clock at send."
         },
+        "origin": {
+          "$ref": "#/$defs/RunOrigin",
+          "description": "Where the run's evidence came from. Absent from live agents, which send nothing here."
+        },
         "previous_agent_run_id": {
           "description": "The run this one replaces after an agent restart in the same job.",
           "format": "uuid",
@@ -342,6 +346,14 @@
         "resume": {
           "$ref": "#/$defs/ResumeState",
           "description": "What the agent still holds."
+        },
+        "started_at": {
+          "description": "When the run started, as the agent recorded it. A published run takes its date (`run_day`)\nfrom this, not from the day it is published; a live run leaves it out and starts now.",
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -428,6 +440,21 @@
         "next_seq"
       ],
       "type": "object"
+    },
+    "RunOrigin": {
+      "description": "Where a run's evidence came from (issue #83). A live run is observed as it happens; a published\nrun is a finished run the agent sent after the fact (`fleet-agent publish`), so the server shows\nit as imported, never as live.",
+      "oneOf": [
+        {
+          "const": "live",
+          "description": "Observed while it ran.",
+          "type": "string"
+        },
+        {
+          "const": "published",
+          "description": "Sent after the fact by `fleet-agent publish`: an offline bundle or a saved output.",
+          "type": "string"
+        }
+      ]
     },
     "Sample": {
       "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).",

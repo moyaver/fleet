@@ -38,7 +38,7 @@ use fleet_protocol::{
     },
     frame::{
         AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, Hello, ProtocolRange,
-        ResumeState, Sample, ServerFrame, Telemetry,
+        ResumeState, RunOrigin, Sample, ServerFrame, Telemetry,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -637,6 +637,8 @@ fn hello(
             oldest_unacked_seq: Some(oldest),
         },
         clock: clock(t0),
+        origin: RunOrigin::Live,
+        started_at: None,
     }
 }
 

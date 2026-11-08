@@ -14,18 +14,28 @@
 
 use std::collections::BTreeMap;
 
-use fleet_protocol::live::{
-    AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, PlanShardView, PlanView,
-    ProjectView, Snapshot, SuiteView,
+use fleet_protocol::{
+    frame::RunOrigin,
+    live::{
+        AgentRunView, AttemptView, DeviceView, EntityView, FlowView, JobView, PlanShardView,
+        PlanView, ProjectView, Snapshot, SuiteView,
+    },
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, postgres::PgListener};
 use uuid::Uuid;
 
 use crate::{
-    Result, Store,
+    Error, Result, Store,
     ingest::{Change, EntityRef},
 };
+
+/// The origin a run's `origin` column names. The column's check constraint admits only the names
+/// [`RunOrigin::parse`] knows, so anything else is stored data this build does not understand.
+pub(crate) fn origin_of(stored: &str) -> Result<RunOrigin> {
+    RunOrigin::parse(stored)
+        .ok_or_else(|| Error::Corrupt(format!("run origin {stored:?} is not known")))
+}
 
 /// The Postgres channel that carries committed live changes between instances.
 const CHANNEL: &str = "fleet_live";
@@ -337,7 +347,7 @@ pub(crate) async fn agent_runs(
                 r.trust_level::text AS \"trust_level!\", r.committed_seq,
                 (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",
                 r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,
-                r.maestro_version, r.maestro_profile_supported, r.rev, NULL::text AS liveness
+                r.maestro_version, r.maestro_profile_supported, r.rev, r.origin, NULL::text AS liveness
            FROM agent_runs r JOIN jobs j ON j.id = r.job_id
            LEFT JOIN workers w ON w.id = r.worker_id
           WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)
@@ -349,28 +359,30 @@ pub(crate) async fn agent_runs(
     .fetch_all(c)
     .await?;
     // The server fills `liveness` from live contact; the database has none.
-    Ok(rows
-        .into_iter()
-        .map(|r| AgentRunView {
-            id: r.id,
-            job_id: r.job_id,
-            worker_id: r.worker_id,
-            runner_name: r.runner_name,
-            state: r.state,
-            trust_level: r.trust_level,
-            committed_seq: r.committed_seq,
-            gaps: r.gaps,
-            last_frame_at: r.last_frame_at,
-            late_resume: r.late_resume,
-            plan_id: r.plan_id,
-            plan_shard_id: r.plan_shard_id,
-            maestro_exit_code: r.maestro_exit_code,
-            maestro_version: r.maestro_version,
-            maestro_profile_supported: r.maestro_profile_supported,
-            rev: r.rev,
-            liveness: None,
+    rows.into_iter()
+        .map(|r| {
+            Ok(AgentRunView {
+                origin: origin_of(&r.origin)?,
+                id: r.id,
+                job_id: r.job_id,
+                worker_id: r.worker_id,
+                runner_name: r.runner_name,
+                state: r.state,
+                trust_level: r.trust_level,
+                committed_seq: r.committed_seq,
+                gaps: r.gaps,
+                last_frame_at: r.last_frame_at,
+                late_resume: r.late_resume,
+                plan_id: r.plan_id,
+                plan_shard_id: r.plan_shard_id,
+                maestro_exit_code: r.maestro_exit_code,
+                maestro_version: r.maestro_version,
+                maestro_profile_supported: r.maestro_profile_supported,
+                rev: r.rev,
+                liveness: None,
+            })
         })
-        .collect())
+        .collect()
 }
 
 pub(crate) async fn suites(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<SuiteView>> {
@@ -413,12 +425,11 @@ pub(crate) async fn devices(
 
 pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Result<Vec<FlowView>> {
     let (attempt, ids, project) = scope.parts();
-    Ok(sqlx::query_as!(
-        FlowView,
+    let rows = sqlx::query!(
         "SELECT f.id, f.job_id, f.suite_execution_id, f.agent_run_id, f.device_session_id,
                 f.shard_number, f.ordinal, f.flow_name AS name, f.flow_path AS path, f.state,
                 f.outcome_source::text AS outcome_source, f.finality::text AS \"finality!\",
-                f.has_conflict, f.failure_message, f.duration_ms, f.rev,
+                f.has_conflict, f.failure_message, f.duration_ms, f.rev, r.origin,
                 (SELECT count(*) FROM step_executions st
                   WHERE st.run_day = r.run_day AND st.flow_execution_id = f.id) AS \"steps!\"
            FROM flow_executions f JOIN agent_runs r ON r.id = f.agent_run_id
@@ -429,7 +440,31 @@ pub(crate) async fn flows(c: &mut sqlx::PgConnection, scope: Scope<'_>) -> Resul
         project
     )
     .fetch_all(c)
-    .await?)
+    .await?;
+    rows.into_iter()
+        .map(|f| {
+            Ok(FlowView {
+                origin: origin_of(&f.origin)?,
+                id: f.id,
+                job_id: f.job_id,
+                suite_execution_id: f.suite_execution_id,
+                agent_run_id: f.agent_run_id,
+                device_session_id: f.device_session_id,
+                shard_number: f.shard_number,
+                ordinal: f.ordinal,
+                name: f.name,
+                path: f.path,
+                state: f.state,
+                outcome_source: f.outcome_source,
+                finality: f.finality,
+                has_conflict: f.has_conflict,
+                failure_message: f.failure_message,
+                duration_ms: f.duration_ms,
+                rev: f.rev,
+                steps: f.steps,
+            })
+        })
+        .collect()
 }
 
 async fn plans(c: &mut sqlx::PgConnection, project: Uuid, attempt: Uuid) -> Result<Vec<PlanView>> {

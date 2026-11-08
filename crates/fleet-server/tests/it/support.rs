@@ -12,7 +12,7 @@ use fleet_protocol::{
     },
     frame::{
         AgentInfo, CiContext, CiProvider, ClientFrame, Hello, ProtocolRange, ResumeState,
-        ServerFrame,
+        RunOrigin, ServerFrame,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, Subject},
 };
@@ -263,6 +263,8 @@ impl Agent {
                 oldest_unacked_seq: oldest_unacked,
             },
             clock: now(),
+            origin: RunOrigin::Live,
+            started_at: None,
         }
     }
 

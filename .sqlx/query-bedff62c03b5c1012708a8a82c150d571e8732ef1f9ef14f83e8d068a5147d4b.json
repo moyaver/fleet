@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id,\n                                 previous_agent_run_id, trust_level, run_day,\n                                 agent_version, protocol_version)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+  "query": "INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id,\n                                 previous_agent_run_id, trust_level, run_day,\n                                 agent_version, protocol_version, origin)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -22,10 +22,11 @@
         },
         "Date",
         "Text",
-        "Int2"
+        "Int2",
+        "Text"
       ]
     },
     "nullable": []
   },
-  "hash": "5382e688e412a3b532d753f47fd5b96937a9bc436cbb939ce6e2354764455b0e"
+  "hash": "bedff62c03b5c1012708a8a82c150d571e8732ef1f9ef14f83e8d068a5147d4b"
 }
