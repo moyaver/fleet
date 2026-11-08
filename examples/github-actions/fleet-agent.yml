@@ -6,6 +6,7 @@ on: [pull_request]
 
 permissions:
   contents: read
+  attestations: read   # the action checks the agent's build attestation (verify-attestation: true)
   id-token: write   # the agent exchanges the job's OIDC token for a Fleet agent token
 
 jobs:

@@ -8,7 +8,7 @@ This installs the alpha pre-release `v0.1.0-alpha.3` (pinned, because `latest` s
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.3/fleet-agent-installer.sh | sh
 ```
 
-Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum (also listed in `sha256.sum`), a GitHub artifact attestation, the license and the third-party notices. To verify a downloaded archive with the [GitHub CLI](https://cli.github.com/):
+Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum (also listed in `sha256.sum`), a GitHub artifact attestation, the license and the third-party notices. The checksum file is served from the same release as the archive, so a check against it proves only that the download was not corrupted. The attestation is what authenticates the archive. To verify a downloaded archive with the [GitHub CLI](https://cli.github.com/):
 
 ```bash
 gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
@@ -16,7 +16,7 @@ gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyave
 
 ## GitHub Actions
 
-The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent (its archive's checksum is verified, and its build attestation too when the `gh` CLI is on the runner), runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason and provenance, each of them linked to its flow page when `FLEET_SERVER` is set, and a link to the dashboard. Maestro's output and exit status are unchanged. Give the job `permissions: id-token: write`:
+The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent, runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason and provenance, each of them linked to its flow page when `FLEET_SERVER` is set, and a link to the dashboard. Maestro's output and exit status are unchanged. Before it runs anything, the action requires the release's build attestation to verify (`verify-attestation: true`, the default), and takes the archive's expected SHA-256 from that attestation. The check needs the `gh` and `jq` CLIs on the runner and a token with `attestations: read`. Set `verify-attestation: false` only where the archive cannot be authenticated anyway, and the action then warns. Give the job `permissions: id-token: write` and `attestations: read`:
 
 ```yaml
 - uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.3
@@ -108,3 +108,20 @@ Fleet's own nightly job runs real Maestro against an emulator on the owner's App
 - have room for a throwaway emulator on port 5580 (serial `emulator-5580`, AVD `fleet-nightly`, kept under the runner's temporary directory). The owner's emulator on 5554 and its AVDs are not used.
 
 An always-run step removes the emulator, its AVD and the Compose stack with its volumes. The image and GPU mode match the capture of the Phase 0 fixtures on this Mac.
+
+## Hardening a runner
+
+Fleet's CI jobs run user code on the runner, so a runner that outlives one job is a standing target. The steps below are the ones the repository can document. The repository cannot enforce them: they are GitHub or infrastructure settings (research 06 T18, T19).
+
+- **No fork pull requests on a self-hosted runner.** The CI workflows already run fork pull requests on hosted runners only. Keep the runner's labels out of any workflow that a fork can trigger, and require approval for fork pull request workflows (repository Actions settings).
+- **Ephemeral or just-in-time registration.** Register the runner with `./config.sh --ephemeral`, or through a JIT configuration, so each job gets a fresh runner that is removed afterwards. A persistent runner keeps its work directory, and anything a job left there is available to the next job.
+- **A separate runner group** for Fleet-instrumented jobs, with access to this repository only.
+- **An unprivileged user** runs the runner service. It has no `sudo`, no Docker group membership it does not need, and no access to other users' keys.
+- **Read-only default token.** Set the repository's default workflow permissions to read. Grant `id-token: write` and `attestations: read` per job, as the examples do.
+- **OIDC, not stored secrets.** Authenticate the agent with the job's OIDC token (`id-token: write`). A static `FLEET_TOKEN` is for push and schedule jobs only, stored as an environment secret with protection rules.
+- **Pinned actions.** Pin every third-party action by its full commit SHA. The examples pin Fleet's composite action to a release tag; move that tag with each release.
+
+**Left for the owner (not in the repository):**
+
+1. Turn on **immutable releases** for `moyaver/fleet` (repository settings, Releases), so a published release tag and its assets cannot be changed.
+2. Run the `fleet-mac` self-hosted runner **ephemerally or just-in-time** (runner registration on the Mac; see the steps above).
