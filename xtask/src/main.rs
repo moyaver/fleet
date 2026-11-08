@@ -12,6 +12,7 @@ mod fixtures;
 mod lint;
 mod schema;
 mod tools;
+mod upgrade;
 
 use std::{
     path::{Path, PathBuf},
@@ -31,7 +32,7 @@ const TOOLS: &[&str] = &[
     "mdbook",
 ];
 
-const USAGE: &str = "usage: cargo xtask <setup | tools | ci | lint | sqlx | schema [--check] | web [--release] | fixtures … | bench-overhead [--runs N] [--linger SECS] [--max-cpu-percent X]>";
+const USAGE: &str = "usage: cargo xtask <setup | tools | ci | lint | sqlx | schema [--check] | web [--release] | fixtures … | bench-overhead [--runs N] [--linger SECS] [--max-cpu-percent X] | upgrade-rehearsal [TAG…]>";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -55,6 +56,7 @@ fn main() -> anyhow::Result<()> {
         ["web", "--release"] => web(&root, true),
         ["fixtures", rest @ ..] => fixtures::run(&root, rest),
         ["bench-overhead", rest @ ..] => bench::run(&root, rest),
+        ["upgrade-rehearsal", tags @ ..] => upgrade::rehearse(&root, tags),
         _ => bail!(USAGE),
     }
 }
