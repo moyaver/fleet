@@ -2,6 +2,7 @@
 //! The agent's three upload calls (see [`fleet_protocol::artifact`]).
 
 use std::{
+    collections::BTreeMap,
     io,
     path::{Path as FsPath, PathBuf},
     time::{Duration, SystemTime},
@@ -14,8 +15,9 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use fleet_blob::{
-    BlobKey, ByteStream, Sha256Digest,
+    BlobKey, ByteStream, Sha256Digest, StagingKey,
     verify::{self, ArtifactClass as BlobClass, Declared, Kind, Limits, VerifyError},
 };
 use fleet_core::policy::{Action, Principal, Resource, authorize};
@@ -26,7 +28,8 @@ use fleet_store::artifacts::{
     Claim, Finished, Pending, PendingArtifact, Quota, Requested, UploadAsk,
 };
 use fleet_store::gc::BlobReservation;
-use futures_util::StreamExt as _;
+use futures_util::{Stream, StreamExt as _};
+use time::OffsetDateTime;
 use tokio::io::AsyncWriteExt as _;
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
@@ -231,12 +234,29 @@ pub(super) async fn request(
             // A retry starts over: whatever an earlier attempt spooled is stale.
             let _ = tokio::fs::remove_file(spool_path(&state, artifact_id)).await;
             let base = format!("/api/v1/agent/artifacts/{artifact_id}");
+            let complete_url = format!("{base}/complete");
+            if req.direct
+                && let Some((url, headers)) = presign(&state, artifact_id, &req.sha256, ttl).await
+            {
+                return (
+                    StatusCode::CREATED,
+                    Json(UploadGrant::Presigned {
+                        artifact_id,
+                        url,
+                        headers,
+                        complete_url,
+                        expires_at,
+                        size: req.size,
+                    }),
+                )
+                    .into_response();
+            }
             (
                 StatusCode::CREATED,
                 Json(UploadGrant::Upload {
                     artifact_id,
                     url: format!("{base}/content"),
-                    complete_url: format!("{base}/complete"),
+                    complete_url,
                     expires_at,
                     size: req.size,
                 }),
@@ -269,6 +289,43 @@ pub(super) async fn request(
     }
 }
 
+/// A presigned `PUT` for the artifact's staging object, bound to the declared digest, or `None`
+/// when the store cannot give one: the grant then relays the bytes through Fleet (ADR-0007). A
+/// failure here is logged, never returned: direct upload is an optimisation (invariant I2).
+async fn presign(
+    state: &AppState,
+    artifact: Uuid,
+    sha256: &str,
+    ttl: Duration,
+) -> Option<(String, BTreeMap<String, String>)> {
+    let digest = Sha256Digest::from_hex(sha256)?;
+    let blobs = match state.blobs().await {
+        Ok(blobs) => blobs,
+        Err(e) => {
+            tracing::warn!(error = %format!("{e:#}"), "opening the blob store for a direct upload");
+            return None;
+        }
+    };
+    let staging = StagingKey::new(artifact);
+    // A staged object from an earlier attempt is stale: the grant starts over.
+    if let Err(e) = blobs.delete_staged(&staging).await {
+        tracing::warn!(error = %e, "clearing a stale staged upload; relaying instead");
+        return None;
+    }
+    let headers = BTreeMap::from([(
+        "x-amz-checksum-sha256".to_owned(),
+        STANDARD.encode(digest.as_bytes()),
+    )]);
+    match blobs.presign_put(&staging, ttl, &headers).await {
+        Ok(Some(url)) => Some((url, headers)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(error = %e, "presigning a direct upload; relaying instead");
+            None
+        }
+    }
+}
+
 fn spool_path(state: &AppState, artifact: Uuid) -> PathBuf {
     state
         .config
@@ -284,17 +341,23 @@ enum Receive {
     Broken(io::Error),
 }
 
-/// Streams `body` into `file`, which must end up exactly `size` bytes long.
-async fn receive(body: Body, file: &mut tokio::fs::File, size: u64) -> Result<(), Receive> {
+/// Streams `chunks` into `file`, which must end up exactly `size` bytes long. Shared by a relayed
+/// body and a staged object, so both are bounded the same way.
+async fn receive<S, T>(mut chunks: S, file: &mut tokio::fs::File, size: u64) -> Result<(), Receive>
+where
+    S: Stream<Item = io::Result<T>> + Unpin,
+    T: AsRef<[u8]>,
+{
     let mut received: u64 = 0;
-    let mut stream = body.into_data_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| Receive::Broken(io::Error::other(e)))?;
-        received = received.saturating_add(chunk.len() as u64);
+    while let Some(chunk) = chunks.next().await {
+        let chunk = chunk.map_err(Receive::Broken)?;
+        received = received.saturating_add(chunk.as_ref().len() as u64);
         if received > size {
             return Err(Receive::TooMuch);
         }
-        file.write_all(&chunk).await.map_err(Receive::Broken)?;
+        file.write_all(chunk.as_ref())
+            .await
+            .map_err(Receive::Broken)?;
     }
     if received != size {
         return Err(Receive::TooLittle);
@@ -366,22 +429,30 @@ pub(super) async fn content(
     }
 }
 
-async fn store_body(
-    state: &AppState,
-    artifact: Uuid,
-    body: Body,
-    size: u64,
-) -> Result<(), Box<Response>> {
+/// Creates the artifact's spool file, empty.
+async fn spool_file(state: &AppState, artifact: Uuid) -> Result<tokio::fs::File, Box<Response>> {
     let path = spool_path(state, artifact);
     if let Some(dir) = path.parent()
         && let Err(e) = tokio::fs::create_dir_all(dir).await
     {
         return Err(Box::new(internal(&e)));
     }
-    let mut file = tokio::fs::File::create(&path)
+    tokio::fs::File::create(&path)
         .await
-        .map_err(|e| Box::new(internal(&e)))?;
-    match receive(body, &mut file, size).await {
+        .map_err(|e| Box::new(internal(&e)))
+}
+
+async fn store_body(
+    state: &AppState,
+    artifact: Uuid,
+    body: Body,
+    size: u64,
+) -> Result<(), Box<Response>> {
+    let mut file = spool_file(state, artifact).await?;
+    let chunks = body
+        .into_data_stream()
+        .map(|chunk| chunk.map_err(io::Error::other));
+    match receive(chunks, &mut file, size).await {
         Ok(()) => Ok(()),
         Err(Receive::TooMuch) => Err(Box::new(error(
             StatusCode::PAYLOAD_TOO_LARGE,
@@ -398,6 +469,86 @@ async fn store_body(
                 "the body was cut short",
             )))
         }
+    }
+}
+
+/// Direct upload: takes the bytes from the staging object into the spool, as a relayed body
+/// would have arrived. The grant is claimed first, so the staged object is read once per grant.
+/// Returns `false` when nothing is staged or the grant is no longer open for it; a staged object
+/// of the wrong size is refused here as a size mismatch, and the staged object is deleted.
+async fn take_staged(
+    state: &AppState,
+    publisher: &fleet_store::auth::Publisher,
+    artifact: Uuid,
+) -> Result<bool, Box<Response>> {
+    let blobs = state
+        .blobs()
+        .await
+        .map_err(|e| Box::new(internal(&format!("{e:#}"))))?;
+    let staging = StagingKey::new(artifact);
+    let staged = match blobs.staged(&staging).await {
+        Ok(Some(staged)) => staged,
+        Ok(None) => return Ok(false),
+        Err(e) => return Err(Box::new(internal(&e))),
+    };
+    let size = match state
+        .store
+        .claim_content(publisher.project_id, publisher.credential, artifact)
+        .await
+    {
+        Ok(Claim::Claimed { size }) => size,
+        Ok(Claim::Expired) => {
+            return Err(Box::new(error(
+                StatusCode::GONE,
+                "the grant has expired: request a new one",
+            )));
+        }
+        Ok(Claim::NotFound | Claim::AlreadyUsed) => return Ok(false),
+        Err(e) => return Err(Box::new(internal(&e))),
+    };
+    let mut file = spool_file(state, artifact).await?;
+    match receive(staged.body, &mut file, size).await {
+        Ok(()) => {
+            state
+                .store
+                .content_received(artifact)
+                .await
+                .map_err(|e| Box::new(internal(&e)))?;
+            Ok(true)
+        }
+        Err(Receive::TooMuch | Receive::TooLittle) => {
+            let _ = tokio::fs::remove_file(spool_path(state, artifact)).await;
+            state
+                .store
+                .mark_rejected(artifact, RejectReason::SizeMismatch.as_str())
+                .await
+                .map_err(|e| Box::new(internal(&e)))?;
+            delete_staged(state, artifact).await;
+            Ok(true)
+        }
+        Err(Receive::Broken(e)) => {
+            tracing::warn!(error = %e, "reading a staged upload");
+            let _ = tokio::fs::remove_file(spool_path(state, artifact)).await;
+            if let Err(e) = state.store.abort_content(artifact).await {
+                tracing::warn!(error = %e, "releasing an upload claim");
+            }
+            Err(Box::new(error(
+                StatusCode::CONFLICT,
+                "the staged bytes could not be read: try again",
+            )))
+        }
+    }
+}
+
+/// Removes the artifact's staging object, if any. Best effort: a leftover is swept later.
+async fn delete_staged(state: &AppState, artifact: Uuid) {
+    match state.blobs().await {
+        Ok(blobs) => {
+            if let Err(e) = blobs.delete_staged(&StagingKey::new(artifact)).await {
+                tracing::warn!(error = %e, "deleting a staged upload");
+            }
+        }
+        Err(e) => tracing::warn!(error = %format!("{e:#}"), "deleting a staged upload"),
     }
 }
 
@@ -466,13 +617,31 @@ pub(super) async fn complete(
         Ok(p) => p,
         Err(r) => return *r,
     };
-    let pending = match state
+    let mut pending = state
         .store
         .pending_complete(publisher.project_id, publisher.credential, artifact)
-        .await
-    {
+        .await;
+    // Nothing relayed yet: the bytes may have gone straight to the object store (direct upload).
+    if matches!(pending, Ok(Pending::NotReceived)) {
+        match take_staged(&state, &publisher, artifact).await {
+            Ok(true) => {
+                pending = state
+                    .store
+                    .pending_complete(publisher.project_id, publisher.credential, artifact)
+                    .await;
+            }
+            Ok(false) => {}
+            Err(r) => return *r,
+        }
+    }
+    let pending = match pending {
         Ok(Pending::Ready(p)) => p,
-        Ok(Pending::Done(finished)) => return result_json(artifact, finished),
+        // Finished already: the recorded outcome, whatever a reused presigned `PUT` staged since.
+        // Staged bytes are never read again, and any stray staged object is removed.
+        Ok(Pending::Done(finished)) => {
+            delete_staged(&state, artifact).await;
+            return result_json(artifact, finished);
+        }
         Ok(Pending::NotFound) => return error(StatusCode::NOT_FOUND, "no such upload"),
         Ok(Pending::NotReceived) => {
             return error(StatusCode::CONFLICT, "the bytes have not arrived");
@@ -480,7 +649,10 @@ pub(super) async fn complete(
         Err(e) => return internal(&e),
     };
     match finish(&state, publisher.project_id, &pending).await {
-        Ok(finished) => result_json(artifact, finished),
+        Ok(finished) => {
+            delete_staged(&state, artifact).await;
+            result_json(artifact, finished)
+        }
         Err(Finish::Lost) => {
             // A concurrent `complete` finished it, or the spool was cleaned: say what is true.
             match state
@@ -577,13 +749,9 @@ async fn finish(state: &AppState, project: Uuid, p: &PendingArtifact) -> Result<
     }
 }
 
-/// Deletes spool files nobody will complete: not an open grant, not awaiting `complete`, and
-/// older than two grant lifetimes.
+/// Deletes spool files and staged direct uploads nobody will complete: not an open grant, not
+/// awaiting `complete`, and older than two grant lifetimes.
 pub(crate) async fn purge_spool(state: &AppState) {
-    let dir = state.config.artifacts.spool_dir.clone();
-    let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
-        return;
-    };
     let keep = match state.store.open_uploads().await {
         Ok(ids) => ids,
         Err(e) => {
@@ -592,11 +760,26 @@ pub(crate) async fn purge_spool(state: &AppState) {
         }
     };
     let grace = Duration::from_secs(state.config.artifacts.grant_ttl_seconds.saturating_mul(2));
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let path = entry.path();
-        if is_stale(&path, &keep, grace).await {
-            let _ = tokio::fs::remove_file(&path).await;
+    // A spool directory that does not exist yet (no relayed upload has arrived) holds nothing.
+    if let Ok(mut entries) = tokio::fs::read_dir(&state.config.artifacts.spool_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            if is_stale(&path, &keep, grace).await {
+                let _ = tokio::fs::remove_file(&path).await;
+            }
         }
+    }
+    // Direct uploads staged in the object store: the same rule, applied there.
+    match state.blobs().await {
+        Ok(blobs) => {
+            let older_than = OffsetDateTime::now_utc() - grace;
+            match blobs.sweep_staged(&keep, older_than).await {
+                Ok(0) => {}
+                Ok(removed) => tracing::info!(removed, "removed stale staged uploads"),
+                Err(e) => tracing::warn!(error = %e, "sweeping staged uploads"),
+            }
+        }
+        Err(e) => tracing::warn!(error = %format!("{e:#}"), "sweeping staged uploads"),
     }
 }
 

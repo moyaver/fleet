@@ -412,6 +412,10 @@ pub struct S3Settings {
     pub endpoint: Option<String>,
     /// Signing region. Garage's default is `garage`.
     pub region: String,
+    /// The base URL agents reach the bucket at, for direct uploads (PLAN §7.6). Presigned URLs
+    /// name this host, so it must be one agents can reach: `endpoint` is often a name only the
+    /// server's network resolves. Unset: presigned URLs use `endpoint`.
+    pub public_endpoint: Option<String>,
     /// The bucket; it must exist.
     pub bucket: Option<String>,
     /// Access key id (`FLEET_STORAGE__S3__ACCESS_KEY_ID_FILE` can hold it).
@@ -436,6 +440,15 @@ impl Storage {
                     matches!(url.scheme(), "http" | "https"),
                     "storage.s3.endpoint must be an http:// or https:// URL"
                 );
+                if let Some(public) = s3.public_endpoint.as_deref() {
+                    let url = url::Url::parse(public).with_context(|| {
+                        format!("storage.s3.public_endpoint {public:?} is not a URL")
+                    })?;
+                    anyhow::ensure!(
+                        matches!(url.scheme(), "http" | "https"),
+                        "storage.s3.public_endpoint must be an http:// or https:// URL"
+                    );
+                }
                 for (key, value) in [
                     ("bucket", s3.bucket.as_deref()),
                     ("region", Some(s3.region.as_str())),
@@ -476,6 +489,10 @@ impl Storage {
                         bucket: get(s3.bucket.as_deref()),
                         access_key_id: get(s3.access_key_id.as_ref().map(Secret::expose)),
                         secret_access_key: get(s3.secret_access_key.as_ref().map(Secret::expose)),
+                        public_endpoint: s3
+                            .public_endpoint
+                            .clone()
+                            .filter(|p| !p.trim().is_empty()),
                     })
                     .context("opening the S3 blob store")?,
                 )
@@ -489,6 +506,7 @@ impl Default for S3Settings {
         Self {
             endpoint: None,
             region: "garage".into(),
+            public_endpoint: None,
             bucket: None,
             access_key_id: None,
             secret_access_key: None,
@@ -1281,6 +1299,36 @@ mod tests {
             "{shown}"
         );
         c.storage.open().expect("a complete S3 configuration opens");
+    }
+
+    #[test]
+    fn a_public_endpoint_is_loaded_for_presigned_uploads_and_must_be_a_url() {
+        let base = [
+            ("FLEET_STORAGE__BACKEND", "s3"),
+            ("FLEET_STORAGE__S3__ENDPOINT", "http://garage:3900"),
+            ("FLEET_STORAGE__S3__BUCKET", "b"),
+            ("FLEET_STORAGE__S3__ACCESS_KEY_ID", "k"),
+            ("FLEET_STORAGE__S3__SECRET_ACCESS_KEY", "s"),
+        ];
+        let mut with = base.to_vec();
+        with.push((
+            "FLEET_STORAGE__S3__PUBLIC_ENDPOINT",
+            "https://files.example.org",
+        ));
+        let c = Config::load(None, &env(&with)).unwrap();
+        assert_eq!(
+            c.storage.s3.public_endpoint.as_deref(),
+            Some("https://files.example.org")
+        );
+        c.storage.open().expect("the presigning client opens");
+
+        let mut bad = base.to_vec();
+        bad.push((
+            "FLEET_STORAGE__S3__PUBLIC_ENDPOINT",
+            "ftp://files.example.org",
+        ));
+        let err = Config::load(None, &env(&bad)).unwrap_err();
+        assert!(format!("{err:#}").contains("public_endpoint"), "{err:#}");
     }
 
     #[test]

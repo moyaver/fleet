@@ -38,6 +38,9 @@ pub(crate) struct Inner {
     pub(crate) signer: Option<Signer>,
     /// The artifact blob store, opened on first use (see [`AppState::blobs`]).
     blobs: tokio::sync::OnceCell<Arc<dyn BlobStore>>,
+    /// A test's own store, which takes precedence over `blobs` (see [`AppState::install_blobs`]).
+    #[cfg(test)]
+    blobs_override: std::sync::OnceLock<Arc<dyn BlobStore>>,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
 }
@@ -64,6 +67,8 @@ impl AppState {
             idp: Idp::new()?,
             signer: Signer::from_config(&config.usercontent),
             blobs: tokio::sync::OnceCell::new(),
+            #[cfg(test)]
+            blobs_override: std::sync::OnceLock::new(),
             store,
             config,
             shutdown: CancellationToken::new(),
@@ -77,9 +82,21 @@ impl AppState {
     /// The artifact blob store. Opened on first use and then kept; a failure to open it (an
     /// unwritable directory, a bad S3 setting) is returned each time until it works.
     pub(crate) async fn blobs(&self) -> anyhow::Result<&Arc<dyn BlobStore>> {
+        #[cfg(test)]
+        if let Some(store) = self.blobs_override.get() {
+            return Ok(store);
+        }
         self.blobs
             .get_or_try_init(|| async { self.config.storage.open() })
             .await
+    }
+
+    /// Replaces the blob store for this server. Tests use it for a store the configuration cannot
+    /// name (one that stages direct uploads in memory); start-up has already opened the
+    /// configured one, so the override is consulted first.
+    #[cfg(test)]
+    pub(crate) fn install_blobs(&self, store: Arc<dyn BlobStore>) {
+        let _ = self.blobs_override.set(store);
     }
 
     pub(crate) fn is_ready(&self) -> bool {
