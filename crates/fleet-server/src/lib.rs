@@ -38,6 +38,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use fleet_store::{PoolOptions, Store, auth::TrustLevel};
 use time::{Duration, OffsetDateTime};
+use uuid::Uuid;
 
 pub use crate::app::{Server, start};
 use crate::config::Config;
@@ -88,6 +89,28 @@ pub enum ApiKeyAction {
         #[arg(long)]
         expires_in_days: Option<u32>,
     },
+    /// List a project's keys: their IDs, names, expiry and revocation. No secret is shown.
+    List {
+        /// Project slug.
+        #[arg(long)]
+        project: String,
+    },
+    /// Revoke a key at once. Agent tokens minted from it stop too. Works on keys made before
+    /// expiry existed.
+    Revoke {
+        /// The key's ID, from `api-key list`.
+        #[arg(long)]
+        id: Uuid,
+    },
+    /// Set when a key stops working, for keys made before expiry existed or any other key.
+    Expire {
+        /// The key's ID, from `api-key list`.
+        #[arg(long)]
+        id: Uuid,
+        /// Days from now until it stops working. `0` ends it now.
+        #[arg(long)]
+        in_days: u32,
+    },
 }
 
 /// Runs a subcommand. `env` is the process environment (passed in so tests stay hermetic).
@@ -131,8 +154,66 @@ pub async fn run(cli: Cli, env: Vec<(String, String)>) -> anyhow::Result<()> {
             tracing::info!(%id, project, "api key created; it is shown once on stdout");
             app::print_once(key.expose())
         }
+        Command::ApiKey {
+            action: ApiKeyAction::List { project },
+        } => {
+            let store = connect(&config)?;
+            let Some(project_id) = store.project_id(&project).await? else {
+                anyhow::bail!("no project {project}");
+            };
+            let keys = store.list_api_keys(project_id).await?;
+            app::print_table(&key_table(&keys))
+        }
+        Command::ApiKey {
+            action: ApiKeyAction::Revoke { id },
+        } => {
+            let store = connect(&config)?;
+            anyhow::ensure!(store.revoke_api_key(id).await?, "no api key {id}");
+            tracing::info!(%id, "api key revoked");
+            Ok(())
+        }
+        Command::ApiKey {
+            action: ApiKeyAction::Expire { id, in_days },
+        } => {
+            let store = connect(&config)?;
+            let expires_at = key_expiry(OffsetDateTime::now_utc(), Some(in_days), 0);
+            anyhow::ensure!(
+                store.set_api_key_expiry(id, expires_at).await?,
+                "no active api key {id} (it may be revoked)"
+            );
+            tracing::info!(%id, %expires_at, "api key expiry set");
+            Ok(())
+        }
         Command::Serve => app::serve(config).await,
     }
+}
+
+/// One line per key for `api-key list`: ID, name, prefix, expiry, revocation and last use.
+pub(crate) fn key_table(keys: &[fleet_store::auth::ApiKeyInfo]) -> String {
+    use std::fmt::Write as _;
+    let when = |t: Option<OffsetDateTime>| {
+        t.map_or_else(
+            || "-".to_owned(),
+            |t| {
+                t.format(&time::format_description::well_known::Rfc3339)
+                    .unwrap_or_default()
+            },
+        )
+    };
+    let mut out = String::from("id\tname\tprefix\texpires_at\trevoked_at\tlast_used_at\n");
+    for k in keys {
+        let _ = writeln!(
+            out,
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            k.id,
+            k.name,
+            k.prefix,
+            when(k.expires_at),
+            when(k.revoked_at),
+            when(k.last_used_at)
+        );
+    }
+    out
 }
 
 /// When a new API key expires: `days` from `now` when given, else the configured default.
@@ -163,6 +244,22 @@ pub(crate) fn connect(config: &Config) -> anyhow::Result<Store> {
 #[cfg(test)]
 mod tests {
     use time::{Duration, OffsetDateTime};
+
+    #[test]
+    fn the_key_subcommands_take_ids_and_days() {
+        use clap::Parser as _;
+
+        use super::Cli;
+        let id = "0190a000-0000-7000-8000-000000000001";
+        for argv in [
+            vec!["fleet", "api-key", "list", "--project", "app"],
+            vec!["fleet", "api-key", "revoke", "--id", id],
+            vec!["fleet", "api-key", "expire", "--id", id, "--in-days", "0"],
+        ] {
+            Cli::try_parse_from(argv.clone()).unwrap_or_else(|e| panic!("{argv:?}: {e}"));
+        }
+        assert!(Cli::try_parse_from(["fleet", "api-key", "expire", "--id", id]).is_err());
+    }
 
     use super::key_expiry;
 

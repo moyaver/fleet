@@ -275,6 +275,14 @@ pub(crate) async fn serve(config: Config) -> anyhow::Result<()> {
 }
 
 /// Writes a secret to stdout once (`fleet api-key create`), never to the log.
+/// Prints a table for the operator on stdout (`api-key list`). Not a secret, so it may repeat.
+pub(crate) fn print_table(text: &str) -> anyhow::Result<()> {
+    let mut out = std::io::stdout().lock();
+    out.write_all(text.as_bytes())?;
+    out.flush()?;
+    Ok(())
+}
+
 pub(crate) fn print_once(secret: &str) -> anyhow::Result<()> {
     let mut out = std::io::stdout().lock();
     writeln!(out, "{secret}")?;

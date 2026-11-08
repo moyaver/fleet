@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE agent_tokens SET last_used_at = now()\n                  WHERE token_hash = $1 AND expires_at > now()\n                  RETURNING id, project_id, trust_level AS \"trust_level!\", claims,\n                            policy_id IS NOT NULL AS \"oidc!\"",
+  "query": "UPDATE agent_tokens SET last_used_at = now()\n                  WHERE token_hash = $1 AND expires_at > now()\n                    AND NOT EXISTS (\n                        SELECT 1 FROM api_keys k\n                         WHERE k.id = agent_tokens.api_key_id\n                           AND (k.revoked_at IS NOT NULL\n                                OR (k.expires_at IS NOT NULL AND k.expires_at <= now())))\n                  RETURNING id, project_id, trust_level AS \"trust_level!\", claims,\n                            policy_id IS NOT NULL AS \"oidc!\"",
   "describe": {
     "columns": [
       {
@@ -67,5 +67,5 @@
       null
     ]
   },
-  "hash": "6a2811bc522b62156415bae3d438395bb3c28a7b4a059ee88856a29a8b50b0a9"
+  "hash": "d3006b8bd56f4c7795bdf9381d58c596d4267d45c26f768ab54aaf612b2a7701"
 }

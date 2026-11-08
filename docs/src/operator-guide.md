@@ -13,6 +13,9 @@ The reference deployment is Docker Compose: Caddy (TLS, WebSocket-friendly), the
 | `fleet check-config` | Validates the configuration and prints it, secrets redacted |
 | `fleet healthcheck` | Exits 0 if the local server is ready (`/readyz`); for Docker `HEALTHCHECK` |
 | `fleet api-key create --project <slug> --name <n> [--expires-in-days <d>]` | Prints a new API key once (`mf_live_…`); only its hash is stored. It expires after `d` days, or `api.api_key_ttl_days` (90) when omitted |
+| `fleet api-key list --project <slug>` | Prints each key's ID, name, prefix, expiry, revocation and last use, tab-separated. No secret is shown |
+| `fleet api-key revoke --id <id>` | Revokes a key at once, and every agent token minted from it stops with it. Works on keys made before expiry existed. Revoking a revoked key is fine |
+| `fleet api-key expire --id <id> --in-days <d>` | Sets when a key stops working, `d` days from now (`0` ends it now). For keys made before expiry existed, or to shorten one. Refused for a revoked key |
 
 ## Configuration
 

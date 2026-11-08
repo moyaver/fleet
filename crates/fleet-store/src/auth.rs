@@ -186,15 +186,43 @@ impl Store {
         Ok((id, Secret(secret)))
     }
 
-    /// Revokes an API key.
-    pub async fn revoke_api_key(&self, id: Uuid) -> Result<()> {
-        sqlx::query!(
-            "UPDATE api_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL",
+    /// Revokes an API key, and every agent token minted from it stops working with it. Returns
+    /// `false` when no key has that ID. A key already revoked keeps its first revocation time.
+    pub async fn revoke_api_key(&self, id: Uuid) -> Result<bool> {
+        let done = sqlx::query!(
+            "UPDATE api_keys SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1",
             id
         )
         .execute(self.pool())
         .await?;
-        Ok(())
+        Ok(done.rows_affected() > 0)
+    }
+
+    /// Sets when an API key stops working: `expires_at` may be in the past, to end it now. Works
+    /// on keys made before expiry existed (they have none). Returns `false` when no active key
+    /// has that ID. Agent tokens minted from the key stop with it.
+    pub async fn set_api_key_expiry(&self, id: Uuid, expires_at: OffsetDateTime) -> Result<bool> {
+        let done = sqlx::query!(
+            "UPDATE api_keys SET expires_at = $2 WHERE id = $1 AND revoked_at IS NULL",
+            id,
+            expires_at
+        )
+        .execute(self.pool())
+        .await?;
+        Ok(done.rows_affected() > 0)
+    }
+
+    /// The API keys of a project, newest first. Secrets are never stored, so none is returned.
+    pub async fn list_api_keys(&self, project_id: Uuid) -> Result<Vec<ApiKeyInfo>> {
+        let rows = sqlx::query_as!(
+            ApiKeyInfo,
+            "SELECT id, name, prefix, expires_at, revoked_at, last_used_at FROM api_keys
+              WHERE project_id = $1 ORDER BY created_at DESC, id",
+            project_id
+        )
+        .fetch_all(self.pool())
+        .await?;
+        Ok(rows)
     }
 
     /// Mints a short-lived agent token for a verified OIDC identity or an API key.
@@ -253,9 +281,15 @@ impl Store {
                 .transpose();
         }
         if bearer.starts_with(AGENT_TOKEN_PREFIX) {
+            // A token minted from an API key dies with that key: revoked or expired (T3).
             let row = sqlx::query!(
                 "UPDATE agent_tokens SET last_used_at = now()
                   WHERE token_hash = $1 AND expires_at > now()
+                    AND NOT EXISTS (
+                        SELECT 1 FROM api_keys k
+                         WHERE k.id = agent_tokens.api_key_id
+                           AND (k.revoked_at IS NOT NULL
+                                OR (k.expires_at IS NOT NULL AND k.expires_at <= now())))
                   RETURNING id, project_id, trust_level AS \"trust_level!\", claims,
                             policy_id IS NOT NULL AS \"oidc!\"",
                 sha256(bearer)
@@ -313,6 +347,23 @@ impl Store {
         .await?;
         Ok(())
     }
+}
+
+/// An API key as an operator sees it: no secret, only what identifies it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiKeyInfo {
+    /// The key's ID, the handle `fleet-server api-key revoke|expire` takes.
+    pub id: Uuid,
+    /// The name it was created with.
+    pub name: String,
+    /// The first characters of the secret, to tell keys apart.
+    pub prefix: String,
+    /// When it stops working; `None` for a key made before expiry existed.
+    pub expires_at: Option<OffsetDateTime>,
+    /// When it was revoked, if it was.
+    pub revoked_at: Option<OffsetDateTime>,
+    /// When it last authenticated a request.
+    pub last_used_at: Option<OffsetDateTime>,
 }
 
 /// What an agent token was minted from.
@@ -544,6 +595,137 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../migrations")]
+    async fn a_key_made_before_expiry_existed_can_be_expired_or_revoked(pool: sqlx::PgPool) {
+        // Research 06 T3: keys made before the 90-day default have no expiry, and an operator
+        // must be able to end them, and every token minted from them, with no SQL.
+        let store = Store {
+            pool: pool.clone(),
+            origin: uuid::Uuid::now_v7(),
+        };
+        let project = store.upsert_project("app", "App").await.unwrap();
+        let now = OffsetDateTime::now_utc();
+        let (old, old_key) = store
+            .create_api_key(
+                project,
+                "old",
+                TrustLevel::Trusted,
+                now + time::Duration::days(90),
+            )
+            .await
+            .unwrap();
+        sqlx::query("UPDATE api_keys SET expires_at = NULL WHERE id = $1")
+            .bind(old)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mint = |key: uuid::Uuid| {
+            let store = &store;
+            async move {
+                store
+                    .mint_agent_token(
+                        project,
+                        TokenSource::ApiKey(key),
+                        TrustLevel::Trusted,
+                        &CiClaims::default(),
+                        now + time::Duration::hours(2),
+                    )
+                    .await
+                    .unwrap()
+                    .1
+            }
+        };
+        let old_token = mint(old).await;
+        assert!(
+            store
+                .authenticate(old_key.expose())
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            store
+                .authenticate(old_token.expose())
+                .await
+                .unwrap()
+                .is_some()
+        );
+
+        let listed = store.list_api_keys(project).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!((listed[0].id, listed[0].expires_at), (old, None));
+
+        // Expiry ends the key and the token minted from it, at once.
+        assert!(
+            store
+                .set_api_key_expiry(old, now - time::Duration::seconds(1))
+                .await
+                .unwrap()
+        );
+        assert!(
+            store
+                .authenticate(old_key.expose())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .authenticate(old_token.expose())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let listed = store.list_api_keys(project).await.unwrap();
+        assert!(listed[0].expires_at.is_some_and(|t| t < now));
+
+        // Revocation ends the key and its tokens; revoking again is fine; an unknown key is not.
+        let (live, live_key) = store
+            .create_api_key(
+                project,
+                "ci",
+                TrustLevel::Trusted,
+                now + time::Duration::days(90),
+            )
+            .await
+            .unwrap();
+        let live_token = mint(live).await;
+        assert!(
+            store
+                .authenticate(live_token.expose())
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(store.revoke_api_key(live).await.unwrap());
+        assert!(
+            store.revoke_api_key(live).await.unwrap(),
+            "already revoked is still a key"
+        );
+        assert!(!store.revoke_api_key(uuid::Uuid::now_v7()).await.unwrap());
+        assert!(
+            store
+                .authenticate(live_key.expose())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .authenticate(live_token.expose())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            !store
+                .set_api_key_expiry(live, now + time::Duration::days(1))
+                .await
+                .unwrap(),
+            "a revoked key cannot be given a new expiry"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
     async fn keys_authenticate_until_revoked(pool: sqlx::PgPool) {
         let store = Store {
             pool,
@@ -568,6 +750,16 @@ mod tests {
         store.revoke_api_key(id).await.unwrap();
         assert!(store.authenticate(key.expose()).await.unwrap().is_none());
 
+        // A token minted from a live key; it stops with that key (research 06 T3).
+        let (live, _) = store
+            .create_api_key(
+                project,
+                "ci-2",
+                TrustLevel::Trusted,
+                OffsetDateTime::now_utc() + time::Duration::days(90),
+            )
+            .await
+            .unwrap();
         let claims = CiClaims {
             run_id: Some("9".into()),
             ..CiClaims::default()
@@ -575,7 +767,7 @@ mod tests {
         let (_, token) = store
             .mint_agent_token(
                 project,
-                TokenSource::ApiKey(id),
+                TokenSource::ApiKey(live),
                 TrustLevel::Pr,
                 &claims,
                 OffsetDateTime::now_utc() + time::Duration::hours(2),
