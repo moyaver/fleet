@@ -42,7 +42,7 @@ use crate::{
     session::{Candidate, Observation, Session},
     transport::{self, Shared},
     upload::{self, Outcome, Source, Uploader},
-    watch::{BundleScanner, LogTailer},
+    watch::{self, BundleScanner, LogTailer},
 };
 
 /// Fault injection for tests (research 02 §14): `observer_panic`, `observer_abort`,
@@ -763,18 +763,8 @@ pub(crate) fn server_url() -> Option<String> {
 }
 
 fn watch(l: &mut Live, final_pass: bool, clock: &impl Fn() -> ClockSample) {
-    if let Some(t) = l.tailer.as_mut() {
-        for r in t.poll() {
-            l.session.observe(clock(), Observation::Log(r));
-        }
-        if final_pass && let Some(r) = t.finish() {
-            l.session.observe(clock(), Observation::Log(r));
-        }
-    }
-    if let Some(s) = l.scanner.as_mut() {
-        for o in s.scan(final_pass) {
-            l.session.observe(clock(), o);
-        }
+    for o in watch::observations(l.tailer.as_mut(), l.scanner.as_mut(), final_pass) {
+        l.session.observe(clock(), o);
     }
 }
 

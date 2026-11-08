@@ -162,6 +162,36 @@ impl BundleScanner {
     }
 }
 
+/// What one pass over Maestro's files reports, in the order the session must see it: the log's
+/// records, then the bundle files (issue #148).
+///
+/// The tailer holds back the newest record until a header follows it. A `commands.json` is lined
+/// up against the log's steps when it is read, so the held-back record is released first, whenever
+/// this pass reads one (or it is the final pass). Otherwise a flow's last step would be missing
+/// from the log when its file settles it. A continuation line that comes after a released record
+/// is not attached to it.
+pub(crate) fn observations(
+    mut tailer: Option<&mut LogTailer>,
+    scanner: Option<&mut BundleScanner>,
+    final_pass: bool,
+) -> Vec<Observation> {
+    let mut out = Vec::new();
+    if let Some(t) = tailer.as_mut() {
+        out.extend(t.poll().into_iter().map(Observation::Log));
+    }
+    let files = scanner.map(|s| s.scan(final_pass)).unwrap_or_default();
+    let reads_commands = files
+        .iter()
+        .any(|o| matches!(o, Observation::File { rel, .. } if rel.ends_with("/commands.json")));
+    if (final_pass || reads_commands)
+        && let Some(r) = tailer.and_then(LogTailer::finish)
+    {
+        out.push(Observation::Log(r));
+    }
+    out.extend(files);
+    out
+}
+
 /// The first [`MAX_CRASH_REPORT`] bytes of `path`, or `None` when it cannot be read.
 fn read_head(path: &Path) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
@@ -176,6 +206,8 @@ fn read_head(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use std::io::Write;
+
+    use fleet_protocol::journal::{ClockSample, SourceKind};
 
     use super::*;
 
@@ -265,6 +297,69 @@ mod tests {
         std::fs::write(flow.join("manifest.json"), b"{}").unwrap();
         assert!(crash_seen(&s.scan(false)));
         assert!(!crash_seen(&s.scan(true)), "nothing twice");
+        std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// One machine-pattern record of `maestro.log`, as Maestro writes it.
+    fn mflt(logger: &str, message: &str) -> String {
+        format!("MFLT1|1|main|INFO|{logger}|{message}\n")
+    }
+
+    /// The newest record of a log is held back until a header follows it. A `commands.json` that the
+    /// same pass reads is lined up against the log, so that record must reach the session first.
+    /// Otherwise the flow's last step settles against a log one step short (issue #148).
+    #[test]
+    fn the_newest_log_record_reaches_the_session_before_the_commands_file_that_settles_against_it()
+    {
+        const SUITE: &str = "maestro.cli.runner.TestSuiteInteractor";
+        const CONSOLE: &str = "maestro.cli.runner.CliConsoleListener";
+        let d = tmp("order");
+        let log = d.join("maestro.log");
+        let mut text = mflt(SUITE, " Running flow pass");
+        text.push_str(&mflt(CONSOLE, "Tap on \"a\" RUNNING"));
+        text.push_str(&mflt(CONSOLE, "Tap on \"a\" COMPLETED"));
+        // The last step is skipped: its only line is the held-back record, and it has no RUNNING line.
+        text.push_str(&mflt(CONSOLE, "Tap on \"b\" SKIPPED"));
+        std::fs::write(&log, text).unwrap();
+        let flow = d.join("pass");
+        std::fs::create_dir_all(&flow).unwrap();
+        let tap = |n: u32, status: &str| {
+            format!(
+                r#"{{"command":{{"tapOnElement":{{}}}},"metadata":{{"status":"{status}","sequenceNumber":{n},"depth":0}}}}"#
+            )
+        };
+        let commands = format!("[{},{}]", tap(0, "COMPLETED"), tap(1, "SKIPPED"));
+        std::fs::write(flow.join("commands.json"), commands).unwrap();
+        std::fs::write(flow.join("manifest.json"), b"{}").unwrap();
+
+        let at = ClockSample {
+            wall: time::OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        };
+        let mut n = 0u128;
+        let ids: crate::session::IdGen = Box::new(move || {
+            n += 1;
+            uuid::Uuid::from_u128(n)
+        });
+        let mut session = crate::session::Session::new(
+            &["maestro".into(), "test".into()],
+            None,
+            fleet_core::redact::Redactor::new([]),
+            ids,
+            at,
+        );
+        let mut tailer = LogTailer::new(log);
+        let mut scanner = BundleScanner::new(d.clone());
+        for o in observations(Some(&mut tailer), Some(&mut scanner), false) {
+            session.observe(at, o);
+        }
+        let settled: Vec<u32> = session
+            .drain()
+            .into_iter()
+            .filter(|e| e.kind == "step.ended" && e.src.kind == SourceKind::ArtifactFile)
+            .filter_map(|e| e.subject.step.map(|r| r.index))
+            .collect();
+        assert_eq!(settled, [0, 1], "both steps settle from the file");
         std::fs::remove_dir_all(&d).ok();
     }
 }
