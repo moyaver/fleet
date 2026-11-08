@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# Garage, one node (Garage v2.5). The RPC secret comes from GARAGE_RPC_SECRET.
+# Garage, one node (Garage v2.5). The RPC secret comes from GARAGE_RPC_SECRET_FILE (a Docker secret).
+# No [s3_web] section: the website endpoint is off, so no bucket is served anonymously. The S3 API
+# only accepts signed requests.
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "sqlite"
