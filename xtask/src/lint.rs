@@ -429,16 +429,22 @@ mod tests {
     fn a_fork_pull_request_never_reaches_a_self_hosted_runner() {
         let guarded = "    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('[\"self-hosted\"]') || 'macos-latest' }}";
         let ci = format!("on:\n  pull_request:\n  push:\njobs:\n  a:\n{guarded}\n");
-        assert!(fork_runner_problems("ci.yml", &ci).is_empty());
+        assert_eq!(fork_runner_problems("ci.yml", &ci), Vec::<String>::new());
         let unguarded =
             "on:\n  pull_request:\njobs:\n  a:\n    runs-on: [self-hosted, fleet-mac]\n";
         assert_eq!(fork_runner_problems("x.yml", unguarded).len(), 1);
         // A workflow that only runs on a schedule may use its own runner.
         let nightly = "on:\n  schedule:\n    - cron: '21 2 * * *'\njobs:\n  a:\n    runs-on: [self-hosted, fleet-mac]\n";
-        assert!(fork_runner_problems("nightly.yml", nightly).is_empty());
+        assert_eq!(
+            fork_runner_problems("nightly.yml", nightly),
+            Vec::<String>::new()
+        );
         let target = "on:\n  pull_request_target:\njobs:\n  a:\n    runs-on: ubuntu-latest\n";
         assert_eq!(fork_runner_problems("t.yml", target).len(), 1);
-        assert!(fork_runner_problems(".github/workflows/cla.yml", target).is_empty());
+        assert_eq!(
+            fork_runner_problems(".github/workflows/cla.yml", target),
+            Vec::<String>::new()
+        );
         let checkout = "on:\n  pull_request_target:\njobs:\n  a:\n    steps:\n      - uses: actions/checkout@v7\n";
         assert_eq!(
             fork_runner_problems(".github/workflows/cla.yml", checkout).len(),
