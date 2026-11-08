@@ -4,15 +4,19 @@
 //! is text: a value a user or an agent supplied is shown as the text it is.
 
 use fleet_protocol::rest::admin::{
-    AdminAgentRow, AdminApiKeyView, AdminGapRow, AdminGroupMappingView, AdminIngestionView,
-    AdminLagRow, AdminProjectView, AdminRejectionRow, AdminRetentionClassView,
-    AdminRoleBindingView, AdminSettingView, AdminTrustPolicyView,
+    AdminAgentRow, AdminApiKeyView, AdminArtifactClassView, AdminGapRow, AdminGroupMappingView,
+    AdminIngestionView, AdminLagRow, AdminProjectLimitsView, AdminProjectView, AdminRejectionRow,
+    AdminRetentionClassView, AdminRoleBindingView, AdminSettingView, AdminTrustPolicyView,
 };
-use fleet_ui::components::display::{EmptyState, TableBox};
+use fleet_ui::{
+    charts::format::format_duration,
+    components::display::{EmptyState, TableBox},
+};
 use leptos::prelude::*;
 
 use super::model::{
-    key_status, lag_text, scope_text, seconds_ago_text, seq_range, source_text, ttl_text,
+    key_status, lag_text, scope_text, seconds_ago_text, seq_range, set_by_text, source_text,
+    ttl_text,
 };
 use crate::{
     app::ErrorNotice,
@@ -307,6 +311,68 @@ pub fn setting_rows(rows: &[AdminSettingView]) -> Vec<Vec<String>> {
         .collect()
 }
 
+/// Each project's artifact classes: whether it accepts them, its largest file, the configured cap
+/// and where the limit comes from.
+#[must_use]
+pub fn artifact_class_rows(rows: &[AdminArtifactClassView]) -> Vec<Vec<String>> {
+    rows.iter()
+        .map(|c| {
+            vec![
+                c.project.clone(),
+                c.class.clone(),
+                if c.accepted { "yes" } else { "no" }.to_owned(),
+                c.max_bytes.to_string(),
+                c.configured_max_bytes.to_string(),
+                set_by_text(c.overridden).to_owned(),
+            ]
+        })
+        .collect()
+}
+
+/// Each project's daily quota: bytes and files, each with where its limit comes from.
+#[must_use]
+pub fn quota_rows(rows: &[AdminProjectLimitsView]) -> Vec<Vec<String>> {
+    rows.iter()
+        .map(|p| {
+            vec![
+                p.project.clone(),
+                format!(
+                    "{} bytes ({})",
+                    p.bytes_per_day,
+                    set_by_text(p.bytes_per_day_overridden)
+                ),
+                format!(
+                    "{} files ({})",
+                    p.files_per_day,
+                    set_by_text(p.files_per_day_overridden)
+                ),
+            ]
+        })
+        .collect()
+}
+
+/// Each project's metric intervals, calm and under pressure, each with where it comes from.
+#[must_use]
+pub fn metric_rows(rows: &[AdminProjectLimitsView]) -> Vec<Vec<String>> {
+    rows.iter()
+        .map(|p| {
+            vec![
+                p.project.clone(),
+                format!(
+                    "{} ({})",
+                    format_duration(p.sample_interval_ms),
+                    set_by_text(p.sample_interval_overridden)
+                ),
+                format!(
+                    "{} ({})",
+                    format_duration(p.pressure_sample_interval_ms),
+                    set_by_text(p.pressure_sample_interval_overridden)
+                ),
+            ]
+        })
+        .collect()
+}
+
 /// Agent versions seen, and whether this server speaks their protocol.
 #[must_use]
 pub fn agent_rows(rows: &[AdminAgentRow], ctx: &Ctx) -> Vec<Vec<String>> {
@@ -416,4 +482,67 @@ pub fn ingestion_view(view: &AdminIngestionView, ctx: &Ctx) -> AnyView {
         </div>
     }
     .into_any()
+}
+#[cfg(test)]
+mod tests {
+    use fleet_protocol::rest::admin::{AdminArtifactClassView, AdminProjectLimitsView};
+
+    use super::{artifact_class_rows, metric_rows, quota_rows};
+
+    fn class(accepted: bool, overridden: bool) -> AdminArtifactClassView {
+        AdminArtifactClassView {
+            project: "app".into(),
+            class: "junit".into(),
+            accepted,
+            max_bytes: 1_024,
+            configured_max_bytes: 4_096,
+            overridden,
+        }
+    }
+
+    fn limits() -> AdminProjectLimitsView {
+        AdminProjectLimitsView {
+            project: "app".into(),
+            bytes_per_day: 2_048,
+            bytes_per_day_overridden: true,
+            files_per_day: 300,
+            files_per_day_overridden: false,
+            sample_interval_ms: 2_500,
+            sample_interval_overridden: false,
+            pressure_sample_interval_ms: 15_000,
+            pressure_sample_interval_overridden: true,
+        }
+    }
+
+    #[test]
+    fn a_class_row_shows_its_limit_the_cap_and_where_the_limit_comes_from() {
+        assert_eq!(
+            artifact_class_rows(&[class(true, true)]),
+            vec![vec!["app", "junit", "yes", "1024", "4096", "dashboard"]]
+        );
+        assert_eq!(
+            artifact_class_rows(&[class(false, false)]),
+            vec![vec!["app", "junit", "no", "1024", "4096", "from config"]]
+        );
+    }
+
+    #[test]
+    fn a_quota_row_names_the_source_of_each_limit() {
+        assert_eq!(
+            quota_rows(&[limits()]),
+            vec![vec![
+                "app",
+                "2048 bytes (dashboard)",
+                "300 files (from config)"
+            ]]
+        );
+    }
+
+    #[test]
+    fn a_metric_row_shows_the_interval_in_force_and_its_source() {
+        assert_eq!(
+            metric_rows(&[limits()]),
+            vec![vec!["app", "2.5 s (from config)", "15 s (dashboard)"]]
+        );
+    }
 }

@@ -59,6 +59,44 @@ pub fn ttl_text(seconds: Option<i64>) -> String {
     }
 }
 
+/// A retention window in whole days, as its form shows it: `0` keeps for ever.
+#[must_use]
+pub fn ttl_days(seconds: Option<i64>) -> u32 {
+    seconds.map_or(0, |s| u32::try_from(s / 86_400).unwrap_or(0))
+}
+
+/// Where a value comes from, as the page says it: `dashboard` when a project overrides the
+/// configuration, else `from config`.
+#[must_use]
+pub fn set_by_text(overridden: bool) -> &'static str {
+    if overridden {
+        "dashboard"
+    } else {
+        "from config"
+    }
+}
+
+/// A project's own value for a form's field: the value when the project overrides it, else blank,
+/// which keeps the configured value when the form is sent.
+#[must_use]
+pub fn own_value(value: i64, overridden: bool) -> String {
+    if overridden {
+        value.to_string()
+    } else {
+        String::new()
+    }
+}
+
+/// [`own_value`] for an interval in milliseconds, shown in whole seconds (the form takes seconds).
+#[must_use]
+pub fn own_seconds(ms: i64, overridden: bool) -> String {
+    if overridden {
+        (ms / 1000).to_string()
+    } else {
+        String::new()
+    }
+}
+
 /// Whether a key works now, and why not if it doesn't: `active`, `revoked`, `expired`, or
 /// `no expiry` for a key that never had one.
 #[must_use]
@@ -259,5 +297,34 @@ mod tests {
     fn a_row_says_whether_the_configuration_or_the_dashboard_holds_it() {
         assert_eq!(super::source_text("config"), "from config");
         assert_eq!(super::source_text("dashboard"), "dashboard");
+    }
+
+    #[test]
+    fn a_retention_window_is_shown_in_whole_days_and_zero_keeps_for_ever() {
+        assert_eq!(
+            ttl_days(None),
+            0,
+            "none is kept for ever, so the form shows 0"
+        );
+        assert_eq!(ttl_days(Some(90 * 86_400)), 90);
+        assert_eq!(ttl_days(Some(86_400)), 1);
+    }
+
+    #[test]
+    fn an_override_shows_its_own_value_and_a_configured_one_leaves_the_field_blank() {
+        assert_eq!(own_value(4_096, true), "4096");
+        assert_eq!(
+            own_value(4_096, false),
+            "",
+            "blank keeps the configured value"
+        );
+        assert_eq!(
+            own_seconds(15_000, true),
+            "15",
+            "milliseconds shown as seconds"
+        );
+        assert_eq!(own_seconds(15_000, false), "");
+        assert_eq!(set_by_text(true), "dashboard");
+        assert_eq!(set_by_text(false), "from config");
     }
 }

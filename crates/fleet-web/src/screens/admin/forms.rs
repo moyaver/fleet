@@ -8,12 +8,16 @@
 //! A configured row (`source` is `config`) has no form at all: it says where it is set.
 
 use fleet_protocol::rest::admin::{
-    AdminApiKeyView, AdminGroupMappingView, AdminPersonView, AdminProjectView,
-    AdminRoleBindingView, AdminTrustPolicyView,
+    AdminApiKeyView, AdminArtifactClassView, AdminGroupMappingView, AdminPersonView,
+    AdminProjectLimitsView, AdminProjectView, AdminRoleBindingView, AdminTrustPolicyView,
 };
+use fleet_ui::charts::format::format_duration;
 use leptos::prelude::*;
 
-use super::model::{PR_POLICY_OPTIONS, ROLE_OPTIONS, TRUST_OPTIONS, is_global_admin};
+use super::model::{
+    PR_POLICY_OPTIONS, ROLE_OPTIONS, TRUST_OPTIONS, is_global_admin, own_seconds, own_value,
+    ttl_days,
+};
 use crate::app::Auth;
 
 /// The class of a text or number field's control.
@@ -75,19 +79,34 @@ pub fn action(action: String, title: &'static str, label: &'static str) -> AnyVi
     })
 }
 
-/// A labelled text field. `required` fields say so to the browser too.
+/// A labelled text field. `required` fields say so to the browser too. The label and the
+/// placeholder may be built from a value (a configured limit, say).
 #[must_use]
 pub fn text(
-    label: &'static str,
+    label: impl Into<String>,
     name: &'static str,
     value: String,
-    placeholder: &'static str,
+    placeholder: impl Into<String>,
     required: bool,
 ) -> AnyView {
+    let label: String = label.into();
+    let placeholder: String = placeholder.into();
     view! {
         <label class="flex min-w-40 flex-col gap-1 text-sm">
             <span class="text-muted">{label}</span>
             <input type="text" name=name value=value placeholder=placeholder required=required class=CONTROL />
+        </label>
+    }
+    .into_any()
+}
+
+/// A labelled checkbox: it is sent as `on` when checked, and not at all when it is not.
+#[must_use]
+pub fn checkbox(label: &'static str, name: &'static str, checked: bool) -> AnyView {
+    view! {
+        <label class="flex min-h-8 items-center gap-2 text-sm">
+            <input type="checkbox" name=name value="on" checked=checked />
+            <span class="text-muted">{label}</span>
         </label>
     }
     .into_any()
@@ -192,9 +211,16 @@ pub fn add_project() -> AnyView {
     )
 }
 
-/// Renames a project (its slug stays).
+/// Renames a dashboard project (its slug stays). A project the configuration creates is renamed
+/// there: it has no form, only the note that says so.
 #[must_use]
 pub fn rename_project(p: &AdminProjectView) -> AnyView {
+    if p.source == "config" {
+        return view! {
+            <span class="note">"from config: change it in the configuration and restart Fleet"</span>
+        }
+        .into_any();
+    }
     let current = p.name.clone();
     details(
         "Rename",
@@ -388,4 +414,122 @@ pub fn group_actions(g: &AdminGroupMappingView) -> AnyView {
             "Remove",
         ),
     ])
+}
+
+/// Changes how long a project keeps one retention class's artifacts, in whole days (0 keeps them
+/// for ever). It applies to artifacts that become available afterwards.
+#[must_use]
+pub fn retention_change(project: &str, class: &str, ttl_seconds: Option<i64>) -> AnyView {
+    let days = ttl_days(ttl_seconds);
+    details(
+        "Change",
+        post(
+            format!("/api/v1/admin/retention/{project}/{class}/edit"),
+            "Change the retention window",
+            "Save window",
+            move || number("Days kept (0 keeps for ever)", "days", days, 0, 3650),
+        ),
+    )
+}
+
+/// Sets whether a project accepts one artifact class, and its largest file. The label names the
+/// configured cap: an override can only lower it. Blank keeps the cap.
+#[must_use]
+pub fn artifact_class_change(c: &AdminArtifactClassView) -> AnyView {
+    let accepted = c.accepted;
+    let largest = own_value(c.max_bytes, c.overridden);
+    let label = format!(
+        "Largest file, bytes (at most the configured cap of {} bytes)",
+        c.configured_max_bytes
+    );
+    details(
+        "Change",
+        post(
+            format!(
+                "/api/v1/admin/artifact-classes/{}/{}/edit",
+                c.project, c.class
+            ),
+            "Change the artifact class",
+            "Save class",
+            move || {
+                view! {
+                    {checkbox("Accepted", "accepted", accepted)}
+                    {text(label.clone(), "max_bytes", largest.clone(), "blank keeps the cap", false)}
+                }
+                .into_any()
+            },
+        ),
+    )
+}
+
+/// Sets a project's daily upload quota. Each limit is at most the configured one, which the label
+/// names; blank keeps the configured value.
+#[must_use]
+pub fn quota_change(p: &AdminProjectLimitsView) -> AnyView {
+    let bytes = own_value(p.bytes_per_day, p.bytes_per_day_overridden);
+    let files = own_value(p.files_per_day, p.files_per_day_overridden);
+    details(
+        "Change",
+        post(
+            format!("/api/v1/admin/artifact-quota/{}/edit", p.project),
+            "Change the daily quota",
+            "Save quota",
+            move || {
+                view! {
+                    {text(
+                        "Bytes per day (at most artifacts.max_project_bytes_per_day)",
+                        "bytes_per_day",
+                        bytes.clone(),
+                        "blank keeps the configured value",
+                        false,
+                    )}
+                    {text(
+                        "Files per day (at most artifacts.max_project_files_per_day)",
+                        "files_per_day",
+                        files.clone(),
+                        "blank keeps the configured value",
+                        false,
+                    )}
+                }
+                .into_any()
+            },
+        ),
+    )
+}
+
+/// Sets how often a project's agents sample metrics, calm and under pressure, in whole seconds
+/// (1 to 300). Blank keeps the value in force, which the placeholder shows.
+#[must_use]
+pub fn metric_change(p: &AdminProjectLimitsView) -> AnyView {
+    let calm = own_seconds(p.sample_interval_ms, p.sample_interval_overridden);
+    let pressure = own_seconds(
+        p.pressure_sample_interval_ms,
+        p.pressure_sample_interval_overridden,
+    );
+    let calm_keeps = format!("blank keeps {}", format_duration(p.sample_interval_ms));
+    let pressure_keeps = format!(
+        "blank keeps {}",
+        format_duration(p.pressure_sample_interval_ms)
+    );
+    details(
+        "Change",
+        post(
+            format!("/api/v1/admin/metric-policy/{}/edit", p.project),
+            "Change the metric collection",
+            "Save intervals",
+            move || {
+                view! {
+                    {text("Calm, seconds (1 to 300)", "sample_interval_seconds", calm.clone(), calm_keeps.clone(), false)}
+                    {text(
+                        "Under pressure, seconds (1 to 300)",
+                        "pressure_sample_interval_seconds",
+                        pressure.clone(),
+                        pressure_keeps.clone(),
+                        false,
+                    )}
+                }
+                .into_any()
+            },
+        ),
+    )
 }

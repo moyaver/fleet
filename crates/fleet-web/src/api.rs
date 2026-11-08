@@ -8,8 +8,9 @@ use fleet_protocol::{
         ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
         TimelineView, WorkerRunPage, WorkerView,
         admin::{
-            AdminAgentsView, AdminApiKeyView, AdminAuditPage, AdminIngestionView, AdminProjectView,
-            AdminRetentionView, AdminRoleMappingsView, AdminSettingView, AdminTrustPolicyView,
+            AdminAgentsView, AdminApiKeyView, AdminAuditPage, AdminIngestionView,
+            AdminProjectPolicyView, AdminProjectView, AdminRetentionView, AdminRoleMappingsView,
+            AdminSettingView, AdminTrustPolicyView,
         },
         history::{
             CompareView, FailureTriageRequest, FailureTriageView, FlowCatalogPage, FlowStatsView,
@@ -408,6 +409,12 @@ pub async fn admin_artifact_policy() -> Result<Vec<AdminSettingView>, ApiError> 
 /// Screen G: the metric collection policy, from the running configuration.
 pub async fn admin_metric_policy() -> Result<Vec<AdminSettingView>, ApiError> {
     get(&format!("{API}/admin/metric-policy")).await
+}
+
+/// Screen G: each project's artifact classes and limits, with the value in force and whether the
+/// project overrides the configuration.
+pub async fn admin_project_policy() -> Result<AdminProjectPolicyView, ApiError> {
+    get(&format!("{API}/admin/project-policy")).await
 }
 
 /// Screen G: agent versions seen and this server's protocol.

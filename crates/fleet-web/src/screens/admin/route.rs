@@ -8,7 +8,7 @@
     reason = "Leptos's #[component] macro generates the props structs and the components return views"
 )]
 
-use fleet_protocol::rest::admin::{AdminAuditEventView, AdminAuditPage};
+use fleet_protocol::rest::admin::{AdminAuditEventView, AdminAuditPage, AdminProjectPolicyView};
 use fleet_ui::components::{
     controls::{Button, ButtonVariant},
     display::EmptyState,
@@ -19,12 +19,18 @@ use super::{
     forms,
     model::{ADMIN_PATH, AUDIT_HEADERS, AUDIT_PAGE, AUDIT_PATH, audit_cells},
     view::{
-        agent_rows, binding_rows, class_rows, ctx, grid, grid_actions_or_empty, grid_or_empty,
-        group_rows, ingestion_view, key_rows, projects_rows, section, setting_rows, trust_rows,
+        agent_rows, artifact_class_rows, binding_rows, class_rows, ctx, grid,
+        grid_actions_or_empty, grid_or_empty, group_rows, ingestion_view, key_rows, metric_rows,
+        projects_rows, quota_rows, section, setting_rows, trust_rows,
     },
 };
 use crate::remote::remote;
-use crate::{api, api::ApiError, app::ErrorNotice, screens::parts::Fetched};
+use crate::{
+    api,
+    api::ApiError,
+    app::ErrorNotice,
+    screens::parts::{Fetched, loaded},
+};
 
 /// The administration page: every area, in the order of the spec's list. The areas that can be
 /// changed carry their forms beside their tables; the server decides who may change them.
@@ -43,6 +49,9 @@ pub fn AdminRoute() -> impl IntoView {
     let metrics = remote(1000, api::admin_metric_policy);
     let agents = remote(1000, api::admin_agents);
     let ingestion = remote(1000, api::admin_ingestion);
+    // Each project's own artifact and metric limits: the artifact and metric sections show them.
+    let project_policy = remote(1000, api::admin_project_policy);
+    let policy = Fetched::from(&project_policy);
     // The project choices of the forms, read where each form is shown.
     let choices = projects.data;
 
@@ -184,14 +193,21 @@ pub fn AdminRoute() -> impl IntoView {
             "Artifact classes per project, and the windows the server keeps data for",
             Fetched::from(&retention),
             |page| {
+                let actions: Vec<AnyView> = page
+                    .classes
+                    .iter()
+                    .map(|c| forms::retention_change(&c.project, &c.class, c.ttl_seconds))
+                    .collect();
                 view! {
                     <div class="space-y-6">
                         <div>
                             <h4 class="pb-2 text-sm font-semibold">"Artifact classes"</h4>
-                            {grid_or_empty(
+                            <p class="pb-2 note">"A changed window applies to artifacts that become available afterwards"</p>
+                            {grid_actions_or_empty(
                                 "Retention classes per project",
-                                &["Project", "Class", "Kept"],
+                                &RETENTION_HEADERS,
                                 class_rows(&page.classes),
+                                actions,
                                 "No retention class",
                             )}
                         </div>
@@ -211,24 +227,38 @@ pub fn AdminRoute() -> impl IntoView {
         {section(
             "artifacts",
             "Artifact policy",
-            "Limits on what agents may upload. Set in the configuration",
+            "Limits on what agents may upload: set in the configuration, and per project where a project overrides them",
             Fetched::from(&artifacts),
-            |rows| grid(
-                "Artifact policy from the configuration",
-                &["Setting", "Value", "Source"],
-                setting_rows(&rows),
-            ),
+            move |rows| {
+                view! {
+                    {grid(
+                        "Artifact policy from the configuration",
+                        &["Setting", "Value", "Source"],
+                        setting_rows(&rows),
+                    )}
+                    <ErrorNotice error=policy.error />
+                    {move || loaded(policy, |p| artifact_limits(&p))}
+                }
+                .into_any()
+            },
         )}
         {section(
             "metrics",
             "Metric collection",
-            "How often metrics are checkpointed and kept",
+            "How often metrics are checkpointed and kept, and how often agents sample them",
             Fetched::from(&metrics),
-            |rows| grid(
-                "Metric collection policy",
-                &["Setting", "Value", "Source"],
-                setting_rows(&rows),
-            ),
+            move |rows| {
+                view! {
+                    {grid(
+                        "Metric collection policy",
+                        &["Setting", "Value", "Source"],
+                        setting_rows(&rows),
+                    )}
+                    <ErrorNotice error=policy.error />
+                    {move || loaded(policy, |p| metric_limits(&p))}
+                }
+                .into_any()
+            },
         )}
         {section(
             "agents",
@@ -310,6 +340,73 @@ const KEY_HEADERS: [&str; 10] = [
 ];
 const BINDING_HEADERS: [&str; 5] = ["Person", "Scope", "Role", "Granted", "Change"];
 const GROUP_HEADERS: [&str; 6] = ["Issuer", "Group", "Scope", "Role", "Source", "Change"];
+const RETENTION_HEADERS: [&str; 4] = ["Project", "Class", "Kept", "Change"];
+const CLASS_HEADERS: [&str; 7] = [
+    "Project",
+    "Class",
+    "Accepted",
+    "Largest file (bytes)",
+    "Configured cap (bytes)",
+    "Set by",
+    "Change",
+];
+const QUOTA_HEADERS: [&str; 4] = ["Project", "Bytes per day", "Files per day", "Change"];
+const METRIC_HEADERS: [&str; 4] = ["Project", "Calm sampling", "Under pressure", "Change"];
+
+/// The artifact section's per-project tables: each project's artifact classes, and each project's
+/// daily quota. Each row has its change form.
+fn artifact_limits(policy: &AdminProjectPolicyView) -> AnyView {
+    let class_actions: Vec<AnyView> = policy
+        .classes
+        .iter()
+        .map(forms::artifact_class_change)
+        .collect();
+    let quota_actions: Vec<AnyView> = policy.projects.iter().map(forms::quota_change).collect();
+    view! {
+        <div class="space-y-6">
+            <div>
+                <h4 class="pb-2 text-sm font-semibold">"Artifact classes per project"</h4>
+                {grid_actions_or_empty(
+                    "Artifact classes per project",
+                    &CLASS_HEADERS,
+                    artifact_class_rows(&policy.classes),
+                    class_actions,
+                    "No project yet",
+                )}
+            </div>
+            <div>
+                <h4 class="pb-2 text-sm font-semibold">"Daily quota per project"</h4>
+                {grid_actions_or_empty(
+                    "Daily quota per project",
+                    &QUOTA_HEADERS,
+                    quota_rows(&policy.projects),
+                    quota_actions,
+                    "No project yet",
+                )}
+            </div>
+        </div>
+    }
+    .into_any()
+}
+
+/// The metric section's per-project table: each project's calm and pressure intervals, each row
+/// with its change form.
+fn metric_limits(policy: &AdminProjectPolicyView) -> AnyView {
+    let actions: Vec<AnyView> = policy.projects.iter().map(forms::metric_change).collect();
+    view! {
+        <div>
+            <h4 class="pb-2 text-sm font-semibold">"Per project"</h4>
+            {grid_actions_or_empty(
+                "Metric collection per project",
+                &METRIC_HEADERS,
+                metric_rows(&policy.projects),
+                actions,
+                "No project yet",
+            )}
+        </div>
+    }
+    .into_any()
+}
 
 /// The audit history, newest first, a page at a time.
 #[component]
