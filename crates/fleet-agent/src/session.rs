@@ -331,7 +331,7 @@ impl Session {
             single_flow: None,
         };
         // Values of flags nobody classified, and `-e`/`--env` values, never leave (research 06 T5).
-        let argv_redacted = redact_argv(
+        let argv_redacted: Vec<String> = redact_argv(
             argv,
             fleet_maestro::invocation::is_safe_value_flag,
             fleet_maestro::invocation::is_boolean_flag,
@@ -339,12 +339,14 @@ impl Session {
         .iter()
         .map(|a| s.redactor.redact(a).into_owned())
         .collect();
+        let reproduction = fleet_maestro::reproduce::reproduction(&argv_redacted);
         s.emit(
             at,
             Subject::default(),
             SourceKind::AgentObserved,
             None,
             &EventBody::RunStarted(RunStarted {
+                reproduction: Some(reproduction),
                 argv: argv_redacted,
                 agent_version: env!("CARGO_PKG_VERSION").to_owned(),
                 evidence: evidence.map(|e| redact_evidence(e, &s.redactor)),
@@ -1899,6 +1901,56 @@ mod tests {
         let json = serde_json::to_string(&first).unwrap();
         assert!(!json.contains("hunter2-secret"), "I6: {json}");
         assert!(json.contains(r#""reason":"user_junit""#), "{json}");
+    }
+
+    #[test]
+    fn run_started_carries_the_rerun_words_built_from_the_redacted_argv() {
+        // The secret is redacted in argv first; the words never carry it, even through an unknown
+        // flag or an env value that the redactor would not match.
+        let argv: Vec<String> = [
+            "maestro",
+            "--device",
+            "emulator-5554",
+            "test",
+            "--token",
+            "hunter2-secret",
+            "-e",
+            "PASSWORD=hunter2-secret",
+            "--shard-split",
+            "2",
+            "flows/login.yaml",
+        ]
+        .map(String::from)
+        .to_vec();
+        let mut s = Session::new(
+            &argv,
+            None,
+            Redactor::new(["hunter2-secret".to_owned()]),
+            Box::new(|| Uuid::from_u128(1)),
+            at(),
+        );
+        let first = s.drain().remove(0);
+        assert_eq!(first.kind, "run.started");
+        let started: fleet_protocol::event::RunStarted =
+            serde_json::from_value(first.data.clone()).unwrap();
+        let repro = started
+            .reproduction
+            .expect("the agent always sends the words");
+        assert_eq!(repro.unavailable, None);
+        assert_eq!(
+            repro.words,
+            [
+                "maestro",
+                "--device",
+                "emulator-5554",
+                "test",
+                "-e",
+                "PASSWORD=[REDACTED]"
+            ]
+        );
+        assert_eq!(repro.left_out, ["--token"]);
+        let json = serde_json::to_string(&first).unwrap();
+        assert!(!json.contains("hunter2-secret"), "I6: {json}");
     }
 
     /// A session with one flow `pass` that Maestro printed no result for yet.

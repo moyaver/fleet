@@ -727,6 +727,33 @@
         }
       ]
     },
+    "Reproduction": {
+      "description": "How to rerun one flow of a run: the Maestro command without its flow paths (issue #82).\n\nThe agent builds it from the redacted argv. The values of `-e`/`--env` flags and of flags it\ndoesn't recognise are never in `words`: an env value is `KEY=[REDACTED]`, and an unknown flag\nis only named in `left_out`. The server adds the flow's own path after `words`.",
+      "properties": {
+        "left_out": {
+          "description": "The flags left out of `words`, by name, with the env key of an `-e` flag (`-e PASSWORD`).\nNever a value.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unavailable": {
+          "description": "Why the run has no command, when it has none (its command line is not `maestro test`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "words": {
+          "description": "The words of the command, `maestro` first, in order. Empty when `unavailable` is set.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "RunEnded": {
       "description": "`run.ended`: the agent is done with this run.",
       "properties": {
@@ -785,6 +812,17 @@
             }
           ],
           "description": "Which evidence sources the prepared command will produce. Absent from older agents."
+        },
+        "reproduction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reproduction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The command a rerun of one flow would use (issue #82), built from the redacted argv. Absent\nfrom older agents, and then the run has no reproduction command."
         }
       },
       "required": [

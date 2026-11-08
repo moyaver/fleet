@@ -143,6 +143,30 @@ pub struct RunStarted {
     /// Which evidence sources the prepared command will produce. Absent from older agents.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<EvidenceSources>,
+    /// The command a rerun of one flow would use (issue #82), built from the redacted argv. Absent
+    /// from older agents, and then the run has no reproduction command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reproduction: Option<Reproduction>,
+}
+
+/// How to rerun one flow of a run: the Maestro command without its flow paths (issue #82).
+///
+/// The agent builds it from the redacted argv. The values of `-e`/`--env` flags and of flags it
+/// doesn't recognise are never in `words`: an env value is `KEY=[REDACTED]`, and an unknown flag
+/// is only named in `left_out`. The server adds the flow's own path after `words`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Reproduction {
+    /// The words of the command, `maestro` first, in order. Empty when `unavailable` is set.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub words: Vec<String>,
+    /// The flags left out of `words`, by name, with the env key of an `-e` flag (`-e PASSWORD`).
+    /// Never a value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub left_out: Vec<String>,
+    /// Why the run has no command, when it has none (its command line is not `maestro test`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<String>,
 }
 
 /// Why the run has, or has not, a JUnit report.
@@ -681,6 +705,7 @@ mod tests {
             EventBody::RunStarted(RunStarted {
                 argv: vec!["maestro".into()],
                 agent_version: "0.0.0".into(),
+                reproduction: None,
                 evidence: Some(EvidenceSources {
                     report: ReportSource {
                         path: None,

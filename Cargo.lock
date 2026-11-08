@@ -1347,6 +1347,7 @@ dependencies = [
 name = "fleet-maestro"
 version = "0.1.0-alpha.3"
 dependencies = [
+ "fleet-core",
  "fleet-protocol",
  "insta",
  "quick-xml 0.42.0",
