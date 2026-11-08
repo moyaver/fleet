@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT name FROM publisher_trust_policies\n              WHERE project_id = $1 AND source = 'dashboard' AND name = ANY($2)\n              ORDER BY name LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "publisher_trust_policies",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "33cb4bdd2b9d2f40fe384bc7310a89d98161914527260a1cf4ab3d641150b66d"
+}

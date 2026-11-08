@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_tokens SET expires_at = now() WHERE policy_id = $1 AND expires_at > now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33e835ad8b13649e5d051832d7e0d7f083686ab2b568ccfad08b22a62b372e43"
+}

@@ -17,7 +17,7 @@
 //!   device detail, flow investigation).
 //! - [`sweep`]: leader-only liveness sweeps (detach silent runs, abandon expired ones).
 //! - [`admin`]: Screen G's read queries (projects, trust, keys, roles, retention, agents,
-//!   ingestion health, audit history).
+//!   ingestion health, audit history) and its writes ([`admin::write`]).
 //!
 //! Invariants upheld here: I3 (only the claim lattice decides a flow's outcome, and a `CHECK`
 //! constraint refuses a passed claim from an inferred source) and I5 (gaps are recorded in
@@ -64,6 +64,10 @@ pub enum Error {
     /// Stored data broke an assumption this build relies on.
     #[error("inconsistent stored data: {0}")]
     Corrupt(String),
+    /// The configuration asks for a row the dashboard already holds (or the reverse): the start-up
+    /// sync refuses, and says which row to remove.
+    #[error("{0}")]
+    Conflict(String),
 }
 
 impl From<sqlx::Error> for Error {

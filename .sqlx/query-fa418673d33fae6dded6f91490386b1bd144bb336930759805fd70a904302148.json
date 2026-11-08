@@ -1,32 +1,21 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT t.id, p.slug AS project, t.name, t.issuer, t.audience, t.repository_id,\n                      t.repository_owner_id, t.trusted_refs, t.allowed_events, t.job_workflow_ref,\n                      t.environment, t.pr_policy, t.created_at, t.revoked_at\n                 FROM publisher_trust_policies t JOIN projects p ON p.id = t.project_id\n                ORDER BY p.slug, t.name",
+  "query": "SELECT project_id, name, issuer, audience, repository_id, repository_owner_id,\n                  trusted_refs, allowed_events, job_workflow_ref, environment, pr_policy,\n                  source AS \"source!\", revoked_at\n             FROM publisher_trust_policies WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "project_id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
             "table": "publisher_trust_policies",
-            "name": "id"
+            "name": "project_id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "project",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "projects",
-            "name": "slug"
-          }
-        }
-      },
-      {
-        "ordinal": 2,
         "name": "name",
         "type_info": "Text",
         "origin": {
@@ -37,7 +26,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "issuer",
         "type_info": "Text",
         "origin": {
@@ -48,7 +37,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "audience",
         "type_info": "Text",
         "origin": {
@@ -59,7 +48,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "repository_id",
         "type_info": "Text",
         "origin": {
@@ -70,7 +59,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "repository_owner_id",
         "type_info": "Text",
         "origin": {
@@ -81,7 +70,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "trusted_refs",
         "type_info": "TextArray",
         "origin": {
@@ -92,7 +81,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "allowed_events",
         "type_info": "TextArray",
         "origin": {
@@ -103,7 +92,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "job_workflow_ref",
         "type_info": "Text",
         "origin": {
@@ -114,7 +103,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "environment",
         "type_info": "Text",
         "origin": {
@@ -125,7 +114,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "pr_policy",
         "type_info": "Text",
         "origin": {
@@ -136,18 +125,18 @@
         }
       },
       {
-        "ordinal": 12,
-        "name": "created_at",
-        "type_info": "Timestamptz",
+        "ordinal": 11,
+        "name": "source!",
+        "type_info": "Text",
         "origin": {
           "Table": {
             "table": "publisher_trust_policies",
-            "name": "created_at"
+            "name": "source"
           }
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "revoked_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -159,10 +148,11 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Uuid"
+      ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -178,5 +168,5 @@
       true
     ]
   },
-  "hash": "c00ae21af64aef6c011096ae52e917eee0c0300ece1e7d3b75045db6a034f7fe"
+  "hash": "fa418673d33fae6dded6f91490386b1bd144bb336930759805fd70a904302148"
 }

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM group_mappings\n                                   WHERE oidc_issuer = $1 AND group_claim = $2 AND source = 'dashboard'\n                                     AND project_id IS NOT DISTINCT FROM $3::uuid) AS \"clash!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "clash!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "00d7008d3065724bd26b64772040d57c0171c4b62b4360922828b6c855534e25"
+}
