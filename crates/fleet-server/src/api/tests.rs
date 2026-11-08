@@ -8,6 +8,7 @@ mod access;
 mod artifacts;
 mod authz_matrix;
 mod compare;
+mod direct;
 mod fleet;
 mod flows;
 mod history;
