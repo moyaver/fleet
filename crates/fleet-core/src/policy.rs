@@ -69,6 +69,10 @@ pub enum Action {
     ManageRoles,
     /// Read the audit log (a [`Resource::Global`] action).
     ViewAudit,
+    /// Read installation-wide administration: projects, publisher trust, API keys, role mappings,
+    /// retention, artifact and metric policy, agent compatibility and ingestion health (Screen G;
+    /// a [`Resource::Global`] action).
+    ViewAdministration,
     /// Change installation-wide settings (a [`Resource::Global`] action).
     ManageGlobalSettings,
     /// Publish events and telemetry (publishers only).
@@ -130,7 +134,9 @@ impl Action {
             | Self::ManageCredentials
             | Self::ManageRetention => Needs::Project(Role::Maintainer),
             Self::ManageRoles => Needs::Project(Role::Admin),
-            Self::ViewAudit | Self::ManageGlobalSettings => Needs::Global(Role::Admin),
+            Self::ViewAudit | Self::ViewAdministration | Self::ManageGlobalSettings => {
+                Needs::Global(Role::Admin)
+            }
             Self::Ingest | Self::UploadArtifact => Needs::Publisher,
         }
     }
@@ -253,7 +259,11 @@ mod tests {
 
     #[test]
     fn global_actions_need_a_global_admin_grant() {
-        for action in [Action::ViewAudit, Action::ManageGlobalSettings] {
+        for action in [
+            Action::ViewAudit,
+            Action::ViewAdministration,
+            Action::ManageGlobalSettings,
+        ] {
             assert!(allowed(
                 &user(&[(None, Role::Admin)]),
                 action,
@@ -327,6 +337,7 @@ mod tests {
             assert!(!allowed(&p, action, Resource::Project(A)), "{action:?}");
         }
         assert!(!allowed(&p, Action::ViewAudit, Resource::Global));
+        assert!(!allowed(&p, Action::ViewAdministration, Resource::Global));
     }
 
     #[test]
