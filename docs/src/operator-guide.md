@@ -244,14 +244,27 @@ In the Compose reference deployment, change `FLEET_IMAGE` to the new tag, then:
 cd deploy/compose
 docker compose pull && docker compose up -d
 docker compose ps        # the fleet service is healthy when `fleet healthcheck` passes
+docker compose exec fleet fleet --version   # the new version
 ```
 
 On start the server applies the pending migrations (`database.migrate = "auto"`, the default), creates the next days' partitions, and serves. Migrations run under Postgres's advisory lock, so instances that start together are safe.
 
-To run migrations yourself, set `FLEET_DATABASE__MIGRATE=manual`. Then `serve` refuses an outdated schema and you apply the migrations as their own step, before the new server starts:
+To run migrations yourself, set `FLEET_DATABASE__MIGRATE=manual`. The shipped `docker-compose.yml` pins `auto`, so set it in a `docker-compose.override.yml` beside it:
+
+```yaml
+services:
+  fleet:
+    environment:
+      FLEET_DATABASE__MIGRATE: manual
+```
+
+With manual migrations, `serve` refuses an outdated schema: a plain `up -d` leaves the new container restarting. So run `docker compose pull`, then stop the old server, apply the migrations as their own step, and start the new one:
 
 ```bash
+docker compose pull
+docker compose stop fleet
 docker compose run --rm fleet migrate
+docker compose up -d
 ```
 
 A server refuses a database whose schema is newer than its own, so an old image cannot run against a migrated database.
@@ -261,7 +274,7 @@ A server refuses a database whose schema is newer than its own, so an old image 
 - Every migration is a plain `NNNN_name.sql` file, and every one runs in its own transaction. A failed migration leaves the schema as it was.
 - **Migrations are forward-only.** There are no down migrations. The schema never moves back: rolling back is a restore ([Rollback](#rollback)).
 - **Applied migrations are never edited.** sqlx stores a checksum of each applied migration and the server refuses to start when an applied file no longer matches it. A fix is a new migration.
-- Each release's migrations are the previous release's plus new files: upgrading from `v0.1.0-alpha.1` applies `0015` to `0020`, in order.
+- Each release's migrations are the previous release's plus new files, and an upgrade applies the new ones in order. The migrations of each tag are listed in `migrations/` at that tag: upgrading from `v0.1.0-alpha.1` to `v0.1.0-alpha.3` applies `0015` to `0017`.
 
 ### Agents and server versions
 
@@ -271,7 +284,7 @@ A server refuses a database whose schema is newer than its own, so an old image 
 
 ### Rollback
 
-The schema does not move back, and the previous release refuses the upgraded schema (it does not know migrations `0018`–`0020`). Rolling back is therefore a restore:
+The schema does not move back, and the previous release refuses the upgraded schema (it does not know the migrations the upgrade added, so it exits at start with "the database schema is newer than this build"). Rolling back is therefore a restore:
 
 1. Stop the new server: `docker compose stop fleet`.
 2. Set `FLEET_IMAGE` back to the previous tag and restore the backup taken before the upgrade, as in [Restore](#restore): a new stack under its own Compose project name, so the upgraded volumes stay intact until you have checked the rollback.
@@ -284,6 +297,10 @@ Everything recorded after the backup is lost from the database. Agents hold unac
 Operators can rehearse on a copy: restore the latest backup into a stack under its own Compose project name (see [Restore](#restore)), set `FLEET_IMAGE` there to the new tag, and check that the server starts, that `SELECT count(*) FROM artifacts` matches the source, and that a run you know lists in the dashboard.
 
 Maintainers can rehearse the migrations without a deployment: `cargo xtask upgrade-rehearsal` exports the `migrations/` of every release tag from git (fetch the tags first, `git fetch --tags`), seeds rows under each release's schema, migrates to the current tree, and checks that every row is unchanged, that the current read paths return the seeded runs, flows and artifacts, and that the release's own migrator refuses the upgraded schema. It takes a few seconds once Postgres 18 is up (`DATABASE_URL`, or a throwaway container). It is not part of `cargo xtask ci`, because CI's checkout does not fetch tags. The test is `crates/fleet-store/tests/upgrade.rs`.
+
+### Verified
+
+On 2026-11-08 the Compose reference deployment went from `v0.1.0-alpha.1` to `v0.1.0-alpha.3` with the steps above: a backup, a project, an API key and a run were created, and after the upgrade migrations `0015` to `0017` were applied, the data was still there, the server reported `0.1.0-alpha.3` and new agents were accepted. The manual-migration path was checked on a second stack: the outdated schema is refused, and the migrate-then-start order works. The older server refuses the upgraded schema.
 
 ## Backup and restore
 
