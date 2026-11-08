@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use axum::http::Method;
 use axum_test::{TestRequest, TestResponse, WsMessage};
 use fleet_core::policy::{Grant, Role};
 use fleet_protocol::brand::WS_SUBPROTOCOL;
@@ -19,6 +20,10 @@ use uuid::Uuid;
 
 use super::rig::{Agent, Rig, rig, sample, telemetry};
 use crate::session;
+
+/// The CSRF token of every signed-in session the matrix creates, and the header that echoes it.
+const CSRF: &str = "csrf";
+const CSRF_HEADER: &str = "x-csrf-token";
 
 /// Who is asking. `Stranger` is signed in with an admin role on the other project only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -55,6 +60,9 @@ enum Class {
     WhoAmI,
     /// Sign-out: needs a session, and the CSRF token that a bare request lacks.
     Logout,
+    /// Failure triage (a write): a viewer is refused, a maintainer or admin gets past the role
+    /// check and reaches the handler, which has no such failure to change.
+    ProjectTriage,
     /// Not authorized by role: the same answer for everyone (public documents and probes, the
     /// sign-in flow, capability links).
     RoleIndependent,
@@ -68,6 +76,7 @@ fn class_of(route: &str) -> Option<Class> {
         "/api/v1/auth/session" => Class::WhoAmI,
         "/api/v1/auth/logout" => Class::Logout,
         "/api/v1/plans" => Class::Agent,
+        "/api/v1/projects/{project}/failures/{fingerprint}/triage" => Class::ProjectTriage,
         "/api/v1/openapi.json"
         | "/livez"
         | "/readyz"
@@ -93,13 +102,16 @@ const ROUTER_SOURCES: [(&str, &str); 6] = [
     ),
 ];
 
-/// The `(path, method)` pairs of every `.route(…)` call in `src`, and how many calls there are.
-/// A call whose path isn't a string literal is not returned, so the caller compares the two.
+/// The methods a `.route(…)` call may chain, as `method(handler)`.
+const METHODS: [&str; 5] = ["get", "post", "put", "patch", "delete"];
+
+/// The `(path, method)` pairs of every `.route(…)` call in `src`, one per chained method, and how
+/// many calls have a path that is a string literal. A call whose path is not a literal is not
+/// returned, so the caller compares the count with the number of calls.
 fn routes_in(src: &str) -> (Vec<(String, String)>, usize) {
     let mut found = Vec::new();
-    let mut calls = 0;
+    let mut literal_paths = 0;
     for (at, _) in src.match_indices(".route(") {
-        calls += 1;
         let rest = src[at + ".route(".len()..].trim_start();
         let Some(literal) = rest.strip_prefix('"') else {
             continue;
@@ -107,27 +119,54 @@ fn routes_in(src: &str) -> (Vec<(String, String)>, usize) {
         let Some(end) = literal.find('"') else {
             continue;
         };
-        let after = literal[end + 1..]
-            .trim_start()
-            .trim_start_matches(',')
-            .trim_start();
-        let method: String = after
-            .chars()
-            .take_while(char::is_ascii_alphabetic)
+        literal_paths += 1;
+        let path = &literal[..end];
+        let args = call_args(&literal[end + 1..]);
+        let mut methods: Vec<&str> = METHODS
+            .into_iter()
+            .filter(|m| calls_method(args, m))
             .collect();
-        found.push((literal[..end].to_owned(), method));
+        // A route with no method the matrix knows stays in the list, so `request` refuses it.
+        if methods.is_empty() {
+            methods.push("");
+        }
+        found.extend(methods.into_iter().map(|m| (path.to_owned(), m.to_owned())));
     }
-    (found, calls)
+    (found, literal_paths)
+}
+
+/// The arguments of a call whose `(` was just before `s`: the text up to its matching `)`.
+fn call_args(s: &str) -> &str {
+    let mut depth = 0_usize;
+    for (i, c) in s.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' if depth == 0 => return &s[..i],
+            ')' => depth -= 1,
+            _ => {}
+        }
+    }
+    s
+}
+
+/// Whether `args` calls `method(` as a whole word, as in `put(a).delete(b)`.
+fn calls_method(args: &str, method: &str) -> bool {
+    args.match_indices(&format!("{method}(")).any(|(at, _)| {
+        args[..at]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'))
+    })
 }
 
 /// Every route of the router, from its sources. Fails if one of them isn't a literal.
 fn derived_routes() -> Vec<(String, String)> {
     let mut all = Vec::new();
     for (name, src) in ROUTER_SOURCES {
-        let (found, calls) = routes_in(src);
+        let (found, literal_paths) = routes_in(src);
         assert_eq!(
-            found.len(),
-            calls,
+            literal_paths,
+            src.matches(".route(").count(),
             "{name}: every .route() path must be a string literal the matrix can read"
         );
         all.extend(found);
@@ -249,7 +288,7 @@ async fn cookies(rig: &Rig) -> HashMap<Who, String> {
             .upsert_user("https://idp.test", &format!("matrix-{who:?}"), None, None)
             .await
             .unwrap();
-        let data = json!({"grants": grants, "csrf": "csrf", "email": null, "name": null});
+        let data = json!({"grants": grants, "csrf": CSRF, "email": null, "name": null});
         let cookie = rig
             .store
             .create_session(
@@ -265,21 +304,37 @@ async fn cookies(rig: &Rig) -> HashMap<Who, String> {
 }
 
 /// A request as `who` makes it. Publisher keys go as bearer tokens; sessions as the cookie.
+/// One request as `who`. `csrf` says whether a signed-in request echoes the session's CSRF token.
 fn request(
     rig: &Rig,
     cookies: &HashMap<Who, String>,
     who: Who,
     method: &str,
     path: &str,
+    csrf: bool,
 ) -> TestRequest {
-    let req = match method {
-        "post" => rig.app.post(path),
-        _ => rig.app.get(path),
+    let method: Method = method
+        .to_ascii_uppercase()
+        .parse()
+        .unwrap_or_else(|_| panic!("the matrix knows no method for {path}"));
+    let req = rig.app.method(method.clone(), path);
+    // The only PUT route is triage, which takes this body (a known failure needs its issue).
+    let req = if method == Method::PUT {
+        req.json(&json!({ "state": "known", "issue_url": "https://example.test/issues/1" }))
+    } else {
+        req
     };
     match who {
         Who::Anonymous => req,
         Who::Publisher => req.authorization_bearer(&rig.key),
-        signed_in => req.add_header("cookie", cookies[&signed_in].clone()),
+        signed_in => {
+            let req = req.add_header("cookie", cookies[&signed_in].clone());
+            if csrf {
+                req.add_header(CSRF_HEADER, CSRF)
+            } else {
+                req
+            }
+        }
     }
 }
 
@@ -328,6 +383,19 @@ fn check(class: Class, who: Who, status: u16, body: &Value, anonymous: u16) -> R
             Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),
             // A signed-in request without the CSRF header is a forged-looking one: refused.
             _ => want(status == 403, "403 expected without the CSRF token"),
+        },
+        Class::ProjectTriage => match who {
+            Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),
+            Who::Stranger => want(
+                status == 404 && body["error"] == "no such project",
+                "404 expected",
+            ),
+            Who::Viewer => want(status == 403, "403 expected: a viewer may not triage"),
+            // Past the role check the handler answers for the failure, and none has this one.
+            _ => want(
+                status == 404 && body["error"] == "no such failure",
+                "404 for the unknown failure",
+            ),
         },
         Class::Agent => match who {
             // Publisher keys are the only callers these routes take; their own answers are not
@@ -444,8 +512,10 @@ async fn every_rest_and_live_route_answers_every_principal_as_its_class_allows()
             }
             continue;
         }
+        // Only triage is checked past its CSRF check; the logout row checks the refusal without it.
+        let csrf = class == Class::ProjectTriage;
         // The anonymous answer is the baseline for role-independent routes.
-        let anonymous = request(&rig, &cookies, Who::Anonymous, &method, &target)
+        let anonymous = request(&rig, &cookies, Who::Anonymous, &method, &target, csrf)
             .await
             .status_code()
             .as_u16();
@@ -453,7 +523,7 @@ async fn every_rest_and_live_route_answers_every_principal_as_its_class_allows()
             let res: TestResponse = if is_socket(&path) {
                 socket(&rig, &cookies, who, &target).await
             } else {
-                request(&rig, &cookies, who, &method, &target).await
+                request(&rig, &cookies, who, &method, &target, csrf).await
             };
             let status = res.status_code().as_u16();
             let body: Value = serde_json::from_str(&res.text()).unwrap_or(Value::Null);

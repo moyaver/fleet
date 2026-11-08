@@ -24,6 +24,7 @@ async fn api_key_create_keeps_the_configured_project_name() {
             action: ApiKeyAction::Create {
                 project: "app".into(),
                 name: "second-key".into(),
+                expires_in_days: None,
             },
         },
     };
