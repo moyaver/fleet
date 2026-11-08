@@ -42,7 +42,8 @@ fn csp(index_html: &str, usercontent: Option<&str>) -> String {
     let origin = usercontent.map(|o| format!(" {o}")).unwrap_or_default();
     format!(
         "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'{hashes}; style-src 'self'; \
-         img-src 'self' blob:{origin}; connect-src 'self'{origin}; frame-ancestors 'none'"
+         object-src 'none'; base-uri 'none'; img-src 'self' blob:{origin}; \
+         connect-src 'self'{origin}; frame-ancestors 'none'"
     )
 }
 
@@ -123,6 +124,13 @@ mod tests {
         assert!(csp.contains("script-src 'self' 'wasm-unsafe-eval' 'sha256-w4ujnOpjBoH2vcasx+reJRUwYivG8Q3afx/XevGJod8='; "), "{csp}");
         assert!(!csp.contains("unsafe-inline"));
         assert_eq!(csp.matches("'sha256-").count(), 1, "{csp}");
+    }
+
+    #[test]
+    fn plugins_and_base_urls_are_refused_outright() {
+        // Not covered by default-src 'self' alone: <object> and <base> would still load.
+        let csp = csp("", None);
+        assert!(csp.contains("object-src 'none'; base-uri 'none';"), "{csp}");
     }
 
     #[test]
