@@ -8,7 +8,8 @@ use fleet_protocol::{
         ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
         TimelineView, WorkerRunPage, WorkerView,
         history::{
-            CompareView, FailureTriageRequest, FailureTriageView, FlowStatsView, HistoryPage,
+            CompareView, FailureTriageRequest, FailureTriageView, FlowCatalogPage, FlowStatsView,
+            HistoryPage, HistoryTrendView,
         },
     },
 };
@@ -250,6 +251,24 @@ pub async fn fetch_text(link: &str) -> Result<String, ApiError> {
 pub async fn history(project: &str, query: &str) -> Result<HistoryPage, ApiError> {
     get(&format!(
         "{API}/projects/{}/history?{query}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen E's flow catalog: one page of the flows the project knows, with the filters in `query`.
+pub async fn catalog(project: &str, query: &str) -> Result<FlowCatalogPage, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/flows?{query}",
+        segment(project)
+    ))
+    .await
+}
+
+/// Screen E's trend over the filtered runs; `query` holds the filters and the window.
+pub async fn trend(project: &str, query: &str) -> Result<HistoryTrendView, ApiError> {
+    get(&format!(
+        "{API}/projects/{}/history/trend?{query}",
         segment(project)
     ))
     .await

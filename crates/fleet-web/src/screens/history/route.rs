@@ -8,7 +8,7 @@
     reason = "Leptos's #[component] macro generates the props structs and the components return views"
 )]
 
-use fleet_protocol::rest::history::HistoryPage;
+use fleet_protocol::rest::history::{FlowCatalogPage, HistoryPage};
 use fleet_ui::components::{display::Skeleton, forms::use_url_query};
 use leptos::{prelude::*, task::spawn_local};
 
@@ -21,8 +21,10 @@ use crate::{
     screens::{
         common::Ctx,
         history::{
-            model::{HistoryQuery, HistoryTable, STATS_PARAM, StatsPanel},
-            view::{HistoryFilters, HistoryTableView, StatsView},
+            model::{
+                CatalogTable, HistoryQuery, HistoryTable, STATS_PARAM, StatsPanel, TrendPanel,
+            },
+            view::{FlowCatalogView, HistoryFilters, HistoryTableView, StatsView, TrendView},
         },
         parts::{Fetched, loaded},
         project::InProject,
@@ -69,8 +71,30 @@ fn HistoryBody(project: String) -> impl IntoView {
     };
     let more: RwSignal<Vec<HistoryPage>> = RwSignal::new(Vec::new());
     let loading_more = RwSignal::new(false);
+    // The flow catalog and the trend read the same filters and window as the history.
+    let catalog = {
+        let project = project.clone();
+        remote(1000, move || {
+            let project = project.clone();
+            let q = rest.get_untracked();
+            let epoch = generation.get_untracked();
+            async move { api::catalog(&project, &q).await.map(|page| (epoch, page)) }
+        })
+    };
+    let catalog_more: RwSignal<Vec<FlowCatalogPage>> = RwSignal::new(Vec::new());
+    let catalog_loading = RwSignal::new(false);
+    let trend = {
+        let project = project.clone();
+        remote(1000, move || {
+            let project = project.clone();
+            let q = rest.get_untracked();
+            async move { api::trend(&project, &q).await }
+        })
+    };
     {
         let history = history.clone();
+        let catalog = catalog.clone();
+        let trend = trend.clone();
         Effect::new(move |previous: Option<()>| {
             rest.track();
             // The first run is the fetch `remote` already started.
@@ -78,10 +102,55 @@ fn HistoryBody(project: String) -> impl IntoView {
                 generation.update(|epoch| *epoch += 1);
                 more.set(Vec::new());
                 loading_more.set(false);
+                catalog_more.set(Vec::new());
+                catalog_loading.set(false);
                 history.request();
+                catalog.request();
+                trend.request();
             }
         });
     }
+    let on_catalog_more = {
+        let project = project.clone();
+        Callback::new(move |cursor: String| {
+            if catalog_loading.get_untracked() {
+                return;
+            }
+            catalog_loading.set(true);
+            let epoch = generation.get_untracked();
+            let project = project.clone();
+            let q = parsed.with_untracked(|p| p.rest_query(Some(&cursor)));
+            spawn_local(async move {
+                let page = api::catalog(&project, &q).await;
+                if generation.get_untracked() == epoch {
+                    if let Ok(page) = page {
+                        catalog_more.update(|pages| pages.push(page));
+                    }
+                    catalog_loading.set(false);
+                }
+            });
+        })
+    };
+    let catalog_table = {
+        let project = project.clone();
+        Memo::new(move |_| {
+            catalog.data.with(|first| {
+                first
+                    .as_ref()
+                    .filter(|(epoch, _)| *epoch == generation.get())
+                    .map(|(_, first)| {
+                        catalog_more.with(|more| {
+                            let mut pages = vec![first.clone()];
+                            pages.extend(more.iter().cloned());
+                            CatalogTable::build(&pages, &ctx(&project), &query.get())
+                        })
+                    })
+            })
+        })
+    };
+    let catalog_fetched = Fetched::from(&catalog);
+    let trend_fetched = Fetched::from(&trend);
+    let trend_utc = utc_offset_minutes();
     let on_more = {
         let project = project.clone();
         Callback::new(move |cursor: String| {
@@ -129,6 +198,7 @@ fn HistoryBody(project: String) -> impl IntoView {
     let on_close = Callback::new(move |()| {
         set_query.run(with_query_param(&query.get_untracked(), STATS_PARAM, None));
     });
+    let trend_project = project.clone();
     let header_project = project.clone();
     view! {
         <div class="page-h">
@@ -145,6 +215,23 @@ fn HistoryBody(project: String) -> impl IntoView {
             </div>
         </div>
         <HistoryFilters query=query on_change=set_query />
+        <ErrorNotice error=trend_fetched.error />
+        {move || {
+            let project = trend_project.clone();
+            loaded(
+                trend_fetched,
+                move |view| {
+                    let panel = TrendPanel::build(&view, &ctx(&project));
+                    view! { <TrendView panel utc_offset_minutes=trend_utc /> }.into_any()
+                },
+            )
+        }}
+        <ErrorNotice error=catalog_fetched.error />
+        {move || {
+            catalog_table
+                .get()
+                .map(|t| view! { <FlowCatalogView table=t on_more=on_catalog_more on_stats=on_stats /> })
+        }}
         <ErrorNotice error=history_fetched.error />
         {move || {
             let table = table.get();

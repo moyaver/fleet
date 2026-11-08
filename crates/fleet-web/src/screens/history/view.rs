@@ -24,7 +24,8 @@ use leptos::prelude::*;
 
 use crate::{
     screens::history::model::{
-        EvidenceLink, FailureGroup, FlakyFlow, HistoryRow, HistoryTable, StatsPanel, filter_spec,
+        CatalogRow, CatalogTable, EvidenceLink, FailureGroup, FlakyFlow, HistoryRow, HistoryTable,
+        LastRun, StatsPanel, TrendPanel, filter_spec,
     },
     screens::parts::PillView,
     screens::rerun::RerunDisclosure,
@@ -157,6 +158,238 @@ fn FlakyFlows(
     .into_any()
 }
 
+/// The flow catalog (issue #85): every flow the project knows, run or not, with its tags and what
+/// its latest finished run says. A never-run flow reads "Never run", in words and no mark (#149).
+#[component]
+pub fn FlowCatalogView(
+    /// The rows shown so far.
+    table: CatalogTable,
+    /// Called with the cursor when "Load more" is pressed.
+    on_more: Callback<String>,
+    /// Called with a flow's stats address when its "Stats" button is pressed.
+    on_stats: Callback<String>,
+) -> impl IntoView {
+    let CatalogTable { rows, next_cursor } = table;
+    let count = rows.len();
+    let empty = rows.is_empty();
+    view! {
+        <section class="mt-9 border-t border-line pt-1" aria-labelledby="catalog-h" data-testid="flow-catalog">
+            <div class="flex flex-wrap items-baseline gap-4 py-3">
+                <h3 id="catalog-h" class="text-[15px] font-semibold">"Flows"</h3>
+                <span class="note">{format!("{count} shown, known to the project")}</span>
+            </div>
+            {if empty {
+                view! {
+                    <p class="text-sm text-muted" data-testid="catalog-empty">"No flow matches these filters."</p>
+                }
+                    .into_any()
+            } else {
+                view! {
+                    <TableBox label="Flows">
+                        <table data-testid="catalog-table" class="tbl tbl-cards">
+                            <thead>
+                                <tr>
+                                    <th scope="col">"Flow"</th>
+                                    <th scope="col">"Tags"</th>
+                                    <th scope="col">"Last finished run"</th>
+                                    <th scope="col"><span class="sr-only">"Stats"</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows
+                                    .into_iter()
+                                    .map(|r| catalog_row(r, on_stats))
+                                    .collect_view()}
+                            </tbody>
+                        </table>
+                    </TableBox>
+                    {next_cursor
+                        .map(|cursor| {
+                            view! {
+                                <div class="pt-4">
+                                    <Button
+                                        variant=ButtonVariant::Secondary
+                                        on_click=Callback::new(move |()| on_more.run(cursor.clone()))
+                                    >
+                                        "Load more"
+                                    </Button>
+                                </div>
+                            }
+                        })}
+                }
+                    .into_any()
+            }}
+        </section>
+    }
+}
+
+fn catalog_row(r: CatalogRow, on_stats: Callback<String>) -> impl IntoView {
+    let stats_query = r.stats_query.clone();
+    let label = format!("Stats for {}", r.flow);
+    let never = matches!(r.last, LastRun::NeverRun);
+    let title = r.name.clone().unwrap_or_else(|| r.flow.clone());
+    let identity = r.name.as_ref().map(|_| r.flow.clone());
+    view! {
+        <tr class="border-b border-line" data-testid="catalog-row" data-flow=r.flow.clone() data-never-run=never.to_string()>
+            <td data-label="Flow">
+                <span class="cell-title">{title}</span>
+                {identity.map(|i| view! { <div class="cell-sub trunc num">{i}</div> })}
+            </td>
+            <td data-label="Tags">
+                <span class="inline-flex flex-wrap gap-1.5">
+                    {r.tags
+                        .into_iter()
+                        .map(|t| view! { <span class="chip" data-testid="flow-tag">{t}</span> })
+                        .collect_view()}
+                </span>
+            </td>
+            <td data-label="Last finished run">
+                {match r.last {
+                    LastRun::NeverRun => view! {
+                        <span class="text-muted" data-testid="never-run">"Never run"</span>
+                    }
+                        .into_any(),
+                    LastRun::NoFinishedRun => view! {
+                        <span class="text-muted" data-testid="no-finished-run">"No finished run yet"</span>
+                    }
+                        .into_any(),
+                    LastRun::Ran { pill, time, provenance, finality_note } => view! {
+                        <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1" title=finality_note>
+                            <PillView pill />
+                            <span class="num">{time}</span>
+                            <RowProvenance provenance />
+                        </span>
+                    }
+                        .into_any(),
+                }}
+            </td>
+            <td>
+                <button
+                    type="button"
+                    class=SMALL_BUTTON
+                    aria-label=label
+                    aria-expanded=r.stats_open.to_string()
+                    data-testid="catalog-stats"
+                    on:click=move |_| on_stats.run(stats_query.clone())
+                >
+                    "Stats"
+                </button>
+            </td>
+        </tr>
+    }
+}
+
+/// The project trend over the filtered runs (issue #85): the headline figures, the duration charts
+/// and the counts per day. Derived from the runs below it, and it says so.
+#[component]
+pub fn TrendView(
+    /// The panel.
+    panel: TrendPanel,
+    /// The viewer's offset from UTC in minutes.
+    utc_offset_minutes: i32,
+) -> impl IntoView {
+    let TrendPanel {
+        window,
+        tiles,
+        days,
+        median_chart,
+        p95_chart,
+    } = panel;
+    let empty = days.is_empty();
+    view! {
+        <section class="mt-9 border-t border-line pt-1" aria-labelledby="trend-h" data-testid="trend">
+            <div class="flex flex-wrap items-baseline gap-4 py-3">
+                <h3 id="trend-h" class="text-[15px] font-semibold">"Trend over the filtered runs"</h3>
+                <span class="note">{window}</span>
+            </div>
+            <ProvenanceStatement provenance=Provenance::Derived>
+                "Settled runs on trusted pipelines, by UTC day. Flaky counts the runs the verdicts above name."
+            </ProvenanceStatement>
+            <div class="mt-3">
+                <ReadoutStrip>
+                    {tiles
+                        .into_iter()
+                        .map(|t| {
+                            view! {
+                                <div data-testid="trend-tile" data-stat=t.id>
+                                    <StatTile label=t.label value=t.value />
+                                </div>
+                            }
+                        })
+                        .collect_view()}
+                </ReadoutStrip>
+            </div>
+            {median_chart
+                .map(|series| {
+                    view! {
+                        <figure class="mt-7 space-y-1" data-testid="trend-median-chart">
+                            <figcaption class="text-sm font-medium">"Median duration per day"</figcaption>
+                            <TimeSeriesChart
+                                series=Signal::derive(move || series.clone())
+                                utc_offset_minutes=utc_offset_minutes
+                            />
+                        </figure>
+                    }
+                })}
+            {p95_chart
+                .map(|series| {
+                    view! {
+                        <figure class="mt-7 space-y-1" data-testid="trend-p95-chart">
+                            <figcaption class="text-sm font-medium">"95th percentile duration per day"</figcaption>
+                            <TimeSeriesChart
+                                series=Signal::derive(move || series.clone())
+                                utc_offset_minutes=utc_offset_minutes
+                            />
+                        </figure>
+                    }
+                })}
+            {if empty {
+                view! {
+                    <p class="mt-7 text-sm text-muted" data-testid="trend-empty">"No settled trusted run in this window."</p>
+                }
+                    .into_any()
+            } else {
+                view! {
+                    <div class="mt-7">
+                        <TableBox label="Trend per day">
+                            <table data-testid="trend-days" class="tbl tbl-cards">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">"Day (UTC)"</th>
+                                        <th scope="col" class="num">"Passed"</th>
+                                        <th scope="col" class="num">"Failed"</th>
+                                        <th scope="col" class="num">"Flaky"</th>
+                                        <th scope="col" class="num">"Median"</th>
+                                        <th scope="col" class="num">"95th percentile"</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {days
+                                        .into_iter()
+                                        .map(|d| {
+                                            view! {
+                                                <tr data-testid="trend-day" data-day=d.day.clone()>
+                                                    <td data-label="Day (UTC)" class="num">{d.day.clone()}</td>
+                                                    <td data-label="Passed" class="num">{d.passed}</td>
+                                                    <td data-label="Failed" class="num">{d.failed}</td>
+                                                    <td data-label="Flaky" class="num">{d.flaky}</td>
+                                                    <td data-label="Median" class="num">{d.p50}</td>
+                                                    <td data-label="95th percentile" class="num">{d.p95}</td>
+                                                </tr>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </tbody>
+                            </table>
+                        </TableBox>
+                    </div>
+                }
+                    .into_any()
+            }}
+        </section>
+    }
+}
+
 /// The history: the flaky flows, then one row per finished execution, with a "Load more" button
 /// while the server has more.
 #[component]
@@ -264,6 +497,11 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
             <td data-label="Flow">
                 <a class="cell-title text-fg underline decoration-line-strong underline-offset-[3px]" href=r.href>{r.name}</a>
                 {identity.map(|i| view! { <div class="cell-sub trunc num">{i}</div> })}
+                {(!r.tags.is_empty()).then(|| view! {
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                        {r.tags.into_iter().map(|t| view! { <span class="chip" data-testid="flow-tag">{t}</span> }).collect_view()}
+                    </div>
+                })}
             </td>
             <td data-label="Result">
                 <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1" title=r.finality_note>
@@ -303,6 +541,11 @@ fn history_row(r: HistoryRow, verified: bool, on_stats: Callback<String>) -> imp
                 {r
                     .condition
                     .map(|c| view! { <span class="font-mono text-[12.5px]" data-testid="condition">{c}</span> })}
+                {r
+                    .facts
+                    .into_iter()
+                    .map(|f| view! { <div class="cell-sub" data-testid="run-fact">{f}</div> })
+                    .collect_view()}
             </td>
             <td>
                 <button
