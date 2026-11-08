@@ -38,6 +38,7 @@ use crate::{
         },
         history::view::FailureFingerprint,
         parts::{FactList, Fetched, Notice, PillView, loaded},
+        rerun::{RerunSection, manifest_href},
         triage::TriageControl,
     },
     status::flow_provenance,
@@ -100,6 +101,7 @@ pub fn FlowPageView(
                             <CrashLine crash=page.crash evidence />
                             <FailureBand project=band_project.clone() failure=page.failure />
                             <HistoryLineView history=page.history />
+                            <RerunSection repro=f.reproduction.clone() manifest=manifest_href(&band_project, f.attempt.id) />
                         }
                             .into_any()
                     },

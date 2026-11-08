@@ -18,6 +18,7 @@ mod m4_exit;
 mod m5_exit;
 mod network;
 mod publish;
+mod rerun;
 mod responsive;
 mod scenarios;
 mod step_marks;

@@ -239,6 +239,15 @@ pub(crate) fn run_agent_planned(
     run_agent_with(fixture_name, env, &[], Some(manifest)).0
 }
 
+/// Like [`run_agent_planned`], and also the run directory, where an offline run keeps its journal.
+pub(crate) fn run_agent_planned_keeping_run_dir(
+    fixture_name: &str,
+    env: &[(&str, &str)],
+    manifest: &Value,
+) -> (Output, PathBuf) {
+    run_agent_with(fixture_name, env, &[], Some(manifest))
+}
+
 fn run_agent_with(
     fixture_name: &str,
     env: &[(&str, &str)],
