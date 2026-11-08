@@ -202,7 +202,7 @@ impl Idp {
         let kid = header
             .kid
             .ok_or_else(|| Refused::Invalid("the token has no kid".into()))?;
-        let key = jwks.key(&login.issuer, &kid).await?;
+        let key = jwks.key(&login.issuer, &login.jwks_hosts, &kid).await?;
         let mut validation = Validation::new(Algorithm::RS256);
         validation.set_issuer(&[&login.issuer]);
         validation.set_audience(&[&login.client_id]);

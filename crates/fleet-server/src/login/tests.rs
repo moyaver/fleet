@@ -193,6 +193,7 @@ async fn rig_with(tweak: impl FnOnce(&mut Config)) -> Rig {
         scopes: vec!["profile".into(), "email".into()],
         group_claims: vec!["groups".into(), "roles".into()],
         session_ttl_minutes: 60,
+        jwks_hosts: Vec::new(),
         group_roles: vec![
             role("qa", Role::Viewer, Some("app")),
             role("leads", Role::Maintainer, Some("app")),

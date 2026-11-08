@@ -765,6 +765,7 @@ impl Default for Oidc {
             issuers: vec![OidcIssuer {
                 issuer: GITHUB_ISSUER.into(),
                 audience: fleet_protocol::brand::OIDC_AUDIENCE.into(),
+                jwks_hosts: Vec::new(),
             }],
             token_ttl_minutes: 360,
             max_token_age_seconds: 600,
@@ -780,6 +781,10 @@ pub struct OidcIssuer {
     pub issuer: String,
     /// The audience the agent requests (`aud`).
     pub audience: String,
+    /// Hosts, besides the issuer's own, that this issuer's `jwks_uri` may name. Most providers
+    /// serve their keys on the issuer's host and need none (research 06 T14).
+    #[serde(default)]
+    pub jwks_hosts: Vec<String>,
 }
 
 /// Browser sign-in: OIDC authorization code with PKCE and nonce, against one identity provider
@@ -805,6 +810,10 @@ pub struct Login {
     /// revoked group membership keeps working.
     #[serde(default = "default_session_minutes")]
     pub session_ttl_minutes: u64,
+    /// Other hosts this provider's `jwks_uri` may name, besides the issuer's own (research 06
+    /// T14). Most providers need none.
+    #[serde(default)]
+    pub jwks_hosts: Vec<String>,
     /// Which group gets which role. A user with no matching group is denied.
     #[serde(default)]
     pub group_roles: Vec<GroupRole>,
