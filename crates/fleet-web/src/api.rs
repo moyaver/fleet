@@ -7,7 +7,9 @@ use fleet_protocol::{
     rest::{
         ArtifactListView, DeviceDetailView, FlowDetailView, MetricsView, OverviewView, SessionView,
         TimelineView, WorkerRunPage, WorkerView,
-        history::{CompareView, FlowStatsView, HistoryPage},
+        history::{
+            CompareView, FailureTriageRequest, FailureTriageView, FlowStatsView, HistoryPage,
+        },
     },
 };
 use gloo_net::http::Request;
@@ -288,6 +290,61 @@ pub async fn logout(csrf_token: &str) -> Result<(), ApiError> {
     let retry = retry_after(&response.headers());
     let body = response.text().await.unwrap_or_default();
     classify(response.status(), &body, retry).map_or(Ok(()), Err)
+}
+
+/// Marks the failure `fingerprint` known or resolved (issue #84). `csrf_token` comes from
+/// [`session`]; the server refuses a person whose role is below maintainer.
+pub async fn set_triage(
+    project: &str,
+    fingerprint: &str,
+    body: &FailureTriageRequest,
+    csrf_token: &str,
+) -> Result<FailureTriageView, ApiError> {
+    let request = Request::put(&triage_path(project, fingerprint))
+        .header("X-CSRF-Token", csrf_token)
+        .json(body)
+        .map_err(|e| ApiError::Decode(e.to_string()))?;
+    answer(request).await
+}
+
+/// Clears the failure `fingerprint` back to untriaged (issue #84). The same rules as
+/// [`set_triage`] apply.
+pub async fn clear_triage(
+    project: &str,
+    fingerprint: &str,
+    csrf_token: &str,
+) -> Result<FailureTriageView, ApiError> {
+    let request = Request::delete(&triage_path(project, fingerprint))
+        .header("X-CSRF-Token", csrf_token)
+        .build()
+        .map_err(|e| ApiError::Decode(e.to_string()))?;
+    answer(request).await
+}
+
+/// Sends a mutating request and reads its body the way [`get`] does.
+async fn answer<T: DeserializeOwned>(request: Request) -> Result<T, ApiError> {
+    let response = request
+        .send()
+        .await
+        .map_err(|e| ApiError::Network(e.to_string()))?;
+    let status = response.status();
+    let retry = retry_after(&response.headers());
+    let body = response
+        .text()
+        .await
+        .map_err(|e| ApiError::Network(e.to_string()))?;
+    if let Some(error) = classify(status, &body, retry) {
+        return Err(error);
+    }
+    serde_json::from_str(&body).map_err(|e| ApiError::Decode(e.to_string()))
+}
+
+fn triage_path(project: &str, fingerprint: &str) -> String {
+    format!(
+        "{API}/projects/{}/failures/{}/triage",
+        segment(project),
+        crate::paths::escape(fingerprint)
+    )
 }
 
 /// A project slug as one path segment.

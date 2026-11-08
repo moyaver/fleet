@@ -560,8 +560,9 @@ async fn two_concurrent_runs_both_update_on_the_overview() {
 }
 
 /// A signed-in session straight in the database (the sign-in flow has its own tests in
-/// `fleet-server`): returns the cookie value of a viewer on every project.
-async fn sign_in_session(stack: &Stack) -> String {
+/// `fleet-server`): returns the cookie value of a person whose only grant is `role` on every
+/// project.
+pub(crate) async fn sign_in_session(stack: &Stack, role: &str) -> String {
     let url = stack.config.database.url.as_ref().unwrap().expose();
     let store = fleet_store::Store::connect_lazy(url, fleet_store::PoolOptions::default()).unwrap();
     let user = store
@@ -574,7 +575,7 @@ async fn sign_in_session(stack: &Stack) -> String {
         .await
         .unwrap();
     let data = json!({
-        "grants": [{"project": null, "role": "viewer"}],
+        "grants": [{"project": null, "role": role}],
         "csrf": "e2e-csrf-token", "email": "ada@example.com", "name": "Ada"
     });
     let expires = time::OffsetDateTime::now_utc() + time::Duration::hours(1);
@@ -635,7 +636,7 @@ async fn without_a_login_the_dashboard_links_to_sign_in_and_with_one_it_signs_ou
     );
 
     // With a session cookie the same page reads, greets the person and offers "Sign out".
-    let cookie = sign_in_session(&stack).await;
+    let cookie = sign_in_session(&stack, "viewer").await;
     browser
         .set_secure_cookie(&origin, "__Host-fleet_session", &cookie)
         .await;

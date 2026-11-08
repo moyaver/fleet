@@ -34,7 +34,9 @@ use crate::{
                 StepRef, StepsSection,
             },
         },
+        history::view::FailureFingerprint,
         parts::{FactList, Fetched, Notice, PillView, loaded},
+        triage::TriageControl,
     },
 };
 
@@ -63,6 +65,7 @@ pub fn FlowPageView(
     evidence: EvidenceFeed,
 ) -> impl IntoView {
     let on_select_step = Callback::new(move |id: String| evidence.selected_step.set(Some(id)));
+    let band_project = project.clone();
     let ctx = Memo::new(move |_| Ctx {
         project: project.clone(),
         now_ms: now_ms.get(),
@@ -92,7 +95,7 @@ pub fn FlowPageView(
                         let page = FlowPage::build(&f, &ctx.get_untracked());
                         view! {
                             <CrashLine crash=page.crash evidence />
-                            <FailureBand failure=page.failure />
+                            <FailureBand project=band_project.clone() failure=page.failure />
                             <HistoryLineView history=page.history />
                         }
                             .into_any()
@@ -240,6 +243,8 @@ fn CrashLine(
 /// band is a tint.
 #[component]
 fn FailureBand(
+    /// The project slug, for the failure's triage control.
+    project: String,
     /// Why the flow failed, if it did.
     failure: Failure,
 ) -> impl IntoView {
@@ -249,6 +254,7 @@ fn FailureBand(
     let total = details.total_steps;
     let message = details.message.clone();
     let infrastructure = details.infrastructure.clone();
+    let (fingerprint, triage) = (details.fingerprint.clone(), details.triage.clone());
     let shown = message
         .clone()
         .unwrap_or_else(|| "No failure message was reported".to_owned());
@@ -292,6 +298,13 @@ fn FailureBand(
                 </div>
                 {message.map(|m| view! { <CopyButton text=m /> })}
             </div>
+            {fingerprint
+                .map(|fingerprint| {
+                    view! {
+                        <FailureFingerprint fingerprint=fingerprint.clone() />
+                        <TriageControl project=project fingerprint=fingerprint triage=triage />
+                    }
+                })}
         </section>
     }
     .into_any()

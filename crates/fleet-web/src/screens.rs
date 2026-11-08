@@ -8,7 +8,8 @@
 //! - [`parts`]: Leptos pieces shared by the pages of screens C and D.
 //! - [`history`]: screen E. [`compare`]: screen F. [`project`]: which project they are about.
 //! - [`routes`]: the routes of screens C and D, fetching with the REST client.
-//! - [`worker`], [`device`]: screen C. [`flow`]: screen D.
+//! - [`worker`], [`device`]: screen C. [`flow`]: screen D. [`triage`]: a failure's recorded state,
+//!   shown on D and E.
 
 pub mod common;
 pub mod compare;
@@ -22,4 +23,5 @@ pub mod pipeline;
 pub mod project;
 pub mod routes;
 pub mod timeline;
+pub mod triage;
 pub mod worker;
