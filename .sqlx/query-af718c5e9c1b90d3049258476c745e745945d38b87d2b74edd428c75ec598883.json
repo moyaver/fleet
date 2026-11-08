@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,\n                    device_session_id, flow_name, flow_path, started_at, ended_at,\n                    crash_package, crash_exception, step_warnings\n               FROM flow_executions WHERE id = $1 AND project_id = $2",
+  "query": "SELECT pipeline_attempt_id, job_id, suite_execution_id, agent_run_id,\n                    device_session_id, flow_name, flow_path, started_at, ended_at,\n                    crash_package, crash_exception, step_warnings, cut_short\n               FROM flow_executions WHERE id = $1 AND project_id = $2",
   "describe": {
     "columns": [
       {
@@ -134,6 +134,17 @@
             "name": "step_warnings"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "cut_short",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_executions",
+            "name": "cut_short"
+          }
+        }
       }
     ],
     "parameters": {
@@ -154,8 +165,9 @@
       true,
       true,
       true,
-      false
+      false,
+      true
     ]
   },
-  "hash": "c8085876ac2d91094bef8113428b52164837b777995c9b776383d0c9971db161"
+  "hash": "af718c5e9c1b90d3049258476c745e745945d38b87d2b74edd428c75ec598883"
 }

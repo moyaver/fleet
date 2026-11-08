@@ -8,7 +8,7 @@
 
 use std::collections::BTreeSet;
 
-use fleet_core::claims::Claim;
+use fleet_core::{claims::Claim, flaky::CUT_SHORT};
 use fleet_protocol::{
     event::{
         AdbState, AgentWarning, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome,
@@ -487,8 +487,9 @@ impl<'a> Ctx<'a> {
 
     /// Keeps the step alignment warnings a flow's final `commands.json` raised, so its page says how
     /// far its steps are verified (issue #148). The flow's verdict never depends on them (I3). A
-    /// commands file whose flow was never named is kept on its agent run instead. Other warnings
-    /// stay in the journal.
+    /// commands file whose flow was never named is kept on its agent run instead. The cut-short
+    /// warning is kept on its flow, so the device-loss label outlives the journal (issue #145).
+    /// Other warnings stay in the journal.
     async fn agent_warning(
         &mut self,
         tx: &mut PgConnection,
@@ -509,6 +510,26 @@ impl<'a> Ctx<'a> {
             if rows > 0 {
                 self.changed
                     .insert(EntityRef::AgentRun(self.run.agent_run_id));
+            }
+            return Ok(Effect::Applied);
+        }
+        if b.code == CUT_SHORT && e.subject.flow_execution_id.is_some() {
+            let flow = match self.owned_flow(tx, e).await? {
+                Ok(f) => f,
+                Err(effect) => return Ok(effect),
+            };
+            let rows = sqlx::query!(
+                "UPDATE flow_executions SET cut_short = $2, rev = rev + 1
+                  WHERE id = $1 AND agent_run_id = $3 AND cut_short IS NULL",
+                flow,
+                b.message,
+                self.run.agent_run_id
+            )
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+            if rows > 0 {
+                self.changed.insert(EntityRef::Flow(flow));
             }
             return Ok(Effect::Applied);
         }
