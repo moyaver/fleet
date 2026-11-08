@@ -63,6 +63,9 @@ enum Class {
     /// Failure triage (a write): a viewer is refused, a maintainer or admin gets past the role
     /// check and reaches the handler, which has no such failure to change.
     ProjectTriage,
+    /// A flow's screen D by its ID alone: a reader of the flow's project is redirected to the page
+    /// (303); anyone else gets the answer for a missing flow.
+    FlowPage,
     /// Not authorized by role: the same answer for everyone (public documents and probes, the
     /// sign-in flow, capability links).
     RoleIndependent,
@@ -77,6 +80,7 @@ fn class_of(route: &str) -> Option<Class> {
         "/api/v1/auth/logout" => Class::Logout,
         "/api/v1/plans" => Class::Agent,
         "/api/v1/projects/{project}/failures/{fingerprint}/triage" => Class::ProjectTriage,
+        "/api/v1/flows/{execution_id}/page" => Class::FlowPage,
         "/api/v1/openapi.json"
         | "/livez"
         | "/readyz"
@@ -356,6 +360,14 @@ fn check(class: Class, who: Who, status: u16, body: &Value, anonymous: u16) -> R
                 "404 expected",
             ),
             _ => want(status == 200, "200 expected"),
+        },
+        Class::FlowPage => match who {
+            Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),
+            Who::Stranger => want(
+                status == 404 && body["error"] == "no such flow",
+                "404 expected",
+            ),
+            _ => want(status == 303, "303 expected"),
         },
         Class::ProjectList => match who {
             Who::Anonymous | Who::Publisher => want(status == 401, "401 expected"),

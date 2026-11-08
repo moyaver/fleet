@@ -16,6 +16,17 @@ use super::workers::device_sessions;
 use crate::{Result, Store, live};
 
 impl Store {
+    /// The slug of the project a flow execution belongs to; `None` when there is no such flow.
+    pub async fn flow_project_slug(&self, flow_id: Uuid) -> Result<Option<String>> {
+        Ok(sqlx::query_scalar!(
+            "SELECT p.slug FROM flow_executions f JOIN projects p ON p.id = f.project_id
+              WHERE f.id = $1",
+            flow_id
+        )
+        .fetch_optional(self.pool())
+        .await?)
+    }
+
     /// Screen D for one flow execution. `None` when it doesn't exist or belongs to another
     /// project. The agent run's `liveness` is `None` until the server fills it in.
     #[expect(

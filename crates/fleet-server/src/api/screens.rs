@@ -7,7 +7,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
 };
 use fleet_protocol::{
     live::Liveness,
@@ -204,6 +204,27 @@ pub(super) async fn device(
 fn with_run_liveness(hub: &Hub, mut r: WorkerRunView) -> WorkerRunView {
     r.run.liveness = Some(hub.run_liveness(r.run.id, &r.run.state, r.run.last_frame_at));
     r
+}
+
+/// Screen D's address for a flow known only by its ID, such as the job summary's link (the agent
+/// does not know the project's slug): a redirect to `/flows/{id}?project={slug}` for a caller who
+/// may read the flow's project. Any other caller gets the answer for a flow that does not exist, so
+/// the slug is never named to someone who could not read it.
+pub(super) async fn flow_page(
+    State(state): State<AppState>,
+    Caller(principal): Caller,
+    Path(execution_id): Path<Uuid>,
+) -> Response {
+    let missing = || error(StatusCode::NOT_FOUND, "no such flow");
+    let slug = match state.store.flow_project_slug(execution_id).await {
+        Ok(Some(slug)) => slug,
+        Ok(None) => return missing(),
+        Err(e) => return internal(&e),
+    };
+    match read_project(&state, &principal, &slug).await {
+        Ok(_) => Redirect::to(&format!("/flows/{execution_id}?project={slug}")).into_response(),
+        Err(_) => missing(),
+    }
 }
 
 /// Screen D: one flow execution with all its evidence.

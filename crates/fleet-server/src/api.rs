@@ -215,6 +215,7 @@ pub(crate) fn router() -> Router<AppState> {
             "/api/v1/projects/{project}/flows/{execution_id}",
             get(screens::flow),
         )
+        .route("/api/v1/flows/{execution_id}/page", get(screens::flow_page))
         .route(
             "/api/v1/projects/{project}/flows/{execution_id}/artifacts",
             get(crate::artifacts::list::flow_artifacts),
