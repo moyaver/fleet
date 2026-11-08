@@ -49,6 +49,10 @@ use uuid::Uuid;
 
 /// What to simulate.
 #[derive(Debug, Clone)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is one independent switch of the simulation"
+)]
 pub struct Options {
     /// `ws://host:port` (the path is added).
     pub server: String,
@@ -91,6 +95,9 @@ pub struct Options {
     /// failure message is one of these, every flow fails with an app crash whose exception is one
     /// of these, and the pattern of [`fails`] is not used. Items are used in order, wrapping around.
     pub corpus: Vec<String>,
+    /// The final `commands.json` files line up with none of their flows' steps, so every step stays
+    /// provisional, read from the live log (issue #148).
+    pub unaligned: bool,
 }
 
 impl Default for Options {
@@ -115,6 +122,7 @@ impl Default for Options {
             wide: false,
             hold: None,
             corpus: Vec::new(),
+            unaligned: false,
         }
     }
 }
@@ -494,8 +502,9 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
                     flow: None,
                 }),
             );
-            // The final commands.json settles every step the log reported (issue #148).
-            for s in 0..steps {
+            // The final commands.json settles every step the log reported (issue #148), unless its
+            // steps line up with none of the log's.
+            for s in (0..steps).filter(|_| !opts.unaligned) {
                 push(
                     Subject {
                         step: Some(StepRef { index: s }),

@@ -446,13 +446,85 @@ async fn a_failed_flows_steps_are_verified_once_its_run_has_ended() {
         &format!("{section_badge} === 'Provenance: verified'"),
     )
     .await;
+    // Settled rows carry no mark of their own: the section says verified once (issue #149). The
+    // failed step is in the tree, settled from the file, and its row is unmarked.
+    assert_eq!(
+        page.count("[role=treeitem] [role=img]").await,
+        0,
+        "no settled row carries a mark"
+    );
     let failed = page
         .eval(
-            "return Array.from(document.querySelectorAll('[role=treeitem]')).some(e => e.textContent.includes('Failed'));",
+            "return Array.from(document.querySelectorAll('[role=treeitem]')).filter(e => e.getAttribute('data-status') === 'Failed').length;",
             vec![],
         )
         .await;
-    assert_eq!(failed, Value::Bool(true), "the failed step is in the tree");
+    assert_eq!(
+        failed,
+        serde_json::json!(1),
+        "the failed step is in the tree"
+    );
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// A flow whose final `commands.json` lines up with none of its steps (issue #148): its steps stay
+/// provisional. The section says so once, and every row carries its own provisional mark, the
+/// failed step included (issue #149).
+#[tokio::test]
+async fn steps_the_file_does_not_settle_stay_provisional_and_each_row_says_so() {
+    let stack = stack(|_| {}).await;
+    let opts = Options {
+        pace: std::time::Duration::ZERO,
+        unaligned: true,
+        ..run_options(&stack, "steps-unaligned")
+    };
+    fleet_loadgen::run(opts).await.unwrap();
+    let attempt = first_attempt(&stack).await;
+    let snapshot = stack
+        .get(&format!("/api/v1/projects/app/attempts/{attempt}"))
+        .await;
+    let id = flow_named(&snapshot, "flow-0-0")["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://{}/flows/{id}?project=app", stack.addr()))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the steps",
+        &format!("{} >= 2", count_of("[role=treeitem]")),
+    )
+    .await;
+    page.wait(
+        "the steps section is provisional",
+        "document.querySelector('.flow-steps .card-h [role=img]')?.getAttribute('aria-label') === 'Provenance: provisional'",
+    )
+    .await;
+    let rows = page
+        .eval(
+            "return Array.from(document.querySelectorAll('[role=treeitem]')).map(e => [e.getAttribute('data-status'), e.querySelector('[role=img]')?.getAttribute('aria-label') ?? null]);",
+            vec![],
+        )
+        .await;
+    let rows = rows.as_array().unwrap();
+    assert!(rows.len() >= 2, "the flow's steps are listed");
+    assert!(
+        rows.iter()
+            .all(|r| r[1] == serde_json::json!("Provenance: provisional")),
+        "every unsettled row carries its own provisional mark, got {rows:?}"
+    );
+    assert!(
+        rows.iter().any(|r| r[0] == serde_json::json!("Failed")),
+        "the failed step is among them, got {rows:?}"
+    );
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;
 }

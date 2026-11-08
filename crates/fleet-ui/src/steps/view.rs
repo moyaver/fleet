@@ -3,8 +3,8 @@
 
 use leptos::prelude::*;
 
-use crate::components::display::StatusPill;
-use crate::steps::tree::{Key, Row, StepTree, TreeState, status_label, status_mark};
+use crate::components::display::{RowProvenance, StatusPill};
+use crate::steps::tree::{Key, Row, StepTree, TreeState, provenance_of, status_label, status_mark};
 
 fn key_of(name: &str) -> Option<Key> {
     Some(match name {
@@ -19,8 +19,9 @@ fn key_of(name: &str) -> Option<Key> {
 }
 
 /// The step tree. Each row shows its number, its status word and its duration. The group's
-/// provenance is said once by the section heading, so rows carry no badge. `on_select` receives the
-/// id of a step the user focuses or clicks.
+/// provenance is said once by the section heading; a row carries its own badge only when its
+/// provenance is an exception to that (issue #149). `on_select` receives the id of a step the user
+/// focuses or clicks.
 #[component]
 pub fn StepTreeView(
     /// The steps.
@@ -63,6 +64,7 @@ pub fn StepTreeView(
                     );
                     let number = row.number.clone().unwrap_or_default();
                     let unnumbered = row.number.is_none();
+                    let provenance = provenance_of(row.source);
                     let item = view! {
                         <li
                             class="step-row flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 px-2 py-2 focus:outline-2 focus:outline-focus"
@@ -91,6 +93,7 @@ pub fn StepTreeView(
                                 {row.label}
                             </span>
                             <StatusPill mark=status_mark(row.status) label=status_label(row.status) />
+                            <RowProvenance provenance=Signal::stored(provenance) />
                             {row.attempt.map(|a| view! { <span class="text-xs text-muted">{a}</span> })}
                             {row.duration.map(|d| view! { <span class="font-mono text-xs tabular-nums text-muted">{d}</span> })}
                         </li>
