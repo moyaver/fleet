@@ -246,7 +246,36 @@ pub(super) fn run_agent(
     // A directory of flows: a suite, which is where the agent may ask for a JUnit report.
     let flows = bin_dir.join("flows");
     std::fs::create_dir_all(&flows).unwrap();
-    run_agent_on(fixture_name, server, extra_args, &[flows.as_os_str()], env)
+    run_agent_on(
+        fixture_name,
+        server,
+        extra_args,
+        &[flows.as_os_str()],
+        env,
+        None,
+    )
+}
+
+/// [`run_agent`] in `cwd`. Maestro writes a report without `--output` into its working directory,
+/// and so does the agent's child, so a test that depends on that path gives it an empty one.
+pub(super) fn run_agent_in(
+    cwd: &Path,
+    fixture_name: &str,
+    server: Option<&str>,
+    extra_args: &[&str],
+    env: &[(&str, &str)],
+) -> (Output, Duration, PathBuf) {
+    let bin_dir = fake_maestro_dir();
+    let flows = bin_dir.join("flows");
+    std::fs::create_dir_all(&flows).unwrap();
+    run_agent_on(
+        fixture_name,
+        server,
+        extra_args,
+        &[flows.as_os_str()],
+        env,
+        Some(cwd),
+    )
 }
 
 fn run_agent_on(
@@ -255,11 +284,15 @@ fn run_agent_on(
     extra_args: &[&str],
     flow_args: &[&std::ffi::OsStr],
     env: &[(&str, &str)],
+    cwd: Option<&Path>,
 ) -> (Output, Duration, PathBuf) {
     let bin_dir = fake_maestro_dir();
     let run_dir = bin_dir.join("run");
     let _ = std::fs::remove_dir_all(&run_dir);
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"));
+    if let Some(cwd) = cwd {
+        cmd.current_dir(cwd);
+    }
     // Hermetic: CI runners set GITHUB_* and the like, which the agent would (rightly) read.
     cmd.env_clear();
     for keep in ["PATH", "HOME", "TMPDIR"] {
@@ -630,6 +663,7 @@ fn a_single_flow_or_continuous_run_reaches_maestro_without_a_format() {
             extra,
             &[flow.as_os_str()],
             &[("FLEET_FAKE_ARGV_LOG", log.to_str().unwrap())],
+            None,
         );
         let argv = received_argv(&log);
         assert!(
@@ -682,6 +716,7 @@ fn a_failing_single_flow_is_test_failures_without_a_report() {
         &[],
         &[flow.as_os_str()],
         &[],
+        None,
     );
     assert_eq!(out.status.code(), Some(1));
     let s = srv.state.lock().unwrap();

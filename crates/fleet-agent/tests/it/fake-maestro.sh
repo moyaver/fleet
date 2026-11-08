@@ -55,12 +55,29 @@ else
   sleep "${FLEET_FAKE_LINGER:-0.6}"
   cat "$FIX/stdout.bin"
 fi
-# `--format html` writes the file named by `--output`: the test's own HTML ($FLEET_FAKE_HTML), not
-# a Maestro fixture (none is captured yet). Otherwise the fixture's JUnit report is written.
-if [ -n "$OUT" ] && [ "$FORMAT" = html ]; then
-  [ -n "$FLEET_FAKE_HTML" ] && cp "$FLEET_FAKE_HTML" "$OUT"
-elif [ -n "$OUT" ] && [ -f "$FIX/run/report.xml" ]; then
-  cp "$FIX/run/report.xml" "$OUT"
-fi
+# An HTML format (`html`, `html-detailed`) writes its report where `--output` says, or to
+# `report.html` in the working directory without one, as Maestro does
+# (fixtures/maestro/2.12.1/html-report-default-path). The report is the test's $FLEET_FAKE_HTML when
+# a test sets it, else the fixture's own run/report.html. Either is written now, as Maestro writes
+# it, so it counts as this run's; a test that needs a stale report sets FLEET_FAKE_HTML_KEEP_MTIME,
+# and the copy keeps the source's modification time. Otherwise the fixture's JUnit report is written
+# to `--output`.
+case "$FORMAT" in
+  html|html-detailed)
+    target="${OUT:-report.html}"
+    if [ -n "$FLEET_FAKE_HTML" ]; then
+      if [ -n "$FLEET_FAKE_HTML_KEEP_MTIME" ]; then
+        cp -p "$FLEET_FAKE_HTML" "$target"
+      else
+        cp "$FLEET_FAKE_HTML" "$target"
+      fi
+    elif [ -f "$FIX/run/report.html" ]; then
+      cp "$FIX/run/report.html" "$target"
+    fi ;;
+  *)
+    if [ -n "$OUT" ] && [ -f "$FIX/run/report.xml" ]; then
+      cp "$FIX/run/report.xml" "$OUT"
+    fi ;;
+esac
 code=$(sed -n 's/.*"code": *\([0-9][0-9]*\).*/\1/p' "$FIX/exit.json")
 exit "${code:-1}"
