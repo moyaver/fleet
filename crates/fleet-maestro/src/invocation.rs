@@ -232,6 +232,17 @@ pub fn requested_report(inv: &Invocation) -> Option<String> {
     }
 }
 
+/// The HTML report the command asks Maestro for: `--format html` with an explicit `--output`.
+/// Without `--output` nothing is named (Maestro's default HTML name is not in a fixture yet), so
+/// nothing is uploaded.
+#[must_use]
+pub fn requested_html_report(inv: &Invocation) -> Option<String> {
+    match inv.format.as_deref() {
+        Some(f) if f.eq_ignore_ascii_case("html") => inv.output.clone(),
+        _ => None,
+    }
+}
+
 fn user_format(inv: &Invocation) -> UserFormat {
     match inv.format.as_deref() {
         None => UserFormat::None,
@@ -600,6 +611,28 @@ mod tests {
             assert_eq!(p.report, None, "{cmd}");
             assert_eq!(p.evidence.report.reason, ReportReason::UserFormat);
         }
+    }
+
+    #[test]
+    fn an_html_report_is_named_only_by_an_explicit_output() {
+        let html = |cmd: &str| requested_html_report(&parse(&argv(cmd)));
+        assert_eq!(
+            html("maestro test --format html --output out/r.html flows/").as_deref(),
+            Some("out/r.html")
+        );
+        assert_eq!(
+            html("maestro test --format=HTML --output=r.html flows/").as_deref(),
+            Some("r.html")
+        );
+        assert_eq!(html("maestro test --format html flows/"), None);
+        assert_eq!(
+            html("maestro test --format html-detailed --output r.html flows/"),
+            None
+        );
+        assert_eq!(
+            html("maestro test --format junit --output r.xml flows/"),
+            None
+        );
     }
 
     #[test]
