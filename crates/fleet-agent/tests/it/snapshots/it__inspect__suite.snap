@@ -49,7 +49,7 @@ expression: result
       "failure": null
     }
   ],
-  "events": 69,
+  "events": 91,
   "event_types": {
     "artifact.registered": 2,
     "flow.ended": 8,
@@ -61,7 +61,7 @@ expression: result
     "run.ended": 1,
     "run.started": 1,
     "shard.assigned": 1,
-    "step.ended": 22,
+    "step.ended": 44,
     "step.started": 22,
     "suite.started": 1
   },

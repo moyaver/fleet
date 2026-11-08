@@ -253,6 +253,20 @@ pub struct StepStarted {
 pub struct StepEnded {
     /// The step's final status.
     pub status: StepStatus,
+    /// Set when a final `commands.json` settles the step: its start and length as that file gives
+    /// them. Absent from a live or log-derived end, which keeps the timing it had.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timing: Option<StepTiming>,
+}
+
+/// A step's start and length, from the command record that settles it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct StepTiming {
+    /// When the step started, in Unix milliseconds.
+    pub started_ms: i64,
+    /// How long it ran, in milliseconds.
+    pub duration_ms: u64,
 }
 
 /// Why a flow failed, as Maestro said it.
@@ -698,6 +712,7 @@ mod tests {
             }),
             EventBody::StepEnded(StepEnded {
                 status: StepStatus::Warned,
+                timing: None,
             }),
             EventBody::FlowEnded(FlowEnded {
                 outcome: FlowOutcome::Failed,

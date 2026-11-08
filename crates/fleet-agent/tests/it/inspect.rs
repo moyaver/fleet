@@ -271,17 +271,21 @@ fn collect_command_depths(
 }
 
 /// Every step as `index -> (description, status)`. Asserts that each step has exactly one start
-/// and one end, so none is left running and none is an unnamed `Step N` row.
+/// and one end, so none is left running and none is an unnamed `Step N` row. A final
+/// `commands.json` may settle a step (issue #148): its status is then the step's, whichever of the
+/// log's end and the file's comes first in the journal.
 fn paired_steps(
     name: &str,
     events: &[fleet_protocol::journal::EventEnvelope],
 ) -> std::collections::BTreeMap<u32, (String, String)> {
     let mut started = std::collections::BTreeMap::new();
     let mut ended = std::collections::BTreeMap::new();
+    let mut settled = std::collections::BTreeMap::new();
     for e in events {
         let Some(step) = &e.subject.step else {
             continue;
         };
+        let status = e.data["status"].as_str().unwrap_or_default();
         match e.kind.as_str() {
             "step.started" => {
                 let description = e.data["description"].as_str().unwrap_or_default();
@@ -291,8 +295,14 @@ fn paired_steps(
                     step.index
                 );
             }
+            "step.ended" if e.src.kind == fleet_protocol::journal::SourceKind::ArtifactFile => {
+                assert!(
+                    settled.insert(step.index, status.to_owned()).is_none(),
+                    "{name}: step {} settled twice",
+                    step.index
+                );
+            }
             "step.ended" => {
-                let status = e.data["status"].as_str().unwrap_or_default();
                 assert!(
                     ended.insert(step.index, status.to_owned()).is_none(),
                     "{name}: step {} ended twice",
@@ -307,10 +317,17 @@ fn paired_steps(
         ended.keys().collect::<Vec<_>>(),
         "{name}: every step needs one start and one end"
     );
+    assert!(
+        settled.keys().all(|index| started.contains_key(index)),
+        "{name}: a settled step was started"
+    );
     started
         .into_iter()
         .map(|(index, description)| {
-            let status = ended[&index].clone();
+            let status = settled
+                .get(&index)
+                .unwrap_or_else(|| &ended[&index])
+                .clone();
             (index, (description, status))
         })
         .collect()
