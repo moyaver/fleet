@@ -70,8 +70,11 @@ impl Jwks {
         let _ = rustls::crypto::ring::default_provider().install_default();
         rs256::install();
         Ok(Self {
+            // A redirect is not followed: the discovery document and the key set come from the
+            // configured issuer, not from wherever a redirect points (research 06 T14).
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(10))
+                .redirect(reqwest::redirect::Policy::none())
                 .build()?,
             cache: Mutex::new(HashMap::new()),
         })
@@ -458,5 +461,41 @@ async fn exchange_api_key(state: &AppState, headers: &HeaderMap, ttl: time::Dura
             tracing::error!(error = %e, "minting an agent token");
             error(StatusCode::INTERNAL_SERVER_ERROR, "internal error")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    use super::{Jwks, Refused};
+
+    #[tokio::test]
+    async fn a_redirected_discovery_document_is_not_followed() {
+        let issuer = MockServer::start().await;
+        let elsewhere = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/.well-known/openid-configuration"))
+            .respond_with(
+                ResponseTemplate::new(302)
+                    .insert_header("Location", format!("{}/discovery", elsewhere.uri())),
+            )
+            .mount(&issuer)
+            .await;
+        // If the client followed the redirect, this discovery document would be read.
+        Mock::given(method("GET"))
+            .and(path("/discovery"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({ "jwks_uri": format!("{}/keys", elsewhere.uri()) }),
+            ))
+            .expect(0)
+            .mount(&elsewhere)
+            .await;
+        let jwks = Jwks::new().unwrap();
+        let result = jwks.fetch(&issuer.uri()).await;
+        assert!(matches!(result, Err(Refused::Unavailable(_))), "{result:?}");
     }
 }
