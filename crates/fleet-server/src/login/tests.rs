@@ -834,10 +834,20 @@ async fn logout_needs_the_csrf_token_and_the_sites_own_origin_and_ends_the_sessi
 
 #[tokio::test]
 async fn logout_without_a_session_is_refused() {
-    let rig = rig().await;
+    // A request with no session is refused before any database call, so this test needs no
+    // database: its store connects on first use, and nothing uses it. No database latency under
+    // load can fail it.
+    let store = fleet_store::Store::connect_lazy(
+        "postgres://fleet:fleet@127.0.0.1:1/fleet",
+        fleet_store::PoolOptions::default(),
+    )
+    .expect("a lazy store needs no server");
+    let state = crate::state::AppState::new(store, Config::default()).unwrap();
+    let app = TestServer::builder()
+        .http_transport()
+        .build(app::router(&state).into_make_service_with_connect_info::<SocketAddr>());
     assert_eq!(
-        rig.app
-            .post("/api/v1/auth/logout")
+        app.post("/api/v1/auth/logout")
             .add_header("x-csrf-token", "x")
             .await
             .status_code(),
