@@ -37,6 +37,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Agent: a final `commands.json` whose flow the log never started is warned on its agent run (`commands_flow_unnamed`) instead of being ignored. The server keeps the warning on the run (`file_warnings`, migration 0025), and the job's entry on the pipeline page says so; no flow is created for it (#148).
 - Docs: the operator guide's Upgrades section covers backups before an upgrade, forward-only migrations and their checksums, agent and server protocol versions, rollback by restore, and how to rehearse an upgrade.
 - Tooling: `cargo xtask upgrade-rehearsal` exports each release tag's migrations from git, seeds rows under each release's schema, migrates to the current tree and checks that the rows and the current read paths survive (`crates/fleet-store/tests/upgrade.rs`). CI runs it on every push and pull request.
+- Server: `fleet-server api-key list --project <slug>` shows each key's ID and state. `api-key revoke --id <id>` and `api-key expire --id <id> --in-days <d>` end keys made before the 90-day default, and revoking or expiring a key also stops every agent token minted from it (research 06 T3, #140).
 
 ### Changed
 
@@ -46,6 +47,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dashboard: a settled result carries no provenance badge of its own. Rows mark only *Provisional*, *Inferred*, *Missing* and *Stale* values; each page or section states *Verified* or *Observed* once (#149).
 - Dashboard: on a phone the top bar shows the brand mark and the live indicator. The pages, the project and the account are behind the ⋯ button (#149).
 - Dashboard: the sign-in prompt and error notices are hairline-ruled rather than bordered boxes, and so is the log viewer (#149).
+- Server: an upload is refused when the project's last 24 hours of declared uploads would pass 20 GiB or 20,000 files (`artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day`; refusal `project_quota_exceeded`). WebSocket and batch frames are capped at 256 KiB, down from 1 MiB (`ingest.max_frame_bytes`); agents fill frames by bytes under that cap, and an agent event over 192 KiB is stored as a gap (research 06 T12, #140).
+- Server: a browser session ends after `login.session_idle_minutes` (60 by default) without a request, as well as at its absolute lifetime. A request renews it; an open live socket does not. Migration 0027 adds `sessions.last_seen_at` (research 06 T21, #140).
+- Server: a discovery document's `jwks_uri` must name the issuer's host, or a host listed in the issuer's `jwks_hosts` (or `login.jwks_hosts`). Any other host is refused and never fetched (research 06 T14, #140).
+- Server: a screenshot, JUnit or HTML report read through a signed link writes an `artifact.fetched` audit row, and a read whose row cannot be written is refused (research 06 T7, #140).
+- Agent: the recorded command line redacts the value of every flag not on the safe list, and `-e`/`--env` values become `KEY=[REDACTED]` (research 06 T5, #140).
+- Agent: every line the agent prints itself (notices, warnings, the job summary, `inspect`, `publish` and `check` output) has its leading `::` removed, so a runner does not read app or device text as a workflow command. Maestro's own output is unchanged (I1; research 06 T13, #140).
+- Agent action: `verify-attestation` defaults to `true`. The action requires the release's build attestation to verify, takes the archive's expected SHA-256 from that attestation, and no longer trusts `sha256.sum` from the same release. The example workflow grants `attestations: read` (research 06 T18, #140).
+- Deployment: Garage's RPC secret is a Docker secret (`GARAGE_RPC_SECRET_FILE`), and Fleet reads the S3 key pair from Docker secrets (`FLEET_STORAGE__S3__*_FILE`), not `.env`. Postgres is pinned to `postgres:18.6`. Garage's default key pair stays in its container's environment, from `secrets/garage.env`, because Garage 2.5 has no file option for it (research 06 T20, #140).
+- Runner guide: a "Hardening a runner" section for the steps the repository can document (research 06 T18, T19, #140). The immutable-releases setting and ephemeral runners for `fleet-mac` are the owner's to set.
 
 ### Fixed
 
