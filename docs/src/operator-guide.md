@@ -37,7 +37,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
 | `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown`, and their open steps become `unknown` and Inferred |
 | `api.viewer_tokens` | — | Bearer tokens that may read every project (scripts, tests); people sign in with `[login]` |
-| `api.api_key_ttl_days` | `90` | Days until a new API key expires when `fleet api-key create` gets no `--expires-in-days`. Keys made before this setting have no expiry; set `expires_at` on them in SQL |
+| `api.api_key_ttl_days` | `90` | Days until a new API key expires when `fleet api-key create` gets no `--expires-in-days`. Keys made before this setting have no expiry; end their life with *Expire* on the [Administration](#administration) page or `fleet api-key expire` |
 | `api.public_url` | — | The dashboard's origin: browser sockets from other origins are refused, and the sign-in redirect URI is built from it (required with `[login]`) |
 | `login.*` | — | Browser sign-in with your identity provider; see [Browser sign-in](#browser-sign-in) |
 | `storage.backend` | `local_fs` | Where artifacts live: `local_fs` or `s3`; see [Artifact storage](#artifact-storage) |
@@ -99,14 +99,16 @@ role = "admin"
 
 Global administrators see **Administration** in the navigation (`/admin`), and the audit history at `/admin/audit`. Every other person, including a project's own admin, a viewer token and anonymous readers, is refused on those URLs and in the API. Grant the role with `[[login.group_roles]]` and no `project`, or bind it to a person as a role for every project.
 
-The page is **read only** in this release. It shows, one section per area:
+Projects, publisher trust, API keys and role mappings are changed on the page, with forms. Each change is written to the audit history in the same transaction as the change: who made it, what, and the values before and after where they were recorded. A refused change changes nothing and writes no event. The forms post to `/api/v1/admin/…` with the session's CSRF token; a request from another site is refused. The same changes can be made through that API with JSON, with `PUT` and `DELETE` on the rows as well as `POST`.
+
+The page shows, one section per area:
 
 | Section | Where the data lives | Changed by |
 |---|---|---|
-| Projects (onboarding) | `projects`, with each project's working API keys and trust policies | `projects` in the configuration (at start-up) |
-| Publisher trust | `publisher_trust_policies` | `projects[].trust_policies` (replaced at start-up) |
-| API keys | `api_keys`: name, prefix, trust level, expiry, revocation, last use. The secret and its hash are never shown | `fleet api-key create|revoke|expire` |
-| Role mappings | `role_bindings` (people) and `group_mappings` (identity-provider groups) | `[[login.group_roles]]` at sign-in; bindings in SQL |
+| Projects (onboarding) | `projects`, with each project's working API keys and trust policies | the page: create a project (a new slug only), rename it. A project in `projects` takes its name from the configuration at each start, so change `name` there to keep a new one |
+| Publisher trust | `publisher_trust_policies` | `projects[].trust_policies` (configured, marked *from config*); the page: add, edit, revoke and remove the rows it added |
+| API keys | `api_keys`: name, prefix, trust level, expiry, revocation, last use. The secret and its hash are never shown | the page: create (the secret is shown once, on the page the form answers with), expire, revoke. `fleet api-key create|revoke|expire` does the same from the command line |
+| Role mappings | `role_bindings` (people) and `group_mappings` (identity-provider groups) | `[[login.group_roles]]` (configured, marked *from config*); the page: give or remove a person's role, and add, change and remove the groups it maps |
 | Retention | `retention_classes` per project, and the `retention.*` windows of the configuration | the `retention_classes` table (SQL) and `retention.*` |
 | Artifact policy | the `storage`, `artifacts` and `usercontent` settings of the running configuration | the configuration file, then a restart |
 | Metric collection | the `ingest` checkpoint and heartbeat and the `retention` windows of the configuration. The agents sample every 5 s, and every 15 s under host pressure; no server setting changes that | the configuration file, then a restart |
@@ -114,7 +116,17 @@ The page is **read only** in this release. It shows, one section per area:
 | Ingestion health | `ingest_rejections` (refused events), `ingest_gaps` (losses the agents reported) and the open runs with how long since the server last heard from them and how far behind their newest event was | |
 | Audit history | `audit_events`, newest first, 50 at a time. Each event shows who (a person, an API key, or the system), what, when, and the values it changed where one was recorded (`before` and `after`, or the `from` and `to` of a triage change) | recorded by Fleet; kept for `retention.audit_days` |
 
-Values from the configuration are shown with their key and marked `config`, so an operator can see what the running server uses. Until the forms arrive, a change to a table-backed area is made with SQL, as described in [Retention](#retention) and [API keys](#configuration).
+A row marked **from config** comes from the configuration file. The start-up sync replaces those rows, and the page does not change them: change the configuration, then restart. A row added on the page is stored in the database, survives restarts, and can be edited or removed on the page. If the configuration adds a trust policy or a group mapping that a page row already has (the same name, or the same group on the same scope), the server does not start and names the row; remove the page row, or the configured entry. The page refuses the reverse, and says which to change.
+
+Some rules the page keeps:
+
+- A person has one role per project. To change it, remove it and give the new one. Their open sessions end, so the role applies at their next request.
+- A group mapping takes effect when each member next signs in, because roles are resolved then.
+- The last person with a global administrator role cannot be removed; the page refuses it. A group mapped to `admin` does not count, because Fleet cannot count a group's members.
+- Revoking a key or a trust policy ends the agent tokens minted from it at once. Removing a trust policy ends them too.
+- Expiry is in days from now; `0` ends a key now.
+
+Values from the configuration are shown with their key and marked `config`, so an operator can see what the running server uses. Retention is still changed with SQL, as described in [Retention](#retention).
 
 ## Client addresses and limits
 
