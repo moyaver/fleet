@@ -83,8 +83,9 @@ pub(crate) struct Budget {
     pub(crate) reserve_events: usize,
     /// Extra window bytes for `journal.gap` and `run.ended`.
     pub(crate) reserve_bytes: usize,
-    /// An event whose JSON is larger than this is not stored (it becomes a gap). The server's
-    /// frame limit is 1 MiB, so a larger event could not be sent anyway.
+    /// An event whose JSON is larger than this is not stored (it becomes a gap). It must leave
+    /// room in a frame for the envelope and the batch's other parts (research 06; the server's
+    /// frame limit is 256 KiB), so a larger event could not be sent anyway.
     pub(crate) max_event_bytes: usize,
 }
 
@@ -98,7 +99,7 @@ impl Default for Budget {
             window_bytes: 2 * 1024 * 1024,
             reserve_events: 8,
             reserve_bytes: 512 * 1024,
-            max_event_bytes: 256 * 1024,
+            max_event_bytes: 192 * 1024,
         }
     }
 }
@@ -470,10 +471,12 @@ impl Outbox {
         }
     }
 
-    /// Unacked events with `seq > after`, at most `max`. Reads the spool back into the window
-    /// when the window has run dry; a spool that can't be read stalls delivery (and is logged)
-    /// instead of skipping events.
-    pub(crate) fn after(&mut self, after: u64, max: usize) -> Vec<EventEnvelope> {
+    /// Unacked events with `seq > after`, at most `max` events and, past the first, at most
+    /// `max_bytes` of serialized JSON, so one frame never outgrows the server's limit. The first
+    /// event is always returned, so a reader always makes progress. Reads the spool back into the
+    /// window when the window has run dry; a spool that can't be read stalls delivery (and is
+    /// logged) instead of skipping events.
+    pub(crate) fn after(&mut self, after: u64, max: usize, max_bytes: usize) -> Vec<EventEnvelope> {
         let after = after.max(self.acked_through);
         if max == 0 || after >= self.last_seq {
             return Vec::new();
@@ -488,12 +491,7 @@ impl Outbox {
                     .back()
                     .is_some_and(|slot| slot.event.seq > sp.through())
             {
-                return match sp.read(
-                    after,
-                    max.min(REFILL_EVENTS),
-                    self.budget.window_bytes,
-                    true,
-                ) {
+                return match sp.read(after, max.min(REFILL_EVENTS), max_bytes, true) {
                     Ok(events) => events.into_iter().map(|(event, _)| event).collect(),
                     Err(e) => {
                         tracing::warn!(error = %e, after, "cannot read the spool back");
@@ -507,11 +505,16 @@ impl Outbox {
             }
         }
         let first = self.window.partition_point(|s| s.event.seq <= after);
-        self.window
-            .range(first..)
-            .take(max)
-            .map(|s| s.event.clone())
-            .collect()
+        let mut out = Vec::new();
+        let mut bytes = 0;
+        for slot in self.window.range(first..).take(max) {
+            if !out.is_empty() && bytes + slot.bytes > max_bytes {
+                break;
+            }
+            bytes += slot.bytes;
+            out.push(slot.event.clone());
+        }
+        out
     }
 
     /// The window holds every stored event after `after`, up to `covered_through`, and at least
@@ -739,7 +742,7 @@ mod tests {
         let mut server = Server::default();
         let mut sent = 0;
         for _ in 0..1_000_000 {
-            let batch = o.after(sent, 64);
+            let batch = o.after(sent, 64, usize::MAX);
             if batch.is_empty() {
                 break;
             }
@@ -778,12 +781,16 @@ mod tests {
     fn acks_release_events_in_order() {
         let mut o = Outbox::memory(Budget::default());
         o.push((1..=5).map(ev).collect());
-        assert_eq!(seqs(&o.after(0, 2)), [1, 2]);
+        assert_eq!(seqs(&o.after(0, 2, usize::MAX)), [1, 2]);
         o.ack(3);
         assert_eq!(o.oldest_unacked(), Some(4));
         o.ack(2);
         assert_eq!(o.acked_through(), 3, "acks never go backwards");
-        assert_eq!(seqs(&o.after(0, 10)), [4, 5], "acked events are not resent");
+        assert_eq!(
+            seqs(&o.after(0, 10, usize::MAX)),
+            [4, 5],
+            "acked events are not resent"
+        );
         o.ack(5);
         assert!(o.drained());
         assert_eq!(o.oldest_unacked(), None);
@@ -801,7 +808,7 @@ mod tests {
         let (read_id, mut replay) = Outbox::replay(&dir.spool()).unwrap();
         assert_eq!(read_id, id);
         assert_eq!(replay.last_seq(), 2);
-        assert_eq!(seqs(&replay.after(0, 10)), [1, 2]);
+        assert_eq!(seqs(&replay.after(0, 10, usize::MAX)), [1, 2]);
     }
 
     #[test]
@@ -822,7 +829,7 @@ mod tests {
         drop(f);
         let (read_id, mut o) = Outbox::replay(&dir.spool()).unwrap();
         assert_eq!(read_id, id);
-        assert_eq!(seqs(&o.after(0, 10)), [1, 2, 3]);
+        assert_eq!(seqs(&o.after(0, 10, usize::MAX)), [1, 2, 3]);
         assert_eq!(o.oldest_unacked(), Some(1));
     }
 
@@ -878,7 +885,7 @@ mod tests {
         let mut sent = 0;
         let mut steps = 0;
         while sent < o.last_seq() {
-            let batch = o.after(sent, 3);
+            let batch = o.after(sent, 3, usize::MAX);
             assert_ne!(batch.len(), 0);
             sent = batch.last().unwrap().seq;
             server.apply(batch).unwrap();
@@ -890,7 +897,7 @@ mod tests {
                 let mut behind = Server {
                     log: server.log[..=back].to_vec(),
                 };
-                let batch = o.after(behind.committed(), 5);
+                let batch = o.after(behind.committed(), 5, usize::MAX);
                 assert!(batch[0].seq > behind.committed());
                 behind.apply(batch).unwrap();
                 sent = server.committed();
@@ -922,7 +929,7 @@ mod tests {
         drop(f);
         let (_, mut o) = Outbox::replay(&dir.spool()).unwrap();
         assert_eq!(
-            seqs(&o.after(0, 10)),
+            seqs(&o.after(0, 10, usize::MAX)),
             [1, 2],
             "seq 4 follows nothing that covers 3"
         );
@@ -1038,14 +1045,14 @@ mod tests {
         // Walk the whole backlog, window by window.
         let mut sent = 0;
         while sent < 1000 {
-            let batch = o.after(sent, 3);
+            let batch = o.after(sent, 3, usize::MAX);
             assert_eq!(batch[0].seq, sent + 1);
             sent = batch.last().unwrap().seq;
             assert!(o.window.len() <= 8);
         }
         // The server lost its tail (a SeqGap): rewind far behind the window, across index slots.
         for from in [0, 499, 300, 999] {
-            assert_eq!(o.after(from, 2)[0].seq, from + 1);
+            assert_eq!(o.after(from, 2, usize::MAX)[0].seq, from + 1);
         }
         o.ack(1000);
         assert!(o.drained());
@@ -1065,7 +1072,7 @@ mod tests {
             o.push((next..next + 5).map(ev).collect());
             next += 5;
             while !o.drained() {
-                let batch = o.after(o.acked_through(), 100);
+                let batch = o.after(o.acked_through(), 100, usize::MAX);
                 o.ack(batch.last().unwrap().seq);
             }
             assert!(fs::metadata(dir.spool()).unwrap().len() <= budget.spool_bytes);
@@ -1077,7 +1084,7 @@ mod tests {
         let (_, mut replay) = Outbox::replay(&dir.spool()).unwrap();
         let first = replay.oldest_unacked().unwrap();
         assert!(first > 1, "{first}");
-        assert_eq!(seqs(&replay.after(0, 100)).last(), Some(&152));
+        assert_eq!(seqs(&replay.after(0, 100, usize::MAX)).last(), Some(&152));
     }
 
     #[test]
@@ -1110,7 +1117,7 @@ mod tests {
         o.push((1..=7).map(ev).collect());
         let mut sent = 0;
         while sent < 7 {
-            let batch = o.after(sent, 3);
+            let batch = o.after(sent, 3, usize::MAX);
             sent = batch.last().unwrap().seq;
         }
         o.spool.as_mut().unwrap().close_writer();
@@ -1118,7 +1125,7 @@ mod tests {
         let mut replayed = Vec::new();
         let mut cursor = 0;
         for _ in 0..10 {
-            let batch = o.after(cursor, 3);
+            let batch = o.after(cursor, 3, usize::MAX);
             if batch.is_empty() {
                 break;
             }
@@ -1200,7 +1207,7 @@ mod tests {
                         o.push(batch);
                     }
                     Op::Send { max } => {
-                        let batch = o.after(sent, max);
+                        let batch = o.after(sent, max, usize::MAX);
                         if let Some(last) = batch.last() {
                             sent = last.seq;
                         }
@@ -1237,7 +1244,7 @@ mod tests {
             o.ack(server.committed());
             let mut sent = server.committed();
             for _ in 0..10_000 {
-                let batch = o.after(sent, 7);
+                let batch = o.after(sent, 7, usize::MAX);
                 if batch.is_empty() {
                     break;
                 }
@@ -1325,5 +1332,41 @@ mod tests {
     fn stress_offline_without_a_spool_keeps_memory_flat() {
         let budget = Budget::default();
         offline_stress(Outbox::memory(budget), &budget, None);
+    }
+    #[test]
+    fn a_batch_stays_within_the_frame_budget() {
+        // Ten events of 150 KiB: the count limit alone would make one 1.5 MiB frame.
+        let mut o = Outbox::memory(Budget::default());
+        for seq in 1..=10 {
+            o.push(vec![padded(seq, 150 * 1024)]);
+        }
+        let budget = 255 * 1024;
+        let mut sent = 0;
+        let mut frames = 0;
+        loop {
+            let batch = o.after(sent, 64, budget);
+            let Some(last) = batch.last() else { break };
+            let total: usize = batch
+                .iter()
+                .map(|e| serde_json::to_vec(e).unwrap().len())
+                .sum();
+            assert!(
+                batch.len() == 1 || total <= budget,
+                "{} events, {total} B",
+                batch.len()
+            );
+            assert!(total <= 256 * 1024, "a frame of {total} B");
+            sent = last.seq;
+            frames += 1;
+        }
+        assert_eq!(sent, 10, "every event is sent");
+        assert_eq!(frames, 10, "one 150 KiB event per frame");
+    }
+
+    #[test]
+    fn the_largest_stored_event_leaves_room_in_a_frame() {
+        let frame = usize::try_from(fleet_protocol::frame::Limits::default().max_frame_bytes)
+            .expect("u32 fits in usize");
+        assert!(Budget::default().max_event_bytes + 4096 <= frame);
     }
 }

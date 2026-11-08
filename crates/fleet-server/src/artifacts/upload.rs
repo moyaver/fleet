@@ -224,6 +224,8 @@ pub(super) async fn request(
     let quota = Quota {
         max_bytes: a.max_run_bytes,
         max_files: a.max_run_files,
+        project_max_bytes: a.max_project_bytes_per_day,
+        project_max_files: a.max_project_files_per_day,
     };
     let ttl = Duration::from_secs(a.grant_ttl_seconds);
     match state.store.request_upload(&ask, ttl, quota).await {
@@ -275,6 +277,13 @@ pub(super) async fn request(
             format!(
                 "a run may store at most {} files and {} bytes",
                 a.max_run_files, a.max_run_bytes
+            ),
+        ),
+        Ok(Requested::OverProjectQuota) => refusal(
+            RejectReason::ProjectQuotaExceeded,
+            format!(
+                "a project may declare at most {} files and {} bytes in 24 hours",
+                a.max_project_files_per_day, a.max_project_bytes_per_day
             ),
         ),
         Ok(Requested::UnknownRun) => error(

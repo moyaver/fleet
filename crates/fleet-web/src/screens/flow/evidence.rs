@@ -391,6 +391,9 @@ fn reject_reason(code: Option<&str>) -> String {
         Some(RejectReason::RunQuotaExceeded) => {
             "the run had already uploaded as much as one run may".to_owned()
         }
+        Some(RejectReason::ProjectQuotaExceeded) => {
+            "the project had already uploaded as much as one day allows".to_owned()
+        }
         Some(RejectReason::SizeMismatch) => "the bytes were not the declared size".to_owned(),
         Some(RejectReason::DigestMismatch) => {
             "the bytes did not match the declared SHA-256".to_owned()

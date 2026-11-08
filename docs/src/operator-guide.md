@@ -30,6 +30,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `ingest.idle_timeout_ms` | `45000` | A silent agent socket is closed and its run detached |
 | `ingest.telemetry_flush_ms` | `15000` | Telemetry checkpoint (10–30 s), then `telemetry_ack` |
 | `ingest.shutdown_grace_ms` | `15000` | Drain time for sockets on SIGTERM |
+| `ingest.max_frame_bytes` | `262144` | Largest WebSocket frame and batch request accepted (256 KiB, research 06 T12). Agents fill each frame up to this and never send more; an agent event over 192 KiB is stored as a gap instead |
 | `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
 | `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown`, and their open steps become `unknown` and Inferred |
 | `api.viewer_tokens` | — | Bearer tokens that may read every project (scripts, tests); people sign in with `[login]` |
@@ -43,6 +44,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification (local disk; one server instance per spool) |
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
+| `artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day` | 20 GiB, 20000 | What one project may declare in any 24 hours across all its runs. A refused upload says `project_quota_exceeded` |
 | `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 4 MiB failure_hierarchy, 512 KiB device_logcat, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class. `failure_hierarchy` is a step's UI hierarchy and `device_logcat` a failed flow's logcat excerpt |
 | `retention.raw_samples_days` | `7` | Raw 5 s telemetry samples; see [Retention](#retention) (0 keeps for ever, like every `retention.*_days`) |
 | `retention.rollup_1m_days`, `retention.rollup_1h_days` | `90`, `365` | One-minute and one-hour rollups |

@@ -353,6 +353,8 @@ mod tests {
             let quota = Quota {
                 max_bytes: 1 << 30,
                 max_files: 100,
+                project_max_bytes: 1 << 40,
+                project_max_files: 1_000_000,
             };
             let id = match self
                 .store
@@ -624,6 +626,8 @@ mod tests {
         let quota = Quota {
             max_bytes: 1 << 30,
             max_files: 100,
+            project_max_bytes: 1 << 40,
+            project_max_files: 1_000_000,
         };
         let requested = second
             .store
@@ -696,6 +700,8 @@ mod tests {
         let quota = Quota {
             max_bytes: 1 << 30,
             max_files: 100,
+            project_max_bytes: 1 << 40,
+            project_max_files: 1_000_000,
         };
         run.store
             .request_upload(&ask, Duration::from_mins(15), quota)

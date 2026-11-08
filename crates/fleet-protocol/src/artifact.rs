@@ -111,6 +111,8 @@ pub enum RejectReason {
     TooLarge,
     /// The run already uploaded as many bytes or files as one run may.
     RunQuotaExceeded,
+    /// The project already declared as many bytes or files in the last 24 hours as it may.
+    ProjectQuotaExceeded,
     /// The bytes sent are not the declared size.
     SizeMismatch,
     /// The bytes' SHA-256 is not the declared one.
@@ -132,6 +134,7 @@ impl RejectReason {
             Self::ContentTypeNotAllowed => "content_type_not_allowed",
             Self::TooLarge => "too_large",
             Self::RunQuotaExceeded => "run_quota_exceeded",
+            Self::ProjectQuotaExceeded => "project_quota_exceeded",
             Self::SizeMismatch => "size_mismatch",
             Self::DigestMismatch => "digest_mismatch",
             Self::TypeNotAllowed => "type_not_allowed",
@@ -148,6 +151,7 @@ impl RejectReason {
             Self::ContentTypeNotAllowed,
             Self::TooLarge,
             Self::RunQuotaExceeded,
+            Self::ProjectQuotaExceeded,
             Self::SizeMismatch,
             Self::DigestMismatch,
             Self::TypeNotAllowed,

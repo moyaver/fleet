@@ -24,6 +24,11 @@
           "type": "string"
         },
         {
+          "const": "project_quota_exceeded",
+          "description": "The project already declared as many bytes or files in the last 24 hours as it may.",
+          "type": "string"
+        },
+        {
           "const": "size_mismatch",
           "description": "The bytes sent are not the declared size.",
           "type": "string"
