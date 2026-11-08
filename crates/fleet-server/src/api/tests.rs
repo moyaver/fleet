@@ -6,6 +6,7 @@
 
 mod access;
 mod artifacts;
+mod authz_matrix;
 mod compare;
 mod fleet;
 mod flows;
