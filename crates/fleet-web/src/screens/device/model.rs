@@ -204,7 +204,7 @@ impl ReadingRow {
 }
 
 /// The unit's formatting of a reading's value, as the charts show it.
-fn format_value(unit: MetricUnit, v: f64) -> String {
+pub(crate) fn format_value(unit: MetricUnit, v: f64) -> String {
     match unit {
         MetricUnit::Percent => Unit::Percent.format(v),
         MetricUnit::Bytes => Unit::Bytes.format(v),

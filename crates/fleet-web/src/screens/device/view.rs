@@ -21,11 +21,9 @@ use crate::{
     paths::history_href,
     screens::{
         common::Ctx,
-        device::model::{
-            CHARTED, DeviceHeader, ExecutionDetails, FlowRow, FlowRows, ReadingRow, ReadingsView,
-        },
+        device::model::{CHARTED, DeviceHeader, ExecutionDetails, FlowRow, FlowRows, ReadingsView},
         metrics::{MetricsPanel, RangeSelection},
-        parts::{Fetched, MetricsCharts, Notice, PillView, RangePicker, loaded},
+        parts::{Fetched, MetricsCharts, Notice, PillView, RangePicker, ReadingsTable, loaded},
     },
 };
 
@@ -226,40 +224,15 @@ fn ReadingsSection(
                 <ProvenanceBadge provenance=Signal::stored(Provenance::Observed) />
                 <span>{statement}</span>
             </p>
-            <TableBox label="Readings of the newest sample">
-                <table class="tbl tbl-cards">
-                    <caption class="sr-only">"Readings of the device's newest sample"</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">"Reading"</th>
-                            <th scope="col">"Value"</th>
-                        </tr>
-                    </thead>
-                    <tbody>{rows.into_iter().map(reading_row).collect_view()}</tbody>
-                </table>
-            </TableBox>
+            <ReadingsTable
+                rows=rows
+                label="Readings of the newest sample"
+                caption="Readings of the device's newest sample"
+                testid="device-reading"
+            />
         </Card>
     }
     .into_any()
-}
-
-fn reading_row(r: ReadingRow) -> impl IntoView {
-    let value = match (r.value, r.reason) {
-        (Some(v), _) => view! { <span>{v}</span> }.into_any(),
-        (None, reason) => view! {
-            <span class="flex flex-wrap items-center gap-2">
-                <RowProvenance provenance=Signal::stored(Provenance::Missing) />
-                <span class="text-muted">{reason.unwrap_or_default()}</span>
-            </span>
-        }
-        .into_any(),
-    };
-    view! {
-        <tr data-testid="device-reading">
-            <td data-label="Reading">{r.label}</td>
-            <td data-label="Value">{value}</td>
-        </tr>
-    }
 }
 
 /// The flows that ran on the device: the latest ten shown in full, the rest in History.

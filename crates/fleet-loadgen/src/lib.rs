@@ -354,7 +354,17 @@ fn host_sample(t0: Instant) -> Sample {
         host_psi_cpu_pct: None,
         host_psi_memory_pct: None,
         host_psi_io_pct: None,
-        unavailable: SampleUnavailable::default(),
+        // The load generator takes none of these readings, so the sample does not take them.
+        unavailable: SampleUnavailable {
+            host_load_1m: Some(Unavailable::NotSampled),
+            host_cpu_cores: Some(Unavailable::NotSampled),
+            host_swap_used_bytes: Some(Unavailable::NotSampled),
+            host_swap_total_bytes: Some(Unavailable::NotSampled),
+            host_psi_cpu_pct: Some(Unavailable::NotSampled),
+            host_psi_memory_pct: Some(Unavailable::NotSampled),
+            host_psi_io_pct: Some(Unavailable::NotSampled),
+            ..SampleUnavailable::default()
+        },
     }
 }
 

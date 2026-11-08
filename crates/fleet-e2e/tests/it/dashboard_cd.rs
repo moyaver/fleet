@@ -135,6 +135,40 @@ async fn the_worker_page_labels_metrics_with_units_and_leaves_out_the_sensor_it_
     assert_eq!(page.count(&tile("host_thermal_c")).await, 0);
     assert_eq!(page.count(&chart("host_thermal_c")).await, 0);
 
+    // The newest host sample: each host reading the agent reports, with its value or the Missing
+    // mark and its reason (PLAN §6.5). The load generator takes no load, core, swap or pressure
+    // reading, so those rows say they were not read in this sample; the thermal sensor is no row.
+    page.wait(
+        "the newest host sample's readings",
+        &format!("{} === 10", count_of(&q("host-reading"))),
+    )
+    .await;
+    page.wait(
+        "every host reading shows a value or a reason",
+        &format!(
+            "[...document.querySelectorAll('{}')].every(r => r.querySelector(\"td[data-label='Value']\").textContent.trim() !== '')",
+            q("host-reading")
+        ),
+    )
+    .await;
+    page.wait(
+        "a host reading the sample does not take says why",
+        &format!(
+            "[...document.querySelectorAll('{}')].some(r => r.textContent.includes('not read in this sample'))",
+            q("host-reading")
+        ),
+    )
+    .await;
+    let rows = page.texts(&q("host-reading")).await.concat();
+    assert!(
+        rows.contains("25%"),
+        "the newest CPU reading is shown: {rows}"
+    );
+    assert!(
+        !rows.contains("Host temperature"),
+        "a sensor the agent never reports is no row"
+    );
+
     assert!(page.never_reloaded().await);
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
     browser.quit().await;

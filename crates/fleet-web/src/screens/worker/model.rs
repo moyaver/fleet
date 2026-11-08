@@ -4,7 +4,9 @@
 //! A value the agent doesn't report is a [`Fact`] with no value ("Not reported"), and a host
 //! sample that is too old to trust turns stale instead of passing for current (invariant I4).
 
-use fleet_protocol::rest::{WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView};
+use fleet_protocol::rest::{
+    MetricReading, WorkerRunPage, WorkerRunView, WorkerSummaryView, WorkerView,
+};
 use fleet_ui::{
     charts::format::{Unit, format_duration},
     mark::Mark,
@@ -18,7 +20,7 @@ use crate::{
     paths::pipeline_href,
     screens::{
         common::{Ctx, Fact},
-        device::model::DeviceSessionRow,
+        device::model::{DeviceSessionRow, ReadingRow, format_value},
         metrics::{Latest, MetricsPanel},
     },
     status::{Pill, liveness_pill},
@@ -97,6 +99,68 @@ impl WorkerHeader {
                 .collect::<Vec<_>>()
                 .join(" · "),
         }
+    }
+}
+
+/// Metrics the agent never reports. They are not readings of a sample, so no row shows them: a
+/// permanent absence is left out, not shown as a gap (PLAN §6.5).
+const NEVER_REPORTED: [&str; 1] = ["host_thermal_c"];
+
+/// The runner's newest host sample: when it was taken, and every reading the agent reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostSampleView {
+    /// `sampled 12 s ago`.
+    pub taken: String,
+    /// Whether the sample is current, or stale once it is old.
+    pub provenance: Provenance,
+    /// Every host reading, in the order the agent reports them.
+    pub rows: Vec<ReadingRow>,
+}
+
+/// The runner's newest host sample, or that the machine has none in the last hour.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HostSample {
+    /// The machine was sampled in the last hour.
+    Taken(HostSampleView),
+    /// The machine has no host sample in the last hour.
+    NoSample,
+}
+
+impl HostSample {
+    /// The newest host sample in `view`.
+    #[must_use]
+    pub fn build(view: &WorkerView, ctx: &Ctx) -> Self {
+        let Some(latest) = view.worker.latest.as_ref() else {
+            return Self::NoSample;
+        };
+        let at = unix_ms(latest.at);
+        Self::Taken(HostSampleView {
+            taken: format!("sampled {}", ctx.ago(at)),
+            provenance: Provenance::Observed.displayed(ctx.age_ms(at), STALE_AFTER_MS),
+            rows: latest
+                .readings
+                .iter()
+                .filter(|r| !NEVER_REPORTED.contains(&r.metric.as_str()))
+                .map(host_row)
+                .collect(),
+        })
+    }
+}
+
+/// One host reading as a row: its value with its unit, or the reason the agent gave for it.
+fn host_row(r: &MetricReading) -> ReadingRow {
+    let value = match (r.available, r.value) {
+        (true, Some(v)) => Some(format_value(r.unit, v)),
+        _ => None,
+    };
+    ReadingRow {
+        label: r.label.clone(),
+        reason: value.is_none().then(|| {
+            r.reason
+                .clone()
+                .unwrap_or_else(|| "The agent gave no reason".to_owned())
+        }),
+        value,
     }
 }
 
@@ -518,6 +582,64 @@ mod tests {
         let h = WorkerHeader::build(&view(WORKER), &ctx("2026-01-01T11:00:20Z"));
         assert_eq!(h.provenance, Provenance::Stale);
         assert_eq!(h.sampled.as_deref(), Some("sampled 10:59:55, 25 s ago"));
+    }
+
+    /// The newest host sample lists each reading the agent reports, with its value or the reason it
+    /// is unknown. The thermal sensor the agent never reports is left out, not shown as a gap.
+    #[test]
+    fn the_newest_host_sample_shows_each_reading_or_why_it_is_unknown() {
+        let mut v = view(WORKER);
+        {
+            let readings = &mut v.worker.latest.as_mut().unwrap().readings;
+            // Index 4 is the load average, 6 the CPU pressure: unknown, the first with a reason and
+            // the second without one, as an older agent would send it.
+            readings[4].available = false;
+            readings[4].value = None;
+            readings[6].available = false;
+            readings[6].value = None;
+            readings[6].reason =
+                Some("the kernel has no pressure information (PSI), as on macOS".to_owned());
+        }
+        let HostSample::Taken(sample) = HostSample::build(&v, &ctx("2026-01-01T11:00:00Z")) else {
+            panic!("the worker was sampled a minute ago");
+        };
+        assert_eq!(sample.taken, "sampled 5 s ago");
+        assert_eq!(sample.provenance, Provenance::Observed);
+        let row = |label: &str| {
+            sample
+                .rows
+                .iter()
+                .find(|r| r.label == label)
+                .unwrap_or_else(|| panic!("no row {label}"))
+                .clone()
+        };
+        assert_eq!(row("Host CPU").value.as_deref(), Some("37.5%"));
+        assert_eq!(row("Host memory used").value.as_deref(), Some("6 GiB"));
+        let load = row("Host load (1 min)");
+        assert_eq!(
+            (load.value, load.reason.as_deref()),
+            (None, Some("The agent gave no reason"))
+        );
+        let psi = row("Host CPU pressure");
+        assert_eq!(
+            (psi.value, psi.reason.as_deref()),
+            (
+                None,
+                Some("the kernel has no pressure information (PSI), as on macOS")
+            )
+        );
+        assert!(
+            sample.rows.iter().all(|r| r.label != "Host temperature"),
+            "the sensor the agent never reports is not a row"
+        );
+        assert_eq!(sample.rows.len(), 7);
+
+        v.worker.latest = None;
+        assert_eq!(
+            HostSample::build(&v, &ctx("2026-01-01T11:00:00Z")),
+            HostSample::NoSample,
+            "no sample in the last hour, so no card rows"
+        );
     }
 
     fn run(id: u8, started: &str, ended: Option<&str>) -> serde_json::Value {
