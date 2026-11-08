@@ -19,8 +19,35 @@ use crate::{
     },
     dashboard_cd::worker_of,
     dashboard_ef::attempt_of,
-    support::Stack,
+    publish::publish,
+    support::{Stack, fixture},
 };
+
+/// Publishes the captured `fail` run after the fact (issue #83), so the project holds a published
+/// run next to the live ones.
+async fn publish_fail_run(stack: &Stack) {
+    let (ws, key) = (stack.ws_url(), stack.key.clone());
+    let dir = fixture("fail");
+    let out = tokio::task::spawn_blocking(move || {
+        publish(
+            &dir,
+            &[
+                ("FLEET_SERVER", &ws),
+                ("FLEET_TOKEN", &key),
+                ("FLEET_UPLOAD_TIMEOUT", "20"),
+            ],
+        )
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    stack.await_run_ended("job").await;
+}
 
 /// A finished run on the project's one commit, with one failing flow on its first agent.
 async fn finished_run(stack: &Stack, run_id: &str) {
@@ -250,9 +277,11 @@ async fn the_overview_reads_run_events_in_batches_and_never_per_update() {
 
 /// The settled provenance marks of a page, checked against the contract: a row carries none, and
 /// each section states Verified or Observed at most once. Every provenance label is one
-/// `role=img` named "Provenance: …".
+/// `role=img` named "Provenance: …". The one other label a `.pv` may carry is a published run's
+/// origin badge (issue #83): it says the run was imported, not what a value's provenance is.
 const AUDIT: &str = r"
   const settled = ['Provenance: verified', 'Provenance: observed'];
+  const origin = 'Origin: published run';
   const marks = Array.from(document.querySelectorAll('[aria-label^=\'Provenance: \']'));
   const problems = [];
   for (const m of marks) {
@@ -260,6 +289,7 @@ const AUDIT: &str = r"
   }
   for (const m of document.querySelectorAll('.pv, .pg')) {
     const label = m.closest('.pv') ? m.closest('.pv').getAttribute('aria-label') : '';
+    if (label === origin) continue;
     if (!label || !label.startsWith('Provenance: ')) problems.push('unnamed provenance: ' + m.outerHTML.slice(0, 80));
   }
   const row = 'tbody tr, ul.list > li, [data-testid=flow-row], [data-testid=history-row], [data-testid=compare-row]';
@@ -298,10 +328,20 @@ const CARDS: &str = r"
 
 #[tokio::test]
 async fn settled_results_carry_no_mark_each_group_states_its_label_once_and_no_page_draws_a_card() {
-    // Issue #149: the provenance and no-cards rules across every live page and the history.
+    // Issue #149: the provenance and no-cards rules across every live page and the history. The
+    // project also holds a published run, whose origin badge the rules must allow.
     let stack = stack(|_| {}).await;
     finished_run(&stack, "marks").await;
+    publish_fail_run(&stack).await;
     let attempt = attempt_of(&stack, "marks").await;
+    let published = stack.get("/api/v1/projects/app/attempts").await;
+    let published = published
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap().to_owned())
+        .find(|id| *id != attempt)
+        .expect("the published run has an attempt of its own");
     let snapshot: Value = stack
         .get(&format!("/api/v1/projects/app/attempts/{attempt}"))
         .await;
@@ -337,6 +377,11 @@ async fn settled_results_carry_no_mark_each_group_states_its_label_once_and_no_p
             format!("{} >= 1", count_of(&q("flow-row"))),
         ),
         (
+            "published",
+            format!("/p/app/pipelines/{published}"),
+            format!("{} >= 1", count_of(&q("flow-row"))),
+        ),
+        (
             "flow",
             format!("/flows/{failed}?project=app"),
             format!("{} === 1", count_of(&q("flow-page"))),
@@ -362,6 +407,14 @@ async fn settled_results_carry_no_mark_each_group_states_its_label_once_and_no_p
         page.wait(&format!("the {screen} page"), ready).await;
         let problems = page.eval(AUDIT, vec![]).await;
         assert_eq!(problems, json!([]), "{screen}: provenance");
+        if *screen == "published" {
+            assert!(
+                page.count("[data-testid=origin-badge][aria-label='Origin: published run']")
+                    .await
+                    >= 1,
+                "the published run shows its origin badge, which the audit allows"
+            );
+        }
         if *screen == "pipeline" {
             // The flows' group says Verified, and the job outcomes the runner observed say Observed:
             // once each, in the Flows section's heading line.
