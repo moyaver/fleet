@@ -4,8 +4,9 @@ expression: result
 ---
 {
   "flows": [],
-  "events": 7,
+  "events": 8,
   "event_types": {
+    "agent.warning": 1,
     "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
