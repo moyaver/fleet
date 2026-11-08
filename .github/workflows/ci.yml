@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # All history and tags: the upgrade rehearsal exports each release tag's migrations.
+          fetch-depth: 0
       - name: Install toolchain (rust-toolchain.toml)
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -49,6 +51,8 @@ jobs:
       # The browser tests use the runner's preinstalled Chrome; xtask fetches the matching
       # chromedriver and the Tailwind CLI into target/tools.
       - run: cargo xtask ci
+      # Uses DATABASE_URL (this job's Postgres 18); the test creates its own databases.
+      - run: cargo xtask upgrade-rehearsal
 
   agent-macos:
     name: agent (macOS arm64)

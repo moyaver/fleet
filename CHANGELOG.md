@@ -21,7 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Server: the usercontent origin answers HTTP `Range` requests for artifacts: a single byte range is `206 Partial Content` with `Content-Range`, an unsatisfiable one is `416`, and every answer carries `Accept-Ranges: bytes` (#43).
 
 - Docs: the operator guide's Upgrades section covers backups before an upgrade, forward-only migrations and their checksums, agent and server protocol versions, rollback by restore, and how to rehearse an upgrade.
-- Tooling: `cargo xtask upgrade-rehearsal` exports each release tag's migrations from git, seeds rows under each release's schema, migrates to the current tree and checks that the rows and the current read paths survive (`crates/fleet-store/tests/upgrade.rs`).
+- Tooling: `cargo xtask upgrade-rehearsal` exports each release tag's migrations from git, seeds rows under each release's schema, migrates to the current tree and checks that the rows and the current read paths survive (`crates/fleet-store/tests/upgrade.rs`). CI runs it on every push and pull request.
 
 ### Fixed
 
