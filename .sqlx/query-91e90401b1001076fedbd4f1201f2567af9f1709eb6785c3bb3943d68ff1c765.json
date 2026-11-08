@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH ran AS (\n               SELECT f.state, f.duration_ms,\n                      f.finality IN ('verified', 'unverified_final') AS settled\n                 FROM flow_executions f\n                 JOIN agent_runs r ON r.id = f.agent_run_id\n                 LEFT JOIN flow_definitions d ON d.id = f.flow_definition_id\n                WHERE f.project_id = $1 AND coalesce(d.repo_path, f.flow_name) = $2\n                  AND r.trust_level = 'trusted'\n                  AND f.state NOT IN ('pending', 'running')\n                  AND coalesce(f.ended_at, f.started_at) >= $3\n                  AND coalesce(f.ended_at, f.started_at) < $4)\n             SELECT count(*) FILTER (WHERE state = 'passed' AND settled) AS \"passed!\",\n                    count(*) FILTER (WHERE state = 'failed' AND settled) AS \"failed!\",\n                    count(*) FILTER (WHERE NOT (state IN ('passed', 'failed') AND settled)) AS \"other!\",\n                    count(duration_ms) FILTER (WHERE state = 'passed' AND settled) AS \"samples!\",\n                    round(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms)\n                          FILTER (WHERE state = 'passed' AND settled))::bigint AS p50_ms,\n                    round(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration_ms)\n                          FILTER (WHERE state = 'passed' AND settled))::bigint AS p90_ms\n               FROM ran",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "passed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "failed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "other!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "samples!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "p50_ms",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "p90_ms",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "91e90401b1001076fedbd4f1201f2567af9f1709eb6785c3bb3943d68ff1c765"
+}
