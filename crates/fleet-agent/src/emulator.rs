@@ -9,7 +9,7 @@
 //!
 //! Fail-open (I2): a process that cannot be read gives no reading, never a zero (I3, I4).
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
 
@@ -36,6 +36,19 @@ pub(crate) fn identify(argv: &[String]) -> Option<Identity> {
         serial: format!("emulator-{port}"),
         avd: value_of("-avd"),
     })
+}
+
+/// Whether a process runs a `qemu-system-*` program: its name, or the file name of the program
+/// it was started with, starts with `qemu-system`. The second test is needed because a process
+/// name can differ from its program's (macOS names a copy of a shell after the shell).
+fn is_qemu(process: &sysinfo::Process) -> bool {
+    let is = |name: &str| name.starts_with("qemu-system");
+    let program = process
+        .cmd()
+        .first()
+        .and_then(|a| Path::new(a).file_name())
+        .map(|n| n.to_string_lossy().into_owned());
+    is(&process.name().to_string_lossy()) || program.is_some_and(|p| is(&p))
 }
 
 /// One emulator's latest reading.
@@ -92,7 +105,7 @@ impl Emulators {
         self.by_serial = system
             .processes()
             .iter()
-            .filter(|(_, p)| p.name().to_string_lossy().starts_with("qemu-system"))
+            .filter(|(_, p)| is_qemu(p))
             .filter_map(|(pid, p)| {
                 let argv: Vec<String> = p
                     .cmd()
@@ -217,7 +230,7 @@ mod tests {
 /// Fake emulator processes for tests in this crate.
 #[cfg(all(test, unix))]
 pub(crate) mod fake {
-    use std::{path::PathBuf, process::Child};
+    use std::{io::Read, path::PathBuf, process::Child};
 
     /// A running fake emulator; it is killed and its directory removed when dropped.
     pub(crate) struct FakeEmulator {
@@ -234,24 +247,56 @@ pub(crate) mod fake {
     }
 
     /// A process named `qemu-system-test` whose command line names console port `port` and, when
-    /// given, AVD `avd`: a copy of `sh` that sleeps, with the flags after its script. Its serial is
-    /// `emulator-<port>`.
+    /// given, AVD `avd`: `sh` under that name, waiting, with the flags after its script. Its serial
+    /// is `emulator-<port>`. Returns once the process has printed `ready`, so it is running (and has
+    /// resident memory) before anyone scans for it.
+    ///
+    /// The process is a copy of `sh` under the emulator's name: a symbolic link would report the
+    /// shell's own name to a process scan. macOS kills a copy that still carries Apple's platform
+    /// signature, so the copy is re-signed ad hoc there.
     pub(crate) fn qemu(port: u16, avd: Option<&str>) -> FakeEmulator {
         let dir = std::env::temp_dir().join(format!("fleet-emu-{}", uuid::Uuid::now_v7()));
         std::fs::create_dir_all(&dir).expect("temp dir");
         let program = dir.join("qemu-system-test");
         std::fs::copy("/bin/sh", &program).expect("copy sh");
-        let mut args = vec!["-c".to_owned(), "sleep 30".to_owned(), "x".to_owned()];
+        #[cfg(target_os = "macos")]
+        assert!(
+            std::process::Command::new("codesign")
+                .args(["--force", "--sign", "-"])
+                .arg(&program)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .expect("codesign should run")
+                .success(),
+            "re-signing the fake emulator"
+        );
+        let mut args = vec![
+            "-c".to_owned(),
+            // `read` is a builtin: no child process outlives the fake when it is killed.
+            "echo ready; read line".to_owned(),
+            "x".to_owned(),
+        ];
         args.extend(["-port".to_owned(), port.to_string()]);
         args.extend(
             avd.map(|a| ["-avd".to_owned(), a.to_owned()])
                 .into_iter()
                 .flatten(),
         );
-        let child = std::process::Command::new(&program)
+        let mut child = std::process::Command::new(&program)
             .args(&args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("the copy should run");
+        let mut ready = [0u8; 6];
+        child
+            .stdout
+            .as_mut()
+            .expect("stdout is piped")
+            .read_exact(&mut ready)
+            .expect("the fake emulator should print ready");
+        assert_eq!(&ready, b"ready\n");
         FakeEmulator { child, dir }
     }
 }
