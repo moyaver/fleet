@@ -23,6 +23,7 @@
 
 pub mod artifacts;
 pub mod auth;
+pub mod catalog;
 pub mod gc;
 pub mod ingest;
 pub mod live;

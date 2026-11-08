@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT repo_path, coalesce(last_name, repo_path) AS \"name!\", tags\n           FROM flow_definitions WHERE project_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "repo_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_definitions",
+            "name": "repo_path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "tags",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "flow_definitions",
+            "name": "tags"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "4c7e2bde7d5957edafea7d6700db64f191a9250e7bab7d6e526b94d819a9e6a2"
+}

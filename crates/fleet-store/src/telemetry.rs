@@ -39,6 +39,7 @@ impl Store {
         let mut tx = self.pool().begin().await?;
         let mut cols = Columns::default();
         let mut devices = DeviceColumns::default();
+        let mut profiles: Vec<ProfileSighting> = Vec::new();
         let mut through: Vec<(Uuid, u64)> = Vec::new();
         for b in batches {
             let t = &b.batch;
@@ -66,6 +67,9 @@ impl Store {
                 // as a gap (the gap ranges count the host samples of the frame).
                 if (d.at.wall - now).abs() <= MAX_SKEW {
                     devices.push(b, d);
+                    if d.model.is_some() || d.os_version.is_some() {
+                        profiles.push(ProfileSighting::of(b.project_id, d));
+                    }
                 }
             }
             match through.iter_mut().find(|(r, _)| *r == b.agent_run_id) {
@@ -75,6 +79,9 @@ impl Store {
         }
         cols.insert(&mut tx).await?;
         devices.insert(&mut tx).await?;
+        for sighting in &profiles {
+            upsert_profile(&mut tx, sighting).await?;
+        }
         for (run, t) in &through {
             sqlx::query!(
                 "UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2)
@@ -169,6 +176,74 @@ fn opt_i64(v: Option<u64>) -> Option<i64> {
 
 fn opt_i32(v: Option<u32>) -> Option<i32> {
     v.and_then(|v| i32::try_from(v).ok())
+}
+
+/// A device sample that says what its device is: its model and OS version (issue #85).
+struct ProfileSighting {
+    project: Uuid,
+    session: Uuid,
+    model: Option<String>,
+    os_version: Option<String>,
+    api_level: Option<i16>,
+    avd: Option<String>,
+}
+
+impl ProfileSighting {
+    fn of(project: Uuid, d: &fleet_protocol::frame::DeviceSample) -> Self {
+        Self {
+            project,
+            session: d.device_session_id,
+            model: d.model.clone(),
+            os_version: d.os_version.clone(),
+            api_level: d.api_level.and_then(|l| i16::try_from(l).ok()),
+            avd: d.avd_name.clone(),
+        }
+    }
+}
+
+/// Records the device profile a sighting describes and makes it the session's profile. A profile
+/// is the device kind, model, OS version, API level and AVD name, keyed by a digest of them, so a
+/// device of the same kind shares one row (the condition fingerprint reads it).
+async fn upsert_profile(
+    tx: &mut sqlx::PgConnection,
+    s: &ProfileSighting,
+) -> Result<(), sqlx::Error> {
+    let kind = if s.avd.is_some() {
+        "emulator"
+    } else {
+        "physical"
+    };
+    let digest = crate::sha256(&format!(
+        "android|{kind}|{}|{}|{}|{}",
+        s.model.as_deref().unwrap_or_default(),
+        s.os_version.as_deref().unwrap_or_default(),
+        s.api_level.map_or_else(String::new, |l| l.to_string()),
+        s.avd.as_deref().unwrap_or_default(),
+    ));
+    let profile = sqlx::query_scalar!(
+        "INSERT INTO device_profiles (platform, kind, model, avd_or_runtime, os_version, api_level, fingerprint)
+         VALUES ('android', $1, $2, $3, $4, $5, $6)
+         ON CONFLICT (fingerprint) DO UPDATE SET kind = EXCLUDED.kind
+         RETURNING id",
+        kind,
+        s.model,
+        s.avd,
+        s.os_version,
+        s.api_level,
+        digest
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE device_sessions SET profile_id = $3
+          WHERE id = $1 AND project_id = $2 AND profile_id IS DISTINCT FROM $3",
+        s.session,
+        s.project,
+        profile
+    )
+    .execute(&mut *tx)
+    .await?;
+    Ok(())
 }
 
 /// One device sample per row of `device_samples`, for an insert with `unnest`.
@@ -418,6 +493,8 @@ mod tests {
 
     fn device(wall: OffsetDateTime, session: Uuid) -> DeviceSample {
         DeviceSample {
+            model: None,
+            os_version: None,
             at: ClockSample { wall, mono_ms: 0 },
             device_session_id: session,
             adb_state: None,

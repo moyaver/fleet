@@ -17,7 +17,10 @@ mod timeline;
 mod workers;
 
 pub use compare::{CompareSide, SIDE_LIMIT, SideFlow};
-pub use history::{FlowStatsData, HistoryCursor, HistoryData, HistoryQuery, LOOKBACK};
+pub(crate) use history::{
+    FROM_EXECUTIONS as FROM_EXECUTIONS_CLAUSE, push_filters as push_filter_clauses,
+};
+pub use history::{Filters, FlowStatsData, HistoryCursor, HistoryData, HistoryQuery, LOOKBACK};
 pub use overview::{Overview, RunState, WorkerRow};
 pub use samples::{DeviceLatest, DeviceRow, HostRow, ProcessRow, SAMPLE_LIMIT, Samples};
 pub use workers::{RunCursor, WorkerDetail};
