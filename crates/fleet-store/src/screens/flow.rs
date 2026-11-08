@@ -268,5 +268,7 @@ fn failure_of(flow: &FlowView, steps: &[StepView]) -> Option<FailureView> {
         message: flow.failure_message.clone(),
         failed_step_index: failed.map(|s| s.index),
         last_successful_step_index: last_ok,
+        fingerprint: None,
+        triage: None,
     })
 }

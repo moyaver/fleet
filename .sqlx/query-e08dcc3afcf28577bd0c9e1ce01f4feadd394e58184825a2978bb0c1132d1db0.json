@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.fingerprint, t.first_seen_at, t.state, t.issue_url, t.updated_at\n               FROM failure_fingerprints ff\n               JOIN failure_triage t\n                 ON t.project_id = ff.project_id AND t.fingerprint = ff.fingerprint\n              WHERE ff.project_id = $1 AND ff.flow_execution_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fingerprint",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "fingerprint"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "first_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "issue_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "issue_url"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "failure_triage",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e08dcc3afcf28577bd0c9e1ce01f4feadd394e58184825a2978bb0c1132d1db0"
+}

@@ -102,6 +102,7 @@ impl HistoryRow {
             failure_message: self.failure_message,
             failure_fingerprint: self.failure_fingerprint,
             condition_fingerprint: self.condition_fingerprint,
+            triage: None,
         }
     }
 }
@@ -342,8 +343,7 @@ async fn failure_groups(
     // `f.project_id` and the state filter match `flow_executions_history` (0010); without them
     // the planner cannot seek the window. Failure fingerprints exist only for final failures, so
     // the state filter drops nothing.
-    Ok(sqlx::query_as!(
-            FailureGroupView,
+    let rows = sqlx::query!(
             "SELECT ff.fingerprint, min(ff.step_kind) AS \"step_kind!\", min(ff.message) AS \"message!\",
                     count(*) AS \"count!\",
                     min(coalesce(f.ended_at, f.started_at)) AS \"first_at!\",
@@ -369,7 +369,21 @@ async fn failure_groups(
             FAILURE_GROUPS
         )
         .fetch_all(&mut *c)
-        .await?)
+        .await?;
+    // Triage is attached by the server, which reads it from `failure_triage`.
+    Ok(rows
+        .into_iter()
+        .map(|r| FailureGroupView {
+            fingerprint: r.fingerprint,
+            step_kind: r.step_kind,
+            message: r.message,
+            count: r.count,
+            first_at: r.first_at,
+            last_at: r.last_at,
+            flow_ids: r.flow_ids,
+            triage: None,
+        })
+        .collect())
 }
 
 /// How far back flaky v1 looks: the longest window a client can ask for.

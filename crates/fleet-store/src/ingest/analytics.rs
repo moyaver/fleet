@@ -157,6 +157,15 @@ async fn store_failure(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx::E
     )
     .execute(&mut *tx)
     .await?;
+    // The first sighting of a fingerprint records when it was first seen (issue #84).
+    sqlx::query!(
+        "INSERT INTO failure_triage (project_id, fingerprint) VALUES ($1, $2)
+         ON CONFLICT (project_id, fingerprint) DO NOTHING",
+        flow.project_id,
+        signature.fingerprint.as_str()
+    )
+    .execute(&mut *tx)
+    .await?;
     Ok(())
 }
 
