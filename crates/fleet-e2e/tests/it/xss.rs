@@ -308,6 +308,53 @@ async fn upload(
     assert!(body.contains("\"available\""), "{class}: {body}");
 }
 
+/// Like [`upload`], for bytes the server refuses: the file is listed on screen D with its refusal.
+async fn upload_refused(
+    stack: &Stack,
+    run: &str,
+    flow: &str,
+    (class, path, content_type): (&str, &str, &str),
+    bytes: &[u8],
+) {
+    let request = json!({
+        "agent_run_id": run, "flow_execution_id": flow, "class": class, "step": null,
+        "path": path, "content_type": content_type,
+        "size": bytes.len(), "sha256": sha256_hex(bytes),
+    });
+    let key = Some(stack.key.as_str());
+    let (status, body) = support::http(
+        stack.addr(),
+        "POST",
+        "/api/v1/agent/artifacts",
+        key,
+        &request.to_string(),
+    )
+    .await;
+    assert_eq!(status, 201, "{class}: {body}");
+    let grant: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(grant["disposition"], "upload", "{class}: {grant}");
+    let text = String::from_utf8_lossy(bytes).into_owned();
+    let (status, _) = support::http(
+        stack.addr(),
+        "PUT",
+        grant["url"].as_str().unwrap(),
+        key,
+        &text,
+    )
+    .await;
+    assert_eq!(status, 204, "{class}");
+    let (status, body) = support::http(
+        stack.addr(),
+        "POST",
+        grant["complete_url"].as_str().unwrap(),
+        key,
+        "",
+    )
+    .await;
+    assert_eq!(status, 200, "{class}: {body}");
+    assert!(body.contains("\"rejected\""), "{class}: {body}");
+}
+
 /// The evidence of the failed flow `flow` of run `run`: a Maestro log, a logcat excerpt and a UI
 /// hierarchy, each with a hostile file name, and the log and hierarchy with hostile content.
 async fn upload_evidence(stack: &Stack, run: &str, flow: &str) {
@@ -355,6 +402,33 @@ async fn upload_evidence(stack: &Stack, run: &str, flow: &str) {
         ),
         hierarchy.to_string().as_bytes(),
         Some(0),
+    )
+    .await;
+    // Maestro's own screenshot and recording (issue #133) with hostile names (no `/` in them: a path
+    // separates its segments there). The bytes are not the type their class takes, so the server
+    // refuses both, and screen D lists each refusal by name: the names are text there.
+    upload_refused(
+        stack,
+        run,
+        flow,
+        (
+            "user_screenshot",
+            "takeScreenshot/<img src=x onerror=\"window.__xss = 1\">.png",
+            "image/png",
+        ),
+        b"not a png",
+    )
+    .await;
+    upload_refused(
+        stack,
+        run,
+        flow,
+        (
+            "user_recording",
+            "startRecording/<video src=x onerror=\"window.__xss = 1\">.mp4",
+            "video/mp4",
+        ),
+        b"not an mp4",
     )
     .await;
 }
@@ -555,6 +629,9 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
     );
     // The hierarchy's file name is shown; the logcat's is not (it downloads under its own label).
     flow_shows.push("step-001-\"><img src=x onerror=\"window.__xss = 1\">.json".into());
+    // Maestro's own media refused by the server: the names are shown, as text.
+    flow_shows.push("<img src=x onerror=\"window.__xss = 1\">.png".into());
+    flow_shows.push("<video src=x onerror=\"window.__xss = 1\">.mp4".into());
     let screens = [
         Screen {
             name: "overview",
