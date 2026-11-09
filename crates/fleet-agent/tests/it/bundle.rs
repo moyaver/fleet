@@ -380,7 +380,10 @@ fn publish_takes_the_user_media_switch_as_run_does() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(published_user_media(&srv.state.lock().unwrap()).is_empty());
+    assert_eq!(
+        published_user_media(&srv.state.lock().unwrap()),
+        Vec::<String>::new()
+    );
 
     let srv = server(Mode::Normal);
     let out = publish_with(
