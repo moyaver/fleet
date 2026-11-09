@@ -41,7 +41,7 @@ It never removes a flag.
 |---|---|
 | `maestro test flows/` (a directory) | yes |
 | `maestro test a.yaml b.yaml` (several flows), or a planner shard of several flows | yes |
-| `maestro test --shard-all N …` with N > 1 | yes |
+| `maestro test --shard-all N …` with N > 1 | not yet verified ([#231](https://github.com/moyaver/fleet/issues/231)) |
 | `maestro test login.yaml` (one flow) | no |
 | any command with `-c` or `--continuous` | no |
 | any command with your own `--format` | no (yours is used) |
