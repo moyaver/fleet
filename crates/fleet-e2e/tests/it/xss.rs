@@ -12,7 +12,11 @@
 //! installation too: a project's name, a publisher policy's name, an API key's name, a person's
 //! display name (on a role binding and in the audit history), an identity-provider group, a refused
 //! event's message, a loss's reason, an agent's version and an audited change's recorded values.
-//! [`seed_administration`] writes them with the corpus.
+//! [`seed_administration`] writes them with the corpus. The per-project policy forms (retention,
+//! artifact classes, quota and metric intervals) have no free text of their own: their numbers are
+//! checked by the admin browser test. The class in their path is free text, though, and a refused
+//! change names it, so a hostile class is posted through the retention form and must render as
+//! text on the refusal page.
 //!
 //! Every payload sets `window.__xss = 1` when it runs, so a screen fails when a payload ran, when
 //! an injected element or an `on*` attribute exists, when a script is not the app's own, when a
@@ -37,7 +41,7 @@ use uuid::Uuid;
 use crate::{
     artifacts::temp,
     browser::Browser,
-    dashboard_ab::{Page, count_of, q, run_options, sign_in_session, stack},
+    dashboard_ab::{PATIENCE, Page, count_of, q, run_options, sign_in_session, stack},
     dashboard_cd::worker_of,
     dashboard_ef::attempt_of,
     m5_exit::sha256_hex,
@@ -422,6 +426,56 @@ fn literal_shows() -> Vec<String> {
     LITERAL.iter().map(|s| (*s).to_owned()).collect()
 }
 
+/// Checks the page on screen: no injected markup, no payload run, each of `shows` as literal text,
+/// and no CSP violation. Returns what is wrong, named by `name`.
+async fn inspect(browser: &Browser, page: &Page<'_>, name: &str, shows: &[String]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let scan = page.eval(SCAN, vec![]).await;
+    for problem in scan["problems"].as_array().unwrap() {
+        problems.push(format!("{name}: {problem}"));
+    }
+    if !scan["xss"].is_null() {
+        problems.push(format!(
+            "{name}: a payload ran: window.__xss is {}",
+            scan["xss"]
+        ));
+    }
+    let missing = page.eval(MISSING, vec![json!(shows)]).await;
+    for text in missing.as_array().unwrap() {
+        problems.push(format!("{name}: not shown as text: {text}"));
+    }
+    for violation in browser.csp_violations().await {
+        problems.push(format!("{name}: CSP violation {violation}"));
+    }
+    problems
+}
+
+/// JS: sends the retention form of app's report class with its class in the path set to
+/// `arguments[0]`, as a client that names a hostile class would.
+const SEND_HOSTILE_CLASS: &str = r#"const f = document.querySelector('form[action="/api/v1/admin/retention/app/report/edit"]');
+f.action = '/api/v1/admin/retention/app/' + encodeURIComponent(arguments[0]) + '/edit';
+f.querySelector('button[type=submit]').click();
+return 'sent';"#;
+
+/// Waits until `expression` is true on the page, tolerating the page navigating meanwhile (a form
+/// was just sent).
+async fn settle(browser: &Browser, expression: &str) {
+    let script = format!("return Boolean({expression});");
+    let deadline = std::time::Instant::now() + PATIENCE;
+    loop {
+        if let Ok(value) = browser.client.execute(&script, vec![]).await
+            && value == json!(true)
+        {
+            return;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the page did not reach {expression}"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 #[expect(
     clippy::too_many_lines,
     reason = "one straight-line scenario: seed, then render every screen"
@@ -634,24 +688,31 @@ async fn every_user_field_renders_as_text_on_every_screen_and_no_payload_runs() 
             .unwrap();
         page.wait(&format!("the {} screen", screen.name), &screen.ready)
             .await;
-        let scan = page.eval(SCAN, vec![]).await;
-        for problem in scan["problems"].as_array().unwrap() {
-            problems.push(format!("{}: {problem}", screen.name));
-        }
-        if !scan["xss"].is_null() {
-            problems.push(format!(
-                "{}: a payload ran: window.__xss is {}",
-                screen.name, scan["xss"]
-            ));
-        }
-        let missing = page.eval(MISSING, vec![json!(screen.shows)]).await;
-        for text in missing.as_array().unwrap() {
-            problems.push(format!("{}: not shown as text: {text}", screen.name));
-        }
-        for violation in browser.csp_violations().await {
-            problems.push(format!("{}: CSP violation {violation}", screen.name));
-        }
+        problems.extend(inspect(&browser, &page, screen.name, &screen.shows).await);
     }
+    // Screen G's policy forms name the artifact class in their path, and a refused change answers
+    // with that name. Sent with a hostile class, the refusal page must show the name as text.
+    browser.client.goto(&format!("{base}/admin")).await.unwrap();
+    page.wait(
+        "the retention form for app's report class",
+        "document.querySelector('form[action=\"/api/v1/admin/retention/app/report/edit\"]') !== null",
+    )
+    .await;
+    page.eval(SEND_HOSTILE_CLASS, vec![json!(CORPUS[1])]).await;
+    settle(
+        &browser,
+        "document.body.textContent.includes('is not a retention class')",
+    )
+    .await;
+    problems.extend(
+        inspect(
+            &browser,
+            &page,
+            "refused policy change",
+            &[CORPUS[1].to_owned()],
+        )
+        .await,
+    );
     browser.quit().await;
     assert!(
         problems.is_empty(),
