@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet161a" tests="3" failures="1" time="7.659" timestamp="2026-11-09T05:08:56">
+    <testcase id="f12" name="f12" classname="f12" file="research/13-assets/suite/f12.yaml" time="4.205" timestamp="2026-11-09T05:08:56" status="ERROR">
+      <failure>Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+    <testcase id="f02" name="f02" classname="f02" file="research/13-assets/suite/f02.yaml" time="2.318" timestamp="2026-11-09T05:09:00" status="SUCCESS"/>
+    <testcase id="f01" name="f01" classname="f01" file="research/13-assets/suite/f01.yaml" time="1.114" timestamp="2026-11-09T05:09:03" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

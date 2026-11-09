@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet161b" tests="3" failures="0" time="31.897" timestamp="2026-11-09T05:04:39">
+    <testcase id="f08" name="f08" classname="f08" file="research/13-assets/suite/f08.yaml" time="13.805" timestamp="2026-11-09T05:04:39" status="SUCCESS"/>
+    <testcase id="f07" name="f07" classname="f07" file="research/13-assets/suite/f07.yaml" time="9.922" timestamp="2026-11-09T05:04:53" status="SUCCESS"/>
+    <testcase id="f06" name="f06" classname="f06" file="research/13-assets/suite/f06.yaml" time="8.13" timestamp="2026-11-09T05:05:03" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

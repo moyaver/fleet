@@ -1,0 +1,285 @@
+{
+  "mode": "dynamic",
+  "devices": [
+    "emulator-5610",
+    "emulator-5612"
+  ],
+  "loadavg_1min_at_end": 20.65,
+  "pipeline_s": 139.753,
+  "device_occupied_s": {
+    "emulator-5610": 139.736,
+    "emulator-5612": 139.711
+  },
+  "device_idle_s": {
+    "emulator-5610": 0.017,
+    "emulator-5612": 0.042
+  },
+  "device_flow_s": {
+    "emulator-5610": 75.417,
+    "emulator-5612": 73.792
+  },
+  "device_flow_idle_s": {
+    "emulator-5610": 64.336,
+    "emulator-5612": 65.961
+  },
+  "lost_flows": [],
+  "kill": null,
+  "notes": [],
+  "flows": {
+    "f10": [
+      {
+        "process": "b002.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194124.689187,
+        "end": 1794194151.1258109,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 18.545,
+        "suite": 1
+      }
+    ],
+    "f11": [
+      {
+        "process": "b001.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194124.689078,
+        "end": 1794194152.949434,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 20.273,
+        "suite": 1
+      }
+    ],
+    "f08": [
+      {
+        "process": "b004.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194152.951034,
+        "end": 1794194173.954269,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 13.514,
+        "suite": 1
+      }
+    ],
+    "f09": [
+      {
+        "process": "b003.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194151.128871,
+        "end": 1794194174.8849049,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 16.259,
+        "suite": 1
+      }
+    ],
+    "f06": [
+      {
+        "process": "b006.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194174.885619,
+        "end": 1794194200.426635,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 14.811,
+        "suite": 1
+      }
+    ],
+    "f07": [
+      {
+        "process": "b005.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194173.957052,
+        "end": 1794194203.312672,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 19.079,
+        "suite": 1
+      }
+    ],
+    "f04": [
+      {
+        "process": "b008.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194203.315957,
+        "end": 1794194225.2884521,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 9.244,
+        "suite": 1
+      }
+    ],
+    "f05": [
+      {
+        "process": "b007.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194200.429877,
+        "end": 1794194228.500227,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 13.314,
+        "suite": 1
+      }
+    ],
+    "f03": [
+      {
+        "process": "b009.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194225.2922869,
+        "end": 1794194249.1063511,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 8.936,
+        "suite": 1
+      }
+    ],
+    "f12": [
+      {
+        "process": "b010.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194228.50299,
+        "end": 1794194250.748558,
+        "rc": 1,
+        "outcome": "failed",
+        "source": "junit",
+        "seconds": 7.148,
+        "suite": 1
+      }
+    ],
+    "f01": [
+      {
+        "process": "b012.emulator-5612",
+        "device": "emulator-5612",
+        "start": 1794194250.752866,
+        "end": 1794194264.4142468,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 3.715,
+        "suite": 1
+      }
+    ],
+    "f02": [
+      {
+        "process": "b011.emulator-5610",
+        "device": "emulator-5610",
+        "start": 1794194249.1095,
+        "end": 1794194264.440059,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 4.371,
+        "suite": 1
+      }
+    ]
+  },
+  "correctness": {
+    "f01": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f02": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f03": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f04": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f05": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f06": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f07": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f08": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f09": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f10": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f11": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f12": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "failed",
+      "expected": "failed",
+      "ran_exactly_once": true,
+      "matches": true
+    }
+  },
+  "all_correct": true
+}

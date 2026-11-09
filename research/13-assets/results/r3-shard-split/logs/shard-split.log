@@ -1,0 +1,39 @@
+WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @2805c96b (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/picocli-4.6.3.jar)
+WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning
+WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled
+Will split 12 flows across 2 shards (6 flows per shard)
+
+[shard 1] Waiting for flows to complete...
+
+[shard 2] Waiting for flows to complete...
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/protobuf-java-3.21.9.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+[shard 1] [Passed] f01 (2s)
+[shard 2] [Passed] f07 (10s)
+[shard 1] [Passed] f11 (18s)
+[shard 2] [Passed] f10 (15s)
+[shard 1] [Passed] f06 (8s)
+[shard 1] [Passed] f05 (6s)
+[shard 1] [Failed] f12 (4s) (Assertion is false: "Fleet never shows this" is visible)
+[shard 2] [Passed] f09 (13s)
+[shard 1] [Passed] f03 (3s)
+
+[shard 1] 1/6 Flow Failed
+
+[shard 2] [Passed] f04 (4s)
+[shard 2] [Passed] f08 (12s)
+[shard 2] [Passed] f02 (3s)
+
+[shard 2] 6/6 Flows Passed in 58s
+
+
+╭─────────────────────────╮
+│                         │
+│   Passed: 11/12         │
+│   [ fleet161a ] - 5/6   │
+│   [ fleet161b ] - 6/6   │
+│                         │
+╰─────────────────────────╯
+

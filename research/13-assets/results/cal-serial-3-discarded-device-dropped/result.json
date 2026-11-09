@@ -1,0 +1,281 @@
+{
+  "mode": "serial",
+  "devices": [
+    "emulator-5610"
+  ],
+  "pipeline_s": 186.654,
+  "device_occupied_s": {
+    "emulator-5610": 186.617
+  },
+  "device_idle_s": {
+    "emulator-5610": 0.037
+  },
+  "device_flow_s": {
+    "emulator-5610": 99.154
+  },
+  "device_flow_idle_s": {
+    "emulator-5610": 87.5
+  },
+  "lost_flows": [
+    "f09"
+  ],
+  "kill": null,
+  "notes": [],
+  "flows": {
+    "f01": [
+      {
+        "process": "f01.serial",
+        "device": "emulator-5610",
+        "start": 1794192650.803104,
+        "end": 1794192661.3605351,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 1.908,
+        "suite": 1
+      }
+    ],
+    "f02": [
+      {
+        "process": "f02.serial",
+        "device": "emulator-5610",
+        "start": 1794192661.363015,
+        "end": 1794192673.11837,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 3.636,
+        "suite": 1
+      }
+    ],
+    "f03": [
+      {
+        "process": "f03.serial",
+        "device": "emulator-5610",
+        "start": 1794192673.1198661,
+        "end": 1794192684.609014,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 3.766,
+        "suite": 1
+      }
+    ],
+    "f04": [
+      {
+        "process": "f04.serial",
+        "device": "emulator-5610",
+        "start": 1794192684.6105778,
+        "end": 1794192695.647382,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 4.451,
+        "suite": 1
+      }
+    ],
+    "f05": [
+      {
+        "process": "f05.serial",
+        "device": "emulator-5610",
+        "start": 1794192695.649075,
+        "end": 1794192707.767071,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 5.911,
+        "suite": 1
+      }
+    ],
+    "f06": [
+      {
+        "process": "f06.serial",
+        "device": "emulator-5610",
+        "start": 1794192707.7684228,
+        "end": 1794192721.5922508,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 7.941,
+        "suite": 1
+      }
+    ],
+    "f07": [
+      {
+        "process": "f07.serial",
+        "device": "emulator-5610",
+        "start": 1794192721.5936692,
+        "end": 1794192737.1131678,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 9.401,
+        "suite": 1
+      }
+    ],
+    "f08": [
+      {
+        "process": "f08.serial",
+        "device": "emulator-5610",
+        "start": 1794192737.114568,
+        "end": 1794192756.0559108,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 12.815,
+        "suite": 1
+      }
+    ],
+    "f09": [
+      {
+        "process": "f09.serial",
+        "device": "emulator-5610",
+        "start": 1794192756.059615,
+        "end": 1794192760.78949,
+        "rc": 1,
+        "outcome": "interrupted",
+        "source": "none",
+        "seconds": null,
+        "suite": null
+      }
+    ],
+    "f10": [
+      {
+        "process": "f10.serial",
+        "device": "emulator-5610",
+        "start": 1794192760.79097,
+        "end": 1794192792.6068249,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 22.005,
+        "suite": 1
+      }
+    ],
+    "f11": [
+      {
+        "process": "f11.serial",
+        "device": "emulator-5610",
+        "start": 1794192792.619081,
+        "end": 1794192824.425684,
+        "rc": 0,
+        "outcome": "passed",
+        "source": "junit",
+        "seconds": 22.677,
+        "suite": 1
+      }
+    ],
+    "f12": [
+      {
+        "process": "f12.serial",
+        "device": "emulator-5610",
+        "start": 1794192824.4291961,
+        "end": 1794192837.452031,
+        "rc": 1,
+        "outcome": "failed",
+        "source": "junit",
+        "seconds": 4.643,
+        "suite": 1
+      }
+    ]
+  },
+  "correctness": {
+    "f01": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f02": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f03": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f04": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f05": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f06": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f07": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f08": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f09": {
+      "attempts": 1,
+      "completed_attempts": 0,
+      "final": "missing",
+      "expected": "passed",
+      "ran_exactly_once": false,
+      "matches": false
+    },
+    "f10": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f11": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "passed",
+      "expected": "passed",
+      "ran_exactly_once": true,
+      "matches": true
+    },
+    "f12": {
+      "attempts": 1,
+      "completed_attempts": 1,
+      "final": "failed",
+      "expected": "failed",
+      "ran_exactly_once": true,
+      "matches": true
+    }
+  },
+  "all_correct": false
+}

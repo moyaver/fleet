@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet161a" tests="12" failures="1" time="107.752" timestamp="2026-11-09T05:23:35">
+    <testcase id="f01" name="f01" classname="f01" file="research/13-assets/suite/f01.yaml" time="2.116" timestamp="2026-11-09T05:23:35" status="SUCCESS"/>
+    <testcase id="f07" name="f07" classname="f07" file="research/13-assets/suite/f07.yaml" time="9.926" timestamp="2026-11-09T05:23:38" status="SUCCESS"/>
+    <testcase id="f11" name="f11" classname="f11" file="research/13-assets/suite/f11.yaml" time="18.479" timestamp="2026-11-09T05:23:48" status="SUCCESS"/>
+    <testcase id="f10" name="f10" classname="f10" file="research/13-assets/suite/f10.yaml" time="22.373" timestamp="2026-11-09T05:24:06" status="SUCCESS"/>
+    <testcase id="f06" name="f06" classname="f06" file="research/13-assets/suite/f06.yaml" time="8.502" timestamp="2026-11-09T05:24:28" status="SUCCESS"/>
+    <testcase id="f09" name="f09" classname="f09" file="research/13-assets/suite/f09.yaml" time="13.837" timestamp="2026-11-09T05:24:37" status="SUCCESS"/>
+    <testcase id="f05" name="f05" classname="f05" file="research/13-assets/suite/f05.yaml" time="5.897" timestamp="2026-11-09T05:24:51" status="SUCCESS"/>
+    <testcase id="f04" name="f04" classname="f04" file="research/13-assets/suite/f04.yaml" time="4.117" timestamp="2026-11-09T05:24:57" status="SUCCESS"/>
+    <testcase id="f12" name="f12" classname="f12" file="research/13-assets/suite/f12.yaml" time="3.942" timestamp="2026-11-09T05:25:01" status="ERROR">
+      <failure>Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+    <testcase id="f08" name="f08" classname="f08" file="research/13-assets/suite/f08.yaml" time="12.277" timestamp="2026-11-09T05:25:05" status="SUCCESS"/>
+    <testcase id="f03" name="f03" classname="f03" file="research/13-assets/suite/f03.yaml" time="3.579" timestamp="2026-11-09T05:25:17" status="SUCCESS"/>
+    <testcase id="f02" name="f02" classname="f02" file="research/13-assets/suite/f02.yaml" time="2.573" timestamp="2026-11-09T05:25:21" status="SUCCESS"/>
+  </testsuite>
+</testsuites>
