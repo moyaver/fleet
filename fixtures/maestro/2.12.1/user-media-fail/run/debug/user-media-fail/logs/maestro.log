@@ -1,0 +1,29 @@
+04:53:38.316 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+04:53:38.320 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+04:53:38.321 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+04:53:38.321 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+04:53:38.321 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.fleet.anr" RUNNING
+04:53:38.371 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr
+04:53:38.371 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch
+04:53:38.457 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.fleet.anr" COMPLETED
+04:53:38.457 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Block main thread" is visible RUNNING
+04:53:38.666 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Block main thread" is visible COMPLETED
+04:53:38.666 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot fleet-before-fail RUNNING
+04:53:38.668 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+04:53:38.672 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+04:53:39.203 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot fleet-before-fail COMPLETED
+04:53:39.208 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Start recording fleet-fail-recording RUNNING
+04:53:39.218 [ INFO] maestro.Maestro.startScreenRecording: Starting screen recording
+04:53:39.218 [ INFO] maestro.Maestro.startScreenRecording: Starting screen recording
+04:53:39.495 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Start recording fleet-fail-recording COMPLETED
+04:53:39.495 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Block main thread" is visible RUNNING
+04:53:39.733 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Block main thread" is visible COMPLETED
+04:53:39.733 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Stop recording RUNNING
+04:53:39.734 [ INFO] maestro.Maestro.close: Stopping screen recording
+04:53:45.898 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Stop recording COMPLETED
+04:53:45.900 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+04:53:55.564 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+04:53:55.815 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+04:53:55.816 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+04:53:56.332 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED
+04:53:56.333 [ INFO] maestro.Maestro.close: Stopping screen recording

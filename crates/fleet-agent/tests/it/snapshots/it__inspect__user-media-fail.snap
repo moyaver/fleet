@@ -1,0 +1,36 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "user-media-fail",
+      "path": "<REPO>/examples/flows/phase0/user-media-fail.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 9,
+      "failure": "Assertion is false: \"Fleet never shows this\" is visible"
+    }
+  ],
+  "events": 40,
+  "event_types": {
+    "artifact.registered": 2,
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "runner.detected": 1,
+    "shard.assigned": 1,
+    "step.ended": 18,
+    "step.started": 9,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

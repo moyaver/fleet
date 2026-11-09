@@ -1,0 +1,10 @@
+appId: com.fleet.anr
+name: user-media-fail
+---
+- launchApp
+- assertVisible: "Block main thread"
+- takeScreenshot: fleet-before-fail
+- startRecording: fleet-fail-recording
+- assertVisible: "Block main thread"
+- stopRecording
+- assertVisible: "Fleet never shows this"
