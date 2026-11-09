@@ -33,9 +33,9 @@ use fleet_protocol::{
     brand::WS_SUBPROTOCOL,
     event::{
         AdbState, AppCrashed, EventBody, ExitClass, FlowEnded, FlowOutcome, FlowRef, FlowReported,
-        FlowStarted, JunitTestcase, MatchMethod, ProcessExited, ReportParsed, ReportStatus,
-        RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted, StepStatus,
-        SuiteStarted,
+        FlowStarted, JournalGap, JunitTestcase, MatchMethod, ProcessExited, ReportParsed,
+        ReportStatus, RunEnded, RunStarted, ShardAssigned, ShardMode, StepEnded, StepStarted,
+        StepStatus, SuiteStarted,
     },
     frame::{
         AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, DeviceUnavailable, Hello,
@@ -641,6 +641,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
             output_bytes_dropped: 0,
         }),
     );
+    oversized_as_gaps(&mut events);
     Script {
         flow_ends,
         live_end,
@@ -800,25 +801,94 @@ async fn agent(
     Ok(report)
 }
 
+/// The largest event the agent sends whole. A bigger one is not stored: the agent sends a
+/// `journal.gap` in its slot instead (`max_event_bytes` in the agent's outbox).
+pub const MAX_EVENT_BYTES: usize = 192 * 1024;
+
+/// Bytes a frame takes besides its events (the envelope and the `op` field).
+const FRAME_OVERHEAD: usize = 1024;
+
+/// The serialized size of one event, as an `events` frame carries it.
+fn event_bytes(e: &EventEnvelope) -> usize {
+    serde_json::to_vec(e).map_or(0, |v| v.len())
+}
+
+/// Where the batch that starts at `from` ends: `opts.batch` events at most, and no more bytes than
+/// `budget` unless one event alone is larger (the agent packs frames the same way).
+fn batch_end(events: &[EventEnvelope], from: usize, opts: &Options, budget: usize) -> usize {
+    let mut to = from;
+    let mut bytes = 0usize;
+    while to < events.len() && to - from < opts.batch.max(1) {
+        let size = event_bytes(&events[to]);
+        if to > from && bytes.saturating_add(size) > budget {
+            break;
+        }
+        bytes = bytes.saturating_add(size);
+        to += 1;
+    }
+    to
+}
+
+/// The frame budget for events, from the server's `max_frame_bytes`.
+fn frame_budget(max_frame_bytes: u32) -> usize {
+    usize::try_from(max_frame_bytes)
+        .unwrap_or(usize::MAX)
+        .saturating_sub(FRAME_OVERHEAD)
+}
+
 /// The events one batch puts on the wire: `events[from..to]`, with the resends and the reordering
-/// the scenario asks for.
+/// the scenario asks for. Resends stop at `budget` bytes.
 fn wire_batch(
     events: &[EventEnvelope],
     from: usize,
     to: usize,
     opts: &Options,
+    budget: usize,
 ) -> Vec<EventEnvelope> {
     let mut batch: Vec<EventEnvelope> = events.get(from..to).unwrap_or_default().to_vec();
     if opts.duplicates && from > 0 {
-        // Resend a few already-sent events.
+        // Resend a few already-sent events, the nearest ones that the frame has room for.
         let back = from.saturating_sub(opts.batch / 2);
-        batch.extend(events.get(back..from).unwrap_or_default().iter().cloned());
+        let mut room = budget.saturating_sub(batch.iter().map(event_bytes).sum());
+        let mut resend = Vec::new();
+        for e in events.get(back..from).unwrap_or_default().iter().rev() {
+            let size = event_bytes(e);
+            if size > room {
+                break;
+            }
+            room -= size;
+            resend.push(e.clone());
+        }
+        resend.reverse();
+        batch.extend(resend);
     }
     if opts.duplicates || opts.reorder {
         // The batch goes out in reverse: the server sorts it by `seq` before it applies it.
         batch.reverse();
     }
     batch
+}
+
+/// Stores every event bigger than [`MAX_EVENT_BYTES`] as a `journal.gap` in its own slot, as the
+/// agent does, so a giant log is recorded as a gap and never refused as a frame.
+fn oversized_as_gaps(events: &mut [EventEnvelope]) {
+    for e in events.iter_mut() {
+        if event_bytes(e) <= MAX_EVENT_BYTES {
+            continue;
+        }
+        let body = EventBody::JournalGap(JournalGap {
+            from_seq: e.seq,
+            to_seq: e.seq,
+            reason: "event_too_large".into(),
+        });
+        *e = EventEnvelope::new(
+            e.seq,
+            e.at,
+            Subject::default(),
+            Provenance::new(SourceKind::AgentObserved),
+            &body,
+        );
+    }
 }
 
 /// A reconnect's jitter: a fraction in `[0, 1)` from OS randomness. The clock's sub-second bits
@@ -857,8 +927,10 @@ async fn stream(
         t0,
     )))))
     .await?;
-    let mut sent = match recv(&mut ws).await? {
-        Some(ServerFrame::Welcome(w)) => w.committed_through,
+    let (mut sent, budget) = match recv(&mut ws).await? {
+        Some(ServerFrame::Welcome(w)) => {
+            (w.committed_through, frame_budget(w.limits.max_frame_bytes))
+        }
         other => bail!("expected welcome, got {other:?}"),
     };
     report.acked = report.acked.max(sent);
@@ -872,7 +944,7 @@ async fn stream(
             return Ok(Ended::Dropped);
         }
         let from = usize::try_from(sent).unwrap_or(usize::MAX);
-        let mut to = (from + opts.batch.max(1)).min(events.len());
+        let mut to = batch_end(events, from, opts, budget);
         if let Some(hold) = &opts.hold {
             // The next stop not yet released: never send past it, and wait there.
             let released = *hold.released.borrow();
@@ -885,7 +957,7 @@ async fn stream(
                 to = to.min(stop);
             }
         }
-        let batch = wire_batch(events, from, to, opts);
+        let batch = wire_batch(events, from, to, opts, budget);
         ws.send(frame(&ClientFrame::Events { events: batch }))
             .await?;
         sent = u64::try_from(to).unwrap_or(u64::MAX);
@@ -1029,7 +1101,7 @@ mod tests {
     #[test]
     fn a_batch_goes_out_in_reverse_only_when_the_scenario_reorders_it() {
         let s = script(0, &Options::default(), Instant::now());
-        let plain = wire_batch(&s.events, 0, 4, &Options::default());
+        let plain = wire_batch(&s.events, 0, 4, &Options::default(), usize::MAX);
         assert_eq!(seqs(&plain), [1, 2, 3, 4]);
         let reordered = wire_batch(
             &s.events,
@@ -1039,6 +1111,7 @@ mod tests {
                 reorder: true,
                 ..Options::default()
             },
+            usize::MAX,
         );
         assert_eq!(seqs(&reordered), [4, 3, 2, 1]);
     }
@@ -1052,8 +1125,51 @@ mod tests {
         };
         let s = script(0, &opts, Instant::now());
         // Events 5..=8 go out with 3 and 4 resent, all reversed.
-        let batch = wire_batch(&s.events, 4, 8, &opts);
+        let batch = wire_batch(&s.events, 4, 8, &opts, usize::MAX);
         assert_eq!(seqs(&batch), [4, 3, 8, 7, 6, 5]);
+    }
+
+    /// A journal event whose exception is `bytes` long.
+    fn big_event(seq: u64, bytes: usize) -> EventEnvelope {
+        EventEnvelope::new(
+            seq,
+            clock(Instant::now()),
+            Subject::default(),
+            Provenance::new(SourceKind::AgentObserved),
+            &EventBody::AppCrashed(AppCrashed {
+                package: "com.example.app".into(),
+                exception: "x".repeat(bytes),
+            }),
+        )
+    }
+
+    #[test]
+    fn a_batch_stops_at_the_frame_budget_but_takes_one_event_that_alone_exceeds_it() {
+        let events: Vec<EventEnvelope> = (1..=3).map(|s| big_event(s, 100_000)).collect();
+        let opts = Options {
+            batch: 32,
+            ..Options::default()
+        };
+        // Two 100 KB events fit a 256 KB frame; a third does not.
+        assert_eq!(batch_end(&events, 0, &opts, frame_budget(256 * 1024)), 2);
+        // An event over the whole budget still goes out, alone.
+        assert_eq!(batch_end(&events, 0, &opts, 10_000), 1);
+    }
+
+    #[test]
+    fn an_event_over_192_kib_goes_out_as_a_gap_in_its_own_slot() {
+        let mut events = vec![
+            big_event(1, 10),
+            big_event(2, MAX_EVENT_BYTES + 1),
+            big_event(3, 10),
+        ];
+        oversized_as_gaps(&mut events);
+        assert_eq!(events[0].kind, "app.crashed");
+        assert_eq!(events[1].kind, "journal.gap");
+        assert_eq!(events[1].seq, 2);
+        assert_eq!(events[1].data["from_seq"], 2);
+        assert_eq!(events[1].data["to_seq"], 2);
+        assert_eq!(events[2].kind, "app.crashed");
     }
 
     #[test]
