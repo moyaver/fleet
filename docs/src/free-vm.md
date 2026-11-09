@@ -113,6 +113,32 @@ docker compose run --rm fleet api-key create --project <project-slug> --name ci
 
 Set `FLEET_SERVER=https://<dashboard>.duckdns.org` in the job, then wrap the Maestro command with `fleet-agent run --` ([user guide](user-guide.md)).
 
+The agent needs the same clean break: the release installer and the composite action both install `v0.1.0-alpha.3`, which cannot report to a server built from this branch. Until the next release, build the agent from this repository (the [runner guide](runner-guide.md#install) has the installer command for the release):
+
+```bash
+cargo build --locked -p fleet-agent     # target/debug/fleet-agent, on the runner or your machine
+```
+
+In GitHub Actions, check out this repository next to your app, build the agent, and run the composite action from that checkout with `install: "false"`, which runs the `fleet-agent` already on `PATH`. This is the second half of the CI job in `.github/workflows/ci.yml`:
+
+```yaml
+steps:
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      repository: moyaver/fleet
+      path: fleet
+  - run: cargo build --locked -p fleet-agent
+    working-directory: fleet
+  - run: echo "$GITHUB_WORKSPACE/fleet/target/debug" >> "$GITHUB_PATH"
+  - uses: ./fleet/examples/github-actions/fleet-agent
+    with:
+      install: "false"
+      command: maestro test .maestro/
+```
+
+Your job also needs `permissions: id-token: write` for the OIDC exchange, or `FLEET_TOKEN` set to the key above (see the [runner guide](runner-guide.md#credentials)).
+
 ## Limits of this setup
 
 - One VM, one Postgres and one Garage on its disk. A failed disk or a reclaimed instance loses the data unless you have a backup.

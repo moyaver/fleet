@@ -2,7 +2,9 @@
 
 ## Install
 
-This installs the alpha pre-release `v0.1.0-alpha.3` (pinned, because `latest` skips pre-releases):
+This installs the alpha pre-release `v0.1.0-alpha.3` (pinned, because `latest` skips pre-releases). That release predates the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases): its agent cannot report to a server built from this branch. Until the next release, build the agent from source with `cargo build --locked -p fleet-agent` and use `target/debug/fleet-agent` in place of the installed binary ([Try Fleet on a free VM](free-vm.md#7-connect-ci)).
+
+The installer command for the release:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.3/fleet-agent-installer.sh | sh
