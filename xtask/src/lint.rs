@@ -141,9 +141,26 @@ const UNSAFE_FILE: &str = "crates/fleet-agent/src/sys.rs";
 /// External crates `fleet-protocol` may use directly (PLAN §4.2).
 const PROTOCOL_EXTERNAL: &[&str] = &["serde", "serde_json", "uuid", "time", "schemars", "utoipa"];
 
+/// ADR-0014: the runner-neutral crates name no runner. Checked in their Rust sources and tests and
+/// in every migration.
+const NEUTRAL_CRATES: &[&str] = &[
+    "fleet-protocol",
+    "fleet-core",
+    "fleet-store",
+    "fleet-server",
+    "fleet-ui",
+    "fleet-web",
+];
+
+/// The names Maestro itself writes, which a runner-neutral crate recognises as text: the exception
+/// class in a failure message, the logger names in its log, and its session file. Data from the
+/// runner, not names of ours. Keep this list short.
+const RUNNER_OUTPUT: &[&str] = &["\"maestro.android.", "\"maestro.cli.", "\"maestro.log\""];
+
 pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
     let mut problems = Vec::new();
     walk(root, root, &mut problems)?;
+    problems.extend(neutral_name_problems(root)?);
     problems.extend(workflow_problems(root)?);
     let host = String::from_utf8(output(root, "rustc", &["--print", "host-tuple"])?)?;
     problems.extend(dependency_problems(
@@ -158,6 +175,103 @@ pub(crate) fn run(root: &Path) -> anyhow::Result<()> {
         eprintln!("lint: {p}");
     }
     bail!("{} lint problem(s)", problems.len())
+}
+
+/// Runner names in the runner-neutral crates and migrations (ADR-0014), as `file:line: problem`.
+fn neutral_name_problems(root: &Path) -> anyhow::Result<Vec<String>> {
+    let mut problems = Vec::new();
+    for krate in NEUTRAL_CRATES {
+        let dir = root.join("crates").join(krate);
+        if dir.is_dir() {
+            scan_rust_files(root, &dir, &mut problems)?;
+        }
+    }
+    let migrations = root.join("migrations");
+    for entry in
+        fs::read_dir(&migrations).with_context(|| format!("reading {}", migrations.display()))?
+    {
+        let path = entry?.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("sql") {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let text = fs::read_to_string(&path).with_context(|| format!("reading {name}"))?;
+        problems.extend(runner_name_lines(&format!("migrations/{name}"), &text));
+    }
+    Ok(problems)
+}
+
+fn scan_rust_files(root: &Path, dir: &Path, problems: &mut Vec<String>) -> anyhow::Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let path = entry?.path();
+        if path.is_dir() {
+            scan_rust_files(root, &path, problems)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            let rel = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            let text = fs::read_to_string(&path).with_context(|| format!("reading {rel}"))?;
+            problems.extend(runner_name_lines(&rel, &text));
+        }
+    }
+    Ok(())
+}
+
+/// The runner names on each line of one file.
+fn runner_name_lines(file: &str, text: &str) -> Vec<String> {
+    text.lines()
+        .enumerate()
+        .flat_map(|(n, line)| {
+            runner_names(line).into_iter().map(move |hit| {
+                format!(
+                    "{file}:{}: `{hit}` is a runner name in a runner-neutral crate or migration (ADR-0014)",
+                    n + 1
+                )
+            })
+        })
+        .collect()
+}
+
+/// The runner names on one line: `maestro_` identifiers and strings, `Maestro` followed by a
+/// capital letter, `MAESTRO_` variables and `"maestro.` wire strings. Maestro's own output names
+/// (see [`RUNNER_OUTPUT`]) and prose are not runner names.
+fn runner_names(line: &str) -> Vec<String> {
+    let mut hits = Vec::new();
+    for (i, _) in line.char_indices() {
+        let rest = &line[i..];
+        let after_letter = line[..i]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_ascii_alphabetic());
+        let camel = |prefix: &str| {
+            rest.strip_prefix(prefix)
+                .and_then(|r| r.chars().next())
+                .is_some_and(|c| c.is_ascii_uppercase())
+        };
+        let hit = (!after_letter && rest.starts_with("maestro_"))
+            || (!after_letter && rest.starts_with("MAESTRO_") && camel("MAESTRO_"))
+            || (rest.starts_with("Maestro") && camel("Maestro"))
+            || (rest.starts_with("\"maestro.")
+                && !RUNNER_OUTPUT.iter().any(|o| rest.starts_with(o)));
+        if hit {
+            hits.push(token_at(line, i));
+        }
+    }
+    hits
+}
+
+/// The identifier or quoted string that starts at `i`, for the message.
+fn token_at(line: &str, i: usize) -> String {
+    line[i..]
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '"'))
+        .collect()
 }
 
 /// Workflows that may use `pull_request_target`: none that checks out a pull request.
@@ -449,6 +563,62 @@ mod tests {
         assert_eq!(
             fork_runner_problems(".github/workflows/cla.yml", checkout).len(),
             1
+        );
+    }
+
+    #[test]
+    fn a_planted_runner_name_fails_the_check() {
+        // Identifiers, wire strings and env names are refused, aliases included.
+        for planted in [
+            "let x = MaestroLog;",
+            "fn maestro_detected() {}",
+            "let c = \"maestro_cpu_pct\";",
+            "KIND = \"maestro.detected\"",
+            "#[serde(alias = \"maestro_log\")]",
+            "std::env::var(\"MAESTRO_FLEET_TOKEN\")",
+            "let own_maestro_line = 1;",
+        ] {
+            assert!(!runner_names(planted).is_empty(), "{planted} should fail");
+        }
+        // Prose, the runner's own output and the neutral identifiers pass.
+        for clean in [
+            "/// Maestro's failure message is shown as it is.",
+            "let runner = \"maestro\";",
+            "let exc = \"maestro.android.DeviceServerDiedException\";",
+            "let f = \"maestro.log\";",
+            "let c = runner_cpu_pct;",
+        ] {
+            assert!(runner_names(clean).is_empty(), "{clean} should pass");
+        }
+    }
+
+    #[test]
+    fn a_planted_runner_name_in_a_neutral_crate_or_migration_fails_the_whole_check() {
+        let dir = std::env::temp_dir().join(format!("fleet-lint-{}", std::process::id()));
+        let src = dir.join("crates/fleet-core/src");
+        fs::create_dir_all(&src).expect("test fixture should be valid");
+        fs::create_dir_all(dir.join("migrations")).expect("test fixture should be valid");
+        fs::write(src.join("lib.rs"), "pub const N: &str = \"maestro_log\";\n")
+            .expect("test fixture should be valid");
+        fs::write(
+            dir.join("migrations/0001_x.sql"),
+            "ALTER TABLE t ADD COLUMN maestro_version text;\n",
+        )
+        .expect("test fixture should be valid");
+        fs::write(dir.join("migrations/0002_clean.sql"), "-- nothing here\n")
+            .expect("test fixture should be valid");
+        let problems = neutral_name_problems(&dir).expect("test fixture should be valid");
+        fs::remove_dir_all(&dir).expect("test fixture should be valid");
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("crates/fleet-core/src/lib.rs:1"))
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("migrations/0001_x.sql:1"))
         );
     }
 
