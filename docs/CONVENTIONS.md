@@ -20,24 +20,24 @@ Sources are listed at the end; the bracketed tags point to them.
 - **Workspace entries declare minimal features; members add their own** with `{ workspace = true, features = [...] }`. Features unify across the graph, so a feature at workspace level reaches every member. [CARGO]
 - **Heavy crates** (sysinfo, reqwest, object_store, sqlx) use `default-features = false`.
 - **Features are additive**: no `no-*` features, and enabling a feature never removes an item.
-- **The lockfile is committed and every command passes `--locked`.** **(CI)**
+- **The lockfile is committed, and CI's build, test and deny steps pass `--locked`.** **(CI)**
 - **Only permissive licenses** in anything linked into a binary. **(CI: `cargo deny`, see `deny.toml`)**
 
 ## Errors and panics
 
-- **Libraries define `thiserror` enums** (one per crate or per boundary). **Binaries use `anyhow`** (`fleet-server`, `fleet-agent`, `fleet-loadgen`, `fleet-e2e`, `xtask`). **(CI: `xtask lint` keeps `anyhow` out of library crates)**
+- **Libraries define `thiserror` enums** (one per crate or per boundary). **Binaries use `anyhow`** (`fleet-server`, `fleet-agent`, `fleet-loadgen`, `fleet-planner`, `xtask`). **(CI: `xtask lint` keeps `anyhow` out of library crates)**
 - **A wrapped error goes in `#[source]`/`#[from]` or in the message, never both.** Use `#[error(transparent)]` to pass one through.
 - **Messages are lowercase, without trailing punctuation, and name the failed operation**: `.with_context(|| format!("binding {listen}"))`. Print the chain with `{err:#}`.
 - **Panics are for bugs.** `unwrap()` appears only in tests **(CI: `unwrap_used`)**. When an invariant guarantees a value, use `expect("<x> should <hold> because …")`.
 - **Parsers of untrusted input never panic**: `fleet-maestro` and `fleet-core` also enable `indexing_slicing`, `string_slice`, `expect_used` and `panic`. A panic on a strange Maestro line would break fail-open (I2).
-- **`std::process::exit` only in the agent's and server's entry points.** **(CI: `exit`)**
+- **`std::process::exit` only in an entry point, with `#[expect(clippy::exit, reason = "…")]`.** Today only the agent's `cli.rs` calls it. **(CI: `exit`)**
 - **Release keeps `panic = "unwind"`**, so a panicking observer task becomes a `JoinError` instead of killing the supervisor (I1, I2). Only the `wasm-release` profile aborts.
 
 ## API design
 
 - **Names** follow RFC 430 and the `as_`/`to_`/`into_` conversions; getters have no `get_` prefix; avoid weasel nouns (`Manager`, `Service`, `Factory`). [APIG]
-- **Newtypes for IDs and validated values** (`RunId(Uuid)`), and **enums instead of `bool` or `Option` flags**.
-- **Public types implement `Debug`** **(CI: `missing_debug_implementations`)**. Secrets get a redacting `Debug` (or `secrecy`) and a test for it (I6).
+- **Newtypes for IDs and validated values** (`StagingKey(Uuid)` in `fleet-blob`), and **enums instead of `bool` or `Option` flags**.
+- **Public types implement `Debug`** **(CI: `missing_debug_implementations`)**. Secrets get a redacting `Debug` and a test for it (I6).
 - **`#[must_use = "why"]`** on guards, handles and builders.
 - **Generic parameters (`impl AsRef<Path>`, `impl BufRead`) only at public entry points**; internals stay concrete.
 - **Parsers are sans-I/O**: they take `&str`, `&[u8]` or `impl BufRead` and never open files or sockets.
@@ -51,13 +51,13 @@ Sources are listed at the end; the bracketed tags point to them.
 - **`select!` arms are cancel-safe** (`mpsc::recv`, `accept`, `read`, `StreamExt::next`); pin reused futures outside the loop. Public async functions document `# Cancel safety`.
 - **Structured concurrency**: every task belongs to a `JoinSet` or a `TaskTracker`. Shutdown is `CancellationToken::cancel()`, `tracker.close()`, then `wait()` under a timeout.
 - **Every network wait has a timeout**, and failure is fail-open (I2).
-- **The agent builds its observer runtime explicitly** (`tokio::runtime::Builder`, few workers), not with `#[tokio::main]` (I10).
+- **The agent builds its observer runtime explicitly** (`tokio::runtime::Builder`, current-thread), not with `#[tokio::main]` (I10).
 - **Servers shut down on SIGINT and SIGTERM.**
 
 ## Logging and output
 
 - **Libraries depend only on `tracing`; binaries install `tracing-subscriber`.** **(CI: `xtask lint`)**
-- **Structured fields and a constant message**: `info!(%listen, "server listening")`. Spans use `#[instrument(skip_all, fields(...))]` so secrets and large arguments stay out.
+- **Structured fields and a constant message**: `info!(%listen, "server listening")`. For a span, use `#[instrument(skip_all, fields(...))]`, so secrets and large arguments stay out.
 - **Levels**: `error` needs an operator, `warn` means degraded or failing open, `info` is lifecycle, `debug`/`trace` are for development. Never log a secret value.
 - **No `println!`/`eprintln!` outside tests** **(CI: `print_stdout`, `print_stderr`)**. `xtask` opts out at crate level. The agent's passthrough writes with `io::Write` and handles `EPIPE`.
 
