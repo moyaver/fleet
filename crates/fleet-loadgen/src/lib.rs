@@ -13,6 +13,7 @@
 //! - `reorder`: batches go out in reverse, without resends (the server sorts them);
 //! - `gap_events`: a full agent buffer drops events, and one `journal.gap` covers them;
 //! - `clock_skew_ms`: the agents' clock reads ahead of (or behind) the server's, wall times and ids;
+//! - `steps` and `failure_bytes`: a giant log, with long flows and failures over the agent's limit;
 //! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
@@ -86,6 +87,11 @@ pub struct Options {
     /// The agents' clock reads this many milliseconds ahead of the server's (behind when negative):
     /// every wall time they send and every id they make carries the offset (clock skew, PLAN §13).
     pub clock_skew_ms: i64,
+    /// Steps per flow: 0 keeps the shape of [`Options::wide`] (or the short two-step flows).
+    pub steps: u32,
+    /// Bytes of every failure message: 0 keeps the short or wide message. A message over 192 KiB
+    /// is a giant log: the agent sends it as a gap, the load generator does too.
+    pub failure_bytes: usize,
     /// Pause between batches, to stretch a run over time.
     pub pace: Duration,
     /// Give up on an agent after this long.
@@ -131,6 +137,8 @@ impl Default for Options {
             reorder: false,
             gap_events: 0,
             clock_skew_ms: 0,
+            steps: 0,
+            failure_bytes: 0,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
             commit: None,
@@ -297,6 +305,14 @@ fn step_description(step: u32, n: usize, opts: &Options) -> String {
 fn failure_message(n: usize, opts: &Options) -> String {
     if let Some(item) = corpus_item(opts, n) {
         return item.to_owned();
+    }
+    if opts.failure_bytes > 0 {
+        // A giant log: the message is `failure_bytes` long.
+        let head = "Assertion is false: ";
+        return format!(
+            "{head}{}",
+            "x".repeat(opts.failure_bytes.saturating_sub(head.len()))
+        );
     }
     if opts.wide {
         "Assertion is false: \"Order total\" was expected to read \"$84.10\" but read \"$0.00\" after the promo code was applied; the checkout screen stayed on https://shop.example.test/checkout/review?session=7f3c9d1e2ab4455f8e0c1d9a6b2e7f40&promo=SPRING-FREE-SHIPPING-2026 and the tax request timed out after 30000 ms".to_owned()
@@ -516,7 +532,13 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     let mut failed = 0;
     let mut flow_ids = Vec::new();
     let mut flow_ends = Vec::new();
-    let steps = if opts.wide { WIDE_STEPS } else { 2 };
+    let steps = if opts.steps > 0 {
+        opts.steps
+    } else if opts.wide {
+        WIDE_STEPS
+    } else {
+        2
+    };
     for f in 0..opts.flows {
         for (d, shard) in (0u32..).zip(&shards) {
             let flow = Subject {
@@ -1218,6 +1240,24 @@ mod tests {
         let suite = s.events[1].subject.suite_execution_id.expect("a suite id");
         let stamped = suite.get_timestamp().expect("a v7 id").to_unix().0;
         assert!(ahead(i64::try_from(stamped).unwrap_or(0)));
+    }
+
+    #[test]
+    fn a_giant_failure_is_sent_as_a_gap_and_steps_are_counted() {
+        let opts = Options {
+            failure_bytes: 300_000,
+            steps: 40,
+            devices: 2,
+            flows: 2,
+            ..Options::default()
+        };
+        let s = script(0, &opts, Instant::now());
+        assert!(s.events.iter().all(|e| event_bytes(e) <= MAX_EVENT_BYTES));
+        // Each failing flow reports its failure, too big to send: that report is a gap.
+        let gaps = s.events.iter().filter(|e| e.kind == "journal.gap").count();
+        assert_eq!(gaps, s.failed as usize);
+        let steps = s.events.iter().filter(|e| e.kind == "step.started").count();
+        assert_eq!(steps, 2 * 2 * 40);
     }
 
     #[test]
