@@ -1477,6 +1477,24 @@ mod tests {
         assert!(format!("{:#}", bad_scheme.unwrap_err()).contains("http"));
     }
 
+    /// The user-media caps are the defaults the operator guide documents (issue #133). A change to
+    /// either default changes the guide's table too: this test reads the guide, so they cannot drift.
+    #[test]
+    fn the_user_media_caps_are_the_documented_defaults() {
+        const MIB: u64 = 1024 * 1024;
+        use fleet_protocol::artifact::ArtifactClass;
+        let caps = ClassLimits::default();
+        assert_eq!(caps.user_screenshot, 20 * MIB);
+        assert_eq!(caps.user_recording, 100 * MIB);
+        assert_eq!(caps.of(ArtifactClass::UserScreenshot), 20 * MIB);
+        assert_eq!(caps.of(ArtifactClass::UserRecording), 100 * MIB);
+        let guide = include_str!("../../../docs/src/operator-guide.md");
+        assert!(
+            guide.contains("20 MiB user_screenshot, 100 MiB user_recording"),
+            "the operator guide's artifacts.max_bytes row names the defaults"
+        );
+    }
+
     #[test]
     fn a_signed_link_lives_at_most_five_minutes() {
         let key = Secret::from("k".repeat(40).as_str());
