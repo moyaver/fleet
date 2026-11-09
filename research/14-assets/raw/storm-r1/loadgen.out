@@ -1,0 +1,2 @@
+100 agents, 11700 events, 11700 acked, 200 connections, 8.8 s
+10 viewers, 13520 frames, 12000 latency samples for 1200 flow ends, p50 / p95 / p99 / max 1382.7 / 3116.8 / 3473.3 / 4563.3 ms

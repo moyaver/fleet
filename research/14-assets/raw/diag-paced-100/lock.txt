@@ -1,0 +1,294 @@
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:17|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:20|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+06:39:20|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+06:39:20|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+06:39:20|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+06:39:22|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:22|IDLE_IN_TX|INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser, occur
+06:39:25|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+06:39:25|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+06:39:25|IDLE_IN_TX|INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser, occur
+06:39:29|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:29|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:29|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:29|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:32|IDLE_IN_TX|SELECT pg_notify($1, $2)
+06:39:32|IDLE_IN_TX|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+06:39:32|IDLE_IN_TX|DELETE FROM failure_fingerprints WHERE flow_execution_id = ANY($1)
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|DELETE FROM failure_fingerprints WHERE flow_execution_id = ANY($1)
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:34|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:35|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+06:39:35|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:35|IDLE_IN_TX|UPDATE flow_executions f SET state = u.state, outcome_source = u.source, finality = u.fina
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:37|IDLE_IN_TX|INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status, source
+06:39:37|IDLE_IN_TX|INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status, source
+06:39:37|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:39|IDLE_IN_TX|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+06:39:41|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:41|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:42|IDLE_IN_TX|UPDATE flow_executions f SET state = u.state, outcome_source = u.source, finality = u.fina
+06:39:42|IDLE_IN_TX|UPDATE step_executions SET status = $4, source = $5, started_at = coalesce($6::timestamptz
+06:39:42|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:39:42|IDLE_IN_TX|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:39:42|IDLE_IN_TX|DELETE FROM failure_fingerprints WHERE flow_execution_id = ANY($1)
+06:39:43|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:45|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:45|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+06:39:45|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:39:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+06:39:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+06:39:45|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:39:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+06:39:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+06:39:46|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:39:46|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:48|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:48|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:48|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:39:48|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:48|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+06:39:48|IDLE_IN_TX|UPDATE flow_executions f SET state = u.state, outcome_source = u.source, finality = u.fina
+06:39:48|IDLE_IN_TX|INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser, occur
+06:39:48|IDLE_IN_TX|SELECT flow_execution_id, source AS "source!", outcome AS "outcome!", claim_order FROM flo
+06:39:50|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+06:39:52|IDLE_IN_TX|UPDATE suite_executions SET lifecycle = 'running', rev = rev + 1 WHERE id = $1 AND lifecyc
+06:39:52|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:39:52|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:39:52|IDLE_IN_TX|INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status, source
+06:39:52|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+06:39:52|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+06:39:55|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:39:57|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:39:57|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+06:39:57|IDLE_IN_TX|UPDATE flow_executions SET condition_fingerprint_id = $2 WHERE id = $1 AND condition_finge
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:39:59|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:00|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:02|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:03|IDLE_IN_TX|BEGIN
+06:40:03|IDLE_IN_TX|UPDATE flow_executions SET condition_fingerprint_id = $2 WHERE id = $1 AND condition_finge
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:05|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:06|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:06|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:06|IDLE_IN_TX|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:40:08|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+06:40:08|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:08|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:08|IDLE_IN_TX|SELECT f.id, f.started, (s.lifecycle = 'closed' OR r.state = 'ended') AS "run_ended!" FROM
+06:40:08|IDLE_IN_TX|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+06:40:09|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+06:40:12|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON 
+06:40:12|WAIT|INSERT INTO condition_fingerprints (project_id, fingerprint, dims) VALUES ($1, $2, $3) ON |<-|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $
+06:40:12|IDLE_IN_TX|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 

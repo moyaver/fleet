@@ -1,0 +1,15 @@
+06:41:38|IDLE_IN_TX|UPDATE flow_executions SET failure_message = coalesce(failure_message, $2), duration_ms = 
+06:41:38|IDLE_IN_TX|UPDATE artifacts a SET retention_class = 'failure_evidence', expires_at = CASE WHEN rc.ttl
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:44|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:46|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:46|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:41:46|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+06:41:46|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON
+06:41:46|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi

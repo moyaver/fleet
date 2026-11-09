@@ -1,0 +1,45 @@
+{
+  "acked": 11700,
+  "agents": 100,
+  "connections": 100,
+  "elapsed_s": 12.860859667,
+  "events": 11700,
+  "events_per_s": 909.7370084848466,
+  "failed_flows": 110,
+  "rejected": 0,
+  "scenario": {
+    "agents": 100,
+    "batch": 32,
+    "clock_skew_ms": 0,
+    "commit": null,
+    "corpus_items": 0,
+    "devices": 4,
+    "duplicates": false,
+    "failure_bytes": 0,
+    "flows": 3,
+    "gap_events": 0,
+    "missing_step": false,
+    "quiet_agents": 0,
+    "reorder": false,
+    "steps": 0,
+    "storm": false,
+    "unaligned": false,
+    "viewers": 10,
+    "wide": false
+  },
+  "viewers": {
+    "errors": 0,
+    "failed": 0,
+    "flows_sent": 1200,
+    "frames": 8920,
+    "latency_ms": {
+      "max": 6522.700333,
+      "p50": 4610.498209,
+      "p95": 5619.664084,
+      "p99": 5826.281959
+    },
+    "resyncs": 0,
+    "samples": 12000,
+    "viewers": 10
+  }
+}
