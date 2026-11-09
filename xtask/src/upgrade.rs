@@ -13,9 +13,14 @@ use anyhow::{Context, bail};
 
 use crate::{db, run_env};
 
-/// Rehearses `tags` (all `v*` release tags when empty), oldest first.
+/// The first release the rehearsal replays. ADR-0014: before it there is no compatibility promise,
+/// so the alpha tags are not upgradable and are not rehearsed.
+const FIRST_REHEARSED: (u64, u64, u64) = (1, 0, 0);
+
+/// Rehearses `tags` (all `v*` release tags when empty), oldest first, from [`FIRST_REHEARSED`] on.
+/// With no such release yet, it says so and succeeds.
 pub(crate) fn rehearse(root: &Path, tags: &[&str]) -> anyhow::Result<()> {
-    let tags: Vec<String> = if tags.is_empty() {
+    let listed: Vec<String> = if tags.is_empty() {
         git(root, &["tag", "--list", "v*", "--sort=v:refname"])?
             .lines()
             .map(str::to_owned)
@@ -23,8 +28,15 @@ pub(crate) fn rehearse(root: &Path, tags: &[&str]) -> anyhow::Result<()> {
     } else {
         tags.iter().map(|t| (*t).to_owned()).collect()
     };
+    let (tags, skipped): (Vec<String>, Vec<String>) = listed
+        .into_iter()
+        .partition(|t| release_version(t).is_some_and(|v| v >= FIRST_REHEARSED));
+    for tag in &skipped {
+        println!("skipping {tag}: rehearsal starts at v1.0.0 (ADR-0014)");
+    }
     if tags.is_empty() {
-        bail!("no release tags to rehearse from (`git tag -l` lists none)");
+        println!("no release from v1.0.0 on to rehearse: nothing to do (ADR-0014)");
+        return Ok(());
     }
     let export = root.join("target/upgrade-rehearsal");
     if export.exists() {
@@ -62,6 +74,14 @@ pub(crate) fn rehearse(root: &Path, tags: &[&str]) -> anyhow::Result<()> {
             ("FLEET_REHEARSAL_DIR", &dir),
         ],
     )
+}
+
+/// `v<major>.<minor>.<patch>` as numbers, a pre-release counting as its release. `None` for any
+/// other name.
+fn release_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let core = tag.strip_prefix('v')?.split(['-', '+']).next()?;
+    let mut parts = core.split('.').map(|p| p.parse::<u64>().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
 }
 
 /// Writes the `.sql` files of `tag`'s `migrations/` into `dest`, byte for byte as committed.
@@ -109,4 +129,17 @@ fn git_bytes(root: &Path, args: &[&str]) -> anyhow::Result<Vec<u8>> {
         );
     }
     Ok(output.stdout)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::release_version;
+
+    #[test]
+    fn only_releases_from_v1_on_are_rehearsed() {
+        assert_eq!(release_version("v1.0.0"), Some((1, 0, 0)));
+        assert_eq!(release_version("v1.2.3-rc.1"), Some((1, 2, 3)));
+        assert!(release_version("v0.1.0-alpha.3").unwrap() < (1, 0, 0));
+        assert_eq!(release_version("release-notes"), None);
+    }
 }
