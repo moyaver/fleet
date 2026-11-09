@@ -5,14 +5,14 @@ expression: summary
 {
   "bundles": {
     "anr": {
-      "commands": "final(5)",
-      "failure_screenshots": 1,
+      "commands": "final(6)",
+      "failure_screenshots": 0,
       "flow": "anr",
       "manifest": true,
       "shard": null
     }
   },
-  "exit": 1,
+  "exit": 0,
   "log": {
     "crashes": [],
     "flows_started": [
@@ -34,9 +34,8 @@ expression: summary
       }
     ],
     "steps": {
-      "Completed": 4,
-      "Failed": 1,
-      "Running": 5
+      "Completed": 6,
+      "Running": 6
     },
     "with_continuation": 0
   },
@@ -46,27 +45,27 @@ expression: summary
       {
         "cases": [
           {
-            "has_failure": true,
+            "has_failure": false,
             "name": "anr",
-            "outcome": "Failed"
+            "outcome": "Passed"
           }
         ],
-        "device": "fleet-anr-77"
+        "device": "fleet-anr-77c"
       }
     ]
   },
   "stdout": {
     "flow_results": [
       {
-        "duration_ms": 36000,
-        "message": "Assertion is false: \"isn't responding\" is visible",
+        "duration_ms": 14000,
+        "message": null,
         "name": "anr",
-        "passed": false,
+        "passed": true,
         "shard": null
       }
     ],
     "other": [
-      "Summary { shard: None, count: 1, total: 1, all_passed: false }"
+      "Summary { shard: None, count: 1, total: 1, all_passed: true }"
     ],
     "unrecognized": 0
   }

@@ -16,8 +16,8 @@
   },
   "metadata" : {
     "status" : "COMPLETED",
-    "timestamp" : 1794186871218,
-    "duration" : 7,
+    "timestamp" : 1794189304021,
+    "duration" : 3,
     "sequenceNumber" : 0,
     "depth" : 0,
     "evaluatedCommand" : {
@@ -48,8 +48,8 @@
   },
   "metadata" : {
     "status" : "COMPLETED",
-    "timestamp" : 1794186871227,
-    "duration" : 0,
+    "timestamp" : 1794189304025,
+    "duration" : 1,
     "sequenceNumber" : 1,
     "depth" : 0,
     "evaluatedCommand" : {
@@ -71,8 +71,8 @@
   },
   "metadata" : {
     "status" : "COMPLETED",
-    "timestamp" : 1794186871227,
-    "duration" : 209,
+    "timestamp" : 1794189304026,
+    "duration" : 197,
     "sequenceNumber" : 2,
     "depth" : 0,
     "evaluatedCommand" : {
@@ -97,8 +97,8 @@
   },
   "metadata" : {
     "status" : "COMPLETED",
-    "timestamp" : 1794186871438,
-    "duration" : 13178,
+    "timestamp" : 1794189304224,
+    "duration" : 12648,
     "sequenceNumber" : 3,
     "depth" : 0,
     "evaluatedCommand" : {
@@ -119,7 +119,7 @@
     "assertConditionCommand" : {
       "condition" : {
         "visible" : {
-          "textRegex" : "isn't responding",
+          "textRegex" : "Fleet ANR isn't responding",
           "optional" : false
         }
       },
@@ -128,33 +128,46 @@
     }
   },
   "metadata" : {
-    "status" : "FAILED",
-    "timestamp" : 1794186884616,
-    "duration" : 20108,
-    "error" : {
-      "message" : "Assertion is false: \"isn't responding\" is visible",
-      "debugMessage" : "Assertion '\"isn't responding\" is visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.\n\nPossible causes:\n- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.\n- Element may be temporarily unavailable due to loading state\n- This could be a real regression that needs to be addressed"
-    },
+    "status" : "COMPLETED",
+    "timestamp" : 1794189316873,
+    "duration" : 46,
     "sequenceNumber" : 4,
     "depth" : 0,
     "evaluatedCommand" : {
       "assertConditionCommand" : {
         "condition" : {
           "visible" : {
-            "textRegex" : "isn't responding",
+            "textRegex" : "Fleet ANR isn't responding",
             "optional" : false
           }
         },
         "timeout" : "20000",
         "optional" : false
       }
+    }
+  }
+}, {
+  "command" : {
+    "takeScreenshotCommand" : {
+      "path" : "fleet-anr-dialog",
+      "optional" : false
+    }
+  },
+  "metadata" : {
+    "status" : "COMPLETED",
+    "timestamp" : 1794189316920,
+    "duration" : 310,
+    "sequenceNumber" : 5,
+    "depth" : 0,
+    "evaluatedCommand" : {
+      "takeScreenshotCommand" : {
+        "path" : "fleet-anr-dialog",
+        "optional" : false
+      }
     },
     "artifacts" : [ {
-      "type" : "SCREEN_HIERARCHY",
-      "path" : "screen-hierarchy/step-005-assertCondition-isn't_responding.json"
-    }, {
-      "type" : "SCREENSHOT",
-      "path" : "screenshots/step-005-assertCondition-isn't_responding.png"
+      "type" : "TAKE_SCREENSHOT",
+      "path" : "takeScreenshot/fleet-anr-dialog.png"
     } ]
   }
 } ]

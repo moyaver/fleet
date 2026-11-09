@@ -2,7 +2,7 @@
   "command": [
     "sh",
     "-c",
-    "(until [ -n \"$(<HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5600 shell pidof com.fleet.anr | tr -d '\\r')\" ]; do sleep 0.5; done; sleep 4; <HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5600 shell input tap 540 1337) >/dev/null 2>&1 & exec maestro --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/anr.yaml"
+    "(until [ -n \"$(<HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5600 shell pidof com.fleet.anr | tr -d '\\r')\" ]; do sleep 0.5; done; sleep 4; <HOME>/Library/Android/sdk/platform-tools/adb -s emulator-5600 shell input tap 540 1274) >/dev/null 2>&1 & exec maestro --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/anr.yaml"
   ],
   "default_env": [
     {
@@ -29,5 +29,5 @@
     "os": "macos"
   },
   "signal": null,
-  "started_at_unix_ms": 1794186862182
+  "started_at_unix_ms": 1794189297617
 }
