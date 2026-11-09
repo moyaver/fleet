@@ -617,7 +617,94 @@ async fn a_failed_flows_own_screenshot_and_recording_are_shown_on_their_step() {
             .starts_with(&format!("http://localhost:{port}/u/")),
         "{shape}"
     );
+    // Settled evidence carries no mark: no provenance badge, no status mark, in either item.
+    let marks = page
+        .eval(
+            "return document.querySelectorAll(\
+               '[data-testid=\"own-media-item\"] .pv, [data-testid=\"own-media-item\"] [role=img], \
+                [data-testid=\"own-media-item\"] .st').length;",
+            vec![],
+        )
+        .await;
+    assert_eq!(marks, json!(0), "own media carries no mark");
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// The page renews its links before they lapse. A recording that is playing keeps its source when
+/// the renewed link arrives: the element's `src` is what it was, so the file is not restarted
+/// (issue #133). The link lasts 70 seconds here, so the first renewal comes within about ten.
+#[tokio::test]
+async fn a_renewed_link_does_not_change_a_recordings_source() {
+    let (stack, port) = evidence_stack_with_link_ttl(70).await;
+    run_agent_to_the_end_with(
+        &stack,
+        "user-media-fail",
+        &[("FLEET_UPLOAD_USER_MEDIA", "1")],
+    )
+    .await;
+    let flow = flow_id(&stack, "user-media-fail").await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the recording's metadata loads",
+        &format!(
+            "document.querySelector('{}') && document.querySelector('{}').readyState >= 1",
+            q("own-media-video"),
+            q("own-media-video")
+        ),
+    )
+    .await;
+    let artifact_fetches = "performance.getEntriesByType('resource').filter(e => e.name.includes('/artifacts')).length";
+    let fetched_before = page
+        .eval(&format!("return {artifact_fetches};"), vec![])
+        .await;
+    let first = page
+        .eval(
+            &format!(
+                "return document.querySelector('{}').getAttribute('src');",
+                q("own-media-video")
+            ),
+            vec![],
+        )
+        .await;
+    let first = first.as_str().unwrap().to_owned();
+
+    // The page fetches the artifact list again: the renewal.
+    page.wait(
+        "the links renew",
+        &format!("{artifact_fetches} > {}", fetched_before.as_u64().unwrap()),
+    )
+    .await;
+    // Give the renewed list a moment to reach the element.
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    let after = page
+        .eval(
+            &format!(
+                "const v = document.querySelector('{}'); return [v.getAttribute('src'), v.currentSrc];",
+                q("own-media-video")
+            ),
+            vec![],
+        )
+        .await;
+    assert_eq!(
+        after[0],
+        json!(first),
+        "the source attribute is unchanged by the renewal"
+    );
+    assert_eq!(
+        after[1],
+        json!(first),
+        "the file the element plays is unchanged"
+    );
     browser.quit().await;
 }
 

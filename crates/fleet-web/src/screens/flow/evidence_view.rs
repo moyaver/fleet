@@ -33,7 +33,7 @@ use crate::screens::{
     flow::{
         evidence::{
             CommandRow, Evidence, EvidenceFiles, EvidenceLink, Hierarchy, Load, LogEvidence,
-            LogMount, LogSource, MediaKind, OwnMedia, Refused, command_rows,
+            LogMount, LogSource, MediaKind, OwnMedia, Refused, command_rows, shown_src,
         },
         model::evidence_steps,
     },
@@ -197,16 +197,21 @@ fn OwnMediaList(
     /// What the route fetched.
     feed: EvidenceFeed,
 ) -> impl IntoView {
+    // The section depends only on whether there is any media: a renewed link updates the items
+    // below, which are keyed by their artifact, and never rebuilds the section or its players.
+    let has_media = Memo::new(move |_| {
+        feed.files_with(|f| !f.own_media.is_empty())
+            .unwrap_or(false)
+    });
     let media = move || feed.files_with(|f| f.own_media.clone()).unwrap_or_default();
     move || {
-        let items = media();
-        (!items.is_empty()).then(|| {
+        has_media.get().then(|| {
             view! {
                 <section class="card-b space-y-4 border-t border-line" aria-labelledby="own-media-h" data-testid="own-media">
                     <h3 id="own-media-h" class="text-sm font-medium">"Maestro's own screenshots and recordings"</h3>
                     <ul class="space-y-6">
                         <For
-                            each=move || media()
+                            each=media
                             key=|m| m.id
                             children=move |m| view! { <OwnMediaItem feed item=m /> }
                         />
@@ -243,32 +248,48 @@ fn OwnMediaItem(
         (None, None) => "Not tied to a step".to_owned(),
     };
     let meta = format!("{} · {}", item.name, item.size);
-    let player = match item.kind {
-        MediaKind::Screenshot => view! {
-            <img
-                class="max-w-full h-auto border border-border"
-                src=url
-                alt=item.name.clone()
-                loading="lazy"
-                data-testid="own-media-image"
-            />
-        }
-        .into_any(),
-        // No script: the browser's own controls play the file, which the usercontent origin serves
-        // inline with its sandbox headers (invariant I7).
-        MediaKind::Recording => view! {
-            <video
-                class="max-w-full h-auto border border-border"
-                controls=true
-                preload="metadata"
-                src=url
-                aria-label=item.name.clone()
-                data-testid="own-media-video"
-            >
-                <a class="underline" href=url>{item.name.clone()}</a>
-            </video>
-        }
-        .into_any(),
+    // The link the element shows. A renewal changes it only while the element has none yet or its
+    // load failed (`shown_src`): a recording that is playing keeps its source (I9: no script).
+    let shown = RwSignal::new(String::new());
+    let load_failed = RwSignal::new(false);
+    Effect::new(move |_| {
+        let fresh = url();
+        let next = shown_src(&shown.get_untracked(), &fresh, load_failed.get_untracked());
+        shown.set(next);
+        load_failed.set(false);
+    });
+    // Mounted once there is a link to show: an element with an empty source would fail at once.
+    let has_src = Memo::new(move |_| !shown.get().is_empty());
+    let player = move || {
+        has_src.get().then(|| match item.kind {
+            MediaKind::Screenshot => view! {
+                <img
+                    class="max-w-full h-auto border border-border"
+                    src=move || shown.get()
+                    on:error=move |_| load_failed.set(true)
+                    alt=item.name.clone()
+                    loading="lazy"
+                    data-testid="own-media-image"
+                />
+            }
+            .into_any(),
+            // No script: the browser's own controls play the file, which the usercontent origin
+            // serves inline with its sandbox headers (invariant I7).
+            MediaKind::Recording => view! {
+                <video
+                    class="max-w-full h-auto border border-border"
+                    controls=true
+                    preload="metadata"
+                    src=move || shown.get()
+                    on:error=move |_| load_failed.set(true)
+                    aria-label=item.name.clone()
+                    data-testid="own-media-video"
+                >
+                    <a class="underline" href=url>{item.name.clone()}</a>
+                </video>
+            }
+            .into_any(),
+        })
     };
     view! {
         <li class="space-y-2" data-testid="own-media-item">
