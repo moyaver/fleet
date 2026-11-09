@@ -43,9 +43,9 @@ use fleet_protocol::{
         StepStatus, SuiteStarted,
     },
     frame::{
-        AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, DeviceUnavailable, Hello,
-        ProtocolRange, ResumeState, RunOrigin, Sample, SampleUnavailable, ServerFrame, Telemetry,
-        Unavailable,
+        AgentInfo, CiContext, CiProvider, ClientFrame, DeviceSample, DeviceUnavailable, ErrorCode,
+        Hello, ProtocolRange, ResumeState, RunOrigin, Sample, SampleUnavailable, ServerFrame,
+        Telemetry, Unavailable,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
@@ -230,6 +230,10 @@ impl Hold {
     }
 }
 
+/// The first wait after a busy refusal, and the longest (see [`overload_pause`]).
+const OVERLOAD_BASE: Duration = Duration::from_millis(200);
+const OVERLOAD_CAP: Duration = Duration::from_secs(5);
+
 /// What one simulated agent sent and saw.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentReport {
@@ -245,6 +249,8 @@ pub struct AgentReport {
     pub connections: u32,
     /// Events the server refused.
     pub rejected: u32,
+    /// Batches a busy server refused; each one was waited out and resent.
+    pub busy: u32,
     /// Flows that failed in its script.
     pub failed_flows: u32,
     /// Device serials it used.
@@ -944,6 +950,7 @@ async fn agent(
         acked: 0,
         connections: 0,
         rejected: 0,
+        busy: 0,
         failed_flows: s.failed,
         serials: s.serials,
     };
@@ -1081,6 +1088,19 @@ fn oversized_as_gaps(events: &mut [EventEnvelope]) {
     }
 }
 
+/// The longest wait after `attempt` busy refusals in a row: 200 ms, doubling, to 5 s. The agent
+/// uses the same schedule (`fleet-agent`'s transport).
+fn overload_ceiling(attempt: u32) -> Duration {
+    OVERLOAD_BASE
+        .saturating_mul(1u32 << attempt.min(5))
+        .min(OVERLOAD_CAP)
+}
+
+/// The wait after `attempt` busy refusals in a row: a jittered share of [`overload_ceiling`].
+fn overload_pause(attempt: u32) -> Duration {
+    overload_ceiling(attempt).mul_f64(jitter_fraction())
+}
+
 /// A reconnect's jitter: a fraction in `[0, 1)` from OS randomness. The clock's sub-second bits
 /// are no source: macOS clocks have microsecond resolution, so their nanoseconds are multiples of
 /// 1000 and `nanos % 1000` was always zero, which retried a refused reconnect at once (issue #138;
@@ -1091,6 +1111,10 @@ fn jitter_fraction() -> f64 {
 }
 
 #[expect(clippy::too_many_arguments, reason = "one connection's whole context")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the stop-and-wait loop reads every frame kind in one place"
+)]
 async fn stream(
     opts: &Options,
     id: Uuid,
@@ -1127,6 +1151,8 @@ async fn stream(
     };
     report.acked = report.acked.max(sent);
     let mut tseq = 0u64;
+    // Busy refusals in a row on this connection: each one lengthens the next wait.
+    let mut busy_streak = 0u32;
     while report.acked < total {
         if !*stormed && report.acked * 2 >= total {
             // Everyone drops at once, then everyone reconnects at once.
@@ -1182,12 +1208,29 @@ async fn stream(
         loop {
             match recv(&mut ws).await? {
                 Some(ServerFrame::Ack { through, .. }) => {
+                    busy_streak = 0;
                     report.acked = report.acked.max(through);
                     if through >= want {
                         break;
                     }
                 }
                 Some(ServerFrame::EventRejected { .. }) => report.rejected += 1,
+                // Busy, as the agent treats it: nothing was committed, so wait, then resend from
+                // the batch's first seq on this socket.
+                Some(ServerFrame::Error {
+                    code: ErrorCode::Overloaded,
+                    fatal: false,
+                    expected_seq,
+                    ..
+                }) => {
+                    report.busy += 1;
+                    tokio::time::sleep(overload_pause(busy_streak)).await;
+                    busy_streak = busy_streak.saturating_add(1);
+                    if let Some(e) = expected_seq {
+                        sent = e.saturating_sub(1);
+                    }
+                    break;
+                }
                 Some(ServerFrame::Error {
                     expected_seq: Some(e),
                     ..
@@ -1338,6 +1381,7 @@ pub fn report_json(report: &Report, scenario: &serde_json::Value) -> serde_json:
         "acked": report.acked(),
         "connections": connections,
         "rejected": report.agents.iter().map(|a| a.rejected).sum::<u32>(),
+        "busy": report.agents.iter().map(|a| a.busy).sum::<u32>(),
         "failed_flows": report.agents.iter().map(|a| a.failed_flows).sum::<u32>(),
         "elapsed_s": report.elapsed.as_secs_f64(),
         "events_per_s": f64::from(u32::try_from(events).unwrap_or(u32::MAX)) / report.elapsed.as_secs_f64().max(0.001),
@@ -1574,6 +1618,23 @@ mod tests {
     }
 
     #[test]
+    fn busy_waits_grow_from_200_ms_to_5_s_and_stay_under_their_ceiling() {
+        let ceilings: Vec<Duration> = (0..8).map(overload_ceiling).collect();
+        assert_eq!(ceilings[0], Duration::from_millis(200));
+        assert_eq!(ceilings[1], Duration::from_millis(400));
+        assert_eq!(ceilings[4], Duration::from_millis(3_200));
+        assert_eq!(ceilings[5], Duration::from_secs(5), "capped at 5 s");
+        assert_eq!(overload_ceiling(u32::MAX), Duration::from_secs(5));
+        for attempt in [0, 3, 6] {
+            let ceiling = overload_ceiling(attempt);
+            assert!((0..64).all(|_| overload_pause(attempt) < ceiling));
+        }
+        let draws: std::collections::HashSet<Duration> =
+            (0..64).map(|_| overload_pause(6)).collect();
+        assert!(draws.len() > 1, "busy waits never vary: {draws:?}");
+    }
+
+    #[test]
     fn a_report_carries_the_scenario_and_the_viewers_latency() {
         let report = Report {
             agents: vec![AgentReport {
@@ -1583,6 +1644,7 @@ mod tests {
                 acked: 100,
                 connections: 2,
                 rejected: 0,
+                busy: 0,
                 failed_flows: 1,
                 serials: vec!["emulator-5554".into()],
             }],
