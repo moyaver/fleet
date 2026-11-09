@@ -117,6 +117,19 @@ pub struct Hierarchy {
     pub link: EvidenceLink,
 }
 
+/// The link an own-media element shows next, given the one it shows now, the fresh one the feed holds
+/// and whether its load failed. A file that is loaded or loading keeps its link, so a renewal does
+/// not restart a recording that is playing. The fresh link is taken when the element has none yet,
+/// or when its load failed (the link lapsed, or the file is gone).
+#[must_use]
+pub fn shown_src(shown: &str, fresh: &str, load_failed: bool) -> String {
+    if shown.is_empty() || load_failed {
+        fresh.to_owned()
+    } else {
+        shown.to_owned()
+    }
+}
+
 /// What Maestro's own screenshot or recording is (issue #133).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MediaKind {
@@ -956,6 +969,23 @@ mod tests {
             !f.mounts().screenshots,
             "the failure screenshots' viewer is unaffected by Maestro's own media"
         );
+    }
+
+    /// A recording's element keeps the link it is playing when the feed renews it (issue #133): a
+    /// renewal alone does not restart the file. The fresh link is taken only before the element has
+    /// one, or after its load failed.
+    #[test]
+    fn a_loaded_recording_keeps_its_link_across_a_renewal() {
+        let first = "https://uc.example.net/u/p/8/1/100/sig/fleet-fail-recording.mp4";
+        let renewed = "https://uc.example.net/u/p/8/1/400/sig2/fleet-fail-recording.mp4";
+        // Before the element has a link: the first one.
+        assert_eq!(shown_src("", first, false), first);
+        // Loaded or loading, the renewal changes nothing it plays.
+        assert_eq!(shown_src(first, renewed, false), first);
+        // A failed load (the link lapsed): the fresh link is taken.
+        assert_eq!(shown_src(first, renewed, true), renewed);
+        // A feed with no link for it keeps what it plays.
+        assert_eq!(shown_src(first, "", false), first);
     }
 
     /// A refused recording is listed with its reason and no player (issue #133).
