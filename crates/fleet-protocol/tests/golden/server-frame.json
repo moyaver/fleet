@@ -5,5 +5,6 @@
   {"op":"telemetry_ack","through":4},
   {"op":"event_rejected","seq":2,"code":"invalid","permanent":true,"message":"invalid"},
   {"op":"error","code":"seq_gap","fatal":false,"message":"gap","expected_seq":2},
+  {"op":"error","code":"overloaded","fatal":false,"message":"the server is busy; resend from seq 3","expected_seq":3},
   {"op":"goaway","reason":"shutdown","reconnect_after_ms":100}
 ]
