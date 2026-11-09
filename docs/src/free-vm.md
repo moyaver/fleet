@@ -74,6 +74,15 @@ Check that the server answers through the proxy:
 curl -f https://<dashboard>.duckdns.org/readyz
 ```
 
+With the two DuckDNS names, Caddy gets its certificates from ACME and nothing else is needed. If you test without public DNS (for example `FLEET_DOMAIN=localhost`), Caddy signs with its own CA instead. Export that CA and check with it, as the [Compose guide](https://github.com/moyaver/fleet/blob/main/deploy/compose/README.md) shows for `FLEET_DOMAIN=localhost`:
+
+```bash
+docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
+curl --cacert caddy-root.crt https://localhost/readyz
+```
+
+Give the agent the same file with `FLEET_CA_FILE=caddy-root.crt` (step 7).
+
 ## 6. Sign in, or use test data
 
 The dashboard needs one of these:
