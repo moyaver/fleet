@@ -50,7 +50,7 @@ Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build 
 gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
 ```
 
-The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.3`; the [Compose guide](deploy/compose/README.md) uses it by default. To build the agent from source instead, follow step 1.
+The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.3`; the [Compose guide](deploy/compose/README.md) uses it by default. That image predates the clean break, so until the next release the server is built from source too: the Compose guide's Start section has the commands. To build the agent from source instead, follow step 1.
 
 ### 1. Observe a Maestro run locally
 
