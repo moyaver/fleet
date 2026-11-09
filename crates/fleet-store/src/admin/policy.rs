@@ -464,3 +464,417 @@ impl Store {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sqlx::PgPool;
+
+    use super::*;
+    use crate::admin::write::WriteError;
+    use crate::{
+        artifacts::tests::upload_shot,
+        ingest::{
+            Transport,
+            tests::{Agent, SuiteIds, publisher, suite_run},
+        },
+    };
+    use time::{Duration, OffsetDateTime};
+
+    fn store(pool: PgPool) -> Store {
+        Store {
+            pool,
+            origin: Uuid::now_v7(),
+        }
+    }
+
+    /// Every audit event of `action`, oldest first: its `(before, after)` as the trail holds them.
+    async fn trail(store: &Store, action: &str) -> Vec<(Value, Value)> {
+        sqlx::query_as::<_, (Value, Value)>(
+            "SELECT details -> 'before', details -> 'after' FROM audit_events
+              WHERE action = $1 ORDER BY at, id",
+        )
+        .bind(action)
+        .fetch_all(store.pool())
+        .await
+        .unwrap()
+    }
+
+    /// Every audit event, whatever its action.
+    async fn audit_count(store: &Store) -> i64 {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM audit_events")
+            .fetch_one(store.pool())
+            .await
+            .unwrap()
+    }
+
+    /// A retention window in seconds, `None` for ever.
+    async fn ttl_seconds(store: &Store, project: Uuid, class: &str) -> Option<i64> {
+        sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT EXTRACT(EPOCH FROM ttl)::bigint FROM retention_classes
+              WHERE project_id = $1 AND class = $2",
+        )
+        .bind(project)
+        .bind(class)
+        .fetch_one(store.pool())
+        .await
+        .unwrap()
+    }
+
+    fn is_refused<T: std::fmt::Debug>(res: WriteResult<T>) -> Refusal {
+        match res {
+            Err(WriteError::Refused(r)) => r,
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
+
+    async fn dashboard_project(store: &Store, slug: &str) -> Uuid {
+        store
+            .create_project(AuditActor::System, slug, "Name")
+            .await
+            .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_retention_change_is_audited_with_the_old_and_new_whole_days(pool: PgPool) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+        // The seeded window of failure evidence is 90 days.
+        store
+            .set_retention(AuditActor::System, app, "failure_evidence", Some(3))
+            .await
+            .unwrap();
+        assert_eq!(
+            ttl_seconds(&store, app, "failure_evidence").await,
+            Some(3 * 86_400)
+        );
+        let events = trail(&store, "retention.set").await;
+        assert_eq!(events.len(), 1, "one event per change");
+        assert_eq!(events[0].0["class"], "failure_evidence");
+        assert_eq!(events[0].0["ttl_days"], 90);
+        assert_eq!(events[0].1["ttl_days"], 3);
+
+        // Keeping for ever is NULL, and the trail shows it as null.
+        store
+            .set_retention(AuditActor::System, app, "failure_evidence", None)
+            .await
+            .unwrap();
+        assert_eq!(ttl_seconds(&store, app, "failure_evidence").await, None);
+        let events = trail(&store, "retention.set").await;
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].0["ttl_days"], 3);
+        assert!(events[1].1["ttl_days"].is_null());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_refused_retention_change_writes_nothing_and_the_longest_window_is_allowed(
+        pool: PgPool,
+    ) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+        let before = audit_count(&store).await;
+
+        let r = is_refused(
+            store
+                .set_retention(AuditActor::System, app, "nope", Some(3))
+                .await,
+        );
+        assert!(matches!(r, Refusal::Invalid(_)), "{r:?}");
+        let r = is_refused(
+            store
+                .set_retention(AuditActor::System, app, "report", Some(36_501))
+                .await,
+        );
+        assert!(matches!(r, Refusal::Invalid(_)), "{r:?}");
+        assert_eq!(
+            audit_count(&store).await,
+            before,
+            "a refusal writes no event"
+        );
+        assert_eq!(
+            ttl_seconds(&store, app, "report").await,
+            Some(365 * 86_400),
+            "a refusal changes no row"
+        );
+
+        // The same window again is refused: nothing to change, nothing audited.
+        let r = is_refused(
+            store
+                .set_retention(AuditActor::System, app, "failure_evidence", Some(90))
+                .await,
+        );
+        assert!(matches!(r, Refusal::Conflict(_)), "{r:?}");
+        assert_eq!(audit_count(&store).await, before);
+
+        // The longest window a person may set is accepted.
+        store
+            .set_retention(AuditActor::System, app, "report", Some(36_500))
+            .await
+            .unwrap();
+        assert_eq!(
+            ttl_seconds(&store, app, "report").await,
+            Some(36_500 * 86_400)
+        );
+        assert_eq!(audit_count(&store).await, before + 1);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_artifact_class_policy_is_audited_and_its_row_removed_when_it_is_the_configured_one(
+        pool: PgPool,
+    ) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+
+        // Turned off: a row is written, and the trail holds the accepted state before.
+        store
+            .set_artifact_class(AuditActor::System, app, "commands", false, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .project_overrides(app)
+                .await
+                .unwrap()
+                .class("commands"),
+            Some(&ClassOverride {
+                class: "commands".into(),
+                accepted: false,
+                max_bytes: None,
+            })
+        );
+        let events = trail(&store, "artifact_class.set").await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].0,
+            json!({"class": "commands", "accepted": true, "max_bytes": null})
+        );
+        assert_eq!(
+            events[0].1,
+            json!({"class": "commands", "accepted": false, "max_bytes": null})
+        );
+
+        // Accepted with a cap: the cap is stored and audited.
+        store
+            .set_artifact_class(AuditActor::System, app, "junit", true, Some(1_024))
+            .await
+            .unwrap();
+        let events = trail(&store, "artifact_class.set").await;
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[1].1,
+            json!({"class": "junit", "accepted": true, "max_bytes": 1024})
+        );
+
+        // The same policy again is refused, and writes nothing.
+        let before = audit_count(&store).await;
+        let r = is_refused(
+            store
+                .set_artifact_class(AuditActor::System, app, "junit", true, Some(1_024))
+                .await,
+        );
+        assert!(matches!(r, Refusal::Conflict(_)), "{r:?}");
+        assert_eq!(audit_count(&store).await, before);
+
+        // A cap of 0 or less, and a class that is not one, are refused.
+        for bad in [0, -5] {
+            let r = is_refused(
+                store
+                    .set_artifact_class(AuditActor::System, app, "junit", true, Some(bad))
+                    .await,
+            );
+            assert!(matches!(r, Refusal::Invalid(_)), "{bad}: {r:?}");
+        }
+        let r = is_refused(
+            store
+                .set_artifact_class(AuditActor::System, app, "video", true, None)
+                .await,
+        );
+        assert!(matches!(r, Refusal::Invalid(_)), "{r:?}");
+        assert_eq!(audit_count(&store).await, before, "refusals write nothing");
+
+        // Accepted with no cap is the configured policy: the row goes.
+        store
+            .set_artifact_class(AuditActor::System, app, "commands", true, None)
+            .await
+            .unwrap();
+        assert!(
+            store
+                .project_overrides(app)
+                .await
+                .unwrap()
+                .class("commands")
+                .is_none()
+        );
+        let rows = sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM project_artifact_classes WHERE project_id = $1 AND class = 'commands'",
+        )
+        .bind(app)
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        assert_eq!(rows, 0);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_daily_quota_is_audited_and_refused_when_it_is_not_a_positive_number(pool: PgPool) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+        store
+            .set_artifact_quota(AuditActor::System, app, Some(1_000_000), Some(50))
+            .await
+            .unwrap();
+        let events = trail(&store, "artifact_quota.set").await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].0,
+            json!({"bytes_per_day": null, "files_per_day": null})
+        );
+        assert_eq!(
+            events[0].1,
+            json!({"bytes_per_day": 1_000_000, "files_per_day": 50})
+        );
+        let o = store.project_overrides(app).await.unwrap();
+        assert_eq!(
+            (o.bytes_per_day, o.files_per_day),
+            (Some(1_000_000), Some(50))
+        );
+
+        let before = audit_count(&store).await;
+        for (bytes, files) in [(Some(0), None), (None, Some(0)), (Some(-1), None)] {
+            let r = is_refused(
+                store
+                    .set_artifact_quota(AuditActor::System, app, bytes, files)
+                    .await,
+            );
+            assert!(
+                matches!(r, Refusal::Invalid(_)),
+                "{bytes:?} {files:?}: {r:?}"
+            );
+        }
+        assert_eq!(audit_count(&store).await, before, "refusals write nothing");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_metric_intervals_are_audited_and_must_be_between_1_and_300_seconds(pool: PgPool) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+        store
+            .set_metric_policy(AuditActor::System, app, Some(2_000), Some(30_000))
+            .await
+            .unwrap();
+        let events = trail(&store, "metric_policy.set").await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].0,
+            json!({"sample_interval_ms": null, "pressure_sample_interval_ms": null})
+        );
+        assert_eq!(
+            events[0].1,
+            json!({"sample_interval_ms": 2_000, "pressure_sample_interval_ms": 30_000})
+        );
+        let o = store.project_overrides(app).await.unwrap();
+        assert_eq!(
+            (o.sample_interval_ms, o.pressure_sample_interval_ms),
+            (Some(2_000), Some(30_000))
+        );
+
+        let before = audit_count(&store).await;
+        for bad in [999, 300_001] {
+            let r = is_refused(
+                store
+                    .set_metric_policy(AuditActor::System, app, Some(bad), None)
+                    .await,
+            );
+            assert!(matches!(r, Refusal::Invalid(_)), "{bad} ms: {r:?}");
+            let r = is_refused(
+                store
+                    .set_metric_policy(AuditActor::System, app, None, Some(bad))
+                    .await,
+            );
+            assert!(
+                matches!(r, Refusal::Invalid(_)),
+                "{bad} ms under pressure: {r:?}"
+            );
+        }
+        assert_eq!(audit_count(&store).await, before, "refusals write nothing");
+        let o = store.project_overrides(app).await.unwrap();
+        assert_eq!(
+            (o.sample_interval_ms, o.pressure_sample_interval_ms),
+            (Some(2_000), Some(30_000)),
+            "a refused interval changes no row"
+        );
+
+        // The same intervals again are refused; the bounds themselves are allowed.
+        let r = is_refused(
+            store
+                .set_metric_policy(AuditActor::System, app, Some(2_000), Some(30_000))
+                .await,
+        );
+        assert!(matches!(r, Refusal::Conflict(_)), "{r:?}");
+        store
+            .set_metric_policy(AuditActor::System, app, Some(1_000), Some(300_000))
+            .await
+            .unwrap();
+    }
+
+    /// A file's `(available_at, expires_at)`, and its retention class.
+    async fn expiry(store: &Store, artifact: Uuid) -> (OffsetDateTime, OffsetDateTime, String) {
+        let (available, expires, class) =
+            sqlx::query_as::<_, (Option<OffsetDateTime>, Option<OffsetDateTime>, String)>(
+                "SELECT available_at, expires_at, retention_class FROM artifacts WHERE id = $1",
+            )
+            .bind(artifact)
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+        (
+            available.expect("an available artifact has available_at"),
+            expires.expect("a finite window sets expires_at"),
+            class,
+        )
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_retention_change_sets_the_expiry_of_artifacts_that_become_available_after_it(
+        pool: PgPool,
+    ) {
+        let store = store(pool);
+        let publisher = publisher(&store).await;
+        let app = publisher.project_id;
+        let mut agent = Agent::new("1", "e2e");
+        let handle = store
+            .open_run(&publisher, &agent.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        // A failed flow, so its screenshots are failure evidence once they are available.
+        let events = suite_run(&mut agent, SuiteIds::new(), &[("login", false)]);
+        store.apply_batch(&handle, &events).await.unwrap();
+        let flow: Uuid =
+            sqlx::query_scalar::<_, Uuid>("SELECT id FROM flow_executions WHERE agent_run_id = $1")
+                .bind(handle.agent_run_id)
+                .fetch_one(store.pool())
+                .await
+                .unwrap();
+
+        // Before the change: failure evidence lasts the seeded 90 days.
+        let before = upload_shot(&store, &publisher, &handle, flow, None, "before").await;
+        let (old_available, old_expires, class) = expiry(&store, before).await;
+        assert_eq!(class, "failure_evidence");
+        assert_eq!(old_expires - old_available, Duration::days(90));
+
+        store
+            .set_retention(AuditActor::System, app, "failure_evidence", Some(3))
+            .await
+            .unwrap();
+
+        // After the change: an artifact that becomes available now lives 3 days from then.
+        let after = upload_shot(&store, &publisher, &handle, flow, None, "after").await;
+        let (available, expires, class) = expiry(&store, after).await;
+        assert_eq!(class, "failure_evidence");
+        assert_eq!(expires - available, Duration::days(3));
+
+        // The artifact that was already there keeps the expiry it was given.
+        let (_, expires_still, _) = expiry(&store, before).await;
+        assert_eq!(expires_still, old_expires);
+    }
+}

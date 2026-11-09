@@ -1209,7 +1209,8 @@ mod tests {
     async fn a_project_is_renamed_with_its_old_and_new_name(pool: PgPool) {
         let store = store(pool);
         let actor = ada(&store).await;
-        let id = store.upsert_project("app", "App").await.unwrap();
+        // A dashboard project: a configured one is not renamed here (the test below).
+        let id = store.create_project(actor, "app", "App").await.unwrap();
         store
             .rename_project(actor, id, "Application")
             .await
@@ -1217,15 +1218,95 @@ mod tests {
         let row = store.admin_projects().await.unwrap();
         assert_eq!(row[0].name, "Application");
         let trail = audit_of(&store).await;
-        assert_eq!(trail.len(), 1);
-        assert_eq!(trail[0].0, "project.rename");
-        assert_eq!(trail[0].1, json!({"slug": "app", "name": "App"}));
-        assert_eq!(trail[0].2, json!({"slug": "app", "name": "Application"}));
+        assert_eq!(trail.len(), 2, "the creation, then the rename");
+        assert_eq!(trail[1].0, "project.rename");
+        assert_eq!(trail[1].1, json!({"slug": "app", "name": "App"}));
+        assert_eq!(trail[1].2, json!({"slug": "app", "name": "Application"}));
         let r = is_refused(store.rename_project(actor, id, "Application").await);
         assert!(matches!(r, Refusal::Conflict(_)), "{r:?}");
         let r = is_refused(store.rename_project(actor, Uuid::now_v7(), "x").await);
         assert_eq!(r, Refusal::NotFound("project"));
-        assert_eq!(audit_count(&store).await, 1);
+        assert_eq!(audit_count(&store).await, 2);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_configured_project_is_not_renamed_here_and_a_dashboard_one_is(pool: PgPool) {
+        let store = store(pool);
+        let actor = ada(&store).await;
+        let configured = store.upsert_project("app", "App").await.unwrap();
+        let r = is_refused(store.rename_project(actor, configured, "Application").await);
+        assert_eq!(r, Refusal::FromConfig("project"));
+        assert_eq!(
+            audit_count(&store).await,
+            0,
+            "a refused rename writes no event"
+        );
+        let app = store
+            .admin_projects()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.slug == "app")
+            .unwrap();
+        assert_eq!(app.name, "App", "the name is unchanged");
+
+        let mobile = store
+            .create_project(actor, "mobile", "Mobile")
+            .await
+            .unwrap();
+        store
+            .rename_project(actor, mobile, "Mobile QA")
+            .await
+            .unwrap();
+        let trail = audit_of(&store).await;
+        assert_eq!(trail.last().map(|t| t.0.as_str()), Some("project.rename"));
+        assert_eq!(
+            trail.last().map(|t| t.2.clone()),
+            Some(json!({"slug": "mobile", "name": "Mobile QA"}))
+        );
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_configured_project_the_configuration_drops_goes_to_the_dashboard(pool: PgPool) {
+        let store = store(pool);
+        let actor = ada(&store).await;
+        store.upsert_project("kept", "Kept").await.unwrap();
+        store.upsert_project("dropped", "Dropped").await.unwrap();
+        store
+            .release_unconfigured_projects(&["kept".to_owned()])
+            .await
+            .unwrap();
+        let source = |slug: &'static str| {
+            let pool = store.pool().clone();
+            async move {
+                sqlx::query_scalar::<_, String>("SELECT source FROM projects WHERE slug = $1")
+                    .bind(slug)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            source("kept").await,
+            "config",
+            "still listed: still configured"
+        );
+        assert_eq!(source("dropped").await, "dashboard");
+
+        // Released, its name stays, and the dashboard may rename it now.
+        let dropped = store.project_id("dropped").await.unwrap().unwrap();
+        store
+            .rename_project(actor, dropped, "Dropped Later")
+            .await
+            .unwrap();
+        let row = store
+            .admin_projects()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.slug == "dropped")
+            .unwrap();
+        assert_eq!(row.name, "Dropped Later");
     }
 
     #[sqlx::test(migrations = "../../migrations")]
