@@ -33,6 +33,8 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `ingest.idle_timeout_ms` | `45000` | A silent agent socket is closed and its run detached |
 | `ingest.telemetry_flush_ms` | `15000` | Telemetry checkpoint (10–30 s), then `telemetry_ack` |
 | `ingest.shutdown_grace_ms` | `15000` | Drain time for sockets on SIGTERM |
+| `ingest.sample_interval_ms` | — | How often agents sample host and process metrics while the host is calm, from 1 000 to 300 000 ms. Unset, agents sample every 5 s. Sent to agents in `welcome`; a project may override it on the [Administration](#administration) page |
+| `ingest.pressure_sample_interval_ms` | — | The same while the host is under pressure, from 1 000 to 300 000 ms. Unset, agents sample every 15 s |
 | `ingest.max_frame_bytes` | `262144` | Largest WebSocket frame and batch request accepted (256 KiB, research 06 T12). Agents fill each frame up to this and never send more; an agent event over 192 KiB is stored as a gap instead |
 | `liveness.stale_after_ms` | `25000` | A connected agent silent this long shows `stale` in the dashboard (display only) |
 | `liveness.resume_grace_ms` | `900000` | A detached run is abandoned; its open flows become `unknown`, and their open steps become `unknown` and Inferred |
@@ -99,24 +101,28 @@ role = "admin"
 
 Global administrators see **Administration** in the navigation (`/admin`), and the audit history at `/admin/audit`. Every other person, including a project's own admin, a viewer token and anonymous readers, is refused on those URLs and in the API. Grant the role with `[[login.group_roles]]` and no `project`, or bind it to a person as a role for every project.
 
-Projects, publisher trust, API keys and role mappings are changed on the page, with forms. Each change is written to the audit history in the same transaction as the change: who made it, what, and the values before and after where they were recorded. A refused change changes nothing and writes no event. The forms post to `/api/v1/admin/…` with the session's CSRF token; a request from another site is refused. The same changes can be made through that API with JSON, with `PUT` and `DELETE` on the rows as well as `POST`.
+Projects, publisher trust, API keys, role mappings, and each project's retention, artifact policy and metric collection are changed on the page, with forms. Each change is written to the audit history in the same transaction as the change: who made it, what, and the values before and after where they were recorded. A refused change changes nothing and writes no event. The forms post to `/api/v1/admin/…` with the session's CSRF token; a request from another site is refused. The same changes can be made through that API with JSON, with `PUT` and `DELETE` on the rows as well as `POST`.
 
 The page shows, one section per area:
 
 | Section | Where the data lives | Changed by |
 |---|---|---|
-| Projects (onboarding) | `projects`, with each project's working API keys and trust policies | the page: create a project (a new slug only), rename it. A project in `projects` takes its name from the configuration at each start, so change `name` there to keep a new one |
+| Projects (onboarding) | `projects`, with each project's working API keys and trust policies | the page: create a project (a new slug only), and rename a project the page created. A project in `projects` is locked against renaming on the page (see Locks below); it takes its name from the configuration at each start, so change `name` there |
 | Publisher trust | `publisher_trust_policies` | `projects[].trust_policies` (configured, marked *from config*); the page: add, edit, revoke and remove the rows it added |
 | API keys | `api_keys`: name, prefix, trust level, expiry, revocation, last use. The secret and its hash are never shown | the page: create (the secret is shown once, on the page the form answers with), expire, revoke. `fleet api-key create|revoke|expire` does the same from the command line |
 | Role mappings | `role_bindings` (people) and `group_mappings` (identity-provider groups) | `[[login.group_roles]]` (configured, marked *from config*); the page: give or remove a person's role, and add, change and remove the groups it maps |
-| Retention | `retention_classes` per project, and the `retention.*` windows of the configuration | the `retention_classes` table (SQL) and `retention.*` |
-| Artifact policy | the `storage`, `artifacts` and `usercontent` settings of the running configuration | the configuration file, then a restart |
-| Metric collection | the `ingest` checkpoint and heartbeat and the `retention` windows of the configuration. The agents sample every 5 s, and every 15 s under host pressure; no server setting changes that | the configuration file, then a restart |
+| Retention | `retention_classes`: each project's window for each artifact class, seeded with the defaults in [Retention](#retention); and the `retention.*` windows of the configuration | the page, per project and class: days kept, 0 for ever. A changed window applies to artifacts that become available afterwards. The `retention.*` windows are changed in the configuration file, then a restart |
+| Artifact policy | the `storage`, `artifacts` and `usercontent` settings of the running configuration: each class's largest file (`artifacts.max_bytes.<class>`) and the daily quota (`artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day`) | the page, per project: accept or turn off each artifact class, set its largest file, and set the daily bytes and files. Each value can only be lower than the configured one. `storage`, `usercontent` and the other `artifacts` settings: the configuration file, then a restart |
+| Metric collection | `ingest.sample_interval_ms` and `ingest.pressure_sample_interval_ms` (unset: 5 s, and 15 s under host pressure), and the `ingest` checkpoint and heartbeat and the `retention` windows of the configuration | the page, per project: the sampling interval while the host is calm and under pressure, from 1 to 300 seconds. An agent takes a new interval at its next welcome. The checkpoint, heartbeat and retention windows are changed in the configuration file, then a restart |
 | Agent compatibility | `agent_runs`: each agent version and protocol seen, with its open runs. Compatible means the protocol is the one this server speaks | agents are upgraded outside Fleet |
 | Ingestion health | `ingest_rejections` (refused events), `ingest_gaps` (losses the agents reported) and the open runs with how long since the server last heard from them and how far behind their newest event was | |
 | Audit history | `audit_events`, newest first, 50 at a time. Each event shows who (a person, an API key, or the system), what, when, and the values it changed where one was recorded (`before` and `after`, or the `from` and `to` of a triage change) | recorded by Fleet; kept for `retention.audit_days` |
 
 A row marked **from config** comes from the configuration file. The start-up sync replaces those rows, and the page does not change them: change the configuration, then restart. A row added on the page is stored in the database, survives restarts, and can be edited or removed on the page. If the configuration adds a trust policy or a group mapping that a page row already has (the same name, or the same group on the same scope), the server does not start and names the row; remove the page row, or the configured entry. The page refuses the reverse, and says which to change.
+
+**Per-project values.** The configuration sets the server-wide value of the artifact size limits (`artifacts.max_bytes.<class>`), the daily quotas (`artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day`) and the metric sampling intervals (`ingest.sample_interval_ms`, `ingest.pressure_sample_interval_ms`). A project's value on the page replaces that server-wide value for that project only, and a blank field keeps the value in force, which the page shows. An artifact override can only tighten the server-wide size cap: a project's largest file for a class, and its daily bytes and files, cannot exceed the configured value, and the label of each field says so. The server refuses a higher value and changes nothing. Artifact retention windows have no configured value: each project starts from the defaults in [Retention](#retention), and the page sets each project's window per class, up to 3650 days (0 keeps for ever).
+
+**Locks.** A project created by the configuration (`projects[]`) cannot be renamed on the page: its rename form is replaced by the note *from config*, and the API answers `409` with a reason that names the configuration. Its name comes from the configuration at each start. A project created on the page is renamed on the page, and its slug never changes.
 
 Some rules the page keeps:
 
@@ -126,7 +132,7 @@ Some rules the page keeps:
 - Revoking a key or a trust policy ends the agent tokens minted from it at once. Removing a trust policy ends them too.
 - Expiry is in days from now; `0` ends a key now.
 
-Values from the configuration are shown with their key and marked `config`, so an operator can see what the running server uses. Retention is still changed with SQL, as described in [Retention](#retention).
+Values from the configuration are shown with their key and marked *from config*, so an operator can see what the running server uses. The rows above say which values the page changes and which the configuration file does.
 
 ## Client addresses and limits
 
@@ -230,7 +236,7 @@ Fleet keeps what you need to debug last week's failure and see this year's trend
 
 **Raw partitions are never dropped before they are rolled up.** If the rollup job is behind (or was down) when a partition expires, the partition is kept, a `keeping an expired partition` warning is logged, and it is dropped by a later pass.
 
-**Artifact classes.** Each artifact gets a retention class when it arrives, and the class decides when it expires. The defaults (seeded per project in the `retention_classes` table, shown read only on the [Administration](#administration) page; change them with SQL until the forms arrive) are:
+**Artifact classes.** Each artifact gets a retention class when it arrives, and the class decides when it expires. The defaults (seeded per project in the `retention_classes` table) are below. Change a project's window for a class on the [Administration](#administration) page; a changed window applies to artifacts that become available afterwards. There is no server-wide window for these classes, so the page's value is the one a project uses. The defaults are:
 
 | Class | Default | Applies to |
 |---|---|---|
@@ -240,7 +246,7 @@ Fleet keeps what you need to debug last week's failure and see this year's trend
 | `debug_log` | 30 days | Maestro logs of runs without a failed flow |
 | `video`, `bundle` | 14 days | Reserved |
 
-A `NULL` TTL keeps a class for ever. A changed TTL applies to artifacts uploaded afterwards. Promotion never shortens an artifact's life. An artifact with `legal_hold` set is never expired. Upload requests nobody completed within a day of their grant lapsing are expired too.
+A window of 0 days on the page keeps a class for ever (stored as a `NULL` TTL). A changed window applies to artifacts that become available afterwards, because an artifact's expiry is fixed when it becomes available. Promotion never shortens an artifact's life. An artifact with `legal_hold` set is never expired. Upload requests nobody completed within a day of their grant lapsing are expired too.
 
 **Blobs are deleted only when nothing refers to them.** Bytes are stored once per project, however many artifacts (of any run or class) name them, so an expired artifact's blob is deleted only after the *last* artifact using it has expired, and then only after the grace period. Before deleting, the collector checks again that no artifact (not even a pending upload of the same bytes) refers to the blob, and an upload that arrives while a blob is being deleted waits for the deletion to finish instead of racing it. A delete that fails (the blob store is down) is retried by the next round.
 
