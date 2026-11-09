@@ -1411,11 +1411,17 @@ mod tests {
             )
             .await
             .unwrap();
-        let now = OffsetDateTime::now_utc();
-        store.expire_api_key_as(actor, id, now).await.unwrap();
+        // Authentication judges `expires_at` against the database's clock (`expires_at > now()`), so
+        // the expiry is taken from that clock too. A host instant can sit ahead of the database's
+        // (a Docker VM clock drifts), and then the key would still be valid when it "expires now".
+        let db_now: OffsetDateTime = sqlx::query_scalar("SELECT now()")
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+        store.expire_api_key_as(actor, id, db_now).await.unwrap();
         assert!(
             store.authenticate(key.expose()).await.unwrap().is_none(),
-            "expired now"
+            "expired now, by the database's clock"
         );
         let trail = audit_of(&store).await;
         let e = trail.iter().find(|e| e.0 == "api_key.expire").unwrap();
