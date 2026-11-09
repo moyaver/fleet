@@ -27,11 +27,12 @@ This document is the single source of truth for building the project. It is writ
 | D1 | **Everything in Rust**: agent, server, protocol, **and the dashboard** | ADR-0001, ADR-0004 (decided: Leptos CSR) |
 | D2 | ~~Source-available, not open source~~ **Open source under AGPL-3.0-only**, contributions under a CLA, commercial license on request, donations welcome | ADR-0012 (supersedes ADR-0010) |
 | D3 | Hosted on the owner's **personal** GitHub account; the owner's employer uses it under the same license | §2.5 (employer IP check is a precondition) |
-| D4 | Focused build: live view + correlation + evidence; history and analytics kept thin | ADR-0009 |
+| D4 | Focused build: live view + correlation + evidence; history and analytics kept thin. **Scope superseded by D9** | ADR-0009 (scope superseded by ADR-0016) |
 | D5 | Postgres 18 only; S3-compatible storage via `object_store`; Garage as the reference store; filesystem backend built in | ADR-0006, ADR-0007 |
 | D6 | GitHub Actions OIDC for publishers; fork PRs run offline | ADR-0008 |
 | D7 | No Node.js, npm or hand-written JavaScript anywhere in the product or its build | §3 invariant I9 |
 | D8 | **Fleet Planner**: static, duration-aware sharding across CI jobs (LPT on Fleet history); no dynamic work queue in v1 | ADR-0013 |
+| D9 | **Fleet is a hub for mobile e2e tests.** The build key and the release record are the core entity. Fleet never runs tests or provides devices, and owns no schedule: the team's CI cron decides when | [ADR-0016](decisions/0016-fleet-is-a-hub.md); [research 16](../research/16-hub-plan.md) |
 
 **Defaults for the decisions still open** (the owner may override them):
 
@@ -126,7 +127,7 @@ Fleet's own code is AGPL-3.0-only, but dependencies stay permissive so the owner
 | # | Invariant | Enforced by |
 |---|---|---|
 | I1 | **The agent never changes Maestro's exit status or CI output.** Pass-through is byte-for-byte; a signal death is re-raised | Supervisor/observer split (ADR-0002); `agent-supervisor` integration tests with a fake Maestro |
-| I2 | **Fail open:** Fleet misconfiguration or outage never prevents or fails a Maestro run (except in `check`/`selftest`) | Tests run with no server, a bad token and a black-holed network |
+| I2 | **Fail open (widened, ADR-0016):** a Fleet misconfiguration or outage never prevents or fails a run (except in `check`/`selftest`). The team's CI decides when a run starts | Tests run with no server, a bad token and a black-holed network. From W5 a test proves that a Fleet outage does not stop `--selection` runs |
 | I3 | **Nothing is ever falsely successful:** only direct-observation provenance may claim `passed` | `fleet-core` claim lattice + DB `CHECK` constraint + property tests |
 | I4 | **Every displayed result carries a provenance** (observed / provisional / final / derived / inferred / missing / stale) | The type system: every DTO outcome is a `Claimed<T>`; UI badges |
 | I5 | **The journal is never silently lossy:** lifecycle and evidence are gap-free or carry an explicit `journal.gap` | Protocol tests; outbox property tests |
@@ -135,6 +136,9 @@ Fleet's own code is AGPL-3.0-only, but dependencies stay permissive so the owner
 | I8 | **No provider-specific code** (AWS, GCP, Azure, Cloudflare, Kubernetes) in core crates | Crate dependency rules in `cargo xtask lint` |
 | I9 | **No Node.js, npm or hand-written JS.** Only Rust, SQL, CSS, HTML templates, YAML (CI) and shell snippets in docs | `cargo xtask lint` fails on `package.json`/`*.js`/`*.ts` outside `target/` and `dist/` |
 | I10 | **The agent stays light:** < 1% host CPU on average, bounded memory, no full process scans in steady state | `agent.self_metrics` + overhead benchmark (M2 exit) |
+| I12 | **No accuracy or recall figure without its labelled set, its counts and its versions.** Simulated numbers are never data | `xtask labelled-runs` and the generated `accuracy.md` (W8); review until then |
+| I13 | **Selection and quarantine never hide a failure.** A quarantined flow still runs and still shows red. A run that left flows out lists them on its record. If the selection cannot be fetched, everything runs | Property test `quarantine_never_changes_outcome` and `selection_names_excluded_flows` (W5) |
+| I14 | **Tenants never see each other.** An org reads only its own rows and blobs | `cross_org.rs`: every `openapi.json` route, called as org A with org B's ids, returns 404 (W2) |
 
 ---
 
@@ -626,6 +630,23 @@ Effort assumes one experienced Rust engineer part-time. Treat estimates as rough
 ### M7+: Optional
 Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the fork-PR relay (O2), iOS simulators, the Leptos 0.9 upgrade, AI summaries (only with approval).
 
+### Hub waves (ADR-0016; [research 16 §4](../research/16-hub-plan.md#4-waves-acceptance-effort-one-maintainer))
+
+The hub waves replace the GitHub milestones "M7: The step" and "M8: Measured". Each wave's full acceptance is in research 16. A wave's README row changes to Exists when the wave is merged on `main`.
+
+| Wave | Content | Headline acceptance |
+| --- | --- | --- |
+| W0 | Alpha.4 and the hub: docs pass 1 (ADR-0016, README, this plan, ROADMAP) | CI green; alpha.4 tagged; README states the hub |
+| W1 | Build key (`build.detected`), `builds` table, release page | `build_key.rs` (fake adb, no adb, I2); `two_runners_one_key_one_build`; release page groups runs by source |
+| W2 | Hosted private beta: tenancy (migration 0034), GitHub App sign-in, token-only signup, metering, purge, hosted instance | `cross_org.rs` (I14); `purge_leaves_no_project_rows`; `hosted_refuses_viewer_tokens`; weekly restore drill |
+| W3 | iOS publish from a Mac, UDID serials | `inspect.rs` iOS snapshots; `ios-fail` published to the fake server |
+| W4 | Last-night page: incidents, infra label, blind banner (#191–#199, #201) | `diagnosis.rs`, `blind.rs`; `last_night_groups_by_incident`; `rule_change_recomputes_history` |
+| W5 | Quarantine (ADR-0018) and `--selection` with path guards | `quarantine_never_changes_outcome` (I13); `selection_names_excluded_flows`; path guards in `prepare.rs` |
+| W6 | Guarded rerun (ADR-0019) | `tests/it/rerun.rs`: a build mismatch exits 2 before Maestro starts |
+| W7 | Shallow JUnit ingest: XCUITest and Espresso (ADR-0020) | `junit_ingest.rs` on a captured xcpretty report |
+| W8 | Measured: labelled runs, in-hub verdicts, hub release gate | `accuracy.md` generated; recall shown with its counts |
+| Billing | Stripe Checkout and portal as redirects; signed webhook sets the plan | Checkout sets the plan; portal opens; banner over quota; built after #205 |
+
 ---
 
 ## 13. Testing strategy (summary)
@@ -673,7 +694,24 @@ Notifications (webhook, Slack), OTLP export, GitLab and Buildkite adapters, the 
 
 ---
 
-## 16. Definition of done for v1.0.0
+## 16. Definition of done
+
+### 16.1 The hub (ADR-0016)
+
+The hub is done when all of these hold:
+
+- Every wave in §12 has its acceptance tests merged and passing in `cargo xtask ci`, and its README row reads Exists.
+- The founder's five verbs are Exists in the README: run on CI, watch, organize, pick what runs, and when (`--selection`, run from the team's own CI cron).
+- Invariants I1 to I14 each have a named test or a written review rule, as listed in §3.
+- Hosted tier (W2): the cross-org test passes for every route, the purge test leaves no row or blob for a purged org, and the weekly restore drill passes on the hosted instance.
+- Docs: each shipped wave has its user-guide section; the operator guide and `docs/src/hosted-ops.md` describe what runs; the README status matches `main`.
+- Validation: the conversations in research 16 §7 are recorded, and design partners are measured on behaviour before any public price.
+- Legal: terms, privacy policy, DPA and the delete-my-data policy (#209) are reviewed before the hosted tier takes a real user.
+- The README says what is not planned: SOC 2 and EU residency.
+
+### 16.2 Criteria for the self-hosted v1.0.0 release
+
+These still apply to the self-hosted release:
 
 - Spec acceptance criteria 1–15 (§16 of the spec) demonstrated by automated tests or a recorded demo.
 - Invariants I1–I10 have tests in CI.

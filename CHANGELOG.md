@@ -5,9 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- Agent: a run takes a Maestro directory only on evidence that it is its own, the directory its own process holds its session log open in. A run whose process could not be asked (it had exited, or the system could not tell) no longer takes another run's lone directory, which two runs in one tree could trade under load (#148). A directory dated a few milliseconds before the run's start, as a coarse birth clock can date it, is still considered.
+- Direction: Fleet is a hub for mobile e2e tests, and the build key and release record are its core entity ([ADR-0016](docs/decisions/0016-fleet-is-a-hub.md)).
 
 ## [0.1.0-alpha.4] - 2026-11-09
 
@@ -101,7 +101,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Loadgen: the same wait and resend, and the results JSON counts the refusals as `busy`.
 - Dashboard: a flow the log started whose run ended with no verdict for it is Unknown with the Missing provenance, not Running. The run's end re-resolves its started flows, and an ended agent run counts as the end of its evidence, as a closed suite does (`fleet-core` `resolve`, `flow_provenance`).
 - Agent: `fleet-agent inspect` and `publish` read a flow's bundles where the layout model says Maestro writes them: `--test-output-dir`, `--debug-output` apart from the session log, and a workspace config's `testOutputDir`. The captured `paths-debug-and-test-output-apart`, `paths-debug-and-test-output-same`, `paths-test-output-dir` and `paths-config-*` runs now settle their flows as a live run does, and a command that runs Maestro from a shell script (`exec maestro …`) is read as its command.
-
+- Agent: a run takes a Maestro directory only on evidence that it is its own, the directory its own process holds its session log open in. A run whose process could not be asked (it had exited, or the system could not tell) no longer takes another run's lone directory, which two runs in one tree could trade under load (#148). A directory dated a few milliseconds before the run's start, as a coarse birth clock can date it, is still considered.
+- Server: sibling runs of one CI job that end at the same moment close the job. Each run's end now locks the job before deriving its state, so neither reads the other as still open (a race #141's write path exposed).
 - Server: on shutdown an agent socket waits up to one second for the agent's close frame after `goaway` and close 1012, so the socket is not reset while the agent's frames are unread and the agent still reads `goaway`.
 - Agent: an emulator is recognised by its program's `qemu-system-*` name as well as by its process name, so a process whose name differs from the program it runs still maps to its serial.
 - Agent: a live run follows Maestro's files for two more layouts, which the captured fixtures now cover: a workspace config's `testOutputDir` (read from `--config`, or from a `config.yaml` in a directory the command names, and overridden by `--test-output-dir`), and `--flatten-debug-output` with `--test-output-dir` or with `--debug-output` and `--test-output-dir`. `--flatten-debug-output` alone writes into Maestro's `user.home`, which the agent now reads as the JVM does (`-Duser.home` in `JAVA_OPTS` or `MAESTRO_OPTS`, else the account's home), not from `$HOME` (#148).
