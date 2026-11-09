@@ -13,6 +13,8 @@ mod batch;
 pub(crate) mod telemetry;
 mod ws;
 
+use std::time::{Duration, Instant};
+
 use axum::{
     Router,
     extract::DefaultBodyLimit,
@@ -192,6 +194,34 @@ pub(crate) enum After {
 /// to publish once the ack is on its way (COMMIT → ack → hub, research 05 §9.4).
 pub(crate) type Outcome = (Vec<ServerFrame>, After, Option<Change>);
 
+/// A busy refusal is logged at most once per this interval, with the refusals it covers.
+const BUSY_LOG_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Counts busy refusals, so an overloaded database writes one warning per interval, not one per
+/// batch. Shared by the server's connections (see [`AppState`]).
+#[derive(Debug, Default)]
+pub(crate) struct BusyLog {
+    /// Refusals since the last warning.
+    refused: u64,
+    /// When the last warning was written.
+    last: Option<Instant>,
+}
+
+impl BusyLog {
+    /// Records one refusal. `Some(n)` when a warning is due, with the `n` refusals since the last
+    /// one (this one included).
+    pub(crate) fn refused(&mut self, now: Instant) -> Option<u64> {
+        self.refused = self.refused.saturating_add(1);
+        let due = self
+            .last
+            .is_none_or(|last| now.duration_since(last) >= BUSY_LOG_INTERVAL);
+        due.then(|| {
+            self.last = Some(now);
+            std::mem::take(&mut self.refused)
+        })
+    }
+}
+
 /// Applies one `events` frame.
 pub(crate) async fn events(state: &AppState, run: &RunHandle, events: &[EventEnvelope]) -> Outcome {
     match state.store.apply_batch(run, events).await {
@@ -217,6 +247,34 @@ pub(crate) async fn events(state: &AppState, run: &RunHandle, events: &[EventEnv
             (frames, After::Continue, applied.change)
         }
         Err(ApplyError::SeqGap { expected }) => (vec![seq_gap(expected)], After::Continue, None),
+        Err(ApplyError::Busy) => {
+            // Nothing was committed, so the socket stays up and the agent resends from the
+            // batch's first seq, after a pause. The lowest seq is the first one the batch needs.
+            let first = events.iter().map(|e| e.seq).min();
+            let refused = state
+                .busy
+                .lock()
+                .ok()
+                .and_then(|mut log| log.refused(Instant::now()));
+            if let Some(refused) = refused {
+                tracing::warn!(refused, agent_run_id = %run.agent_run_id,
+                    "the database is busy: refusing batches for the agents to resend");
+            }
+            let message = match first {
+                Some(seq) => format!("the server is busy; resend from seq {seq}"),
+                None => "the server is busy; retry later".into(),
+            };
+            (
+                vec![ServerFrame::Error {
+                    code: ErrorCode::Overloaded,
+                    fatal: false,
+                    message,
+                    expected_seq: first,
+                }],
+                After::Continue,
+                None,
+            )
+        }
         Err(ApplyError::Superseded) => (
             vec![ServerFrame::Error {
                 code: ErrorCode::Superseded,
@@ -255,8 +313,177 @@ fn seq_gap(expected: u64) -> ServerFrame {
 #[cfg(test)]
 mod tests {
     use axum::http::HeaderValue;
+    use fleet_protocol::{
+        event::EventBody,
+        frame::{AgentInfo, CiContext, CiProvider, FlowCatalog, ResumeState, RunOrigin},
+        journal::{ClockSample, Provenance, SourceKind, Subject},
+    };
+    use fleet_store::{
+        PoolOptions, Store,
+        auth::{Credential, TrustLevel},
+        testing::hold_connection,
+    };
+    use time::OffsetDateTime;
+    use uuid::Uuid;
 
     use super::*;
+    use crate::config::Config;
+
+    /// A publisher and an open run on a fresh database, with the run's handle.
+    async fn open_run(store: &Store) -> RunHandle {
+        let project_id = store.upsert_project("app", "App").await.unwrap();
+        let (key, _) = store
+            .create_api_key(
+                project_id,
+                "ci",
+                TrustLevel::Trusted,
+                OffsetDateTime::now_utc() + time::Duration::days(90),
+            )
+            .await
+            .unwrap();
+        let publisher = Publisher {
+            project_id,
+            credential: Credential::ApiKey(key),
+            trust: TrustLevel::Trusted,
+            claims: None,
+        };
+        let now = OffsetDateTime::now_utc();
+        let hello = Hello {
+            protocol: fleet_protocol::frame::ProtocolRange {
+                min: PROTOCOL_VERSION,
+                max: PROTOCOL_VERSION,
+            },
+            agent: AgentInfo {
+                version: "0.0.0".into(),
+                os: "linux".into(),
+                arch: "x86_64".into(),
+            },
+            agent_run_id: Uuid::now_v7(),
+            previous_agent_run_id: None,
+            ci: CiContext {
+                provider: CiProvider::Generic,
+                repository: Some("o/r".into()),
+                run_id: Some("1".into()),
+                run_attempt: Some(1),
+                job_key: "job".into(),
+                job_name: Some("job".into()),
+                sha: None,
+                git_ref: None,
+                runner: Some("runner".into()),
+            },
+            resume: ResumeState {
+                next_seq: 1,
+                oldest_unacked_seq: None,
+            },
+            clock: ClockSample {
+                wall: now,
+                mono_ms: 0,
+            },
+            origin: RunOrigin::Live,
+            started_at: None,
+            catalog: FlowCatalog::default(),
+        };
+        store
+            .open_run(&publisher, &hello, Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle
+    }
+
+    /// A batch of `RunFinalizing` events with the given seqs, in the order given.
+    fn batch(seqs: &[u64]) -> Vec<EventEnvelope> {
+        seqs.iter()
+            .map(|&seq| {
+                EventEnvelope::new(
+                    seq,
+                    ClockSample {
+                        wall: OffsetDateTime::now_utc(),
+                        mono_ms: 0,
+                    },
+                    Subject::default(),
+                    Provenance::new(SourceKind::AgentObserved),
+                    &EventBody::RunFinalizing,
+                )
+            })
+            .collect()
+    }
+
+    /// A state whose store is `url`'s database, with the given pool settings.
+    fn state_with(url: &str, pool: PoolOptions) -> AppState {
+        let store = Store::connect_lazy(url, pool).unwrap();
+        AppState::new(store, Config::default()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_pool_that_times_out_refuses_the_batch_and_keeps_the_socket() {
+        let db = fleet_store::testing::fresh_database().await.unwrap();
+        let run = open_run(&Store::connect_lazy(db.url(), PoolOptions::default()).unwrap()).await;
+        // The pool's only connection is held, so the batch waits out its acquire timeout.
+        let state = state_with(
+            db.url(),
+            PoolOptions {
+                max_connections: 1,
+                acquire_timeout: Duration::from_millis(1_000),
+            },
+        );
+        let _held = hold_connection(&state.store).await.unwrap();
+        let (frames, after, change) = events(&state, &run, &batch(&[5, 4, 6])).await;
+        assert_eq!(after, After::Continue, "the socket stays open");
+        assert!(change.is_none(), "nothing was committed");
+        assert!(
+            matches!(
+                frames.as_slice(),
+                [ServerFrame::Error {
+                    code: ErrorCode::Overloaded,
+                    fatal: false,
+                    expected_seq: Some(4),
+                    ..
+                }]
+            ),
+            "the refusal names the batch's first seq: {frames:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn another_store_error_is_still_fatal() {
+        let db = fleet_store::testing::fresh_database().await.unwrap();
+        let run = open_run(&Store::connect_lazy(db.url(), PoolOptions::default()).unwrap()).await;
+        // A database that does not exist fails at once: not a timeout, so not busy.
+        let missing = db.url().replacen(db.name(), "fleet_missing_database", 1);
+        let state = state_with(&missing, PoolOptions::default());
+        let (frames, after, _) = events(&state, &run, &batch(&[1])).await;
+        assert_eq!(after, After::Close(1011));
+        assert!(
+            matches!(
+                frames.as_slice(),
+                [ServerFrame::Error {
+                    code: ErrorCode::Internal,
+                    fatal: true,
+                    expected_seq: None,
+                    ..
+                }]
+            ),
+            "{frames:?}"
+        );
+    }
+
+    #[test]
+    fn busy_refusals_warn_once_per_interval_and_count_what_they_cover() {
+        let mut log = BusyLog::default();
+        let t0 = Instant::now();
+        assert_eq!(log.refused(t0), Some(1), "the first refusal warns");
+        assert_eq!(log.refused(t0 + Duration::from_secs(1)), None);
+        assert_eq!(log.refused(t0 + Duration::from_secs(2)), None);
+        assert_eq!(
+            log.refused(t0 + BUSY_LOG_INTERVAL),
+            Some(3),
+            "the next warning counts the refusals since the last"
+        );
+        assert_eq!(
+            log.refused(t0 + BUSY_LOG_INTERVAL + Duration::from_millis(1)),
+            None
+        );
+    }
 
     #[test]
     fn bearer_tokens_are_parsed_case_insensitively() {
