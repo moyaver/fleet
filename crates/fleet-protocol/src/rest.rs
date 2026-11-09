@@ -424,7 +424,7 @@ pub enum MetricUnit {
 pub enum MetricScope {
     /// The machine.
     Host,
-    /// The runner's process (Maestro today). Older clients send `maestro`.
+    /// The runner's process (Maestro today).
     Runner,
     /// The Fleet agent itself.
     Agent,
