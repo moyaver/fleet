@@ -10,7 +10,7 @@ Basis labels used in every table: **M** = measured here by running the tool on t
 2. **CI-only reporting gets the outcome right in every scenario** (`[Passed]`/`[Failed]` lines and exit code; the cancelled run needs its exit code 130 or 143 decoded), but it has no evidence. It names the wrong cause for the app crash (`crash`), and it cannot show the screen behind any assertion failure.
 3. **ReportPortal's JUnit import would also get every outcome right, but documented, not measured.** Its plugin reads `<failure>`/`<error>` as FAILED and logs the failure text. It drops the `device` attribute, has no attachment path for Maestro output, and imports nothing for an interrupted run (section 8).
 4. **Fleet reaches the decisive evidence in 7 of 8 scenarios** (the next action is identifiable from its output), against 3 of 8 for CI-only, 2 of 8 for Allure and 3 of 8 for ReportPortal (documented). It matches Maestro's outcome in all 13 flows of the 10 captured runs it was given. It is worse than the others on the app crash: it does not upload `crash-report.txt`, and it names the assertion as the cause (section 9).
-5. **Fleet's losses are real.** It does not label device loss as infrastructure in its inspect output, it does not identify the crash, it does not upload logcat, and the crash screenshot is missing from the fixture so what it shows is not measured. Its setup cost (an agent wrapping Maestro, plus a server) is not measured and is higher than CI-only, which needs nothing.
+5. **Fleet's losses are real.** It does not label device loss as infrastructure in its inspect output, it does not identify the crash, it does not upload logcat, and the crash screenshot is missing from the fixture so what it shows is not measured. Its setup cost (an agent wrapping Maestro, plus a server) was not measured in this study; it is measured in [15 Setup cost](15-setup-cost.md), and it is higher than CI-only, which needs nothing.
 
 ## 2. Scenarios and ground truth
 
@@ -143,7 +143,7 @@ Cells in sections 4 to 6 marked ReportPortal (D) follow from these rules and the
 - **The crash screenshot is not in the fixture.** `crash/SKIPPED.txt` lists the 1.25 MB screenshot as over the import limit. The screenshot Fleet registers in that replay is the event, not a file, so what it shows is not measured.
 - **Replay limitation.** In the `crash` replay the JUnit file was not read (`report.parsed` `status: absent`), because the capture's argv is `sh -c …` and `--output` cannot be found (`inspect.rs` `report_path`). The outcome came from the bundle manifest (`source: artifact_file`). A live `fleet-agent run` would not use that wrapper, but this was not measured live. This is an open item for the owner, not a verdict on the live path.
 - **Device loss is not labelled infrastructure in the inspect output.** The outcome is `failed` with source `junit_final`. The infrastructure exclusion applies to flake history, not to the displayed outcome, so a developer sees `failed`.
-- **Setup cost is not measured.** Fleet needs the agent to wrap Maestro and a server to see the dashboard. CI-only needs nothing. This study measures what each tool shows, not what it costs to run.
+- **Setup cost was not measured in this study.** Fleet needs the agent to wrap Maestro and a server to see the dashboard. CI-only needs nothing. This study measures what each tool shows, not what it costs to run. The cost was measured afterwards, from nothing to a first run on the dashboard: see [15 Setup cost](15-setup-cost.md).
 
 ## 10. Wins and losses, by scenario
 
