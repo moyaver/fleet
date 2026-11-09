@@ -18,3 +18,4 @@ They follow from the research in [`../../research/`](../../research/00-synthesis
 | [0011](0011-name-and-runner-scope.md) | Name "Fleet"; generic core, Maestro first | Accepted |
 | [0012](0012-agpl-license.md) | Open source under AGPL-3.0-only; CLA kept for a commercial license | Accepted |
 | [0013](0013-fleet-planner.md) | Fleet Planner: static, duration-aware CI sharding | Accepted |
+| [0014](0014-runner-neutral-names.md) | Runner-neutral names on the wire and in the schema | Accepted |

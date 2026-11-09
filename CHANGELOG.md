@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Breaking
+
+- Protocol, schema and configuration use runner-neutral names (ADR-0014, #153): the event `runner.detected { runner, version, profile_supported }` replaces `maestro.detected`; the artifact class `runner_log` replaces `maestro_log`; the agent-run and telemetry fields are `runner_exit_code`, `runner_exit_signal`, `runner_version`, `runner_profile_supported`, `runner_cpu_pct`, `runner_rss_bytes`, `runner_cpu_avg` and `runner_rss_max`; the exit class is `runner_error`; the metric scope is `runner`; the failure-fingerprint dimension is `runner`; the configuration key is `artifacts.max_bytes.runner_log`. The migrations carry these names from the start.
+- There is no compatibility before v1.0.0. The alpha releases cannot be upgraded: start with a fresh database, and upgrade the agents and the server together, since an alpha agent cannot talk to this server.
+- `cargo xtask upgrade-rehearsal` replays release tags from v1.0.0 on. With none yet it reports that there is nothing to rehearse and succeeds.
+
 ### Added
 
 - Dashboard: screen E lists the flow catalog, every flow the project knows, including flows that have never run (shown as "Never run", never as a pass). The agent sends the workspace's flows with their header tags in `hello.catalog`, and a stored plan names its flows; migration 0031 stores the tags on `flow_definitions` (#85).

@@ -203,7 +203,7 @@ An artifact is accepted only if its declared size and SHA-256 match, it is not l
 | screenshot | PNG, JPEG, WebP |
 | junit | XML |
 | html report | an HTML file, or a zip |
-| text: `maestro_log`, `commands`, `failure_hierarchy`, `device_logcat` | UTF-8 text without NUL bytes |
+| text: `runner_log`, `commands`, `failure_hierarchy`, `device_logcat` | UTF-8 text without NUL bytes |
 | bundle | zip, or `tar.zst` |
 
 Zip and `tar.zst` archives are also read through (never unpacked to disk) and refused if they have more than 5,000 entries, expand to more than 1 GiB in total, expand more than 100:1 (judged per file in a zip, over the whole stream for `tar.zst`, above 1 MiB), contain an absolute path, `..`, a backslash, a drive letter, control characters, a symlink, hardlink, device or fifo, contain another archive, or have bytes after their end. Sizes in archive headers are ignored: only bytes actually produced by decompression count. A refused artifact is refused with its reason and nothing is kept.
@@ -289,7 +289,14 @@ On SIGTERM the server stops accepting connections, finishes each agent's in-flig
 
 ## Upgrades
 
-Upgrade the server first, then the agents. Read the [CHANGELOG](https://github.com/moyaver/fleet/blob/main/CHANGELOG.md) from your version to the new one for steps that need action before you start.
+Upgrade the server first, then the agents, except for the move from the alpha releases: that one is a clean break, below. Read the [CHANGELOG](https://github.com/moyaver/fleet/blob/main/CHANGELOG.md) from your version to the new one for steps that need action before you start.
+
+### Clean break from the alpha releases
+
+Before v1.0.0 the wire protocol and the schema have no compatibility promise (ADR-0014). The move from `v0.1.0-alpha.1` to `alpha.3` to the release that carries runner-neutral names (#153) has no upgrade path:
+
+- The migrations were edited in place, so an alpha database has the old names and the new server refuses it. Start from a fresh database; the alpha data is not carried over.
+- The alpha agents write the old names, which the server no longer reads. Upgrade the agents and the server together, and do not run an alpha agent against the new server.
 
 ### Before you upgrade
 
@@ -334,13 +341,14 @@ A server refuses a database whose schema is newer than its own, so an old image 
 - Every migration is a plain `NNNN_name.sql` file, and every one runs in its own transaction. A failed migration leaves the schema as it was.
 - **Migrations are forward-only.** There are no down migrations. The schema never moves back: rolling back is a restore ([Rollback](#rollback)).
 - **Applied migrations are never edited.** sqlx stores a checksum of each applied migration and the server refuses to start when an applied file no longer matches it. A fix is a new migration.
-- Each release's migrations are the previous release's plus new files, and an upgrade applies the new ones in order. The migrations of each tag are listed in `migrations/` at that tag: upgrading from `v0.1.0-alpha.1` to `v0.1.0-alpha.3` applies `0015` to `0017`.
+- Each release's migrations are the previous release's plus new files, and an upgrade applies the new ones in order. The migrations of each tag are listed in `migrations/` at that tag. Before v1.0.0 migrations may be edited in place, and the alpha releases do not upgrade to the next one (see the clean break above).
 
 ### Agents and server versions
 
 - Agents and the server negotiate one wire protocol, `PROTOCOL_VERSION` (`1` in every release so far). An agent's `hello` names the range it speaks, and the server accepts the connection only when its own version is in that range. Otherwise it answers `reject` with `unsupported_protocol`, which is fatal for that run: the agent stops reporting to Fleet, and Maestro is unaffected.
 - Within one protocol version, changes are additive optional fields. Neither side rejects a field it does not know, and a frame an agent cannot decode is dropped, so a newer agent and an older server (or the reverse) keep working on the same version.
 - A change that is not additive bumps the protocol version. Then the server must be upgraded before the agents that need the new version, which is why the server goes first. Agents still on the old version are refused until they are upgraded.
+- The runner-neutral names ([ADR-0014](https://github.com/moyaver/fleet/blob/main/docs/decisions/0014-runner-neutral-names.md)) are not read by an older agent or server, so the agents and the server of one release move together. The protocol version stays `1`.
 
 ### Rollback
 
@@ -356,7 +364,7 @@ Everything recorded after the backup is lost from the database. Agents hold unac
 
 Operators can rehearse on a copy: restore the latest backup into a stack under its own Compose project name (see [Restore](#restore)), set `FLEET_IMAGE` there to the new tag, and check that the server starts, that `SELECT count(*) FROM artifacts` matches the source, and that a run you know lists in the dashboard.
 
-Maintainers can rehearse the migrations without a deployment: `cargo xtask upgrade-rehearsal` exports the `migrations/` of every release tag from git (fetch the tags first, `git fetch --tags`), seeds rows under each release's schema, migrates to the current tree, and checks that every row is unchanged, that the current read paths return the seeded runs, flows and artifacts, and that the release's own migrator refuses the upgraded schema. It takes a few seconds once Postgres 18 is up (`DATABASE_URL`, or a throwaway container). CI runs it after `cargo xtask ci` in the main job, on the job's Postgres, and its checkout fetches every tag (`fetch-depth: 0`). The test is `crates/fleet-store/tests/upgrade.rs`.
+Maintainers can rehearse the migrations without a deployment: `cargo xtask upgrade-rehearsal` exports the `migrations/` of every release tag from v1.0.0 on from git (fetch the tags first, `git fetch --tags`; the alpha tags are skipped, see the clean break above, and with no release from v1.0.0 on it reports that there is nothing to rehearse and succeeds), seeds rows under each release's schema, migrates to the current tree, and checks that every row is unchanged, that the current read paths return the seeded runs, flows and artifacts, and that the release's own migrator refuses the upgraded schema. It takes a few seconds once Postgres 18 is up (`DATABASE_URL`, or a throwaway container). CI runs it after `cargo xtask ci` in the main job, on the job's Postgres, and its checkout fetches every tag (`fetch-depth: 0`). The test is `crates/fleet-store/tests/upgrade.rs`.
 
 ### Verified
 
