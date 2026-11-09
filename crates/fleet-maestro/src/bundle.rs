@@ -48,6 +48,16 @@ pub enum Entry {
         /// The flow folder.
         flow_dir: String,
     },
+    /// `takeScreenshot/<name>.png`: a screenshot the flow took on purpose (issue #133).
+    UserScreenshot {
+        /// The flow folder.
+        flow_dir: String,
+    },
+    /// `startRecording/<name>.mp4`: a recording the flow made on purpose (issue #133).
+    UserRecording {
+        /// The flow folder.
+        flow_dir: String,
+    },
     /// Something else.
     Other,
 }
@@ -71,6 +81,12 @@ pub fn classify(rel: &str) -> Entry {
             flow_dir: (*dir).to_owned(),
         },
         [dir, "logs", "crash-report.txt"] => Entry::CrashReport {
+            flow_dir: (*dir).to_owned(),
+        },
+        [dir, "takeScreenshot", file] if has_ext(file, "png") => Entry::UserScreenshot {
+            flow_dir: (*dir).to_owned(),
+        },
+        [dir, "startRecording", file] if has_ext(file, "mp4") => Entry::UserRecording {
             flow_dir: (*dir).to_owned(),
         },
         [dir, "screenshots", file] if has_ext(file, "png") => {
@@ -280,6 +296,24 @@ mod tests {
             classify("fail/screenshots/step-005-x.png.tmp"),
             Entry::Other,
             "not until renamed"
+        );
+        assert_eq!(
+            classify("fail/takeScreenshot/fleet-main.png"),
+            Entry::UserScreenshot {
+                flow_dir: "fail".into()
+            },
+            "Maestro's own screenshots are their own entries, not step screenshots"
+        );
+        assert_eq!(
+            classify("recording/startRecording/fleet-recording.mp4"),
+            Entry::UserRecording {
+                flow_dir: "recording".into()
+            }
+        );
+        assert_eq!(
+            classify("recording/startRecording/fleet-recording.mp4.tmp"),
+            Entry::Other,
+            "a recording is not classified until its name is final"
         );
         assert_eq!(
             classify("fail/manifest.json"),
