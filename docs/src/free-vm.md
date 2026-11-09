@@ -50,21 +50,11 @@ cp .env.example .env
 mkdir -p secrets
 ```
 
-Create the four files in `secrets/` with the commands in the [Start section of the Compose guide](https://github.com/moyaver/fleet/blob/main/deploy/compose/README.md#start). Then edit `.env`, replacing the empty values:
+Run the commands in the [Start section of the Compose guide](https://github.com/moyaver/fleet/blob/main/deploy/compose/README.md#start) that create the secret files. They create eight files in `secrets/`, including `garage.env`, which Compose reads before it starts. The Garage keys are secret files, not `.env` values, so `.env` needs only the two names. Set the two names in `.env`:
 
 ```
 FLEET_DOMAIN=<dashboard>.duckdns.org
 FLEET_USERCONTENT_DOMAIN=<uploads>.duckdns.org
-GARAGE_RPC_SECRET=...
-GARAGE_ACCESS_KEY=GK...
-GARAGE_SECRET_KEY=...
-```
-
-Generate the Garage values with:
-
-```bash
-printf 'GARAGE_RPC_SECRET=%s\nGARAGE_ACCESS_KEY=GK%s\nGARAGE_SECRET_KEY=%s\n' \
-  "$(openssl rand -hex 32)" "$(openssl rand -hex 12)" "$(openssl rand -hex 32)"
 ```
 
 Keep `.env` and `secrets/`: a restore needs them.
