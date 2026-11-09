@@ -2,7 +2,10 @@
 
 Flows used to capture the Maestro fixtures in `fixtures/maestro/` (PLAN §12 M1). They drive the
 built-in Android **Settings** app, so they need no APK and the captures contain nothing private.
-Written for an API 37 Google Play image; menu labels may differ on other images.
+Written for an API 37 Google Play image; menu labels may differ on other images. The Automated Test
+Device image (`google_atd`) has no Settings app, so the flows whose `appId` is `com.android.settings`
+fail there at launch with `Package com.android.settings is not installed`. Use a Google Play image
+for them. The ANR and crash flows need the fixture app from `fixtures/android/anr-app`.
 
 | File | Exercises |
 |---|---|
