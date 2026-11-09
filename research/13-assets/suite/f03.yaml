@@ -1,0 +1,11 @@
+appId: com.fleet.anr
+name: f03
+---
+- launchApp:
+    clearState: true
+- repeat:
+    times: 3
+    commands:
+      - stopApp
+      - launchApp
+      - assertVisible: "Crash app"

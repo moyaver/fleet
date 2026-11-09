@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="fleet161a" tests="6" failures="1" time="40.065" timestamp="2026-11-09T05:10:44">
+    <testcase id="f01" name="f01" classname="f01" file="research/13-assets/suite/f01.yaml" time="2.174" timestamp="2026-11-09T05:10:44" status="SUCCESS"/>
+    <testcase id="f11" name="f11" classname="f11" file="research/13-assets/suite/f11.yaml" time="17.746" timestamp="2026-11-09T05:10:47" status="SUCCESS"/>
+    <testcase id="f06" name="f06" classname="f06" file="research/13-assets/suite/f06.yaml" time="7.622" timestamp="2026-11-09T05:11:04" status="SUCCESS"/>
+    <testcase id="f05" name="f05" classname="f05" file="research/13-assets/suite/f05.yaml" time="5.812" timestamp="2026-11-09T05:11:12" status="SUCCESS"/>
+    <testcase id="f12" name="f12" classname="f12" file="research/13-assets/suite/f12.yaml" time="3.649" timestamp="2026-11-09T05:11:18" status="ERROR">
+      <failure>[shard 1] Assertion is false: "Fleet never shows this" is visible</failure>
+    </testcase>
+    <testcase id="f03" name="f03" classname="f03" file="research/13-assets/suite/f03.yaml" time="3.024" timestamp="2026-11-09T05:11:21" status="SUCCESS"/>
+  </testsuite>
+  <testsuite name="Test Suite" device="fleet161b" tests="6" failures="0" time="58.131" timestamp="2026-11-09T05:10:44">
+    <testcase id="f07" name="f07" classname="f07" file="research/13-assets/suite/f07.yaml" time="10.445" timestamp="2026-11-09T05:10:44" status="SUCCESS"/>
+    <testcase id="f10" name="f10" classname="f10" file="research/13-assets/suite/f10.yaml" time="15.473" timestamp="2026-11-09T05:10:55" status="SUCCESS"/>
+    <testcase id="f09" name="f09" classname="f09" file="research/13-assets/suite/f09.yaml" time="13.104" timestamp="2026-11-09T05:11:10" status="SUCCESS"/>
+    <testcase id="f04" name="f04" classname="f04" file="research/13-assets/suite/f04.yaml" time="3.892" timestamp="2026-11-09T05:11:23" status="SUCCESS"/>
+    <testcase id="f08" name="f08" classname="f08" file="research/13-assets/suite/f08.yaml" time="12.49" timestamp="2026-11-09T05:11:27" status="SUCCESS"/>
+    <testcase id="f02" name="f02" classname="f02" file="research/13-assets/suite/f02.yaml" time="2.655" timestamp="2026-11-09T05:11:40" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,8 @@
+appId: com.fleet.anr
+name: f12
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Fleet never shows this"
+    timeout: 3000

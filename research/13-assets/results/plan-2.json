@@ -1,0 +1,33 @@
+{
+  "planId": "plan-3d7a1164015810026d9d9a6184543d783ebf3d64be26ba1fccf5e34f7e157ff6",
+  "totalFlows": 12,
+  "configPath": "research/13-assets/suite/config.yaml",
+  "configSha256": "540b024efae720f5a4ae4df84d9986f42179401072e87bbf21f082ce5b123e92",
+  "equalCountEstimatedSeconds": 54,
+  "shards": [
+    {
+      "id": 0,
+      "estimatedSeconds": 52,
+      "flows": [
+        "research/13-assets/suite/f11.yaml",
+        "research/13-assets/suite/f08.yaml",
+        "research/13-assets/suite/f07.yaml",
+        "research/13-assets/suite/f04.yaml",
+        "research/13-assets/suite/f03.yaml",
+        "research/13-assets/suite/f02.yaml"
+      ]
+    },
+    {
+      "id": 1,
+      "estimatedSeconds": 51,
+      "flows": [
+        "research/13-assets/suite/f10.yaml",
+        "research/13-assets/suite/f09.yaml",
+        "research/13-assets/suite/f06.yaml",
+        "research/13-assets/suite/f05.yaml",
+        "research/13-assets/suite/f12.yaml",
+        "research/13-assets/suite/f01.yaml"
+      ]
+    }
+  ]
+}
