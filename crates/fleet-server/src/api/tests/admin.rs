@@ -335,6 +335,7 @@ async fn a_project_admin_or_a_viewer_reads_nothing_of_screen_g() {
         "/api/v1/admin/role-mappings",
         "/api/v1/admin/retention",
         "/api/v1/admin/artifact-policy",
+        "/api/v1/admin/project-policy",
         "/api/v1/admin/metric-policy",
         "/api/v1/admin/agents",
         "/api/v1/admin/ingestion",
@@ -359,4 +360,85 @@ async fn a_project_admin_or_a_viewer_reads_nothing_of_screen_g() {
             "{path}: the viewer token is a viewer"
         );
     }
+}
+
+#[tokio::test]
+async fn the_project_policy_shows_each_override_and_the_configured_value_it_replaces() {
+    use fleet_store::auth::AuditActor;
+
+    let rig = rig().await;
+    let cookie = signed_in_everywhere(&rig, Role::Admin, "ada").await;
+    let app = rig.store.project_id("app").await.unwrap().unwrap();
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "commands", false, None)
+        .await
+        .unwrap();
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "junit", true, Some(1_024))
+        .await
+        .unwrap();
+    rig.store
+        .set_artifact_quota(AuditActor::System, app, Some(1_000), None)
+        .await
+        .unwrap();
+    rig.store
+        .set_metric_policy(AuditActor::System, app, Some(2_000), None)
+        .await
+        .unwrap();
+
+    let (status, view) = read(&rig, &cookie, "/api/v1/admin/project-policy").await;
+    assert_eq!(status, 200, "{view}");
+    let class = |project: &str, name: &str| {
+        view["classes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["project"] == project && c["class"] == name)
+            .unwrap_or_else(|| panic!("no row for {project} {name}"))
+            .clone()
+    };
+    // Every project shows every artifact class.
+    assert_eq!(view["classes"].as_array().unwrap().len(), 2 * 7);
+
+    let commands = class("app", "commands");
+    assert_eq!(commands["accepted"], false);
+    assert_eq!(commands["overridden"], true);
+    assert_eq!(commands["max_bytes"], commands["configured_max_bytes"]);
+
+    let junit = class("app", "junit");
+    assert_eq!(junit["accepted"], true);
+    assert_eq!(junit["max_bytes"], 1_024);
+    assert_eq!(junit["overridden"], true);
+
+    let other = class("other", "commands");
+    assert_eq!(other["accepted"], true, "the configured policy");
+    assert_eq!(other["overridden"], false);
+
+    let limits = |project: &str| {
+        view["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["project"] == project)
+            .unwrap_or_else(|| panic!("no limits for {project}"))
+            .clone()
+    };
+    let app_limits = limits("app");
+    assert_eq!(app_limits["bytes_per_day"], 1_000);
+    assert_eq!(app_limits["bytes_per_day_overridden"], true);
+    assert_eq!(
+        app_limits["files_per_day_overridden"], false,
+        "files a day is the configured value"
+    );
+    assert_eq!(app_limits["sample_interval_ms"], 2_000);
+    assert_eq!(app_limits["sample_interval_overridden"], true);
+    assert_eq!(
+        app_limits["pressure_sample_interval_ms"], 15_000,
+        "the agent's default"
+    );
+    assert_eq!(app_limits["pressure_sample_interval_overridden"], false);
+
+    let other_limits = limits("other");
+    assert_eq!(other_limits["sample_interval_ms"], 5_000);
+    assert_eq!(other_limits["sample_interval_overridden"], false);
 }

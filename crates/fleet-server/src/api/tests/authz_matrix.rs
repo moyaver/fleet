@@ -105,6 +105,7 @@ fn class_of(route: &str, method: &str) -> Option<Class> {
         | "/api/v1/admin/role-mappings"
         | "/api/v1/admin/retention"
         | "/api/v1/admin/artifact-policy"
+        | "/api/v1/admin/project-policy"
         | "/api/v1/admin/metric-policy"
         | "/api/v1/admin/agents"
         | "/api/v1/admin/ingestion"
@@ -220,6 +221,63 @@ fn every_route_has_a_row() {
         unclassified.is_empty(),
         "routes without an authorization row in class_of: {unclassified:?}"
     );
+}
+
+#[test]
+fn the_policy_routes_are_rows_of_the_matrix() {
+    // Screen G's per-project policy (#139): each write in both its PUT and its form POST form, and
+    // the read of the Administration page's project policy. A route missing from the router's
+    // source would pass the matrix vacuously.
+    let routes = derived_routes();
+    for (path, method, class) in [
+        (
+            "/api/v1/admin/retention/{project}/{class}",
+            "put",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/retention/{project}/{class}/edit",
+            "post",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/artifact-classes/{project}/{class}",
+            "put",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/artifact-classes/{project}/{class}/edit",
+            "post",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/artifact-quota/{project}",
+            "put",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/artifact-quota/{project}/edit",
+            "post",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/metric-policy/{project}",
+            "put",
+            Class::AdminWrite,
+        ),
+        (
+            "/api/v1/admin/metric-policy/{project}/edit",
+            "post",
+            Class::AdminWrite,
+        ),
+        ("/api/v1/admin/project-policy", "get", Class::Admin),
+    ] {
+        assert!(
+            routes.iter().any(|(p, m)| p == path && m == method),
+            "{method} {path} is not a route of the router"
+        );
+        assert_eq!(class_of(path, method), Some(class), "{method} {path}");
+    }
 }
 
 /// The IDs the matrix substitutes into route templates, from a run that exists in project `app`.
