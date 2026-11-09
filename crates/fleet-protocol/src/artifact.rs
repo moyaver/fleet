@@ -49,11 +49,18 @@ pub enum ArtifactClass {
     /// The device logcat excerpt of a failed flow: the lines around the failing step, redacted
     /// and capped by the agent (text; issue #75).
     DeviceLogcat,
+    /// A screenshot the flow took on purpose (`takeScreenshot`, Maestro's PNG). The agent uploads
+    /// it only with its user-media switch on, and only for a failed flow, linked to its step.
+    /// Its pixels are not redacted (issue #133, invariant I6).
+    UserScreenshot,
+    /// A screen recording the flow started on purpose (`startRecording`, Maestro's MP4). The same
+    /// switch and rules as [`Self::UserScreenshot`] (issue #133).
+    UserRecording,
 }
 
 impl ArtifactClass {
     /// Every class the server accepts.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 9] = [
         Self::FailureScreenshot,
         Self::FailureHierarchy,
         Self::Commands,
@@ -61,6 +68,8 @@ impl ArtifactClass {
         Self::RunnerLog,
         Self::HtmlReport,
         Self::DeviceLogcat,
+        Self::UserScreenshot,
+        Self::UserRecording,
     ];
 
     /// The wire name, for example `failure_screenshot`.
@@ -74,6 +83,8 @@ impl ArtifactClass {
             Self::RunnerLog => "runner_log",
             Self::HtmlReport => "html_report",
             Self::DeviceLogcat => "device_logcat",
+            Self::UserScreenshot => "user_screenshot",
+            Self::UserRecording => "user_recording",
         }
     }
 
@@ -93,6 +104,8 @@ impl ArtifactClass {
             Self::Junit => &["application/xml", "text/xml"],
             Self::RunnerLog | Self::DeviceLogcat => &["text/plain"],
             Self::HtmlReport => &["text/html", "application/zip"],
+            Self::UserScreenshot => &["image/png"],
+            Self::UserRecording => &["video/mp4"],
         }
     }
 }

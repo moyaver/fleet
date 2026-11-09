@@ -11,7 +11,7 @@ use fleet_blob::{
     verify::{ArtifactClass, Declared, Kind, Limits, Verified, VerifyError, verify},
 };
 
-use ArtifactClass::{Bundle, HtmlReport, Junit, Log, Screenshot};
+use ArtifactClass::{Bundle, HtmlReport, Junit, Log, Screenshot, Video};
 
 /// Real Maestro output (fixtures are captured, never invented).
 const JUNIT: &[u8] =
@@ -49,6 +49,46 @@ fn real_maestro_output_is_accepted_for_its_class() {
     assert_eq!(verified.size, SCREENSHOT.len() as u64);
     assert_eq!(verified.sha256, Sha256Digest::of(SCREENSHOT));
     assert_eq!(verified.archive, None);
+}
+
+/// Maestro's `startRecording` output (issue #133): an MP4 with an `ftyp` box.
+const RECORDING: &[u8] = include_bytes!(
+    "../../../../fixtures/maestro/2.12.1/recording/run/debug/recording/startRecording/fleet-recording.mp4"
+);
+
+#[test]
+fn a_maestro_recording_is_accepted_only_as_video() {
+    let verified = accepts(Video, RECORDING);
+    assert_eq!(verified.kind, Kind::Mp4);
+    assert_eq!(verified.size, RECORDING.len() as u64);
+    assert_eq!(verified.archive, None);
+    // The class is the allowlist: an image is not a video, and a video is not an image.
+    for (class, why) in [(Screenshot, "a screenshot"), (Log, "a log")] {
+        let err = check(class, RECORDING, &Limits::default()).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                VerifyError::TypeNotAllowed {
+                    detected: Some(Kind::Mp4),
+                    ..
+                }
+            ),
+            "{why} may not be an MP4: {err}"
+        );
+    }
+    assert!(matches!(
+        check(Video, SCREENSHOT, &Limits::default()),
+        Err(VerifyError::TypeNotAllowed {
+            detected: Some(Kind::Png),
+            ..
+        })
+    ));
+    // Nothing else starting with a box header passes as MP4.
+    let not_mp4 = [&[0, 0, 0, 16][..], b"moov", &[0; 32]].concat();
+    assert!(matches!(
+        check(Video, &not_mp4, &Limits::default()),
+        Err(VerifyError::TypeNotAllowed { detected: None, .. })
+    ));
 }
 
 #[test]
