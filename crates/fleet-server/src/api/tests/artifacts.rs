@@ -12,6 +12,7 @@ use fleet_protocol::{
     artifact::{RejectReason, UploadGrant, UploadRequest, UploadResult},
     event::{FlowOutcome, StepStatus},
 };
+use fleet_store::auth::AuditActor;
 use futures_util::TryStreamExt;
 use serde_json::Value;
 use uuid::Uuid;
@@ -818,5 +819,118 @@ async fn a_flow_lists_its_own_evidence_and_its_runs_report_and_log_but_not_anoth
         seen,
         [("junit", true), ("failure_screenshot", false)],
         "run-level files say so with a null flow; another run's log is not here"
+    );
+}
+
+/// A project that turns one class off refuses only that class; turning it back on grants it.
+#[tokio::test]
+async fn a_project_that_turns_a_class_off_refuses_only_that_class() {
+    let (rig, _dirs) = artifact_rig(|_| {}).await;
+    let app = rig.store.project_id("app").await.unwrap().unwrap();
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "commands", false, None)
+        .await
+        .unwrap();
+    let run = run_with_failed_flow(&rig, "1100").await;
+    let commands = request(&run, "commands", "cmds.json", "application/json", b"[]");
+    assert_eq!(
+        refused(rig.grant(&commands).await),
+        RejectReason::ClassNotAllowed
+    );
+
+    let log = request(&run, "maestro_log", "m.log", "text/plain", b"log");
+    assert!(
+        matches!(rig.grant(&log).await, UploadGrant::Upload { .. }),
+        "another class of the same project is still granted"
+    );
+
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "commands", true, None)
+        .await
+        .unwrap();
+    assert!(matches!(
+        rig.grant(&commands).await,
+        UploadGrant::Upload { .. }
+    ));
+}
+
+/// A project's largest file for a class is its own cap, never above the configured one: a file
+/// over it is too large, and the message names the cap that applies.
+#[tokio::test]
+async fn a_projects_largest_file_for_a_class_is_its_cap_and_never_above_the_configured_one() {
+    let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_bytes.failure_screenshot = 100).await;
+    let app = rig.store.project_id("app").await.unwrap().unwrap();
+    let run = run_with_failed_flow(&rig, "1101").await;
+    let shot = |bytes: &[u8]| request(&run, "failure_screenshot", "shot.png", "image/png", bytes);
+    let too_large = |g: UploadGrant, cap: &str| match g {
+        UploadGrant::Rejected { reason, message } => {
+            assert_eq!(reason, RejectReason::TooLarge);
+            assert!(message.contains(cap), "{message}");
+        }
+        other => panic!("expected too large, got {other:?}"),
+    };
+
+    // Its own cap of 60 bytes: the 67-byte PNG is too large and says so; 40 bytes is granted.
+    rig.store
+        .set_artifact_class(
+            AuditActor::System,
+            app,
+            "failure_screenshot",
+            true,
+            Some(60),
+        )
+        .await
+        .unwrap();
+    too_large(rig.grant(&shot(PNG)).await, "60 bytes");
+    assert!(matches!(
+        rig.grant(&shot(&[7; 40])).await,
+        UploadGrant::Upload { .. }
+    ));
+
+    // A cap above the configured 100 bytes is no raise: 150 bytes is still too large, at 100.
+    rig.store
+        .set_artifact_class(
+            AuditActor::System,
+            app,
+            "failure_screenshot",
+            true,
+            Some(i64::MAX),
+        )
+        .await
+        .unwrap();
+    too_large(rig.grant(&shot(&[7; 150])).await, "100 bytes");
+    assert!(matches!(
+        rig.grant(&shot(PNG)).await,
+        UploadGrant::Upload { .. }
+    ));
+}
+
+/// A project whose daily byte quota is below a file's size refuses the file, whatever else it
+/// has declared that day.
+#[tokio::test]
+async fn a_project_daily_byte_quota_below_a_file_refuses_it() {
+    let (rig, _dirs) = artifact_rig(|_| {}).await;
+    let app = rig.store.project_id("app").await.unwrap().unwrap();
+    rig.store
+        .set_artifact_quota(AuditActor::System, app, Some(100), None)
+        .await
+        .unwrap();
+    let run = run_with_failed_flow(&rig, "1102").await;
+    let log =
+        |n: u8, size: usize| request(&run, "maestro_log", "m.log", "text/plain", &vec![n; size]);
+
+    assert_eq!(
+        refused(rig.grant(&log(1, 120)).await),
+        RejectReason::ProjectQuotaExceeded,
+        "a 120-byte file is over a 100-byte day"
+    );
+    assert!(matches!(
+        rig.grant(&log(1, 60)).await,
+        UploadGrant::Upload { .. }
+    ));
+    assert_eq!(
+        refused(rig.grant(&log(2, 60)).await),
+        RejectReason::ProjectQuotaExceeded,
+        "60 more is 120 bytes in the day"
     );
 }

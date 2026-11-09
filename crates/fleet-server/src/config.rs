@@ -1212,6 +1212,25 @@ mod tests {
     }
 
     #[test]
+    fn the_sampling_intervals_are_between_1_and_300_seconds() {
+        for key in [
+            "FLEET_INGEST__SAMPLE_INTERVAL_MS",
+            "FLEET_INGEST__PRESSURE_SAMPLE_INTERVAL_MS",
+        ] {
+            for bad in ["500", "300001"] {
+                let err = Config::load(None, &env(&[(key, bad)])).unwrap_err();
+                assert!(
+                    format!("{err:#}").contains("1000 and 300000"),
+                    "{key} {bad}"
+                );
+            }
+            for ok in ["1000", "300000"] {
+                assert!(Config::load(None, &env(&[(key, ok)])).is_ok(), "{key} {ok}");
+            }
+        }
+    }
+
+    #[test]
     fn bad_values_name_their_source() {
         let err =
             Config::load(None, &env(&[("FLEET_INGEST__MAX_FRAME_BYTES", "lots")])).unwrap_err();

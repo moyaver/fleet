@@ -4,12 +4,13 @@
 //! global administrator; and the configuration's locked rows.
 
 use fleet_core::policy::{Grant, Role};
+use fleet_protocol::frame::{BatchRequest, BatchResponse, Limits, ServerFrame};
 use fleet_store::{auth::AuditActor, testing};
 use serde_json::{Value, json};
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
-use super::rig::{Rig, rig, rig_with};
+use super::rig::{Agent, Rig, rig, rig_with};
 use crate::{config::TrustPolicyConfig, session};
 
 const CSRF: &str = "csrf-for-writes";
@@ -912,4 +913,270 @@ async fn group_mappings_are_added_edited_and_removed_and_the_configured_ones_are
     )
     .await;
     assert_eq!(res.status_code(), 422, "{}", res.text());
+}
+
+/// A policy write as a JSON `PUT`, and the same change as the dashboard's form `POST` to its
+/// `/edit` path. Every one names project `app`: only the caller decides the answer.
+fn policy_writes(n: u32) -> Vec<(&'static str, Value, String)> {
+    let (days, max, quota, seconds) = (n, 1_000 * n, 500 * n, 2 * n);
+    vec![
+        (
+            "/api/v1/admin/retention/app/failure_evidence",
+            json!({"days": days}),
+            format!("days={days}"),
+        ),
+        (
+            "/api/v1/admin/artifact-classes/app/junit",
+            json!({"accepted": true, "max_bytes": max}),
+            format!("accepted=on&max_bytes={max}"),
+        ),
+        (
+            "/api/v1/admin/artifact-quota/app",
+            json!({"bytes_per_day": quota, "files_per_day": 5}),
+            format!("bytes_per_day={quota}&files_per_day=5"),
+        ),
+        (
+            "/api/v1/admin/metric-policy/app",
+            json!({"sample_interval_seconds": seconds, "pressure_sample_interval_seconds": 30}),
+            format!("sample_interval_seconds={seconds}&pressure_sample_interval_seconds=30"),
+        ),
+    ]
+}
+
+/// Every retention window as the store holds it: `(project, class, seconds)`.
+async fn retention_of(rig: &Rig) -> Vec<(String, String, Option<i64>)> {
+    rig.store
+        .admin_retention_classes()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|c| (c.project, c.class, c.ttl_seconds))
+        .collect()
+}
+
+/// A dashboard form posted with `cookie`, as a browser sends it.
+fn form_write(rig: &Rig, path: &str, cookie: &str, body: &str) -> axum_test::TestRequest {
+    rig.app
+        .post(path)
+        .add_header("cookie", cookie.to_owned())
+        .text(body.to_owned())
+        .content_type("application/x-www-form-urlencoded")
+}
+
+#[tokio::test]
+async fn the_policy_writes_are_refused_for_anyone_but_a_global_administrator() {
+    let rig = rig().await;
+    let project = rig.store.project_id("app").await.unwrap().unwrap();
+    let other = rig.store.project_id("other").await.unwrap().unwrap();
+    let (audit, projects) = snapshot(&rig).await;
+    let overrides = rig.store.admin_project_overrides().await.unwrap();
+    let retention = retention_of(&rig).await;
+    let who = [
+        (
+            "viewer",
+            vec![Grant {
+                project: Some(project),
+                role: Role::Viewer,
+            }],
+        ),
+        (
+            "maintainer",
+            vec![Grant {
+                project: Some(project),
+                role: Role::Maintainer,
+            }],
+        ),
+        (
+            "project admin",
+            vec![Grant {
+                project: Some(project),
+                role: Role::Admin,
+            }],
+        ),
+        (
+            "other project's admin",
+            vec![Grant {
+                project: Some(other),
+                role: Role::Admin,
+            }],
+        ),
+    ];
+    for (name, grants) in who {
+        let cookie = signed_in(&rig, name, grants).await;
+        for (path, body, form) in policy_writes(1) {
+            // A JSON change, and the form with its right CSRF token: both refused by the role.
+            let res = json_write(&rig, "PUT", path, &cookie, Some(&body)).await;
+            assert_eq!(res.status_code(), 403, "{name} PUT {path}: {}", res.text());
+            let res = form_write(
+                &rig,
+                &format!("{path}/edit"),
+                &cookie,
+                &format!("{form}&csrf={CSRF}"),
+            )
+            .await;
+            assert_eq!(
+                res.status_code(),
+                403,
+                "{name} POST {path}/edit: {}",
+                res.text()
+            );
+        }
+    }
+    assert_eq!(snapshot(&rig).await, (audit, projects), "nothing changed");
+    assert_eq!(
+        rig.store.admin_project_overrides().await.unwrap(),
+        overrides
+    );
+    assert_eq!(retention_of(&rig).await, retention);
+}
+
+#[tokio::test]
+async fn a_policy_form_needs_the_csrf_token_of_its_own_session() {
+    let rig = rig().await;
+    let cookie = global_admin(&rig).await;
+    let (audit, projects) = snapshot(&rig).await;
+    for (path, _, form) in policy_writes(1) {
+        let edit = format!("{path}/edit");
+        // A forged cross-site form carries the cookie and no token, or a guessed one.
+        let res = form_write(&rig, &edit, &cookie, &form).await;
+        assert_eq!(
+            res.status_code(),
+            403,
+            "{path} without a token: {}",
+            res.text()
+        );
+        let res = form_write(&rig, &edit, &cookie, &format!("{form}&csrf=guessed")).await;
+        assert_eq!(
+            res.status_code(),
+            403,
+            "{path} with a wrong token: {}",
+            res.text()
+        );
+    }
+    assert_eq!(
+        snapshot(&rig).await,
+        (audit, projects),
+        "nothing was written"
+    );
+}
+
+#[tokio::test]
+async fn a_global_admin_sets_each_policy_over_json_and_as_a_form_and_each_change_is_audited() {
+    let rig = rig().await;
+    let cookie = global_admin(&rig).await;
+    let (audit, _) = snapshot(&rig).await;
+
+    // JSON: 200 with the project's ID, one audit event each.
+    for (path, body, _) in policy_writes(1) {
+        let res = json_write(&rig, "PUT", path, &cookie, Some(&body)).await;
+        assert_eq!(res.status_code(), 200, "{path}: {}", res.text());
+        assert!(res.json::<Value>()["id"].is_string(), "{path}");
+    }
+    assert_eq!(snapshot(&rig).await.0, audit + 4, "one event per change");
+    let retention = read(&rig, &cookie, "/api/v1/admin/retention")
+        .await
+        .json::<Value>();
+    let failure = retention["classes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["project"] == "app" && c["class"] == "failure_evidence")
+        .unwrap();
+    assert_eq!(failure["ttl_seconds"], 86_400, "the new window is in force");
+
+    // A form: sent back to its section of /admin, one event each. Other values, so it is a change.
+    for (path, _, form) in policy_writes(2) {
+        let res = form_write(
+            &rig,
+            &format!("{path}/edit"),
+            &cookie,
+            &format!("{form}&csrf={CSRF}"),
+        )
+        .await;
+        assert_eq!(res.status_code(), 303, "{path}: {}", res.text());
+        assert!(
+            res.header("location")
+                .to_str()
+                .unwrap()
+                .starts_with("/admin#")
+        );
+    }
+    assert_eq!(snapshot(&rig).await.0, audit + 8);
+
+    // A change the server or the store refuses writes nothing.
+    let before = snapshot(&rig).await.0;
+    let refused: [(&str, Value); 4] = [
+        (
+            "/api/v1/admin/retention/app/report",
+            json!({"days": 36_501}),
+        ),
+        (
+            "/api/v1/admin/artifact-classes/app/junit",
+            json!({"accepted": true, "max_bytes": u64::MAX}),
+        ),
+        (
+            "/api/v1/admin/artifact-quota/app",
+            json!({"bytes_per_day": u64::MAX}),
+        ),
+        (
+            "/api/v1/admin/metric-policy/app",
+            json!({"sample_interval_seconds": 301}),
+        ),
+    ];
+    for (path, body) in refused {
+        let res = json_write(&rig, "PUT", path, &cookie, Some(&body)).await;
+        assert_eq!(res.status_code(), 422, "{path} {body}: {}", res.text());
+    }
+    assert_eq!(
+        snapshot(&rig).await.0,
+        before,
+        "a refused change writes nothing"
+    );
+}
+
+/// The welcome's limits for a run of `agent` in project `app`, as the agent is told them.
+async fn welcome_limits(rig: &Rig, agent: &Agent) -> Limits {
+    let res = rig
+        .app
+        .post("/api/v1/agent/batch")
+        .authorization_bearer(rig.key.as_str())
+        .json(&BatchRequest {
+            hello: agent.hello(),
+            events: Vec::new(),
+            telemetry: Vec::new(),
+        })
+        .await;
+    assert_eq!(res.status_code(), 200, "{}", res.text());
+    let body: BatchResponse = res.json();
+    match &body.frames[0] {
+        ServerFrame::Welcome(w) => w.limits,
+        other => panic!("expected a welcome, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn the_welcome_carries_the_projects_sampling_intervals_and_none_when_nothing_sets_them() {
+    let rig = rig().await;
+    let agent = Agent::new("1200", "build", "runner-a");
+    let limits = welcome_limits(&rig, &agent).await;
+    assert_eq!(
+        limits.sample_interval_ms, None,
+        "unset: the agent's own default"
+    );
+    assert_eq!(limits.pressure_sample_interval_ms, None);
+
+    // The project's own interval, set on the dashboard, is what the agent is told.
+    let cookie = global_admin(&rig).await;
+    let res = json_write(
+        &rig,
+        "PUT",
+        "/api/v1/admin/metric-policy/app",
+        &cookie,
+        Some(&json!({"sample_interval_seconds": 2})),
+    )
+    .await;
+    assert_eq!(res.status_code(), 200, "{}", res.text());
+    let limits = welcome_limits(&rig, &agent).await;
+    assert_eq!(limits.sample_interval_ms, Some(2_000));
+    assert_eq!(limits.pressure_sample_interval_ms, None);
 }

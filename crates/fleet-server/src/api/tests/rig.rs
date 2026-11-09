@@ -327,7 +327,7 @@ impl Agent {
         self.flow_ms = ms;
     }
 
-    fn hello(&self) -> Hello {
+    pub(super) fn hello(&self) -> Hello {
         Hello {
             protocol: ProtocolRange {
                 min: PROTOCOL_VERSION,
