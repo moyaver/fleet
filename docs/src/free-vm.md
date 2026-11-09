@@ -6,35 +6,37 @@ Replace `<dashboard>` and `<uploads>` below with your own names.
 
 ## 1. Create the VM
 
-- Oracle Cloud's Always Free tier includes Arm (Ampere A1) compute. At the time of writing its allowance was 2 OCPUs and 12 GB of memory in total. Check Oracle's current limits before you create the instance, because they change.
+- Use Oracle Cloud's Always Free tier, which includes Arm (Ampere A1) compute.
+- Check Oracle's current limits before you create the instance. The limits change. At the time of writing, the allowance was 2 OCPUs and 12 GB of memory in total.
 - Create one instance with shape `VM.Standard.A1.Flex`, 2 OCPUs and 12 GB (or less), and an Ubuntu LTS image for arm64. Give it a public IPv4 address.
-- Oracle's Always Free terms also allow idle instances to be reclaimed. Check the current terms.
+- Check Oracle's Always Free terms. They allow idle instances to be reclaimed.
 
 ## 2. Open ports 80 and 443
 
-Ports 80 (the certificate challenge and redirect) and 443 (HTTPS) must reach the VM from the internet, in two places:
+Ports 80 (the certificate challenge and redirect) and 443 (HTTPS) must reach the VM from the internet. Open them in two places:
 
-1. The VCN security list (or a network security group): an ingress rule for TCP 80 and TCP 443 from `0.0.0.0/0`.
-2. The Ubuntu image's own firewall (iptables). Look at the chain first with `sudo iptables -L INPUT -n --line-numbers`, then add the rules above any `REJECT` rule:
+1. Add ingress rules for TCP 80 and TCP 443 from `0.0.0.0/0` to the VCN security list, or to a network security group.
+2. Open the same ports in the Ubuntu image's own firewall (iptables). List the chain first with `sudo iptables -L INPUT -n --line-numbers`. Insert the rules above any `REJECT` rule. The commands below insert at line 6. Choose a lower line number if a `REJECT` rule sits above line 6:
 
 ```bash
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo netfilter-persistent save   # from the iptables-persistent package, if it is missing: sudo apt-get install -y iptables-persistent
+sudo apt-get install -y iptables-persistent   # only if netfilter-persistent is missing
+sudo netfilter-persistent save
 ```
 
 ## 3. Get two names
 
 Create two DuckDNS names, each pointing at the VM's public IP:
 
-- `<dashboard>.duckdns.org` for the dashboard and the API;
-- `<uploads>.duckdns.org` for uploaded files.
+- Use `<dashboard>.duckdns.org` for the dashboard and the API.
+- Use `<uploads>.duckdns.org` for uploaded files.
 
 duckdns.org is on the Public Suffix List, so the two names are separate sites. Uploaded files must not share a site with the dashboard ([usercontent domain](operator-guide.md#usercontent-domain)). Caddy requests certificates for both names on first start, so both must resolve to the VM before then.
 
 ## 4. Install Docker
 
-Install Docker Engine and the Compose plugin from Docker's apt repository ([instructions](https://docs.docker.com/engine/install/ubuntu/)). Then let your user run it, and log in again:
+Install Docker Engine and the Compose plugin from Docker's apt repository ([instructions](https://docs.docker.com/engine/install/ubuntu/)). Then add your user to the `docker` group, and log in again:
 
 ```bash
 sudo usermod -aG docker "$USER"
@@ -88,14 +90,15 @@ Give the agent the same file with `FLEET_CA_FILE=caddy-root.crt` (step 7).
 
 The dashboard needs one of these:
 
-- **Browser sign-in** with your identity provider, set in the `[login]` section of `fleet.toml` ([browser sign-in](operator-guide.md#browser-sign-in)).
-- **Anonymous reads** for test data only. The `fleet.toml` in the repository has no `[api]` table: add these lines at the end of `deploy/compose/fleet.toml`, then restart with `docker compose restart fleet`:
+- Set up **browser sign-in** with your identity provider in the `[login]` section of `fleet.toml` ([browser sign-in](operator-guide.md#browser-sign-in)).
+- Turn on **anonymous reads** for test data only. The `fleet.toml` in the repository has no `[api]` table. Add these lines to the end of `deploy/compose/fleet.toml`, then run `docker compose restart fleet`:
 
   ```toml
   [api]
   anonymous_read = true
   ```
- Anyone who can reach the dashboard can then read every run, and anonymous reads are not rate limited. Do not use it with real application data.
+
+  Anyone who can reach the dashboard can then read every run. Anonymous reads are not rate limited. Do not use them with real application data.
 
 Scripts can use the REST API with the viewer token in `secrets/viewer_token`:
 
@@ -105,21 +108,21 @@ curl -H "Authorization: Bearer $(cat secrets/viewer_token)" https://<dashboard>.
 
 ## 7. Connect CI
 
-Create an API key for the project and store it as the CI secret `FLEET_TOKEN`. The key is shown once:
+Create an API key for the project and store it as the CI secret `FLEET_TOKEN`. The server prints the key once, so copy it then:
 
 ```bash
 docker compose run --rm fleet api-key create --project <project-slug> --name ci
 ```
 
-Set `FLEET_SERVER=https://<dashboard>.duckdns.org` in the job, then wrap the Maestro command with `fleet-agent run --` ([user guide](user-guide.md)).
+In the CI job, set `FLEET_SERVER=https://<dashboard>.duckdns.org`. Then wrap the Maestro command with `fleet-agent run --`. See the [user guide](user-guide.md).
 
-The agent is the matching `v0.1.0-alpha.4` release: the release installer and the composite action both install it (the [runner guide](runner-guide.md#install) has the installer command). To build the agent from this repository instead:
+The agent is the matching `v0.1.0-alpha.4` release. The release installer and the composite action both install it. The [runner guide](runner-guide.md#install) has the installer command. To build the agent from this repository instead:
 
 ```bash
 cargo build --locked -p fleet-agent     # target/debug/fleet-agent, on the runner or your machine
 ```
 
-In GitHub Actions, check out this repository next to your app, build the agent, and run the composite action from that checkout with `install: "false"`, which runs the `fleet-agent` already on `PATH`. This is the second half of the CI job in `.github/workflows/ci.yml`:
+In GitHub Actions, check out this repository next to your app, build the agent, and run the composite action from that checkout with `install: "false"`, which runs the `fleet-agent` already on `PATH`. The repository's own CI runs this pattern in the `action-smoke` job of `.github/workflows/ci.yml`:
 
 ```yaml
 steps:
@@ -141,5 +144,6 @@ Your job also needs `permissions: id-token: write` for the OIDC exchange, or `FL
 
 ## Limits of this setup
 
-- One VM, one Postgres and one Garage on its disk. A failed disk or a reclaimed instance loses the data unless you have a backup.
-- Take a backup ([backup and restore](operator-guide.md#backup-and-restore)) before you upgrade. Upgrade by changing `FLEET_IMAGE` in `.env`, then `docker compose pull && docker compose up -d`.
+- Plan for one VM: one Postgres and one Garage, both on its disk.
+- Expect data loss after a failed disk or a reclaimed instance, unless you have a backup.
+- Take a backup ([backup and restore](operator-guide.md#backup-and-restore)) before you upgrade. Upgrade by changing `FLEET_IMAGE` in `.env`, then run `docker compose pull && docker compose up -d`.

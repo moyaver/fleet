@@ -1,12 +1,12 @@
 # Fleet with Docker Compose
 
-The reference deployment: Caddy (TLS, WebSocket-friendly) → Fleet → Postgres 18, plus Garage as the S3-compatible artifact store (used from M5).
+The reference deployment: Caddy (TLS, WebSocket-friendly) → Fleet → Postgres 18, plus Garage as the S3-compatible artifact store.
 
 ## Start
 
 ```bash
 cd deploy/compose
-cp .env.example .env            # then fill in the Garage values
+cp .env.example .env            # then set FLEET_DOMAIN and FLEET_USERCONTENT_DOMAIN
 mkdir -p secrets
 openssl rand -hex 24 > secrets/postgres_password
 printf 'postgres://fleet:%s@postgres:5432/fleet' "$(cat secrets/postgres_password)" > secrets/database_url
@@ -66,7 +66,7 @@ curl --cacert caddy-root.crt https://localhost/readyz
 
 ```bash
 cargo build --release -p fleet-loadgen
-SSL_CERT_FILE=caddy-root.crt FLEET_TOKEN=<API key> target/release/fleet-loadgen \
+FLEET_CA_FILE=caddy-root.crt FLEET_TOKEN=<API key> target/release/fleet-loadgen \
   --server wss://localhost --storm --duplicates
 ```
 
