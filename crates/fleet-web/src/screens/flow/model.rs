@@ -688,17 +688,19 @@ fn history(view: &FlowDetailView, ctx: &Ctx) -> HistoryLine {
     let cells: Vec<Mark> = all.into_iter().skip(start).collect();
     let count = |mark: Mark| cells.iter().filter(|m| **m == mark).count();
     let (passed, failed) = (count(Mark::Passed), count(Mark::Failed));
+    // The strip ends at this execution, not at the flow's latest one: it reads the executions up
+    // to and including this one, the oldest dropped past HISTORY_CELLS. The words say so.
     let summary = if view.previous.is_empty() {
         "First execution of this flow".to_owned()
     } else {
         format!(
-            "Failed in {failed} of the last {}",
+            "Failed in {failed} of the last {} up to this one",
             plural(cells.len(), "execution", "executions")
         )
     };
     HistoryLine {
         strip_label: format!(
-            "Last {}: {passed} passed, {failed} failed, {} other",
+            "Last {} up to this one: {passed} passed, {failed} failed, {} other",
             plural(cells.len(), "execution", "executions"),
             cells.len() - passed - failed
         ),
@@ -1251,14 +1253,43 @@ mod tests {
     fn the_history_line_strips_this_flows_recent_executions_and_opens_its_history() {
         let h = page().history;
         assert_eq!(h.cells, [Mark::Passed, Mark::Failed]);
-        assert_eq!(h.summary, "Failed in 1 of the last 2 executions");
+        assert_eq!(
+            h.summary,
+            "Failed in 1 of the last 2 executions up to this one"
+        );
         assert_eq!(
             h.strip_label,
-            "Last 2 executions: 1 passed, 1 failed, 0 other"
+            "Last 2 executions up to this one: 1 passed, 1 failed, 0 other"
         );
         assert_eq!(
             h.href,
             "/history?project=shop&flow=flows%2Fcheckout.yaml&stats=flows%2Fcheckout.yaml"
+        );
+    }
+
+    #[test]
+    fn a_strip_of_more_executions_than_it_shows_counts_only_the_cells_and_says_so() {
+        // Nine earlier executions, the newest failed: the strip holds the last eight of the ten,
+        // so the two oldest are not counted, and the words say the count ends at this execution.
+        use fleet_protocol::rest::PreviousExecutionView;
+
+        let mut v = view();
+        let template = v.previous[0].clone();
+        v.previous = (0..9)
+            .map(|i| PreviousExecutionView {
+                state: if i == 0 { "failed" } else { "passed" }.to_owned(),
+                ..template.clone()
+            })
+            .collect();
+        let h = FlowPage::build(&v, &ctx()).history;
+        assert_eq!(h.cells.len(), 8);
+        assert_eq!(
+            h.summary,
+            "Failed in 2 of the last 8 executions up to this one"
+        );
+        assert_eq!(
+            h.strip_label,
+            "Last 8 executions up to this one: 6 passed, 2 failed, 0 other"
         );
     }
 
