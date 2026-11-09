@@ -34,6 +34,8 @@ This installs the latest cargo-nextest, cargo-deny, cargo-about, Trunk and mdBoo
 | `cargo xtask web [--release]` | Build the dashboard into `crates/fleet-web/dist` |
 | `cargo run -p fleet-server -- serve` | Serve the dashboard and API on <http://127.0.0.1:8080> |
 
+The browser tests (`fleet-e2e`) never leave Chrome running. Each test's chromedriver leads its own process group, Chrome joins it, and the test's `Browser` ends the session and that group when it drops, also when the test panics. Each Chrome runs on a profile under `$TMPDIR/fleet-e2e-chrome/`, and removes it when the browser ends. A test process killed outright (no drop) is cleaned up by the next fleet-e2e run: it ends the Chrome processes whose profile belongs to a test process that is no longer alive, and deletes those profiles. It never touches a Chrome whose profile is outside that directory.
+
 Two checkouts can share one Postgres server, but not the `#[sqlx::test]` tests at the same time. sqlx 0.9 names each such test's database from a hash of the test's module path and name (`_sqlx_test_<hash>`), with no per-process or per-checkout part, so two runs of the same test both create `_sqlx_test_<hash>` and the second fails with `duplicate key … _sqlx_test_<hash> already exists`. Give each checkout its own server (a container on its own port), or run one checkout's database tests at a time. The other database tests name their databases `fleet_test_<uuid>` (`fleet_store::testing::fresh_database`) and do not collide.
 
 ## 3. Rules that CI enforces
