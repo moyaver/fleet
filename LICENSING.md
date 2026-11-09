@@ -22,7 +22,7 @@ Running an unmodified Fleet, or a modified one only you use, asks nothing of you
 
 ## Can I fork it?
 
-Yes, it's open source. Forks are welcome under the AGPL. A fork must not use the name "Fleet" or the project's logo in a way that suggests it is the official project, or that the owner endorses it. Call your fork something else, and say it's based on Fleet.
+Yes, it's open source. Forks are welcome under the AGPL. A fork must not use the name "Fleet" in a way that suggests it is the official project, or that the owner endorses it. Call your fork something else, and say it's based on Fleet.
 
 ## I want to use Fleet in a proprietary product
 

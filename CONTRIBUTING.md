@@ -57,7 +57,7 @@ The invariants in [PLAN §3](docs/PLAN.md#3-invariants-non-negotiable) are non-n
 - [Conventional Commits](https://www.conventionalcommits.org/): `feat(agent): …`, `fix(server): …`, `docs: …`, `chore(ci): …`. Scopes are crate names without the `fleet-` prefix, plus `ci`, `docs`, `xtask`. CI does not check commit messages or PR titles. Reviewers do.
 - `cargo xtask ci` passes locally.
 - Update the docs and [CHANGELOG.md](CHANGELOG.md) (`Unreleased`) when behaviour changes.
-- `main` keeps a linear history: pull requests are squash- or rebase-merged.
+- Merging: the repository allows merge, squash and rebase. The `main` ruleset, which would require linear history, the checks `cargo xtask ci`, `agent (macOS arm64)` and `check`, and resolved review threads, is defined but **disabled**. Today GitHub does not enforce any of it. CI runs the checks on each pull request, and reviewers check the rest. The `cla-signatures` branch is protected against deletion and force-push.
 
 ## 5. Architecture decisions
 
