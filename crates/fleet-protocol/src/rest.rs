@@ -424,8 +424,8 @@ pub enum MetricUnit {
 pub enum MetricScope {
     /// The machine.
     Host,
-    /// The Maestro process.
-    Maestro,
+    /// The runner's process (Maestro today). Older clients send `maestro`.
+    Runner,
     /// The Fleet agent itself.
     Agent,
     /// The emulator process, as the host sees it.
@@ -730,7 +730,7 @@ pub struct ArtifactView {
     /// no step produced it, and for uploads that predate step links.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step: Option<u32>,
-    /// The class: `failure_screenshot`, `failure_hierarchy`, `commands`, `junit`, `maestro_log`,
+    /// The class: `failure_screenshot`, `failure_hierarchy`, `commands`, `junit`, `runner_log`,
     /// `html_report` or `device_logcat`.
     pub class: String,
     /// File name.

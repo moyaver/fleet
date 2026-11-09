@@ -31,11 +31,11 @@ const MEM_TOTAL: &str = "host_mem_total_bytes";
 const CPU_CORES: &str = "host_cpu_cores";
 const HOST_CPU: &str = "host_cpu_pct";
 const HOST_MEM: &str = "host_mem_used_bytes";
-const MAESTRO_CPU: &str = "maestro_cpu_pct";
+const RUNNER_CPU: &str = "runner_cpu_pct";
 const AGENT_CPU: &str = "agent_cpu_pct";
 
 /// The metrics the Runner page charts, in the order its design shows them.
-pub const CHARTED: [&str; 5] = [HOST_CPU, HOST_MEM, MAESTRO_CPU, AGENT_CPU, "emu_cpu_pct"];
+pub const CHARTED: [&str; 5] = [HOST_CPU, HOST_MEM, RUNNER_CPU, AGENT_CPU, "emu_cpu_pct"];
 
 /// The newest host sample's value for `metric`, when the agent reported one.
 fn latest_value(w: &WorkerSummaryView, metric: &str) -> Option<f64> {
@@ -235,9 +235,9 @@ pub fn health_cells(view: &WorkerView, processes: Option<&MetricsPanel>) -> Vec<
             None => HealthValue::Missing(Some("no samples in this range".to_owned())),
         };
         cells.push(HealthCell {
-            id: MAESTRO_CPU,
+            id: RUNNER_CPU,
             label: "Maestro CPU (% of one core)",
-            value: process(MAESTRO_CPU),
+            value: process(RUNNER_CPU),
             note: Some("while a run is active".to_owned()),
         });
         cells.push(HealthCell {
@@ -278,7 +278,7 @@ pub struct RunRow {
 impl RunRow {
     fn build(r: &WorkerRunView, ctx: &Ctx) -> Self {
         let started_ms = unix_ms(r.started_at);
-        let exit = r.run.maestro_exit_code;
+        let exit = r.run.runner_exit_code;
         let (verdict, open, duration, mut outcome) = match r.ended_at {
             None => (
                 Pill {
@@ -535,15 +535,15 @@ mod tests {
                 r#"{"subject": {"kind": "worker", "id": "00000000-0000-0000-0000-0000000000a1"},
                 "from": "2026-01-01T10:00:00Z", "to": "2026-01-01T11:00:00Z",
                 "resolution": "raw", "truncated": false,
-                "series": [{"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
-                  "scope": "maestro", "available": true,
+                "series": [{"metric": "runner_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+                  "scope": "runner", "available": true,
                   "points": [{"at_ms": 1767261600000, "value": 12.0, "available": true},
                              {"at_ms": 1767261660000, "value": 180.0, "available": true}]}]}"#,
             )
             .unwrap(),
         );
         let cells = health_cells(&view(WORKER), Some(&panel));
-        let maestro = cells.iter().find(|c| c.id == "maestro_cpu_pct").unwrap();
+        let maestro = cells.iter().find(|c| c.id == "runner_cpu_pct").unwrap();
         assert_eq!(
             maestro.value,
             HealthValue::Value(Unit::PercentOfCore.format(180.0))
@@ -685,7 +685,7 @@ mod tests {
             "trust_level": "trusted", "committed_seq": 40, "gaps": if id == 2 { 2 } else { 0 },
             "last_frame_at": "2026-01-01T10:59:55Z", "late_resume": false,
             "plan_id": null, "plan_shard_id": null,
-            "maestro_exit_code": if ended.is_some() { serde_json::json!(1) } else { serde_json::Value::Null },
+            "runner_exit_code": if ended.is_some() { serde_json::json!(1) } else { serde_json::Value::Null },
             "rev": 3, "liveness": if ended.is_some() { "completed" } else { "online" }
           },
           "pipeline_attempt_id": "00000000-0000-0000-0000-0000000000c1",
@@ -727,9 +727,9 @@ mod tests {
     #[test]
     fn a_run_that_ended_clean_is_no_failures_and_one_without_an_exit_is_interrupted() {
         let mut clean = run(3, "2026-01-01T09:00:00Z", Some("2026-01-01T09:04:05Z"));
-        clean["run"]["maestro_exit_code"] = serde_json::json!(0);
+        clean["run"]["runner_exit_code"] = serde_json::json!(0);
         let mut cut_short = run(4, "2026-01-01T10:00:00Z", Some("2026-01-01T10:01:00Z"));
-        cut_short["run"]["maestro_exit_code"] = serde_json::Value::Null;
+        cut_short["run"]["runner_exit_code"] = serde_json::Value::Null;
         let v = worker_with_runs(vec![clean, cut_short]);
         let list = RunsList::from_view(&v, &ctx("2026-01-01T11:00:00Z"));
         let rows = list.rows();

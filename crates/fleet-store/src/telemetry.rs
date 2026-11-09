@@ -140,8 +140,8 @@ struct Columns {
     host_cpu: Vec<Option<f32>>,
     host_used: Vec<Option<i64>>,
     host_total: Vec<Option<i64>>,
-    maestro_cpu: Vec<Option<f32>>,
-    maestro_rss: Vec<Option<i64>>,
+    runner_cpu: Vec<Option<f32>>,
+    runner_rss: Vec<Option<i64>>,
     agent_cpu: Vec<Option<f32>>,
     agent_rss: Vec<Option<i64>>,
     load_1m: Vec<Option<f32>>,
@@ -343,8 +343,8 @@ impl Columns {
         self.host_cpu.push(s.host_cpu_pct);
         self.host_used.push(opt_i64(s.host_mem_used_bytes));
         self.host_total.push(opt_i64(s.host_mem_total_bytes));
-        self.maestro_cpu.push(s.maestro_cpu_pct);
-        self.maestro_rss.push(opt_i64(s.maestro_rss_bytes));
+        self.runner_cpu.push(s.runner_cpu_pct);
+        self.runner_rss.push(opt_i64(s.runner_rss_bytes));
         self.agent_cpu.push(s.agent_cpu_pct);
         self.agent_rss.push(opt_i64(s.agent_rss_bytes));
         self.load_1m.push(s.host_load_1m);
@@ -363,8 +363,8 @@ impl Columns {
         }
         sqlx::query!(
             "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq, host_cpu_pct,
-                                       host_mem_used_bytes, host_mem_total_bytes, maestro_cpu_pct,
-                                       maestro_rss_bytes, agent_cpu_pct, agent_rss_bytes,
+                                       host_mem_used_bytes, host_mem_total_bytes, runner_cpu_pct,
+                                       runner_rss_bytes, agent_cpu_pct, agent_rss_bytes,
                                        host_load_1m, host_cpu_cores, host_swap_used_bytes,
                                        host_swap_total_bytes, host_psi_cpu_pct,
                                        host_psi_memory_pct, host_psi_io_pct, unavailable)
@@ -382,8 +382,8 @@ impl Columns {
             &self.host_cpu as &[Option<f32>],
             &self.host_used as &[Option<i64>],
             &self.host_total as &[Option<i64>],
-            &self.maestro_cpu as &[Option<f32>],
-            &self.maestro_rss as &[Option<i64>],
+            &self.runner_cpu as &[Option<f32>],
+            &self.runner_rss as &[Option<i64>],
             &self.agent_cpu as &[Option<f32>],
             &self.agent_rss as &[Option<i64>],
             &self.load_1m as &[Option<f32>],
@@ -418,8 +418,8 @@ mod tests {
             host_cpu_pct: None,
             host_mem_used_bytes: None,
             host_mem_total_bytes: None,
-            maestro_cpu_pct: None,
-            maestro_rss_bytes: None,
+            runner_cpu_pct: None,
+            runner_rss_bytes: None,
             agent_cpu_pct: None,
             agent_rss_bytes: None,
             host_load_1m: None,
@@ -455,8 +455,8 @@ mod tests {
             host_psi_cpu_pct: Some(Unavailable::NoPsi),
             host_psi_memory_pct: Some(Unavailable::NoPsi),
             host_psi_io_pct: Some(Unavailable::NoPsi),
-            maestro_cpu_pct: Some(Unavailable::NoProcess),
-            maestro_rss_bytes: Some(Unavailable::NoProcess),
+            runner_cpu_pct: Some(Unavailable::NoProcess),
+            runner_rss_bytes: Some(Unavailable::NoProcess),
             ..SampleUnavailable::default()
         };
         // An agent that predates reasons: a value for every reading it has, and no reason at all.

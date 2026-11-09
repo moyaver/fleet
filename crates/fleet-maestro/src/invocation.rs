@@ -542,7 +542,7 @@ pub fn prepare(
     .filter(|(k, _)| !user_env(k))
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
     .collect();
-    let maestro_log = env.iter().any(|(k, _)| k == "MAESTRO_CLI_LOG_PATTERN_FILE");
+    let runner_log = env.iter().any(|(k, _)| k == "MAESTRO_CLI_LOG_PATTERN_FILE");
     Prepared {
         argv: out,
         env,
@@ -553,7 +553,7 @@ pub fn prepare(
                 reason,
             },
             debug_output: debug_dir.clone(),
-            maestro_log,
+            runner_log,
         },
         debug_dir,
         report,
@@ -914,7 +914,7 @@ mod tests {
         assert_eq!(p.evidence.report.path.as_deref(), Some("/run/report.xml"));
         assert_eq!(p.evidence.report.reason, ReportReason::Injected);
         assert_eq!(p.evidence.debug_output.as_deref(), Some("/run/artifacts"));
-        assert!(p.evidence.maestro_log);
+        assert!(p.evidence.runner_log);
         let p = run("maestro test login.yaml");
         assert_eq!(p.evidence.report.path, None);
         assert_eq!(p.evidence.report.reason, ReportReason::SkippedSingleFlow);
@@ -928,7 +928,7 @@ mod tests {
             |_| true,
         );
         assert_eq!(p.evidence.report.reason, ReportReason::RewriteDisabled);
-        assert!(!p.evidence.maestro_log, "the user's own log pattern");
+        assert!(!p.evidence.runner_log, "the user's own log pattern");
     }
 
     /// Where Maestro writes for each flag combination (research 01 §4.1; the captured fixtures in

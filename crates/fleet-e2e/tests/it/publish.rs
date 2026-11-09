@@ -138,7 +138,7 @@ async fn a_maestro_output_directory_publishes_as_the_run_it_describes() {
         .get(&format!("/api/v1/projects/app/flows/{flow}/artifacts"))
         .await;
     let artifacts = listed["artifacts"].as_array().unwrap();
-    for class in ["failure_screenshot", "commands", "maestro_log"] {
+    for class in ["failure_screenshot", "commands", "runner_log"] {
         assert!(
             artifacts.iter().any(|a| a["class"] == class),
             "no {class} in {listed}"

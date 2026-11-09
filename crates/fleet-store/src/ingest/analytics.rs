@@ -65,7 +65,7 @@ async fn load(tx: &mut PgConnection, flows: &[Uuid]) -> Result<Vec<Flow>, sqlx::
                   WHERE s.flow_execution_id = f.id AND s.run_day = r.run_day
                     AND s.status = 'failed'
                   ORDER BY s.step_index LIMIT 1) AS failed_step,
-                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider, r.maestro_version,
+                w.os AS \"os?\", w.arch AS \"arch?\", pr.provider, r.runner_version,
                 coalesce(dp.model, dp.avd_or_runtime) AS device_model, dp.api_level AS \"api_level?\",
                 (SELECT h.host_mem_total_bytes FROM host_samples h
                   WHERE h.agent_run_id = f.agent_run_id AND h.host_mem_total_bytes IS NOT NULL
@@ -97,7 +97,7 @@ async fn load(tx: &mut PgConnection, flows: &[Uuid]) -> Result<Vec<Flow>, sqlx::
             conditions: ConditionFacts {
                 device_model: row.device_model,
                 device_api_level: row.api_level.and_then(|n| u32::try_from(n).ok()),
-                maestro_version: row.maestro_version,
+                runner_version: row.runner_version,
                 os: row.os,
                 arch: row.arch,
                 host_cores: None,
@@ -173,7 +173,7 @@ async fn store_failure(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx::E
 mod tests {
     use fleet_core::fingerprint::FailureFacts;
     use fleet_protocol::{
-        event::{EventBody, MaestroBuild, RunEnded},
+        event::{EventBody, RunEnded, RunnerBuild},
         frame::{Hello, Sample, SampleUnavailable, Telemetry},
         journal::{ClockSample, SourceKind, Subject},
     };
@@ -235,8 +235,8 @@ mod tests {
                 host_cpu_pct: None,
                 host_mem_used_bytes: None,
                 host_mem_total_bytes: Some(total),
-                maestro_cpu_pct: None,
-                maestro_rss_bytes: None,
+                runner_cpu_pct: None,
+                runner_rss_bytes: None,
                 agent_cpu_pct: None,
                 agent_rss_bytes: None,
                 host_load_1m: None,
@@ -276,7 +276,8 @@ mod tests {
             rest.push(a.event(
                 Subject::default(),
                 SourceKind::DebugLog,
-                &EventBody::MaestroDetected(MaestroBuild {
+                &EventBody::RunnerDetected(RunnerBuild {
+                    runner: "maestro".into(),
                     version: version.into(),
                     profile_supported,
                 }),
@@ -468,7 +469,7 @@ mod tests {
                 "device_model": "unknown",
                 "host_cores": "unknown",
                 "host_memory": "16GiB",
-                "maestro": "unknown",
+                "runner": "unknown",
                 "os": "linux",
             }))
         );
@@ -479,7 +480,7 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../migrations")]
-    async fn the_condition_fingerprint_includes_the_maestro_version(pool: PgPool) {
+    async fn the_condition_fingerprint_includes_the_runner_version(pool: PgPool) {
         let store = Store {
             pool,
             origin: uuid::Uuid::now_v7(),
@@ -515,14 +516,14 @@ mod tests {
         run_as(&store, "343", &[LOGIN], None, None, |_| {}).await;
         // The run keeps the version it reported, and whether its profile was supported.
         let stored = sqlx::query!(
-            "SELECT maestro_version, maestro_profile_supported FROM agent_runs WHERE id = $1",
+            "SELECT runner_version, runner_profile_supported FROM agent_runs WHERE id = $1",
             first.id
         )
         .fetch_one(store.pool())
         .await
         .unwrap();
-        assert_eq!(stored.maestro_version.as_deref(), Some("2.12.1"));
-        assert_eq!(stored.maestro_profile_supported, Some(true));
+        assert_eq!(stored.runner_version.as_deref(), Some("2.12.1"));
+        assert_eq!(stored.runner_profile_supported, Some(true));
         let all = conditions(&store).await;
         let [a, b, c, unknown] = all.as_slice() else {
             panic!("expected four flows, got {}", all.len());
@@ -531,7 +532,7 @@ mod tests {
         assert_eq!(a.id, b.id);
         assert_ne!(a.id, c.id);
         assert_ne!(a.id, unknown.id);
-        let maestro = |c: &Condition| c.dims.as_ref().and_then(|d| d.get("maestro")).cloned();
+        let maestro = |c: &Condition| c.dims.as_ref().and_then(|d| d.get("runner")).cloned();
         assert_eq!(maestro(a), Some(serde_json::json!("2.12")));
         assert_eq!(maestro(c), Some(serde_json::json!("2.13")));
         assert_eq!(maestro(unknown), Some(serde_json::json!("unknown")));

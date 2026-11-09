@@ -104,7 +104,7 @@ async fn a_failed_runs_evidence_is_uploaded_redacted_and_opens_only_on_the_userc
 
     // The log and the commands were redacted on the runner: the planted value is not in what
     // the server stored, and the screenshot is the exact bytes of the file Maestro wrote.
-    for class in ["commands", "maestro_log"] {
+    for class in ["commands", "runner_log"] {
         let link = find(class)["link"]["url"].as_str().unwrap();
         let path = url::Url::parse(link).unwrap().path().to_owned();
         let (status, head, body) = get_as(stack.addr(), USERCONTENT, &path).await;

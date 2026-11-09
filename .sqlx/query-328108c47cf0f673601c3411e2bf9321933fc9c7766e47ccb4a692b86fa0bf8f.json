@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET runner_version = $2, runner_profile_supported = $3, rev = rev + 1\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "328108c47cf0f673601c3411e2bf9321933fc9c7766e47ccb4a692b86fa0bf8f"
+}

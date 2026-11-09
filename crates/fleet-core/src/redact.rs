@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Secret redaction (invariant I6).
 //!
-//! Research 08 found planted `-e` and `MAESTRO_*` values in clear in `commands.json`, both
-//! `maestro.log`s and the argv. Everything that leaves the runner goes through a [`Redactor`]
-//! built from those values, secret-named environment variables, and well-known token shapes.
+//! Research 08 found planted secret values in clear in `commands.json`, the runner's logs and the
+//! argv. Everything that leaves the runner goes through a [`Redactor`] built from the secret
+//! values the runner adapter names (`fleet-maestro::redact` for Maestro), and from well-known
+//! token shapes. This module knows no runner's flags or variables.
 
 use std::{borrow::Cow, fmt::Write as _};
 
@@ -85,12 +86,6 @@ impl Redactor {
         }
     }
 
-    /// Builds a redactor for a Maestro run from its argv and the environment it runs with.
-    #[must_use]
-    pub fn for_run<'a>(argv: &[String], env: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
-        Self::new(secrets_from(argv, env))
-    }
-
     /// The text with every secret replaced.
     #[must_use]
     pub fn redact<'t>(&self, text: &'t str) -> Cow<'t, str> {
@@ -109,32 +104,12 @@ impl Redactor {
     }
 }
 
-/// Secret values for a run: `-e KEY=VALUE` / `--env KEY=VALUE` arguments, every `MAESTRO_*`
-/// variable (Maestro passes those into flows), and variables whose names look secret.
+/// Whether an environment variable's name marks it as a secret (its upper-cased name contains a
+/// secret word such as `TOKEN` or `PASSWORD`).
 #[must_use]
-pub fn secrets_from<'a>(
-    argv: &[String],
-    env: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut rest = argv.iter();
-    while let Some(arg) = rest.next() {
-        let value = match arg.as_str() {
-            "-e" | "--env" => rest.next().map(String::as_str),
-            a => a.strip_prefix("--env=").or_else(|| a.strip_prefix("-e=")),
-        };
-        if let Some((_, v)) = value.and_then(|kv| kv.split_once('=')) {
-            out.push(v.to_owned());
-        }
-    }
-    for (name, value) in env {
-        let upper = name.to_ascii_uppercase();
-        let named_secret = SECRET_NAME_PARTS.iter().any(|p| upper.contains(p));
-        if (upper.starts_with("MAESTRO_") && !is_maestro_setting(&upper)) || named_secret {
-            out.push(value.to_owned());
-        }
-    }
-    out
+pub fn is_secret_name(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    SECRET_NAME_PARTS.iter().any(|p| upper.contains(p))
 }
 
 /// Where the reader of a command line is, for [`redact_argv`].
@@ -153,19 +128,20 @@ enum Expect {
 /// Records a command line without its secrets (I6, research 06 T5).
 ///
 /// `safe_value_flag` names the flags whose value is known not to be a secret; `boolean_flag`
-/// names the flags that take no value, so the word after them is not theirs. The value of any
-/// other flag is replaced with [`MARKER`]. The value of `-e`/`--env` is replaced with
-/// `KEY=[REDACTED]`, whatever it holds. Words that are not flags are kept, and so is everything
-/// after `--`. The program name is kept.
+/// names the flags that take no value, so the word after them is not theirs; `env_flag` names
+/// the flags that take a `KEY=VALUE` pair. The value of any other flag is replaced with
+/// [`MARKER`]. The value of an `env_flag` is replaced with `KEY=[REDACTED]`, whatever it holds.
+/// Words that are not flags are kept, and so is everything after `--`. The program name is kept.
 #[must_use]
 pub fn redact_argv(
     argv: &[String],
     safe_value_flag: impl Fn(&str) -> bool,
     boolean_flag: impl Fn(&str) -> bool,
+    env_flag: impl Fn(&str) -> bool,
 ) -> Vec<String> {
     let flag_like = |word: &str| {
         let name = word.split_once('=').map_or(word, |(n, _)| n);
-        name.starts_with("--") || name == "-e" || boolean_flag(name) || safe_value_flag(name)
+        name.starts_with("--") || env_flag(name) || boolean_flag(name) || safe_value_flag(name)
     };
     let mut out = Vec::with_capacity(argv.len());
     let mut words = argv.iter();
@@ -203,7 +179,7 @@ pub fn redact_argv(
         let (name, inline) = word
             .split_once('=')
             .map_or((word.as_str(), None), |(n, v)| (n, Some(v)));
-        if name == "-e" || name == "--env" {
+        if env_flag(name) {
             if let Some(kv) = inline {
                 out.push(format!("{name}={}", env_pair(kv)));
             } else {
@@ -235,13 +211,6 @@ fn env_pair(kv: &str) -> String {
         Some((key, _)) => format!("{key}={MARKER}"),
         None => MARKER.to_owned(),
     }
-}
-
-/// `MAESTRO_*` variables that configure the CLI rather than carry flow data.
-fn is_maestro_setting(upper: &str) -> bool {
-    upper.starts_with("MAESTRO_CLI_")
-        || upper == "MAESTRO_DISABLE_UPDATE_CHECK"
-        || upper == "MAESTRO_DRIVER_STARTUP_TIMEOUT"
 }
 
 fn percent_encoded(value: &str, uppercase: bool) -> String {
@@ -289,35 +258,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn finds_secrets_in_argv_and_env() {
-        let argv: Vec<String> = [
-            "maestro",
-            "test",
-            "-e",
-            "PASSWORD=hunter22",
-            "--env=PIN=1234",
-            "-e",
-            "X=1",
-            "flow.yaml",
-        ]
-        .map(String::from)
-        .to_vec();
-        let env = [
-            ("MAESTRO_FLEET_TOKEN", "abcd-efgh"),
-            ("MAESTRO_CLI_NO_ANALYTICS", "1"),
-            ("HOME", "/home/me"),
-            ("API_KEY", "k3y-value"),
-        ];
-        let s = secrets_from(&argv, env);
-        assert!(s.contains(&"hunter22".to_owned()) && s.contains(&"1234".to_owned()));
-        assert!(s.contains(&"abcd-efgh".to_owned()) && s.contains(&"k3y-value".to_owned()));
-        assert!(!s.contains(&"/home/me".to_owned()), "HOME is not a secret");
-        let r = Redactor::new(s);
-        assert_eq!(
-            r.redact("input hunter22 then 1"),
-            "input [REDACTED] then 1",
-            "short values are left alone"
-        );
+    fn secret_words_in_names_mark_secrets() {
+        assert!(is_secret_name("api_token"));
+        assert!(is_secret_name("PIN_PASSWORD"));
+        assert!(!is_secret_name("HOME"));
     }
 
     #[test]
@@ -367,6 +311,10 @@ mod tests {
         matches!(name, "--flatten-debug-output" | "-c")
     }
 
+    fn env(name: &str) -> bool {
+        matches!(name, "-e" | "--env")
+    }
+
     #[test]
     fn unknown_flag_values_are_redacted_and_known_flags_keep_theirs() {
         let argv = words(&[
@@ -382,7 +330,7 @@ mod tests {
             "flow.yaml",
         ]);
         assert_eq!(
-            redact_argv(&argv, safe_value, boolean),
+            redact_argv(&argv, safe_value, boolean, env),
             words(&[
                 "maestro",
                 "test",
@@ -410,7 +358,7 @@ mod tests {
             "FLAG",
         ]);
         assert_eq!(
-            redact_argv(&argv, safe_value, boolean),
+            redact_argv(&argv, safe_value, boolean, env),
             words(&[
                 "maestro",
                 "test",
@@ -435,7 +383,7 @@ mod tests {
             "-x",
         ]);
         assert_eq!(
-            redact_argv(&argv, safe_value, boolean),
+            redact_argv(&argv, safe_value, boolean, env),
             words(&[
                 "maestro",
                 "test",

@@ -49,7 +49,7 @@ pub(super) fn run(n: u128, job: u128, liveness: &str) -> AgentRunView {
         "id": id(n), "job_id": id(job), "worker_id": null, "runner_name": "runner-1",
         "state": "active", "trust_level": "trusted", "committed_seq": 0, "gaps": 0,
         "last_frame_at": "2026-01-01T00:00:00Z", "late_resume": false, "plan_id": null,
-        "plan_shard_id": null, "maestro_exit_code": null, "rev": 1, "liveness": liveness
+        "plan_shard_id": null, "runner_exit_code": null, "rev": 1, "liveness": liveness
     }))
 }
 

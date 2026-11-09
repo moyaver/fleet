@@ -450,7 +450,7 @@ async fn run_started_persists_the_evidence_description(pool: PgPool) {
             reason: ReportReason::UserFormat,
         },
         debug_output: Some("/run/artifacts".into()),
-        maestro_log: true,
+        runner_log: true,
     };
     let started = a.event(
         Subject::default(),
@@ -1352,7 +1352,7 @@ async fn rejected_process_exit_does_not_change_the_run(pool: PgPool) {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(snapshot.agent_runs[0].maestro_exit_code, None);
+    assert_eq!(snapshot.agent_runs[0].runner_exit_code, None);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

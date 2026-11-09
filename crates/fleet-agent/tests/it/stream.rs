@@ -383,15 +383,15 @@ fn a_run_streams_to_the_server_without_changing_the_result() {
         ev["debug_output"].as_str().map(Path::new),
         Some(run_dir.join("artifacts").as_path())
     );
-    assert_eq!(ev["maestro_log"], true);
+    assert_eq!(ev["runner_log"], true);
 }
 
-/// The `maestro.detected` payloads the server committed.
-fn maestro_detected(state: &State) -> Vec<Value> {
+/// The `runner.detected` payloads the server committed.
+fn runner_detected(state: &State) -> Vec<Value> {
     state
         .committed
         .values()
-        .filter(|e| e["type"] == "maestro.detected")
+        .filter(|e| e["type"] == "runner.detected")
         .map(|e| e["data"].clone())
         .collect()
 }
@@ -406,8 +406,8 @@ fn the_maestro_version_is_journaled_once_per_run() {
         std::fs::read(fixture("suite/stdout.bin")).unwrap()
     );
     assert_eq!(
-        maestro_detected(&srv.state.lock().unwrap()),
-        [json!({ "version": "2.12.1", "profile_supported": true })]
+        runner_detected(&srv.state.lock().unwrap()),
+        [json!({ "runner": "maestro", "version": "2.12.1", "profile_supported": true })]
     );
     assert!(
         !String::from_utf8_lossy(&out.stderr).contains("version profile"),
@@ -438,8 +438,8 @@ fn an_unsupported_maestro_version_is_flagged_and_the_run_is_unchanged() {
         "{stderr}"
     );
     assert_eq!(
-        maestro_detected(&srv.state.lock().unwrap()),
-        [json!({ "version": "2.13.0", "profile_supported": false })]
+        runner_detected(&srv.state.lock().unwrap()),
+        [json!({ "runner": "maestro", "version": "2.13.0", "profile_supported": false })]
     );
 }
 
@@ -457,7 +457,7 @@ fn a_log_without_a_version_line_reports_none() {
         out.stdout,
         std::fs::read(fixture("suite/stdout.bin")).unwrap()
     );
-    let detected: Vec<Value> = maestro_detected(&srv.state.lock().unwrap());
+    let detected: Vec<Value> = runner_detected(&srv.state.lock().unwrap());
     assert!(detected.is_empty(), "{detected:?}");
     assert!(!String::from_utf8_lossy(&out.stderr).contains("version profile"));
 }

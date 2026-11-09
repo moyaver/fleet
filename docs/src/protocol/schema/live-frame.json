@@ -50,28 +50,6 @@
           ],
           "description": "Set by the server from live contact (heartbeats never touch the database)."
         },
-        "maestro_exit_code": {
-          "description": "Maestro's exit code.",
-          "format": "int32",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "maestro_profile_supported": {
-          "description": "Whether the agent's parsers were built for that version. Absent until it is known.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "maestro_version": {
-          "description": "The Maestro version the run's session log named, when it did.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "origin": {
           "$ref": "#/$defs/RunOrigin",
           "default": "live",
@@ -97,8 +75,30 @@
           "format": "int64",
           "type": "integer"
         },
+        "runner_exit_code": {
+          "description": "The runner's exit code.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "runner_name": {
           "description": "Runner name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner_profile_supported": {
+          "description": "Whether the agent's parsers were built for that version. Absent until it is known.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "runner_version": {
+          "description": "The runner version the run's session log named, when it did.",
           "type": [
             "string",
             "null"

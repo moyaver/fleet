@@ -47,7 +47,7 @@ fn parse_log(path: &Path) -> Value {
     let mut flows = Vec::new();
     let mut step_ends: BTreeMap<String, u32> = BTreeMap::new();
     let mut crashes = Vec::new();
-    let mut maestro_version = None;
+    let mut runner_version = None;
     for r in &records {
         match log::classify(r) {
             Some(log::Event::ShardAssigned {
@@ -61,7 +61,7 @@ fn parse_log(path: &Path) -> Value {
             Some(log::Event::Step { state, .. } | log::Event::CommandStep { state, .. }) => {
                 *step_ends.entry(format!("{state:?}")).or_default() += 1;
             }
-            Some(log::Event::MaestroVersion { version }) => maestro_version = Some(version),
+            Some(log::Event::MaestroVersion { version }) => runner_version = Some(version),
             Some(log::Event::RetryAttemptFailed { attempt }) => {
                 *kinds
                     .entry(format!("retry_attempt_failed_{attempt}"))
@@ -80,7 +80,7 @@ fn parse_log(path: &Path) -> Value {
     }
     json!({
         "records": records.len(),
-        "maestro_version": maestro_version,
+        "runner_version": runner_version,
         "machine_pattern": records.iter().all(|r| r.unix_ms.is_some()),
         "with_continuation": records.iter().filter(|r| !r.continuation.is_empty()).count(),
         "orphan_lines": a.orphan_lines,

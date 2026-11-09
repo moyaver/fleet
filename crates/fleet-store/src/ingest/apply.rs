@@ -12,8 +12,8 @@ use fleet_core::{claims::Claim, flaky::CUT_SHORT};
 use fleet_protocol::{
     event::{
         AdbState, AgentWarning, AppCrashed, DeviceStateObserved, EventBody, FlowEnded, FlowOutcome,
-        FlowRef, FlowReported, JournalGap, MaestroBuild, PlanAssigned, ProcessExited, ReportParsed,
-        RunEnded, RunSignal, RunStarted, ShardAssigned, StepEnded, StepStarted, StepTiming,
+        FlowRef, FlowReported, JournalGap, PlanAssigned, ProcessExited, ReportParsed, RunEnded,
+        RunSignal, RunStarted, RunnerBuild, ShardAssigned, StepEnded, StepStarted, StepTiming,
         SuiteStarted,
     },
     journal::{EventEnvelope, SourceKind},
@@ -185,7 +185,7 @@ impl<'a> Ctx<'a> {
             EventBody::PlanAssigned(b) => self.plan_assigned(tx, &b).await,
             EventBody::DeviceStateObserved(b) => self.device_state(tx, e, &b).await,
             EventBody::JournalGap(b) => self.journal_gap(tx, &b).await,
-            EventBody::MaestroDetected(b) => self.maestro_detected(tx, &b).await,
+            EventBody::RunnerDetected(b) => self.runner_detected(tx, &b).await,
             EventBody::AgentWarning(b) => self.agent_warning(tx, e, &b).await,
             // Kept in the journal; projected by later milestones (artifacts: M5).
             EventBody::ArtifactRegistered(_)
@@ -942,7 +942,7 @@ impl<'a> Ctx<'a> {
             return Ok(effect);
         }
         sqlx::query!(
-            "UPDATE agent_runs SET maestro_exit_code = $2, maestro_exit_signal = $3, rev = rev + 1
+            "UPDATE agent_runs SET runner_exit_code = $2, runner_exit_signal = $3, rev = rev + 1
               WHERE id = $1",
             self.run.agent_run_id,
             b.code,
@@ -1050,13 +1050,13 @@ impl<'a> Ctx<'a> {
 
     /// Records the Maestro build, and re-derives the run's flows: their condition fingerprint
     /// reads the version, and it may arrive after the flows have ended.
-    async fn maestro_detected(
+    async fn runner_detected(
         &mut self,
         tx: &mut PgConnection,
-        b: &MaestroBuild,
+        b: &RunnerBuild,
     ) -> Result<Effect, sqlx::Error> {
         sqlx::query!(
-            "UPDATE agent_runs SET maestro_version = $2, maestro_profile_supported = $3, rev = rev + 1
+            "UPDATE agent_runs SET runner_version = $2, runner_profile_supported = $3, rev = rev + 1
              WHERE id = $1",
             self.run.agent_run_id,
             b.version,

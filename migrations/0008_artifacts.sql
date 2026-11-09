@@ -62,7 +62,7 @@ CREATE TABLE artifacts (
   flow_execution_id  uuid REFERENCES flow_executions,
   -- The allowlist (PLAN §6.6): a class not named here cannot be stored.
   class              text NOT NULL CHECK (class IN ('failure_screenshot', 'commands', 'junit',
-                                                    'maestro_log', 'html_report')),
+                                                    'runner_log', 'html_report')),
   -- What the uploader declared. What is served is `served_type`, from the verified content.
   content_type       text NOT NULL,
   served_type        text,

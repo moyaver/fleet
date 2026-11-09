@@ -55,7 +55,7 @@ pub fn suite_outcome(facts: &SuiteFacts<'_>) -> Option<(SuiteOutcome, SourceKind
         ExitClass::Passed if facts.exit_code == Some(0) => (SuiteOutcome::Passed, report_source),
         ExitClass::Passed => (SuiteOutcome::Unknown, SourceKind::ProcessExit),
         ExitClass::TestFailures
-        | ExitClass::MaestroError
+        | ExitClass::RunnerError
         | ExitClass::UsageError
         | ExitClass::Other => (SuiteOutcome::Failed, SourceKind::ProcessExit),
     };
@@ -254,7 +254,7 @@ mod tests {
         prop::sample::select(vec![
             ExitClass::Passed,
             ExitClass::TestFailures,
-            ExitClass::MaestroError,
+            ExitClass::RunnerError,
             ExitClass::UsageError,
             ExitClass::Interrupted,
             ExitClass::Other,

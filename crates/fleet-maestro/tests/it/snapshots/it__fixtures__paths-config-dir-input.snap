@@ -14,10 +14,10 @@ expression: summary
       }
     ],
     "machine_pattern": false,
-    "maestro_version": "2.12.1",
     "orphan_lines": 0,
     "other": {},
     "records": 30,
+    "runner_version": "2.12.1",
     "shards": [
       {
         "planned": 1,

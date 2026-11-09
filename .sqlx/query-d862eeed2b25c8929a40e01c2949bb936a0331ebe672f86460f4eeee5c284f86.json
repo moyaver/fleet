@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_runs SET runner_exit_code = $2, runner_exit_signal = $3, rev = rev + 1\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d862eeed2b25c8929a40e01c2949bb936a0331ebe672f86460f4eeee5c284f86"
+}

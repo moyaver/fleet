@@ -12,8 +12,8 @@ CREATE TABLE host_samples (
   host_cpu_pct         real,
   host_mem_used_bytes  bigint,
   host_mem_total_bytes bigint,
-  maestro_cpu_pct      real,
-  maestro_rss_bytes    bigint,
+  runner_cpu_pct      real,
+  runner_rss_bytes    bigint,
   agent_cpu_pct        real,
   agent_rss_bytes      bigint,
   PRIMARY KEY (agent_run_id, ts)
@@ -42,7 +42,7 @@ CREATE TABLE host_rollup_1m (
   n                 integer NOT NULL,
   host_cpu_pct_avg  real, host_cpu_pct_max real,
   host_mem_used_avg bigint, host_mem_used_max bigint,
-  maestro_cpu_avg   real, maestro_rss_max bigint,
+  runner_cpu_avg   real, runner_rss_max bigint,
   PRIMARY KEY (agent_run_id, bucket)
 );
 CREATE INDEX host_rollup_1m_worker ON host_rollup_1m (worker_id, bucket);

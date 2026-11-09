@@ -6,11 +6,11 @@ expression: result
   "flows": [],
   "events": 6,
   "event_types": {
-    "maestro.detected": 1,
     "process.exited": 1,
     "report.parsed": 1,
     "run.ended": 1,
     "run.started": 1,
+    "runner.detected": 1,
     "suite.started": 1
   },
   "unrecognized_stdout": 0

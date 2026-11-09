@@ -362,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn real_maestro_stdout_becomes_lines_with_anchors() {
+    fn captured_stdout_becomes_lines_with_anchors() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../fixtures/maestro/2.12.1/verbose/stdout.bin"

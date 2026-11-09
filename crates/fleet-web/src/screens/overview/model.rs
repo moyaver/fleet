@@ -665,7 +665,7 @@ mod tests {
                 reading("host_cpu_pct", "Host CPU", "percent", "host", cpu),
                 reading("host_mem_used_bytes", "Host memory used", "bytes", "host",
                         &json!(4_294_967_296_u64)),
-                reading("maestro_cpu_pct", "Maestro CPU", "percent", "maestro", &json!(80.0)),
+                reading("runner_cpu_pct", "Maestro CPU", "percent", "runner", &json!(80.0)),
             ]}
         })
     }
@@ -997,8 +997,8 @@ mod tests {
     #[test]
     fn the_failed_step_is_its_label_or_a_one_based_number() {
         let steps: Vec<StepView> = serde_json::from_value(json!([
-            {"index": 0, "label": "Setup", "status": "completed", "source": "maestro_log"},
-            {"index": 1, "label": null, "status": "failed", "source": "maestro_log"}
+            {"index": 0, "label": "Setup", "status": "completed", "source": "runner_log"},
+            {"index": 1, "label": null, "status": "failed", "source": "runner_log"}
         ]))
         .unwrap();
         assert_eq!(failed_step(Some(0), &steps).as_deref(), Some("Setup"));

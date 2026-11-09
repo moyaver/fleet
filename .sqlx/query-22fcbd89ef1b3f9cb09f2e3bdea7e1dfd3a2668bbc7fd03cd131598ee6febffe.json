@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,\n                r.maestro_version, r.maestro_profile_supported, r.file_warnings, r.rev, r.origin, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
+  "query": "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,\n                r.trust_level::text AS \"trust_level!\", r.committed_seq,\n                (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",\n                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.runner_exit_code,\n                r.runner_version, r.runner_profile_supported, r.file_warnings, r.rev, r.origin, NULL::text AS liveness\n           FROM agent_runs r JOIN jobs j ON j.id = r.job_id\n           LEFT JOIN workers w ON w.id = r.worker_id\n          WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)\n          ORDER BY r.started_at",
   "describe": {
     "columns": [
       {
@@ -127,34 +127,34 @@
       },
       {
         "ordinal": 12,
-        "name": "maestro_exit_code",
+        "name": "runner_exit_code",
         "type_info": "Int4",
         "origin": {
           "Table": {
             "table": "agent_runs",
-            "name": "maestro_exit_code"
+            "name": "runner_exit_code"
           }
         }
       },
       {
         "ordinal": 13,
-        "name": "maestro_version",
+        "name": "runner_version",
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "agent_runs",
-            "name": "maestro_version"
+            "name": "runner_version"
           }
         }
       },
       {
         "ordinal": 14,
-        "name": "maestro_profile_supported",
+        "name": "runner_profile_supported",
         "type_info": "Bool",
         "origin": {
           "Table": {
             "table": "agent_runs",
-            "name": "maestro_profile_supported"
+            "name": "runner_profile_supported"
           }
         }
       },
@@ -227,5 +227,5 @@
       null
     ]
   },
-  "hash": "90ed656927c989e3c284b5b259731935ed88c9677512829a9ccab9754c4a8354"
+  "hash": "22fcbd89ef1b3f9cb09f2e3bdea7e1dfd3a2668bbc7fd03cd131598ee6febffe"
 }

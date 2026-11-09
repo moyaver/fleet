@@ -119,14 +119,14 @@ pub struct AgentRunView {
     pub plan_id: Option<String>,
     /// That shard.
     pub plan_shard_id: Option<i32>,
-    /// Maestro's exit code.
-    pub maestro_exit_code: Option<i32>,
-    /// The Maestro version the run's session log named, when it did.
+    /// The runner's exit code.
+    pub runner_exit_code: Option<i32>,
+    /// The runner version the run's session log named, when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub maestro_version: Option<String>,
+    pub runner_version: Option<String>,
     /// Whether the agent's parsers were built for that version. Absent until it is known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub maestro_profile_supported: Option<bool>,
+    pub runner_profile_supported: Option<bool>,
     /// The warnings its own files raised, by code: `commands_flow_unnamed` (a final `commands.json`
     /// whose flow the log never started, so its steps are not settled). Empty when none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

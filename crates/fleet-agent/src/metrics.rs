@@ -84,8 +84,8 @@ impl Sampler {
                 host_cpu_pct: None,
                 host_mem_used_bytes: None,
                 host_mem_total_bytes: None,
-                maestro_cpu_pct: None,
-                maestro_rss_bytes: None,
+                runner_cpu_pct: None,
+                runner_rss_bytes: None,
                 agent_cpu_pct,
                 agent_rss_bytes,
                 host_load_1m: None,
@@ -99,8 +99,8 @@ impl Sampler {
                     host_cpu_pct: Some(Unavailable::NoSystemInfo),
                     host_mem_used_bytes: Some(Unavailable::NoSystemInfo),
                     host_mem_total_bytes: Some(Unavailable::NoSystemInfo),
-                    maestro_cpu_pct: Some(Unavailable::NoSystemInfo),
-                    maestro_rss_bytes: Some(Unavailable::NoSystemInfo),
+                    runner_cpu_pct: Some(Unavailable::NoSystemInfo),
+                    runner_rss_bytes: Some(Unavailable::NoSystemInfo),
                     agent_cpu_pct: agent_cpu_why,
                     agent_rss_bytes: agent_rss_why,
                     host_load_1m: Some(Unavailable::NoSystemInfo),
@@ -130,8 +130,8 @@ impl Sampler {
             None => Err(Unavailable::NoProcess),
         };
         let total = system.total_memory();
-        let (maestro_cpu_pct, maestro_cpu_why) = split(maestro.map(|(cpu, _)| cpu));
-        let (maestro_rss_bytes, maestro_rss_why) = split(maestro.map(|(_, rss)| rss));
+        let (runner_cpu_pct, maestro_cpu_why) = split(maestro.map(|(cpu, _)| cpu));
+        let (runner_rss_bytes, maestro_rss_why) = split(maestro.map(|(_, rss)| rss));
         let (host_mem_used_bytes, mem_used_why) = split(nonzero(total, system.used_memory()));
         let (host_mem_total_bytes, mem_total_why) = split(nonzero(total, total));
         let (host_load_1m, load_why) = split(
@@ -147,8 +147,8 @@ impl Sampler {
             host_cpu_pct: Some(system.global_cpu_usage()),
             host_mem_used_bytes,
             host_mem_total_bytes,
-            maestro_cpu_pct,
-            maestro_rss_bytes,
+            runner_cpu_pct,
+            runner_rss_bytes,
             agent_cpu_pct,
             agent_rss_bytes,
             host_load_1m,
@@ -161,8 +161,8 @@ impl Sampler {
             unavailable: SampleUnavailable {
                 host_mem_used_bytes: mem_used_why,
                 host_mem_total_bytes: mem_total_why,
-                maestro_cpu_pct: maestro_cpu_why,
-                maestro_rss_bytes: maestro_rss_why,
+                runner_cpu_pct: maestro_cpu_why,
+                runner_rss_bytes: maestro_rss_why,
                 agent_cpu_pct: agent_cpu_why,
                 agent_rss_bytes: agent_rss_why,
                 host_load_1m: load_why,
@@ -447,7 +447,7 @@ mod tests {
         let first = s.sample(at);
         assert!(first.host_mem_total_bytes.is_some_and(|t| t > 0));
         assert!(
-            first.maestro_rss_bytes.is_some(),
+            first.runner_rss_bytes.is_some(),
             "the watched pid (here: the test) is found"
         );
         assert!(first.agent_cpu_pct.is_none(), "no baseline yet");
@@ -601,14 +601,14 @@ mod tests {
                 u.host_mem_total_bytes.is_some(),
             ),
             (
-                "maestro_cpu_pct",
-                s.maestro_cpu_pct.is_some(),
-                u.maestro_cpu_pct.is_some(),
+                "runner_cpu_pct",
+                s.runner_cpu_pct.is_some(),
+                u.runner_cpu_pct.is_some(),
             ),
             (
-                "maestro_rss_bytes",
-                s.maestro_rss_bytes.is_some(),
-                u.maestro_rss_bytes.is_some(),
+                "runner_rss_bytes",
+                s.runner_rss_bytes.is_some(),
+                u.runner_rss_bytes.is_some(),
             ),
             (
                 "agent_cpu_pct",
@@ -705,15 +705,12 @@ mod tests {
         let mut unknown_maestro = Sampler::new(Some(u32::MAX - 1), None);
         let s = unknown_maestro.sample(at());
         assert_eq!(
-            (s.maestro_cpu_pct, s.maestro_rss_bytes),
+            (s.runner_cpu_pct, s.runner_rss_bytes),
             (None, None),
             "a pid the table does not hold is not a reading"
         );
         assert_eq!(
-            (
-                s.unavailable.maestro_cpu_pct,
-                s.unavailable.maestro_rss_bytes
-            ),
+            (s.unavailable.runner_cpu_pct, s.unavailable.runner_rss_bytes),
             (Some(Unavailable::NoProcess), Some(Unavailable::NoProcess))
         );
         assert_eq!(readings_without_matching_reason(&s), Vec::<&str>::new());

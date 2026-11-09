@@ -257,14 +257,14 @@ async fn host_minutes(
     Ok(sqlx::query!(
         "INSERT INTO host_rollup_1m (bucket, agent_run_id, worker_id, project_id, n,
                         host_cpu_pct_avg, host_cpu_pct_max, host_mem_used_avg, host_mem_used_max,
-                        maestro_cpu_avg, maestro_rss_max, host_load_1m_avg, host_swap_used_avg,
+                        runner_cpu_avg, runner_rss_max, host_load_1m_avg, host_swap_used_avg,
                         host_psi_cpu_pct_avg, host_psi_memory_pct_avg, host_psi_io_pct_avg)
                  SELECT date_bin('1 minute', ts, TIMESTAMPTZ '2000-01-01'), agent_run_id,
                         (array_agg(worker_id ORDER BY ts DESC))[1],
                         (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,
                         avg(host_cpu_pct)::real, max(host_cpu_pct),
                         avg(host_mem_used_bytes)::bigint, max(host_mem_used_bytes),
-                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes),
+                        avg(runner_cpu_pct)::real, max(runner_rss_bytes),
                         avg(host_load_1m)::real, avg(host_swap_used_bytes)::bigint,
                         avg(host_psi_cpu_pct)::real, avg(host_psi_memory_pct)::real,
                         avg(host_psi_io_pct)::real
@@ -277,8 +277,8 @@ async fn host_minutes(
                         host_cpu_pct_max = excluded.host_cpu_pct_max,
                         host_mem_used_avg = excluded.host_mem_used_avg,
                         host_mem_used_max = excluded.host_mem_used_max,
-                        maestro_cpu_avg = excluded.maestro_cpu_avg,
-                        maestro_rss_max = excluded.maestro_rss_max,
+                        runner_cpu_avg = excluded.runner_cpu_avg,
+                        runner_rss_max = excluded.runner_rss_max,
                         host_load_1m_avg = excluded.host_load_1m_avg,
                         host_swap_used_avg = excluded.host_swap_used_avg,
                         host_psi_cpu_pct_avg = excluded.host_psi_cpu_pct_avg,
@@ -302,14 +302,14 @@ async fn host_hours(
     Ok(sqlx::query!(
         "INSERT INTO host_rollup_1h (bucket, agent_run_id, worker_id, project_id, n,
                         host_cpu_pct_avg, host_cpu_pct_max, host_mem_used_avg, host_mem_used_max,
-                        maestro_cpu_avg, maestro_rss_max, host_load_1m_avg, host_swap_used_avg,
+                        runner_cpu_avg, runner_rss_max, host_load_1m_avg, host_swap_used_avg,
                         host_psi_cpu_pct_avg, host_psi_memory_pct_avg, host_psi_io_pct_avg)
                  SELECT date_bin('1 hour', ts, TIMESTAMPTZ '2000-01-01'), agent_run_id,
                         (array_agg(worker_id ORDER BY ts DESC))[1],
                         (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,
                         avg(host_cpu_pct)::real, max(host_cpu_pct),
                         avg(host_mem_used_bytes)::bigint, max(host_mem_used_bytes),
-                        avg(maestro_cpu_pct)::real, max(maestro_rss_bytes),
+                        avg(runner_cpu_pct)::real, max(runner_rss_bytes),
                         avg(host_load_1m)::real, avg(host_swap_used_bytes)::bigint,
                         avg(host_psi_cpu_pct)::real, avg(host_psi_memory_pct)::real,
                         avg(host_psi_io_pct)::real
@@ -322,8 +322,8 @@ async fn host_hours(
                         host_cpu_pct_max = excluded.host_cpu_pct_max,
                         host_mem_used_avg = excluded.host_mem_used_avg,
                         host_mem_used_max = excluded.host_mem_used_max,
-                        maestro_cpu_avg = excluded.maestro_cpu_avg,
-                        maestro_rss_max = excluded.maestro_rss_max,
+                        runner_cpu_avg = excluded.runner_cpu_avg,
+                        runner_rss_max = excluded.runner_rss_max,
                         host_load_1m_avg = excluded.host_load_1m_avg,
                         host_swap_used_avg = excluded.host_swap_used_avg,
                         host_psi_cpu_pct_avg = excluded.host_psi_cpu_pct_avg,
@@ -470,12 +470,12 @@ mod tests {
             &self,
             ts: OffsetDateTime,
             cpu: Option<f32>,
-            maestro_cpu: Option<f32>,
+            runner_cpu: Option<f32>,
             tseq: i64,
         ) {
             sqlx::query!(
                 "INSERT INTO host_samples (ts, agent_run_id, worker_id, project_id, tseq,
-                                           host_cpu_pct, host_mem_used_bytes, maestro_cpu_pct)
+                                           host_cpu_pct, host_mem_used_bytes, runner_cpu_pct)
                  VALUES ($1, $2, $3, $4, $5, $6, 4294967296, $7)",
                 ts,
                 self.run,
@@ -483,7 +483,7 @@ mod tests {
                 self.project,
                 tseq,
                 cpu,
-                maestro_cpu
+                runner_cpu
             )
             .execute(self.store.pool())
             .await
@@ -520,7 +520,7 @@ mod tests {
                 .zip(maestro)
                 .map(|(r, m)| {
                     assert_eq!(r.at, m.at);
-                    (r.at, r.host_cpu_pct, m.maestro_cpu_pct)
+                    (r.at, r.host_cpu_pct, m.runner_cpu_pct)
                 })
                 .collect()
         }

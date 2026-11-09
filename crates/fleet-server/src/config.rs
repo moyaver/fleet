@@ -267,8 +267,8 @@ pub struct ClassLimits {
     pub commands: u64,
     /// `junit`.
     pub junit: u64,
-    /// `maestro_log`.
-    pub maestro_log: u64,
+    /// `runner_log`.
+    pub runner_log: u64,
     /// `html_report`.
     pub html_report: u64,
     /// `device_logcat`: the excerpt of a failed flow's device log. The agent cuts it to at most
@@ -284,7 +284,7 @@ impl Default for ClassLimits {
             failure_hierarchy: 4 * MIB,
             commands: 16 * MIB,
             junit: 32 * MIB,
-            maestro_log: 64 * MIB,
+            runner_log: 64 * MIB,
             html_report: 128 * MIB,
             device_logcat: 512 * 1024,
         }
@@ -301,7 +301,7 @@ impl ClassLimits {
             C::FailureHierarchy => self.failure_hierarchy,
             C::Commands => self.commands,
             C::Junit => self.junit,
-            C::MaestroLog => self.maestro_log,
+            C::RunnerLog => self.runner_log,
             C::HtmlReport => self.html_report,
             C::DeviceLogcat => self.device_logcat,
         }

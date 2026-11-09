@@ -386,8 +386,8 @@ pub(crate) async fn agent_runs(
         "SELECT r.id, r.job_id, r.worker_id, w.runner_name, r.state,
                 r.trust_level::text AS \"trust_level!\", r.committed_seq,
                 (SELECT count(*) FROM ingest_gaps g WHERE g.agent_run_id = r.id) AS \"gaps!\",
-                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.maestro_exit_code,
-                r.maestro_version, r.maestro_profile_supported, r.file_warnings, r.rev, r.origin, NULL::text AS liveness
+                r.last_frame_at, r.late_resume, r.plan_id, r.plan_shard_id, r.runner_exit_code,
+                r.runner_version, r.runner_profile_supported, r.file_warnings, r.rev, r.origin, NULL::text AS liveness
            FROM agent_runs r JOIN jobs j ON j.id = r.job_id
            LEFT JOIN workers w ON w.id = r.worker_id
           WHERE ($1::uuid IS NULL OR j.pipeline_attempt_id = $1) AND ($2::uuid[] IS NULL OR r.id = ANY($2)) AND ($3::uuid IS NULL OR r.project_id = $3)
@@ -415,9 +415,9 @@ pub(crate) async fn agent_runs(
                 late_resume: r.late_resume,
                 plan_id: r.plan_id,
                 plan_shard_id: r.plan_shard_id,
-                maestro_exit_code: r.maestro_exit_code,
-                maestro_version: r.maestro_version,
-                maestro_profile_supported: r.maestro_profile_supported,
+                runner_exit_code: r.runner_exit_code,
+                runner_version: r.runner_version,
+                runner_profile_supported: r.runner_profile_supported,
                 file_warnings: r.file_warnings,
                 rev: r.rev,
                 liveness: None,

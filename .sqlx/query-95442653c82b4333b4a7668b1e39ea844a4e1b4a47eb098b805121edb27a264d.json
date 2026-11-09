@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT bucket AS \"at!\", agent_run_id AS \"run_id!\",\n                            maestro_cpu_avg::float8 AS maestro_cpu_pct,\n                            maestro_rss_max::float8 AS maestro_rss_bytes,\n                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes\n                       FROM host_rollup_1m\n                      WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket, agent_run_id LIMIT $5",
+  "query": "SELECT bucket AS \"at!\", agent_run_id AS \"run_id!\",\n                            runner_cpu_avg::float8 AS runner_cpu_pct,\n                            runner_rss_max::float8 AS runner_rss_bytes,\n                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes\n                       FROM host_rollup_1m\n                      WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket, agent_run_id LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -27,13 +27,13 @@
       },
       {
         "ordinal": 2,
-        "name": "maestro_cpu_pct",
+        "name": "runner_cpu_pct",
         "type_info": "Float8",
         "origin": "Expression"
       },
       {
         "ordinal": 3,
-        "name": "maestro_rss_bytes",
+        "name": "runner_rss_bytes",
         "type_info": "Float8",
         "origin": "Expression"
       },
@@ -68,5 +68,5 @@
       null
     ]
   },
-  "hash": "5c67389e24bd91b14cd76797be2340f2b806737a50deaace7086ac1f323f940d"
+  "hash": "95442653c82b4333b4a7668b1e39ea844a4e1b4a47eb098b805121edb27a264d"
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO host_rollup_1m (bucket, agent_run_id, worker_id, project_id, n,\n                        host_cpu_pct_avg, host_cpu_pct_max, host_mem_used_avg, host_mem_used_max,\n                        runner_cpu_avg, runner_rss_max, host_load_1m_avg, host_swap_used_avg,\n                        host_psi_cpu_pct_avg, host_psi_memory_pct_avg, host_psi_io_pct_avg)\n                 SELECT date_bin('1 minute', ts, TIMESTAMPTZ '2000-01-01'), agent_run_id,\n                        (array_agg(worker_id ORDER BY ts DESC))[1],\n                        (array_agg(project_id ORDER BY ts DESC))[1], count(*)::int,\n                        avg(host_cpu_pct)::real, max(host_cpu_pct),\n                        avg(host_mem_used_bytes)::bigint, max(host_mem_used_bytes),\n                        avg(runner_cpu_pct)::real, max(runner_rss_bytes),\n                        avg(host_load_1m)::real, avg(host_swap_used_bytes)::bigint,\n                        avg(host_psi_cpu_pct)::real, avg(host_psi_memory_pct)::real,\n                        avg(host_psi_io_pct)::real\n                   FROM host_samples\n                  WHERE ts >= $1 AND ts < $2 AND ($3::uuid IS NULL OR agent_run_id = $3)\n                  GROUP BY 1, agent_run_id\n                 ON CONFLICT (agent_run_id, bucket) DO UPDATE SET\n                        worker_id = excluded.worker_id, project_id = excluded.project_id,\n                        n = excluded.n, host_cpu_pct_avg = excluded.host_cpu_pct_avg,\n                        host_cpu_pct_max = excluded.host_cpu_pct_max,\n                        host_mem_used_avg = excluded.host_mem_used_avg,\n                        host_mem_used_max = excluded.host_mem_used_max,\n                        runner_cpu_avg = excluded.runner_cpu_avg,\n                        runner_rss_max = excluded.runner_rss_max,\n                        host_load_1m_avg = excluded.host_load_1m_avg,\n                        host_swap_used_avg = excluded.host_swap_used_avg,\n                        host_psi_cpu_pct_avg = excluded.host_psi_cpu_pct_avg,\n                        host_psi_memory_pct_avg = excluded.host_psi_memory_pct_avg,\n                        host_psi_io_pct_avg = excluded.host_psi_io_pct_avg",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c2e22b91b79e4bdb00d28a13188b593051ba832563bf07d90038b521d92ee152"
+}

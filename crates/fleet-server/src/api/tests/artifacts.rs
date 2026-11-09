@@ -382,7 +382,7 @@ async fn only_allowlisted_classes_types_and_sizes_get_a_grant() {
     assert_eq!(refused(g), RejectReason::ContentTypeNotAllowed);
     // The declared type may carry parameters.
     let g = rig
-        .grant(&ask("maestro_log", "text/plain; charset=utf-8", b"log"))
+        .grant(&ask("runner_log", "text/plain; charset=utf-8", b"log"))
         .await;
     assert!(matches!(g, UploadGrant::Upload { .. }), "{g:?}");
     // The per-class size limit from the configuration: 50 bytes here, the PNG is 67.
@@ -488,7 +488,7 @@ async fn bytes_that_fail_verification_are_rejected_with_a_reason_and_nothing_is_
         ),
         // A log must be UTF-8 text without NUL bytes.
         (
-            "maestro_log",
+            "runner_log",
             "text/plain",
             "maestro.log",
             with_nul,
@@ -714,7 +714,7 @@ async fn a_run_cannot_store_more_files_or_bytes_than_its_quota() {
     })
     .await;
     let run = run_with_failed_flow(&rig, "980").await;
-    let log = |n: u8| request(&run, "maestro_log", "m.log", "text/plain", &[n; 30]);
+    let log = |n: u8| request(&run, "runner_log", "m.log", "text/plain", &[n; 30]);
 
     assert!(matches!(
         rig.grant(&log(1)).await,
@@ -737,7 +737,7 @@ async fn a_run_cannot_store_more_files_or_bytes_than_its_quota() {
 
     let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_run_bytes = 100).await;
     let run = run_with_failed_flow(&rig, "981").await;
-    let big = |n: u8| request(&run, "maestro_log", "m.log", "text/plain", &[n; 60]);
+    let big = |n: u8| request(&run, "runner_log", "m.log", "text/plain", &[n; 60]);
     assert!(matches!(
         rig.grant(&big(1)).await,
         UploadGrant::Upload { .. }
@@ -755,7 +755,7 @@ async fn a_project_cannot_declare_more_than_its_daily_quota_across_its_runs() {
     let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_project_files_per_day = 2).await;
     let first = run_with_failed_flow(&rig, "1000").await;
     let second = run_with_failed_flow(&rig, "1001").await;
-    let log = |run: &Run, n: u8| request(run, "maestro_log", "m.log", "text/plain", &[n; 30]);
+    let log = |run: &Run, n: u8| request(run, "runner_log", "m.log", "text/plain", &[n; 30]);
     assert!(matches!(
         rig.grant(&log(&first, 1)).await,
         UploadGrant::Upload { .. }
@@ -773,7 +773,7 @@ async fn a_project_cannot_declare_more_than_its_daily_quota_across_its_runs() {
     let (rig, _dirs) = artifact_rig(|c| c.artifacts.max_project_bytes_per_day = 100).await;
     let first = run_with_failed_flow(&rig, "1002").await;
     let second = run_with_failed_flow(&rig, "1003").await;
-    let big = |run: &Run, n: u8| request(run, "maestro_log", "m.log", "text/plain", &[n; 60]);
+    let big = |run: &Run, n: u8| request(run, "runner_log", "m.log", "text/plain", &[n; 60]);
     assert!(matches!(
         rig.grant(&big(&first, 1)).await,
         UploadGrant::Upload { .. }
@@ -799,7 +799,7 @@ async fn a_flow_lists_its_own_evidence_and_its_runs_report_and_log_but_not_anoth
         PNG,
     )
     .await;
-    let mut elsewhere = request(&other, "maestro_log", "maestro.log", "text/plain", b"log");
+    let mut elsewhere = request(&other, "runner_log", "maestro.log", "text/plain", b"log");
     elsewhere.flow_execution_id = None;
     rig.upload(&elsewhere, b"log").await;
 
@@ -838,7 +838,7 @@ async fn a_project_that_turns_a_class_off_refuses_only_that_class() {
         RejectReason::ClassNotAllowed
     );
 
-    let log = request(&run, "maestro_log", "m.log", "text/plain", b"log");
+    let log = request(&run, "runner_log", "m.log", "text/plain", b"log");
     assert!(
         matches!(rig.grant(&log).await, UploadGrant::Upload { .. }),
         "another class of the same project is still granted"
@@ -917,7 +917,7 @@ async fn a_project_daily_byte_quota_below_a_file_refuses_it() {
         .unwrap();
     let run = run_with_failed_flow(&rig, "1102").await;
     let log =
-        |n: u8, size: usize| request(&run, "maestro_log", "m.log", "text/plain", &vec![n; size]);
+        |n: u8, size: usize| request(&run, "runner_log", "m.log", "text/plain", &vec![n; size]);
 
     assert_eq!(
         refused(rig.grant(&log(1, 120)).await),

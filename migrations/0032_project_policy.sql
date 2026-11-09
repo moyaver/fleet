@@ -18,7 +18,7 @@ ALTER TABLE projects
 CREATE TABLE project_artifact_classes (
   project_id uuid NOT NULL REFERENCES projects,
   class      text NOT NULL CHECK (class IN ('failure_screenshot', 'failure_hierarchy', 'commands',
-                                            'junit', 'maestro_log', 'html_report', 'device_logcat')),
+                                            'junit', 'runner_log', 'html_report', 'device_logcat')),
   accepted   boolean NOT NULL,
   max_bytes  bigint CHECK (max_bytes > 0),
   PRIMARY KEY (project_id, class)

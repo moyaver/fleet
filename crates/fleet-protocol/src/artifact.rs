@@ -42,8 +42,8 @@ pub enum ArtifactClass {
     Commands,
     /// The JUnit XML report.
     Junit,
-    /// Maestro's session `maestro.log`, redacted by the agent (text).
-    MaestroLog,
+    /// The runner's session log (Maestro's `maestro.log`), redacted by the agent (text).
+    RunnerLog,
     /// Maestro's HTML report: one HTML file, or a zip of the report directory.
     HtmlReport,
     /// The device logcat excerpt of a failed flow: the lines around the failing step, redacted
@@ -58,7 +58,7 @@ impl ArtifactClass {
         Self::FailureHierarchy,
         Self::Commands,
         Self::Junit,
-        Self::MaestroLog,
+        Self::RunnerLog,
         Self::HtmlReport,
         Self::DeviceLogcat,
     ];
@@ -71,7 +71,7 @@ impl ArtifactClass {
             Self::FailureHierarchy => "failure_hierarchy",
             Self::Commands => "commands",
             Self::Junit => "junit",
-            Self::MaestroLog => "maestro_log",
+            Self::RunnerLog => "runner_log",
             Self::HtmlReport => "html_report",
             Self::DeviceLogcat => "device_logcat",
         }
@@ -91,7 +91,7 @@ impl ArtifactClass {
             Self::FailureHierarchy => &["application/json"],
             Self::Commands => &["application/json", "text/plain"],
             Self::Junit => &["application/xml", "text/xml"],
-            Self::MaestroLog | Self::DeviceLogcat => &["text/plain"],
+            Self::RunnerLog | Self::DeviceLogcat => &["text/plain"],
             Self::HtmlReport => &["text/html", "application/zip"],
         }
     }

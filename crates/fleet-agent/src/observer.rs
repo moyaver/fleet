@@ -20,7 +20,6 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use fleet_core::redact::Redactor;
 use fleet_maestro::{ReportState, stdout::strip_ansi};
 use fleet_protocol::{
     artifact::ArtifactClass,
@@ -457,7 +456,7 @@ fn start(
     journal_max_bytes: u64,
 ) -> Live {
     let agent_run_id = Uuid::now_v7();
-    let redactor = Redactor::for_run(
+    let redactor = fleet_maestro::redact::redactor_for_run(
         argv,
         std::env::vars()
             .collect::<Vec<_>>()
@@ -816,7 +815,7 @@ fn submit_uploads(l: &mut Live, report: Option<&[u8]>, clock: &impl Fn() -> Cloc
         enqueue(
             l,
             upload::Item {
-                class: ArtifactClass::MaestroLog,
+                class: ArtifactClass::RunnerLog,
                 path: "maestro.log".into(),
                 content_type: "text/plain",
                 flow: None,
