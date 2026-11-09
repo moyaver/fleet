@@ -5,7 +5,7 @@
 //! with `403`: an administration page has no project to hide, so "no role" is not a `404` here.
 //!
 //! Settings that come from the running configuration are read from [`AppState`]'s config and
-//! say so (`source: "config"`). Nothing here writes; the edit routes come with the forms.
+//! say so (`source: "config"`). Nothing here writes: the writes are in `api::admin::write`, behind the administrator gate.
 
 use axum::{
     Json,
