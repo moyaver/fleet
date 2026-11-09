@@ -14,6 +14,8 @@
 //! - `gap_events`: a full agent buffer drops events, and one `journal.gap` covers them;
 //! - `clock_skew_ms`: the agents' clock reads ahead of (or behind) the server's, wall times and ids;
 //! - `steps` and `failure_bytes`: a giant log, with long flows and failures over the agent's limit;
+//! - `viewers`: live sockets subscribe to the project like a dashboard and time every flow end
+//!   from its send to the frame that shows it finished ([`ViewerReport`]);
 //! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
@@ -48,9 +50,13 @@ use fleet_protocol::{
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
 };
 use futures_util::{SinkExt, StreamExt};
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use time::OffsetDateTime;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest, http::HeaderValue};
 use uuid::Uuid;
+
+mod viewer;
+pub use viewer::ViewerReport;
 
 /// What to simulate.
 #[derive(Debug, Clone)]
@@ -89,6 +95,18 @@ pub struct Options {
     pub clock_skew_ms: i64,
     /// Steps per flow: 0 keeps the shape of [`Options::wide`] (or the short two-step flows).
     pub steps: u32,
+    /// Live sockets that subscribe to the project like a dashboard, and measure the ingest-to-live
+    /// latency of every flow end (see [`ViewerReport`]). 0 runs no viewers.
+    pub viewers: usize,
+    /// The project the viewers subscribe to.
+    pub project: String,
+    /// The viewer credential (a configured viewer token) the live sockets use.
+    pub viewer_token: String,
+    /// How long the viewers keep reading after the last agent finished, so the last deltas arrive.
+    pub linger: Duration,
+    /// A PEM file of CA certificates for `wss://` (the roots are this file only). Unset: the
+    /// WebSocket library's own roots.
+    pub ca_file: Option<std::path::PathBuf>,
     /// Bytes of every failure message: 0 keeps the short or wide message. A message over 192 KiB
     /// is a giant log: the agent sends it as a gap, the load generator does too.
     pub failure_bytes: usize,
@@ -139,6 +157,11 @@ impl Default for Options {
             clock_skew_ms: 0,
             steps: 0,
             failure_bytes: 0,
+            viewers: 0,
+            project: "mobile-app".into(),
+            viewer_token: String::new(),
+            linger: Duration::from_secs(3),
+            ca_file: None,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
             commit: None,
@@ -231,6 +254,8 @@ pub struct Report {
     pub agents: Vec<AgentReport>,
     /// Wall time.
     pub elapsed: Duration,
+    /// The viewers, when the run had any.
+    pub viewers: Option<ViewerReport>,
 }
 
 impl Report {
@@ -245,20 +270,47 @@ impl Report {
 pub async fn run(opts: Options) -> anyhow::Result<Report> {
     let t0 = Instant::now();
     let opts = Arc::new(opts);
+    let probe = Arc::new(viewer::Probe::default());
+    let stats = Arc::new(viewer::Stats::default());
+    // The viewers subscribe first, so they see every flow end the agents send.
+    let mut viewers = tokio::task::JoinSet::new();
+    for _ in 0..opts.viewers {
+        viewers.spawn(viewer::live(
+            Arc::clone(&opts),
+            Arc::clone(&probe),
+            Arc::clone(&stats),
+        ));
+    }
+    let subscribed = Instant::now();
+    while stats.subscribed.load(std::sync::atomic::Ordering::Relaxed) < opts.viewers as u64 {
+        if subscribed.elapsed() > Duration::from_secs(30) || viewers.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
     let storm = Arc::new(tokio::sync::Barrier::new(opts.agents.max(1)));
     let mut set = tokio::task::JoinSet::new();
     for i in 0..opts.agents {
-        let (opts, storm) = (Arc::clone(&opts), Arc::clone(&storm));
-        set.spawn(async move { agent(i, &opts, &storm).await });
+        let (opts, storm, probe) = (Arc::clone(&opts), Arc::clone(&storm), Arc::clone(&probe));
+        set.spawn(async move { agent(i, &opts, &storm, &probe).await });
     }
     let mut agents = Vec::new();
     while let Some(r) = set.join_next().await {
         agents.push(r.context("an agent task panicked")??);
     }
     agents.sort_by_key(|a| a.agent_run_id);
+    let elapsed = t0.elapsed();
+    let viewer_report = if opts.viewers > 0 {
+        tokio::time::sleep(opts.linger).await;
+        viewers.abort_all();
+        Some(viewer::report(opts.viewers, &probe, &stats))
+    } else {
+        None
+    };
     Ok(Report {
         agents,
-        elapsed: t0.elapsed(),
+        elapsed,
+        viewers: viewer_report,
     })
 }
 
@@ -731,26 +783,58 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     }
 }
 
-type Ws =
+pub(crate) type Ws =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-async fn connect(opts: &Options) -> anyhow::Result<Ws> {
-    let mut req =
-        format!("{}/api/v1/agent/ws", opts.server.trim_end_matches('/')).into_client_request()?;
-    req.headers_mut().insert(
-        "Sec-WebSocket-Protocol",
-        HeaderValue::from_static(WS_SUBPROTOCOL),
-    );
+/// The TLS roots of `--ca-file`: that file's certificates, and no others.
+fn ca_connector(path: &std::path::Path) -> anyhow::Result<tokio_tungstenite::Connector> {
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in CertificateDer::pem_file_iter(path)
+        .with_context(|| format!("reading the CA file {}", path.display()))?
+    {
+        roots
+            .add(cert.with_context(|| format!("parsing the CA file {}", path.display()))?)
+            .with_context(|| format!("adding a CA from {}", path.display()))?;
+    }
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Ok(tokio_tungstenite::Connector::Rustls(Arc::new(config)))
+}
+
+/// Opens a WebSocket on `path` with `token` as the bearer credential. Agents name the protocol
+/// subprotocol; viewers do not.
+pub(crate) async fn connect_ws(
+    opts: &Options,
+    path: &str,
+    token: &str,
+    agent_protocol: bool,
+) -> anyhow::Result<Ws> {
+    let mut req = format!("{}{path}", opts.server.trim_end_matches('/')).into_client_request()?;
+    if agent_protocol {
+        req.headers_mut().insert(
+            "Sec-WebSocket-Protocol",
+            HeaderValue::from_static(WS_SUBPROTOCOL),
+        );
+    }
     req.headers_mut().insert(
         "Authorization",
-        HeaderValue::from_str(&format!("Bearer {}", opts.token))?,
+        HeaderValue::from_str(&format!("Bearer {token}"))?,
     );
+    let connector = match &opts.ca_file {
+        Some(path) => Some(ca_connector(path)?),
+        None => None,
+    };
     let (ws, _) = tokio::time::timeout(
         Duration::from_secs(10),
-        tokio_tungstenite::connect_async(req),
+        tokio_tungstenite::connect_async_tls_with_config(req, None, false, connector),
     )
     .await??;
     Ok(ws)
+}
+
+async fn connect(opts: &Options) -> anyhow::Result<Ws> {
+    connect_ws(opts, "/api/v1/agent/ws", &opts.token, true).await
 }
 
 /// The workspace catalog of a corpus run: the first few items name flows that have not run, with
@@ -826,6 +910,7 @@ async fn agent(
     i: usize,
     opts: &Options,
     storm: &tokio::sync::Barrier,
+    probe: &viewer::Probe,
 ) -> anyhow::Result<AgentReport> {
     let t0 = Instant::now();
     let id = new_id(clock_skew(opts));
@@ -867,6 +952,7 @@ async fn agent(
             &mut report,
             &mut stormed,
             storm,
+            probe,
             t0,
         )
         .await
@@ -1000,6 +1086,7 @@ async fn stream(
     report: &mut AgentReport,
     stormed: &mut bool,
     storm: &tokio::sync::Barrier,
+    probe: &viewer::Probe,
     t0: Instant,
 ) -> anyhow::Result<Ended> {
     let total = u64::try_from(events.len()).unwrap_or(u64::MAX);
@@ -1048,6 +1135,16 @@ async fn stream(
             }
         }
         let batch = wire_batch(events, from, to, opts, budget, hole);
+        // The latency clock of each flow end starts before its batch leaves.
+        let now = Instant::now();
+        for e in batch
+            .iter()
+            .filter(|e| e.kind == "flow.ended" && e.src.kind == SourceKind::LiveConsole)
+        {
+            if let Some(flow) = e.subject.flow_execution_id {
+                probe.sent(flow, now);
+            }
+        }
         sent = u64::try_from(to).unwrap_or(u64::MAX);
         // The server acks the last `seq` it applied: a batch that ends in the hole acks below `to`.
         let want = batch.iter().map(|e| e.seq).max().unwrap_or(sent);
