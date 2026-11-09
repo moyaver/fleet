@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-09. **Approved by the owner 2026-11-09.** Code read at v0.1.0-alpha.4 (PR #186).
 
-**The one change from the planning session.** The owner decided: **no Fleet-owned schedules.** Option B (an opt-in Fleet schedule that dispatches a workflow) and its cron row are removed. The team's CI cron is the "when"; `--selection` is the "what". Every section that mentioned the schedule was edited to match. The rest of the text is the approved plan, verbatim. The effort figures are the approved ones and were not re-estimated for the removal (it was about 2 days).
+**The one change from the planning session.** The owner decided: **no Fleet-owned schedules.** Option B (an opt-in Fleet schedule that dispatches a workflow) and its cron row are removed. The team's CI cron is the "when"; `--selection` is the "what". Every section that mentioned the schedule was edited to match. The rest of the text is the approved plan, verbatim. Effort is recalculated for the removal. The schedule was about 2 days of server work, the "+2" in W6's "server 6+2", so W6 becomes "server 6" and the totals fall from about 90 to about 88 engineer-days (agent 42, server 40, docs 6).
 
 Issues cite "the plan §N" for the section numbers below. Those references resolve to this file.
 
@@ -85,12 +85,12 @@ The rules move into `fleet-core::diagnosis` as pure functions over journal event
 | **W3** iOS publish | #206 capture study, `publish` from a Mac, UDID serials | `inspect.rs` `ios-*` snapshots; publishing `ios-fail` to the fake server; no probe fires for a UDID | agent 6 | Mac time |
 | **W4** Last night | #191–#199, #201 in `fleet-core::diagnosis`; `CiContext.workflow/event`; last-night page | agent: `versions.rs`, `diagnosis.rs`, `blind.rs`, observer faults in `supervisor.rs`, `summary.rs`, `junit_out.rs`, the kill captures. server: `last_night_groups_by_incident`, `blind_run_shows_banner`, `rule_change_recomputes_history` | agent 19, server 5 | Mac time for captures (#196); google_apis 33 install |
 | **W5** Quarantine + selection | ADR-0018; `quarantines`; `--selection` | agent: `prepare.rs` path guards against `../x`, `-e`, absolute paths and paths outside the catalog for `--plan`, `--rerun`, `--selection`; wiremock tests for a selection fetched, timed out, refused. server: `quarantine_never_changes_outcome` (proptest: outcome columns identical with and without quarantine), `expired_quarantine_reads_as_none`, `selection_names_excluded_flows` (I13), audit rows | server 4, agent 2 | — |
-| **W6** Guarded rerun | ADR-0019; `reruns`; `rerun fetch`; guard in `prepare.rs` | agent `tests/it/rerun.rs`: a build mismatch exits 2 and `fake-maestro.sh` never starts; a match runs; `rerun fetch` works with OIDC. server: `rerun_rejects_flows_outside_catalog`, `rerun_fetch_needs_the_policy_repo` (existing fake OIDC signer), `dispatch_calls_only_the_named_workflow` (wiremock) | agent 4, server 6+2 | GitHub App `actions: write` |
+| **W6** Guarded rerun | ADR-0019; `reruns`; `rerun fetch`; guard in `prepare.rs` | agent `tests/it/rerun.rs`: a build mismatch exits 2 and `fake-maestro.sh` never starts; a match runs; `rerun fetch` works with OIDC. server: `rerun_rejects_flows_outside_catalog`, `rerun_fetch_needs_the_policy_repo` (existing fake OIDC signer), `dispatch_calls_only_the_named_workflow` (wiremock) | agent 4, server 6 | GitHub App `actions: write` |
 | **W7** Shallow ingest | ADR-0020; `publish --junit`; XCUITest fixture | agent `tests/it/junit_ingest.rs` on a captured xcpretty report (Gradle one once the owner installs Gradle); server `junit_ingest_attaches_to_build` | agent 4 | Gradle install for an Espresso fixture |
 | **W8** Measured + gate | #202, #203 verdicts, hub release gate | accuracy.md generated; recall per project shown with its counts | agent 5, docs 1 | — |
 | **Billing** | Stripe redirects + webhook | checkout → plan set; portal; banner over quota | server 4 | Stripe account; price agreed by 3 partners |
 
-Totals ≈ agent 42, server 42, docs 6: **about 90 engineer-days** for one maintainer. Critical path: W1 → W2 → W3 (the CTO persona's four items) → W4 (the platform-lead persona's items).
+Totals ≈ agent 42, server 40, docs 6: **about 88 engineer-days** for one maintainer (the approved plan said about 90; the removed schedule was 2 server-days). Critical path: W1 → W2 → W3 (the CTO persona's four items) → W4 (the platform-lead persona's items).
 
 ---
 
