@@ -4,7 +4,7 @@
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/moyaver/fleet?include_prereleases&label=release)](https://github.com/moyaver/fleet/releases)
 
-Fleet is the home for your mobile end-to-end tests. Run them in your own CI, watch them, organize them, and choose what runs and when. Every result lands on one record per app build, with infra failures set apart.
+Fleet is the home for your mobile end-to-end tests. Run them in your own CI, watch them live, and keep every failure's evidence and history in one place. Next, it groups results by app build and lets you choose what runs.
 
 > **Self-hosted alpha today; no hosted tier yet. Android today; iOS next.**
 > Maestro is the first runner.
