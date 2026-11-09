@@ -789,14 +789,20 @@ async fn agent(
             Ok(Ended::Dropped) | Err(_) => {
                 attempt = attempt.saturating_add(1);
                 let ceiling = Duration::from_millis(100 * u64::from(attempt.min(10)));
-                let nanos = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0, |d| d.subsec_nanos());
-                tokio::time::sleep(ceiling.mul_f64(f64::from(nanos % 1000) / 1000.0)).await;
+                tokio::time::sleep(ceiling.mul_f64(jitter_fraction())).await;
             }
         }
     }
     Ok(report)
+}
+
+/// A reconnect's jitter: a fraction in `[0, 1)` from OS randomness. The clock's sub-second bits
+/// are no source: macOS clocks have microsecond resolution, so their nanoseconds are multiples of
+/// 1000 and `nanos % 1000` was always zero, which retried a refused reconnect at once (issue #138;
+/// the agent and the server keep their own one-line copies).
+fn jitter_fraction() -> f64 {
+    let permille = getrandom::u64().map_or(0, |r| r % 1000);
+    f64::from(u32::try_from(permille).unwrap_or(0)) / 1000.0
 }
 
 #[expect(clippy::too_many_arguments, reason = "one connection's whole context")]
@@ -984,6 +990,18 @@ async fn recv(ws: &mut Ws) -> anyhow::Result<Option<ServerFrame>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reconnect_jitter_varies_on_every_clock() {
+        // Issue #138: the clock's nanoseconds are always multiples of 1000 on macOS, so a jitter
+        // taken from them is zero every time. OS randomness must vary.
+        let fractions: Vec<f64> = (0..64).map(|_| jitter_fraction()).collect();
+        assert!(fractions.iter().all(|f| (0.0..1.0).contains(f)));
+        assert!(
+            fractions.iter().any(|f| *f > 0.0),
+            "the jitter never left zero"
+        );
+    }
 
     #[test]
     fn scripts_are_gap_free_and_fail_where_planned() {
