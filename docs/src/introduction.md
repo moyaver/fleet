@@ -1,16 +1,18 @@
 # Fleet
 
-Fleet is self-hosted, live observability for mobile UI tests running in CI, starting with [Maestro](https://github.com/mobile-dev-inc/maestro).
-It is not affiliated with mobile.dev, the makers of Maestro.
-It shows what is running and on which device, how far each run has got, how the runner and emulator are coping, and why each failure happened.
+Fleet is the home for your mobile end-to-end tests. Run them in your own CI, watch them, organize them, and choose what runs and when. Every result lands on one record per app build, with infra failures set apart.
 
-> **Status:** pre-release. The agent (M2), the server (M3), the dashboard (M4) and evidence and history (M5) are implemented. Hardening (M6) is in progress.
-> See the [roadmap tracker](https://github.com/moyaver/fleet#roadmap) for progress.
+> **Status:** Self-hosted alpha today; no hosted tier yet. Android today; iOS next.
+
+Fleet works with [Maestro](https://github.com/mobile-dev-inc/maestro) today. It is not affiliated with mobile.dev, the makers of Maestro.
+Today you can watch runs live, follow runners and devices, read failure evidence, and browse the flow catalog.
+The one-record-per-build view, quarantine, Fleet-triggered reruns, test selection and schedules are planned, not built. See the [roadmap](https://github.com/moyaver/fleet/blob/main/docs/ROADMAP.md).
+Fleet observes runs. It does not change a test's outcome, and a Fleet outage never fails a run.
 
 It has three parts, all in Rust:
 
 - **`fleet-agent`**, the agent: wraps `maestro test` in CI without changing its exit status or output, and streams what it observes.
-- **`fleet`**, the server: stores runs in PostgreSQL and artifacts in S3-compatible storage, and pushes live updates.
+- **`fleet`**, the server: stores runs in PostgreSQL and artifacts in S3-compatible storage or on the server's disk, and pushes live updates.
 - **The dashboard**: a Leptos web app, embedded in the server.
 
 Design documents live in the repository: the [implementation plan](https://github.com/moyaver/fleet/blob/main/docs/PLAN.md),
