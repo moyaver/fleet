@@ -1,0 +1,20 @@
+# bench-overhead raw output, 50-second run
+# Date: 2026-11-09 (local, EET). Machine: Apple M1 Pro, 10 cores, macOS 26.7.1 (25G241).
+# Build: release fleet-agent from source at commit 6c27b31 (origin/wave/5; the later commits on docs/hub-pass-1 change docs only).
+# Maestro: NOT a live Maestro run. The fake Maestro (crates/fleet-agent/tests/it/fake-maestro.sh) replays the captured
+#   Maestro 2.12.1 suite fixture (fixtures/maestro/2.12.1/suite). No emulator or device was used.
+# Command: cargo xtask bench-overhead --runs 3 --linger 50
+# Scope: the agent's own CPU and peak RSS, and the wall-time delta, on this machine with this fake suite.
+#   It is not a general performance guarantee.
+
+$ cargo build --locked --release -p fleet-agent
+Agent overhead on the fake Maestro suite (3 runs each, 50 s per run, release build)
+
+                                      median   min .. max
+wall, without agent               50067.1 ms   50061.1 ms .. 50079.7 ms
+wall, with agent                  50391.8 ms   50389.1 ms .. 50405.2 ms
+duration delta (paired)             324.8 ms   309.3 ms .. 344.1 ms
+agent CPU per run                    97.8 ms   73.2 ms .. 105.0 ms
+agent CPU, % of one core              0.19 %
+agent CPU, % of host (10 cores)       0.02 %
+agent peak RSS                      18.9 MiB   18.8 MiB .. 19.1 MiB

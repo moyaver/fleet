@@ -79,7 +79,7 @@ Set `FLEET_SERVER` to send events to a Fleet server. Authenticate with GitHub Ac
 
 ## Measured
 
-On one Apple M1 Pro, the agent used 0.20% of one core and 17 MiB of memory during a 50-second Maestro run, and it added about 0.3 seconds. This is one machine and one suite, not a general guarantee. See the [runner guide](docs/src/runner-guide.md#cost).
+On an Apple M1 Pro (10 cores, macOS 26.7.1), the agent used 0.19% of one core and 18.9 MiB of peak memory over three 50-second runs. The fake Maestro replayed a captured Maestro 2.12.1 suite, and the run with the agent took 0.32 s longer (median). This is one machine and a replayed suite, not a general guarantee. The raw output is in [research 15 assets](research/15-assets/), and the [runner guide](docs/src/runner-guide.md#cost) has the ranges.
 
 Setup took 8 minutes 17 seconds for the server stack, built from source on one Mac with a throwaway emulator. A VM, DNS and public TLS were not timed. See [research 15](research/15-setup-cost.md).
 
