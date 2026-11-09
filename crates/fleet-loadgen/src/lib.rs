@@ -93,6 +93,9 @@ pub struct Options {
     /// The agents' clock reads this many milliseconds ahead of the server's (behind when negative):
     /// every wall time they send and every id they make carries the offset (clock skew, PLAN §13).
     pub clock_skew_ms: i64,
+    /// Agents that connect, send a little of their script and then go silent with the socket open
+    /// until the run ends (a runner whose process hung): the server shows them `stale`.
+    pub quiet_agents: usize,
     /// Steps per flow: 0 keeps the shape of [`Options::wide`] (or the short two-step flows).
     pub steps: u32,
     /// Live sockets that subscribe to the project like a dashboard, and measure the ingest-to-live
@@ -155,6 +158,7 @@ impl Default for Options {
             reorder: false,
             gap_events: 0,
             clock_skew_ms: 0,
+            quiet_agents: 0,
             steps: 0,
             failure_bytes: 0,
             viewers: 0,
@@ -288,6 +292,11 @@ pub async fn run(opts: Options) -> anyhow::Result<Report> {
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+    // Quiet agents open their runs first and then hold their sockets silent until the end.
+    let mut quiet_agents = Vec::new();
+    for _ in 0..opts.quiet_agents {
+        quiet_agents.push(quiet(&opts, QUIET_EVENTS).await?);
+    }
     let storm = Arc::new(tokio::sync::Barrier::new(opts.agents.max(1)));
     let mut set = tokio::task::JoinSet::new();
     for i in 0..opts.agents {
@@ -297,6 +306,9 @@ pub async fn run(opts: Options) -> anyhow::Result<Report> {
     let mut agents = Vec::new();
     while let Some(r) = set.join_next().await {
         agents.push(r.context("an agent task panicked")??);
+    }
+    for quiet_agent in quiet_agents {
+        quiet_agent.disconnect().await;
     }
     agents.sort_by_key(|a| a.agent_run_id);
     let elapsed = t0.elapsed();
@@ -319,6 +331,9 @@ pub async fn run(opts: Options) -> anyhow::Result<Report> {
 pub fn fails(agent: usize, device: u32, flow: u32) -> bool {
     (agent + device as usize * 3 + flow as usize * 5).is_multiple_of(11)
 }
+
+/// Events a quiet agent sends before it goes silent.
+const QUIET_EVENTS: usize = 10;
 
 /// Steps per flow in a [`Options::wide`] suite.
 const WIDE_STEPS: u32 = 24;
@@ -1271,6 +1286,65 @@ async fn recv(ws: &mut Ws) -> anyhow::Result<Option<ServerFrame>> {
     }
 }
 
+/// The corpus file's items: its non-empty lines.
+///
+/// # Errors
+///
+/// When the file cannot be read.
+pub fn read_corpus(path: &std::path::Path) -> anyhow::Result<Vec<String>> {
+    let text = std::fs::read_to_string(path)
+        .with_context(|| format!("reading the corpus {}", path.display()))?;
+    Ok(text
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
+/// What a run was asked to do, as the knobs it was given (the scenario of a results file).
+#[must_use]
+pub fn scenario_json(opts: &Options) -> serde_json::Value {
+    serde_json::json!({
+        "agents": opts.agents,
+        "devices": opts.devices,
+        "flows": opts.flows,
+        "steps": opts.steps,
+        "batch": opts.batch,
+        "storm": opts.storm,
+        "duplicates": opts.duplicates,
+        "reorder": opts.reorder,
+        "gap_events": opts.gap_events,
+        "clock_skew_ms": opts.clock_skew_ms,
+        "wide": opts.wide,
+        "failure_bytes": opts.failure_bytes,
+        "corpus_items": opts.corpus.len(),
+        "unaligned": opts.unaligned,
+        "missing_step": opts.missing_step,
+        "quiet_agents": opts.quiet_agents,
+        "viewers": opts.viewers,
+        "commit": opts.commit,
+    })
+}
+
+/// A run's numbers as JSON, with the scenario it ran. Latencies are in milliseconds.
+#[must_use]
+pub fn report_json(report: &Report, scenario: &serde_json::Value) -> serde_json::Value {
+    let events: u64 = report.agents.iter().map(|a| a.events).sum();
+    let connections: u32 = report.agents.iter().map(|a| a.connections).sum();
+    serde_json::json!({
+        "scenario": scenario.clone(),
+        "agents": report.agents.len(),
+        "events": events,
+        "acked": report.acked(),
+        "connections": connections,
+        "rejected": report.agents.iter().map(|a| a.rejected).sum::<u32>(),
+        "failed_flows": report.agents.iter().map(|a| a.failed_flows).sum::<u32>(),
+        "elapsed_s": report.elapsed.as_secs_f64(),
+        "events_per_s": f64::from(u32::try_from(events).unwrap_or(u32::MAX)) / report.elapsed.as_secs_f64().max(0.001),
+        "viewers": report.viewers.as_ref().map(ViewerReport::to_json),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1486,5 +1560,54 @@ mod tests {
             6,
             "every flow ended live before the report"
         );
+    }
+
+    #[test]
+    fn a_corpus_file_gives_one_item_per_non_empty_line() {
+        let dir = std::env::temp_dir().join(format!("fleet-loadgen-corpus-{}", Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).expect("a test directory");
+        let file = dir.join("corpus.txt");
+        std::fs::write(&file, "<svg onload=x>\n\n{{ 7*7 }}\n").expect("a corpus file");
+        let items = read_corpus(&file).expect("the corpus");
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+        assert_eq!(items, ["<svg onload=x>", "{{ 7*7 }}"]);
+    }
+
+    #[test]
+    fn a_report_carries_the_scenario_and_the_viewers_latency() {
+        let report = Report {
+            agents: vec![AgentReport {
+                agent_run_id: Uuid::from_u128(1),
+                job_key: "job-0".into(),
+                events: 100,
+                acked: 100,
+                connections: 2,
+                rejected: 0,
+                failed_flows: 1,
+                serials: vec!["emulator-5554".into()],
+            }],
+            elapsed: Duration::from_secs(2),
+            viewers: Some(ViewerReport {
+                viewers: 5,
+                failed: 0,
+                frames: 40,
+                resyncs: 1,
+                errors: 0,
+                flows_sent: 3,
+                samples: 15,
+                latency_ms: Some([1.0, 2.0, 3.0, 4.0]),
+            }),
+        };
+        let opts = Options {
+            viewers: 5,
+            ..Options::default()
+        };
+        let json = report_json(&report, &scenario_json(&opts));
+        assert_eq!(json["scenario"]["viewers"], 5);
+        assert_eq!(json["events"], 100);
+        assert_eq!(json["connections"], 2);
+        assert_eq!(json["events_per_s"], 50.0);
+        assert_eq!(json["viewers"]["latency_ms"]["p95"], 2.0);
+        assert_eq!(json["viewers"]["samples"], 15);
     }
 }
