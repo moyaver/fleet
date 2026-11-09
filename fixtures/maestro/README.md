@@ -36,6 +36,7 @@ Flows are in [`examples/flows/phase0/`](../../examples/flows/phase0/). `A`/`B` a
 | `anr` | `MP`, under `sh -c` (see [provenance](#provenance-of-the-2121-scenarios-added-for-77)) | `--device emulator-5600 test CANON anr.yaml` |
 | `repeat` | `MP` | `--device emulator-5600 test CANON repeat.yaml` |
 | `app-crash` | `MP` | `--device emulator-5600 test CANON app-crash.yaml` |
+| `user-media-fail` | `MP` | `--device emulator-5600 test CANON user-media-fail.yaml` |
 | `nested` | `MP` | `--device emulator-5582 test CANON nested.yaml` |
 | `screenshot` | `MP` | `--device emulator-5582 test CANON screenshot.yaml` |
 | `recording` | `MP` | `--device emulator-5582 test CANON recording.yaml` |
@@ -93,6 +94,12 @@ Imports normalize paths and cut `device-logcat.txt` to 32 KiB head and tail, and
   - `repeat` ran on the same AVD. The image has no `com.android.settings` package (a Settings-based `repeat` failed with `Package com.android.settings is not installed`, and was not kept), so `repeat.yaml` repeats `pressKey: Home`, `launchApp` and `assertVisible: "Block main thread"` on the ANR app three times. Maestro wrote exit 0 after 29.3 s (`[Passed] repeat (13s)`). `maestro.log` has `Repeat 3 times RUNNING`, then three iterations, and `commands.json` holds the `repeatCommand`. `paths-flatten-repeated` is a different case: it repeats the `--flatten-debug-output` CLI option, which Maestro refuses with exit 2. `features` and `nested` also contain a `repeat`, inside a flow.
 
 - **`app-crash`: captured on Android 13 (API 33, `google_atd`, `-gpu swiftshader_indirect`).** The test app's `Crash app` button throws `java.lang.RuntimeException: Fleet app crash` on tap. The flow is `launchApp`, `tapOn: "Crash app"`, then `extendedWaitUntil` visible `Fleet never shows this` for 20 s. Maestro wrote exit 1 after 40.0 s, with stdout `[Failed] app-crash (29s) (Assertion is false: "Fleet never shows this" is visible)`. `logs/device-logcat.txt` keeps the whole crash: `E/AndroidRuntime: FATAL EXCEPTION: main`, `Process: com.fleet.anr, PID: 3789`, `java.lang.RuntimeException: Fleet app crash`, and the app's own frames (`at com.fleet.anr.MainActivity.lambda$onCreate$1(MainActivity.java:36)` and the framework frames under it). Maestro wrote `logs/crash-report.txt` (1645 bytes), which `crash.rs` parses to package `com.fleet.anr` and that exception (`the_app_crash_fixture_names_the_package_and_the_exception`). The import keeps the `AndroidRuntime` lines in the logcat cut (`LOGCAT_MARKERS`), which is why the stack survives.
+
+### Provenance of `user-media-fail` (#133)
+
+Captured on 2026-11-09 on macOS 26 (Apple Silicon) with the Homebrew Maestro 2.12.1 formula, on a throwaway AVD `fleet-fixtures-133` from the installed `system-images;android-33;google_atd;arm64-v8a` image (Android 13, API 33). The AVD config was written by hand, because `avdmanager` does not run on this host's JDK. It booted headless on port 5600 (serial `emulator-5600`) with `-gpu swiftshader_indirect`, and the AVD was deleted afterwards. The owner's emulators were not used. `device.json` records the device.
+
+The flow is `examples/flows/phase0/user-media-fail.yaml`, which runs on the test app `com.fleet.anr` (built with `fixtures/android/anr-app/build.sh`, installed on the throwaway device): `assertVisible`, `takeScreenshot: fleet-before-fail`, `startRecording: fleet-fail-recording`, `assertVisible`, `stopRecording`, and then `assertVisible: "Fleet never shows this"`, which fails. Maestro wrote exit 1 after 31.9 s (`[Failed] user-media-fail (22s)`). `commands.json`'s `artifacts[]` names `takeScreenshot/fleet-before-fail.png` for step 4 and `startRecording/fleet-fail-recording.mp4` for step 5, and the failure's own screenshot and hierarchy are for step 8. The import cut the device log to its head and tail as usual. This is the only captured failed flow with Maestro's own media: `screenshot`, `recording` and `anr` pass.
 
 ### Provenance of the HTML scenarios (#43)
 

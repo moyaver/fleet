@@ -1,0 +1,36 @@
+{
+  "maestro": "2.12.1",
+  "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
+  "device": {
+    "avd": "fleet-fixtures-133",
+    "serial": "emulator-5600",
+    "system_image": "system-images;android-33;google_atd;arm64-v8a",
+    "api_level": "33",
+    "build": "sdk_gslim_arm64-userdebug 13 TE1A.220922.033 10836537 dev-keys",
+    "fingerprint": "google/sdk_gslim_arm64/emulator64_arm64:13/TE1A.220922.033/10836537:userdebug/dev-keys",
+    "sdk_int": "33",
+    "release": "13",
+    "abi": "arm64-v8a",
+    "model": "Android ATD built for arm64",
+    "egl": "emulation"
+  },
+  "emulator": {
+    "version": "Android emulator version 37.2.13.0 (build_id 16740729) (CL:N/A)",
+    "launch": "emulator -avd fleet-fixtures-133 -port 5600 -no-window -no-audio -no-snapshot -no-boot-anim -no-metrics -gpu swiftshader_indirect",
+    "config_ini": {
+      "hw.cpu.arch": "arm64",
+      "hw.gpu.enabled": "no",
+      "hw.gpu.mode": "auto",
+      "hw.lcd.density": "420",
+      "hw.lcd.height": "2400",
+      "hw.lcd.width": "1080",
+      "hw.ramSize": "2048"
+    },
+    "avd_home": "temporary directory, deleted after capture"
+  },
+  "host": {
+    "os": "macOS 26.7.1",
+    "arch": "arm64"
+  },
+  "notes": "Captured on 2026-11-09 for #133 on the API 33 google_atd image, the same image as anr. The AVD config was written by hand because avdmanager fails on this host's JDK. The flow is launchApp, assertVisible on the test app's Block main thread button, takeScreenshot fleet-before-fail, startRecording fleet-fail-recording, the same assertion, stopRecording, and then an assertion that fails (Fleet never shows this). The flow fails at step 8 (0-based), so Maestro's failure screenshot and hierarchy are there too. The test app com.fleet.anr was built with fixtures/android/anr-app/build.sh and installed on the throwaway device, which was shut down and deleted afterwards. The owner's emulators were not used."
+}

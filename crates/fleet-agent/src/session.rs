@@ -2690,7 +2690,7 @@ mod tests {
     #[test]
     fn every_captured_run_settles_each_flows_steps_from_its_final_commands_file() {
         let runs = captured_runs();
-        assert_eq!(runs.len(), 48, "every captured run is replayed");
+        assert_eq!(runs.len(), 49, "every captured run is replayed");
         let mut settled_flows = 0;
         for run in &runs {
             let mut s = session_for(&run.argv);
@@ -2746,7 +2746,7 @@ mod tests {
             })
             .count();
         assert_eq!(settled_flows, final_files);
-        assert_eq!(final_files, 56, "the captured final files");
+        assert_eq!(final_files, 57, "the captured final files");
     }
 
     /// The default-format runs settle their steps from their final files, where the console names no
