@@ -720,7 +720,10 @@ async fn a_batch_without_a_connection_is_busy_and_writes_nothing(pool: PgPool) {
         .unwrap()
         .handle;
     let events = suite_run(&mut a, SuiteIds::new(), &[("login", true)]);
-    // A pool of one connection, held here, so the batch waits out its acquire timeout.
+    // A pool of one connection, held here, so the batch waits out its acquire timeout. The first
+    // acquire opens that connection, and the same 200 ms budget covers the connect, which a loaded
+    // database can exhaust. Retry until the connection is open: from then on the only acquire that
+    // can time out is the batch's, which is the one this test means.
     let tight = Store {
         pool: sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
@@ -728,7 +731,13 @@ async fn a_batch_without_a_connection_is_busy_and_writes_nothing(pool: PgPool) {
             .connect_lazy_with(options),
         origin: store.origin,
     };
-    let held = tight.pool().acquire().await.unwrap();
+    let held = loop {
+        match tight.pool().acquire().await {
+            Ok(conn) => break conn,
+            Err(sqlx::Error::PoolTimedOut) => {}
+            Err(e) => panic!("opening the held connection: {e}"),
+        }
+    };
     let out = tight.apply_batch(&h, &events).await;
     assert!(matches!(out, Err(ApplyError::Busy)), "{out:?}");
     drop(held);
