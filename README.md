@@ -9,29 +9,34 @@ Fleet is the home for your mobile end-to-end tests. Run them in your own CI, wat
 > **Self-hosted alpha today; no hosted tier yet. Android today; iOS next.**
 > Maestro is the first runner.
 
-Fleet is for mobile teams that run [Maestro](https://github.com/mobile-dev-inc/maestro) in their own CI. It does not run your tests or provide devices, and it does not change a test's result.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dashboard-run-dark.png">
+  <img alt="Fleet's flow page for a failed checkout flow: the failure message, the screenshot at the failing step and the Maestro log" src="docs/assets/dashboard-run.png">
+</picture>
 
-<!-- Screenshot to add: the dashboard during a live run, with a failed flow open. None exists in the repo yet. Capture one from a run and place it here. -->
+Fleet is for mobile teams that run [Maestro](https://github.com/mobile-dev-inc/maestro) in their own CI. It does not run your tests or provide devices, and it does not change a test's result.
 
 ## Status
 
-| Feature | Status |
-| --- | --- |
-| **Run them on CI.** `fleet-agent run --` around `maestro test` | Exists |
-| **Watch them.** Live view of runs, devices and runners; evidence for each failed flow | Exists |
-| **Organize them.** Flow catalog, tags, history and compare | Exists |
-| **Organize them.** One record per app build, with a release page (W1) | Coming |
-| **Organize them.** Quarantine, with an owner and an expiry; infra failures never quarantined (W5) | Coming |
-| **Pick what to run.** `--selection`: the PR gate, minus quarantined flows (W5) | Coming |
-| **Pick what to run.** Guarded rerun of chosen flows from the page (W6) | Coming |
-| **And when.** Your CI's cron calls `--selection`. Fleet owns no schedule (W5) | Coming |
-| Fleet Planner: duration-aware sharding across CI jobs | Exists |
-| Hosted tier, private beta, token-only sign-up (W2) | Coming |
-| iOS Maestro `publish` from a Mac (W3) | Coming |
-| Last night: incidents, infra label and blind banner (W4) | Coming |
-| XCUITest and Espresso results (W7) | Coming |
+**Today**
 
-A row changes to Exists when its wave is merged on `main`. The [roadmap](docs/ROADMAP.md) has the waves and their acceptance.
+- Run `maestro test` on CI through `fleet-agent run --`
+- Watch runs, devices and runners live, with the evidence for each failed flow
+- Organize flows in a catalog, with tags, history and compare
+- Shard flows across CI jobs by duration with the Fleet Planner
+
+**Coming**
+
+- One record per app build, with a release page ([W1](docs/ROADMAP.md))
+- Quarantine with an owner and an expiry; infra failures are never quarantined ([W5](docs/ROADMAP.md))
+- `--selection` runs the PR gate, minus quarantined flows. Your CI's cron runs it; Fleet owns no schedule ([W5](docs/ROADMAP.md))
+- Guarded rerun of chosen flows from the page ([W6](docs/ROADMAP.md))
+- Hosted tier: private beta with token-only sign-up ([W2](docs/ROADMAP.md))
+- iOS Maestro `publish` from a Mac ([W3](docs/ROADMAP.md))
+- Last night: incidents, infra label and blind banner ([W4](docs/ROADMAP.md))
+- XCUITest and Espresso results ([W7](docs/ROADMAP.md))
+
+An item moves to Today when its wave is merged on `main`. The [roadmap](docs/ROADMAP.md) has the waves and their acceptance.
 
 ## Get started
 
@@ -47,19 +52,15 @@ Each archive has a SHA-256 checksum and a GitHub build attestation. The [runner 
 
 ### Try it on a Maestro run
 
-You can observe a run without a Fleet server. You need [Rust](https://rustup.rs/), [Maestro](https://docs.maestro.dev/), an Android emulator or device, and an app that already runs under Maestro.
+You can observe a run without a Fleet server. You need [Maestro](https://docs.maestro.dev/), an Android emulator or device, and an app that already runs under Maestro.
 
 ```bash
-git clone https://github.com/moyaver/fleet.git
-cd fleet
-cargo build --locked -p fleet-agent
-
 # Replace the path with your existing Maestro flows.
-FLEET_RUN_DIR="$PWD/.fleet-run" target/debug/fleet-agent run -- maestro test path/to/flows/
-target/debug/fleet-agent inspect .fleet-run/artifacts  # add --json for machine-readable output
+FLEET_RUN_DIR="$PWD/.fleet-run" fleet-agent run -- maestro test path/to/flows/
+fleet-agent inspect .fleet-run/artifacts  # add --json for machine-readable output
 ```
 
-Fleet passes Maestro's output through and returns Maestro's own exit status. Without `FLEET_SERVER`, observation stays local. The [user guide](docs/src/user-guide.md) covers the captured run, offline capture and `flush`.
+Fleet passes Maestro's output through and returns Maestro's own exit status. Without `FLEET_SERVER`, observation stays local. The [user guide](docs/src/user-guide.md) covers the captured run, offline capture and `flush`. To build the agent from source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Use it in CI
 
