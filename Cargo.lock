@@ -1318,6 +1318,7 @@ dependencies = [
  "fleet-store",
  "http 1.5.0",
  "hyper-util",
+ "nix",
  "rustls",
  "serde_json",
  "time",

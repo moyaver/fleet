@@ -22,6 +22,7 @@ fleet-server.workspace = true
 fleet-store = { workspace = true, features = ["test-util"] }
 http.workspace = true
 hyper-util.workspace = true
+nix = { workspace = true, features = ["signal", "process"] }
 serde_json.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
