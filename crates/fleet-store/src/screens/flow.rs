@@ -114,6 +114,8 @@ impl Store {
               WHERE project_id = $1 AND id <> $2 AND started_at IS NOT NULL
                 AND ($3::timestamptz IS NULL OR started_at < $3)
                 AND CASE WHEN $4::text IS NOT NULL THEN flow_path = $4 ELSE flow_name = $5 END
+                AND EXISTS (SELECT 1 FROM agent_runs r
+                             WHERE r.id = flow_executions.agent_run_id AND r.trust_level = 'trusted')
               ORDER BY started_at DESC, id DESC
               LIMIT 10",
             project_id,
