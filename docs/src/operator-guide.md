@@ -50,7 +50,7 @@ Defaults, then a TOML file (`--config` or `FLEET_CONFIG`), then `FLEET_*` variab
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
 | `artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day` | 20 GiB, 20000 | What one project may declare in any 24 hours across all its runs. A refused upload says `project_quota_exceeded` |
-| `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 4 MiB failure_hierarchy, 512 KiB device_logcat, 32 MiB junit, 64 MiB log, 128 MiB html report | Size limit per class. `failure_hierarchy` is a step's UI hierarchy and `device_logcat` a failed flow's logcat excerpt |
+| `artifacts.max_bytes.<class>` | 20 MiB screenshot, 16 MiB commands, 4 MiB failure_hierarchy, 512 KiB device_logcat, 32 MiB junit, 64 MiB log, 128 MiB html report, 20 MiB user_screenshot, 100 MiB user_recording | Size limit per class. `failure_hierarchy` is a step's UI hierarchy, `device_logcat` a failed flow's logcat excerpt, and `user_screenshot` and `user_recording` Maestro's own `takeScreenshot` image and `startRecording` video (sent only when the agent's user-media switch is on, see [Artifact uploads](#artifact-uploads)). A file over its class's cap is refused before its bytes are sent |
 | `retention.raw_samples_days` | `7` | Raw 5 s telemetry samples; see [Retention](#retention) (0 keeps for ever, like every `retention.*_days`) |
 | `retention.rollup_1m_days`, `retention.rollup_1h_days` | `90`, `365` | One-minute and one-hour rollups |
 | `retention.journal_days`, `retention.steps_days` | `14`, `14` | The raw agent journal and step executions |
@@ -201,6 +201,8 @@ An artifact is accepted only if its declared size and SHA-256 match, it is not l
 | Class | Accepted content |
 |---|---|
 | screenshot | PNG, JPEG, WebP |
+| user_screenshot | PNG |
+| user_recording | MP4 |
 | junit | XML |
 | html report | an HTML file, or a zip |
 | text: `runner_log`, `commands`, `failure_hierarchy`, `device_logcat` | UTF-8 text without NUL bytes |
@@ -210,7 +212,7 @@ Zip and `tar.zst` archives are also read through (never unpacked to disk) and re
 
 ## Artifact uploads
 
-Agents upload failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log`, and two classes for failures: a failing step's UI hierarchy (`failure_hierarchy`) and a failed flow's device logcat excerpt (`device_logcat`). The HTML report is uploaded too, when the command asks Maestro for one with `--format html` or `--format html-detailed`: the file that `--output` names, or Maestro's default `report.html` in the working directory when there is no `--output`, is redacted like a log and uploaded as `html_report` (its `Content-Type` is `text/html`), provided it was written during the run. A report over 16 MiB is not uploaded, because it cannot be redacted reliably in memory (I6), and a report left by an earlier run is ignored with a `report_stale` warning. An upload that fails is journaled and never changes the run's result. The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
+Agents upload failure screenshots, each flow's `commands.json`, the JUnit report and `maestro.log`, and two classes for failures: a failing step's UI hierarchy (`failure_hierarchy`) and a failed flow's device logcat excerpt (`device_logcat`). Maestro's own screenshots and recordings (`takeScreenshot` images as `user_screenshot`, `startRecording` videos as `user_recording`) are uploaded only when the agent is run with `--upload-user-media` or `FLEET_UPLOAD_USER_MEDIA=1`, and only for a flow that failed, each on the step that made it. They are binary, so they are never redacted (I6): the switch is an operator's decision, and a project that must keep them off the server turns the class off on the Administration page. Each class has its own size cap above, its own content type and the `user_media` retention class. The HTML report is uploaded too, when the command asks Maestro for one with `--format html` or `--format html-detailed`: the file that `--output` names, or Maestro's default `report.html` in the working directory when there is no `--output`, is redacted like a log and uploaded as `html_report` (its `Content-Type` is `text/html`), provided it was written during the run. A report over 16 MiB is not uploaded, because it cannot be redacted reliably in memory (I6), and a report left by an earlier run is ignored with a `report_stale` warning. An upload that fails is journaled and never changes the run's result. The server accepts only its allowlisted classes, with the size limits above, and each run is capped at 2 GiB and 2,000 files. An upload is a request, a `PUT` of the bytes (spooled to `artifacts.spool_dir`), and a completion that verifies the bytes (see the table above) before the blob is written. Each upload grant belongs to the credential that asked, is short-lived and takes the bytes once; the same file requested again by a run is the same artifact, and bytes a project already holds for a class are not sent again. Nothing about a refused upload is kept except the reason. Spool files nobody completes are removed after twice the grant lifetime.
 
 Retention is recorded per artifact and enforced by the retention jobs (see [Retention](#retention)).
 
@@ -244,6 +246,7 @@ Fleet keeps what you need to debug last week's failure and see this year's trend
 | `failure_evidence` | 90 days | The same, once the flow fails (promoted when the flow finalizes, or at upload if it had already failed), and the run's Maestro log and device logcat excerpt when any of its flows failed |
 | `report` | 1 year | JUnit reports and HTML reports |
 | `debug_log` | 30 days | Maestro logs of runs without a failed flow |
+| `user_media` | 14 days | Maestro's own screenshots and recordings of a failed flow (not promoted: the switch is opt-in and they are unredacted) |
 | `video`, `bundle` | 14 days | Reserved |
 
 A window of 0 days on the page keeps a class for ever (stored as a `NULL` TTL). A changed window applies to artifacts that become available afterwards, because an artifact's expiry is fixed when it becomes available. Promotion never shortens an artifact's life. An artifact with `legal_hold` set is never expired. Upload requests nobody completed within a day of their grant lapsing are expired too.
@@ -274,12 +277,12 @@ What the origin guarantees, on every response:
 
 - A link names one artifact of one project until one moment (`/u/<project>/<artifact>/<expires>/<signature>/<file name>`; the signature is an HMAC-SHA256 under your key). A changed, expired or foreign link gets 403, 410 or 404. Rotating the key invalidates every link.
 - `Content-Security-Policy: sandbox; default-src 'none'; …`: HTML reports get an opaque origin and no scripts. `X-Content-Type-Options: nosniff`, and the `Content-Type` is what the verified bytes are, not what the uploader said.
-- Images and (sandboxed) HTML are `Content-Disposition: inline`; everything else is `attachment`.
+- Images, videos and (sandboxed) HTML are `Content-Disposition: inline`; everything else is `attachment`.
 - HTTP `Range` requests: a single `bytes=` range is answered `206 Partial Content` with a `Content-Range`, and a range the file cannot give is `416` with `Content-Range: bytes */<size>`. Several ranges, another unit, a malformed range or an `If-Range` header get the whole file (`200`), which HTTP allows. Every answer carries `Accept-Ranges: bytes`.
 - No cookie is read or set, and nothing but `/u/…` links is served: the API, the dashboard and the agent routes answer 404 on this host.
 - `Cross-Origin-Resource-Policy: cross-origin` (the dashboard embeds screenshots; the link is the access control), and `Access-Control-Allow-Origin` and `frame-ancestors` allow only `api.public_url`.
 
-The dashboard's own policy names this origin, and only this one, in `img-src` (screenshots) and `connect-src` (the log viewer fetches `maestro.log` and `commands.json` as text); it is added from `usercontent.url`, and no other directive (scripts, styles, frames) allows it. A browser that reports a CSP violation on the flow page usually means `usercontent.url` does not match the address people reach it at.
+The dashboard's own policy names this origin, and only this one, in `img-src` (screenshots), `media-src` (Maestro's own recordings, played in the page's player) and `connect-src` (the log viewer fetches `maestro.log` and `commands.json` as text); it is added from `usercontent.url`, and no other directive (scripts, styles, frames) allows it. A browser that reports a CSP violation on the flow page usually means `usercontent.url` does not match the address people reach it at.
 
 Without `usercontent.url` artifacts are stored but cannot be opened (the flow page says so). Fleet routes by the `Host` header on its main listener, so a proxy that sends both hostnames to `fleet:8080` is enough ([`deploy/compose/Caddyfile`](https://github.com/moyaver/fleet/blob/main/deploy/compose/Caddyfile)); `usercontent.listen` serves the origin on a separate port instead.
 
