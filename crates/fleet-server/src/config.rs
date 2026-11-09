@@ -274,6 +274,10 @@ pub struct ClassLimits {
     /// `device_logcat`: the excerpt of a failed flow's device log. The agent cuts it to at most
     /// 512 KiB (issue #75), so this is the ceiling it can reach.
     pub device_logcat: u64,
+    /// `user_screenshot`: a screenshot the flow took with `takeScreenshot` (issue #133).
+    pub user_screenshot: u64,
+    /// `user_recording`: a recording the flow made with `startRecording` (issue #133).
+    pub user_recording: u64,
 }
 
 impl Default for ClassLimits {
@@ -287,6 +291,8 @@ impl Default for ClassLimits {
             runner_log: 64 * MIB,
             html_report: 128 * MIB,
             device_logcat: 512 * 1024,
+            user_screenshot: 20 * MIB,
+            user_recording: 100 * MIB,
         }
     }
 }
@@ -304,6 +310,8 @@ impl ClassLimits {
             C::RunnerLog => self.runner_log,
             C::HtmlReport => self.html_report,
             C::DeviceLogcat => self.device_logcat,
+            C::UserScreenshot => self.user_screenshot,
+            C::UserRecording => self.user_recording,
         }
     }
 }

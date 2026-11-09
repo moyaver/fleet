@@ -438,6 +438,118 @@ async fn a_device_logcat_excerpt_is_text_within_its_own_limit_and_lists_on_its_f
     assert_eq!(excerpt["retention_class"], "failure_evidence");
 }
 
+/// Maestro's own screenshot and recording (issue #133): each class takes its own type, its own size
+/// limit and the project's switch, and a stored one is listed on the step that made it, with the
+/// `user_media` retention class.
+#[tokio::test]
+async fn a_users_screenshot_and_recording_are_typed_capped_switched_and_listed_on_their_step() {
+    const MP4: &[u8] = include_bytes!(
+        "../../../../../fixtures/maestro/2.12.1/user-media-fail/run/debug/user-media-fail/startRecording/fleet-fail-recording.mp4"
+    );
+    let (rig, _dirs) = artifact_rig(|c| {
+        c.artifacts.max_bytes.user_recording = 1024 * 1024;
+        c.artifacts.max_bytes.user_screenshot = 16;
+    })
+    .await;
+    let run = run_with_failed_flow(&rig, "1200").await;
+    let rec = "user-media-fail/startRecording/fleet-fail-recording.mp4";
+
+    // Each class takes its own content type, and no other.
+    let g = rig
+        .grant(&request(&run, "user_recording", rec, "image/png", MP4))
+        .await;
+    assert_eq!(refused(g), RejectReason::ContentTypeNotAllowed);
+    let g = rig
+        .grant(&request(&run, "user_screenshot", "s.png", "video/mp4", PNG))
+        .await;
+    assert_eq!(refused(g), RejectReason::ContentTypeNotAllowed);
+    // Its own cap: a screenshot over 16 bytes is too large, though a recording of that size is not.
+    let g = rig
+        .grant(&request(&run, "user_screenshot", "s.png", "image/png", PNG))
+        .await;
+    assert_eq!(refused(g), RejectReason::TooLarge);
+    // Asking again for the same file is the same artifact, so the step is named from the first ask.
+    let on_step = UploadRequest {
+        step: Some(5),
+        ..request(&run, "user_recording", rec, "video/mp4", MP4)
+    };
+    let g = rig.grant(&on_step).await;
+    assert!(matches!(g, UploadGrant::Upload { .. }), "{g:?}");
+
+    // The bytes are checked as what the class allows: a PNG is not a recording (magic bytes). The
+    // declared type is right, so the grant is given, and the bytes are refused when they arrive.
+    let mut req = request(&run, "user_recording", rec, "video/mp4", PNG);
+    req.step = Some(5);
+    let grant = rig.grant(&req).await;
+    let UploadGrant::Upload {
+        url, complete_url, ..
+    } = grant.clone()
+    else {
+        panic!("a PNG declared as a recording is granted before its bytes are read: {grant:?}");
+    };
+    assert_eq!(rig.put_as(&rig.key, &url, PNG).await.status_code(), 204);
+    let done: UploadResult = rig.complete_as(&rig.key, &complete_url).await.json();
+    assert!(
+        matches!(
+            done,
+            UploadResult::Rejected {
+                reason: RejectReason::TypeNotAllowed,
+                ..
+            }
+        ),
+        "{done:?}"
+    );
+
+    // Maestro's own recording is stored under its step, and listed with it.
+    let result = rig.upload(&on_step, MP4).await;
+    assert!(
+        matches!(result, UploadResult::Available { .. }),
+        "{result:?}"
+    );
+    let listed = rig.artifacts_of(run.flow).await;
+    let found = listed["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["class"] == "user_recording")
+        .unwrap_or_else(|| panic!("the recording is listed: {listed}"));
+    assert_eq!(found["step"], 5, "{found}");
+    assert_eq!(found["content_type"], "video/mp4");
+    assert_eq!(found["state"], "available");
+    assert_eq!(found["retention_class"], "user_media");
+    assert!(
+        found["link"]["url"].is_null() || found["link"]["url"].is_string(),
+        "{found}"
+    );
+
+    // The project's own switch turns the class off, and the other user class stays.
+    let app = rig.store.project_id("app").await.unwrap().unwrap();
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "user_recording", false, None)
+        .await
+        .unwrap();
+    let g = rig
+        .grant(&request(&run, "user_recording", "r2.mp4", "video/mp4", MP4))
+        .await;
+    assert_eq!(refused(g), RejectReason::ClassNotAllowed);
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "user_recording", true, None)
+        .await
+        .unwrap();
+    rig.store
+        .set_artifact_class(AuditActor::System, app, "user_screenshot", true, Some(4))
+        .await
+        .unwrap();
+    let g = rig
+        .grant(&request(&run, "user_screenshot", "s.png", "image/png", PNG))
+        .await;
+    assert_eq!(
+        refused(g),
+        RejectReason::TooLarge,
+        "the project's own cap, below the configured one"
+    );
+}
+
 fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
     use std::io::Write as _;
     let mut out = std::io::Cursor::new(Vec::new());

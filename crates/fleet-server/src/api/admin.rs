@@ -147,6 +147,14 @@ pub(crate) fn artifact_policy(config: &Config) -> Vec<AdminSettingView> {
             &c.device_logcat.to_string(),
         ),
         setting(
+            "artifacts.max_bytes.user_screenshot",
+            &c.user_screenshot.to_string(),
+        ),
+        setting(
+            "artifacts.max_bytes.user_recording",
+            &c.user_recording.to_string(),
+        ),
+        setting(
             "usercontent.link_ttl_seconds",
             &config.usercontent.link_ttl_seconds,
         ),

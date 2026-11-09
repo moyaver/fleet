@@ -185,6 +185,84 @@ async fn every_screenshot_and_report_read_through_a_link_is_audited() {
     assert_eq!(audited().await.len(), 2, "text evidence is not audited");
 }
 
+/// Maestro's own recording of a failed flow (issue #133): an MP4 that opens inline on the
+/// usercontent origin, with ranges (the browser seeks in it), sandboxed like every artifact, and
+/// audited on every read like a screenshot, since it may show personal data.
+#[tokio::test]
+async fn a_users_recording_plays_inline_in_ranges_and_every_read_is_audited() {
+    const MP4: &[u8] = include_bytes!(
+        "../../../../../fixtures/maestro/2.12.1/user-media-fail/run/debug/user-media-fail/startRecording/fleet-fail-recording.mp4"
+    );
+    let (rig, run) = rig_with_usercontent().await;
+    let video = store(
+        &rig,
+        &run,
+        "user_recording",
+        "user-media-fail/startRecording/fleet-fail-recording.mp4",
+        "video/mp4",
+        MP4,
+    )
+    .await;
+    let shot = store(
+        &rig,
+        &run,
+        "user_screenshot",
+        "user-media-fail/takeScreenshot/fleet-before-fail.png",
+        "image/png",
+        PNG,
+    )
+    .await;
+    let link = link_of(&rig, &run, video).await;
+    assert!(link.ends_with("/fleet-fail-recording.mp4"), "{link}");
+
+    let res = open(&rig, UC_HOST, &link).await;
+    assert_eq!(res.status_code(), 200);
+    assert_eq!(res.as_bytes().as_ref(), MP4);
+    assert_eq!(header(&res, "content-type"), "video/mp4");
+    assert!(
+        header(&res, "content-disposition")
+            .starts_with("inline; filename=\"fleet-fail-recording.mp4\""),
+        "a recording is shown, not saved: {:?}",
+        res.headers()
+    );
+    assert!(header(&res, "content-security-policy").starts_with("sandbox;"));
+    assert_eq!(header(&res, "accept-ranges"), "bytes");
+
+    // A range, as a browser's player asks for it when it seeks.
+    let url = url::Url::parse(&link).unwrap();
+    let ranged = rig
+        .app
+        .get(url.path())
+        .add_header("host", UC_HOST)
+        .add_header("range", "bytes=0-99")
+        .await;
+    assert_eq!(ranged.status_code(), 206, "{:?}", ranged.headers());
+    assert_eq!(ranged.as_bytes().as_ref(), &MP4[..100]);
+
+    // The screenshot and the recording are both audited, one row per read, with their classes: the
+    // whole recording, its range, then the screenshot.
+    let link_shot = link_of(&rig, &run, shot).await;
+    assert_eq!(open(&rig, UC_HOST, &link_shot).await.status_code(), 200);
+    let project = rig.store.project_id("app").await.unwrap().unwrap();
+    let rows = rig
+        .store
+        .audited(project, "artifact.fetched")
+        .await
+        .unwrap();
+    let classes: Vec<&str> = rows.iter().map(|r| r["class"].as_str().unwrap()).collect();
+    assert_eq!(
+        classes,
+        ["user_recording", "user_recording", "user_screenshot"],
+        "{rows:?}"
+    );
+    let partial: Vec<bool> = rows
+        .iter()
+        .map(|r| r["partial"].as_bool().unwrap())
+        .collect();
+    assert_eq!(partial, [false, true, false]);
+    assert!(rows.iter().all(|r| r["via"] == "signed_link"));
+}
+
 #[tokio::test]
 async fn html_is_shown_sandboxed_and_everything_else_is_a_download() {
     let (rig, run) = rig_with_usercontent().await;
