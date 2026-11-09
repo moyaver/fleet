@@ -54,13 +54,13 @@ A device session is the device as one shard of a run selected it. When a later s
 
 `cargo xtask bench-overhead` measures the agent's cost on the captured four-flow suite the agent's tests replay, with a fake Maestro. It runs the suite with and without `fleet-agent run` (offline, no server), alternating the order, and reports wall time, the agent's CPU time and its peak memory. `--runs N` (default 5) sets the number of runs, `--linger SECS` (default 10) how long each run lasts, and `--max-cpu-percent X` makes it exit 1 when the agent uses more than X% of one core. The numbers depend on the machine, so the command is not part of `cargo xtask ci`.
 
-Measured with `cargo xtask bench-overhead --runs 3 --linger 50` on an Apple M1 Pro (10 cores, macOS 26.7.1), release build, 50 s per run, about the length of the real four-flow suite. These figures predate the post-exit drain change in #128, so they have not been re-measured since; run the command again to refresh them:
+Measured with `cargo xtask bench-overhead --runs 3 --linger 50` on an Apple M1 Pro (10 cores, macOS 26.7.1), release build, 50 s per run, about the length of the real four-flow suite (2026-11-09):
 
-- agent CPU: 99 ms per run (range 86 to 119 ms), 0.20% of one core and 0.02% of the host;
-- agent peak memory: 17.2 MiB, supervisor and observer together;
-- duration: the run with the agent took 0.32 s longer (range 0.27 to 0.34 s), 0.6% of 50 s. The cause was not isolated.
+- agent CPU: 127 ms per run (range 125 to 131 ms), 0.25% of one core and 0.03% of the host;
+- agent peak memory: 21.0 MiB, supervisor and observer together;
+- duration: the run with the agent took 0.32 s longer (range 0.32 to 0.34 s), 0.6% of 50 s. The cause was not isolated.
 
-Shorter runs spend more of their time on the fixed start-up and exit cost: the default 10 s runs used 0.42% and 0.43% of one core in two runs on the same machine. Its own CPU and memory are also reported with every metrics sample.
+Shorter runs spend more of their time on the fixed start-up and exit cost: the default 10 s runs used 0.99% of one core (103 ms per run) on the same machine. Its own CPU and memory are also reported with every metrics sample.
 
 **Unknown host readings.** Every host and process reading the agent did not take carries its reason, the same as a device reading does: `no_system_info` (the platform's system information could not be read, so the host readings that come from it are not taken), `no_psi` (the kernel has no pressure stall information, as on macOS, so the three pressure readings are absent and never zero), `no_process` (Maestro has not started yet, or its process or the agent's has exited), `probe_failed` (the read failed), and `no_baseline` (the first CPU sample only sets the baseline). A reading that has a value has no reason. The newest host sample is on the runner page's *Newest host sample* card, with each reading's value or its reason. The units are part of each field's name and the scope is its prefix: `host_` is the machine, `maestro_` the Maestro process and `agent_` the agent itself.
 
