@@ -328,13 +328,11 @@ async fn history_filters_live_in_the_url_and_survive_a_reload_and_a_flows_stats_
         &format!("{} === 1", count_of(&q("history-row"))),
     )
     .await;
-    let controls = page
-        .eval(
-            "return [document.querySelector('#filter-outcome').value, document.querySelector('#filter-flow').value];",
-            vec![],
-        )
-        .await;
-    assert_eq!(controls, json!(["failed", "flow-0-0"]));
+    page.wait(
+        "the filter controls to show the filters after the reload",
+        "document.querySelector('#filter-outcome')?.value === 'failed' && document.querySelector('#filter-flow')?.value === 'flow-0-0'",
+    )
+    .await;
     assert_eq!(
         page.count(&format!(
             "{} {}",
@@ -483,13 +481,16 @@ async fn compare_explains_a_new_failure_by_the_changed_condition_and_lists_flows
         &count_of(&q("comparison")),
     )
     .await;
-    let picked = page
-        .eval(
-            "return [document.querySelector('#compare-a').value, document.querySelector('#compare-b').value];",
-            vec![],
-        )
-        .await;
-    assert_eq!(picked, json!([a, b]));
+    // The pickers render on their own after the reload: wait for them to show the choice.
+    page.wait(
+        "both pickers to show the chosen attempts after the reload",
+        &format!(
+            "document.querySelector('#compare-a')?.value === {} && document.querySelector('#compare-b')?.value === {}",
+            json!(a),
+            json!(b)
+        ),
+    )
+    .await;
     page.wait("the explanation again", &count_of(&q("explanation")))
         .await;
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
