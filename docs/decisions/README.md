@@ -19,3 +19,4 @@ They follow from the research in [`../../research/`](../../research/00-synthesis
 | [0012](0012-agpl-license.md) | Open source under AGPL-3.0-only; CLA kept for a commercial license | Accepted |
 | [0013](0013-fleet-planner.md) | Fleet Planner: static, duration-aware CI sharding | Accepted |
 | [0014](0014-runner-neutral-names.md) | Runner-neutral names on the wire and in the schema | Accepted |
+| [0015](0015-coordinate-mode.md) | Coordinate mode is not built; observe mode and the static planner stay | Accepted (rejected under the 20% rule) |
