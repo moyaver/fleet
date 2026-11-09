@@ -1634,6 +1634,88 @@ mod tests {
         assert!(draws.len() > 1, "busy waits never vary: {draws:?}");
     }
 
+    /// A `welcome` that commits nothing yet, for the fake server below.
+    fn fresh_welcome() -> String {
+        serde_json::json!({ "op": "welcome", "protocol": 1,
+            "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
+            "committed_through": 0, "resume": "new", "limits": { "max_inflight_events": 512,
+            "max_frame_bytes": 1_048_576, "heartbeat_interval_ms": 10_000 } })
+        .to_string()
+    }
+
+    #[tokio::test]
+    async fn a_busy_refusal_rewinds_the_stop_and_wait_loop_and_is_counted() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Accepts one socket, refuses the first batch as busy, acks every resend, and returns the
+        // seqs of each batch it received, in order, until the agent says bye.
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            #[expect(clippy::result_large_err, reason = "tungstenite callback signature")]
+            let callback = |_req: &tokio_tungstenite::tungstenite::handshake::server::Request, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                response.headers_mut().insert("Sec-WebSocket-Protocol", HeaderValue::from_static(WS_SUBPROTOCOL));
+                Ok(response)
+            };
+            let mut ws = tokio_tungstenite::accept_hdr_async(socket, callback)
+                .await
+                .unwrap();
+            let mut batches: Vec<Vec<u64>> = Vec::new();
+            let mut refused = false;
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                match serde_json::from_str::<ClientFrame>(text.as_str()) {
+                    Ok(ClientFrame::Hello(_)) => {
+                        ws.send(Message::text(fresh_welcome())).await.unwrap();
+                    }
+                    Ok(ClientFrame::Events { events }) => {
+                        let seqs: Vec<u64> = events.iter().map(|e| e.seq).collect();
+                        let (first, last) = (seqs[0], seqs[seqs.len() - 1]);
+                        batches.push(seqs);
+                        let reply = if refused {
+                            serde_json::json!({ "op": "ack", "through": last, "epoch": 1, "duplicates": 0 })
+                        } else {
+                            refused = true;
+                            serde_json::json!({ "op": "error", "code": "overloaded", "fatal": false,
+                                "message": "busy", "expected_seq": first })
+                        };
+                        ws.send(Message::text(reply.to_string())).await.unwrap();
+                    }
+                    Ok(ClientFrame::Bye) => break,
+                    _ => {}
+                }
+            }
+            batches
+        });
+        let report = run(Options {
+            server: format!("ws://{addr}"),
+            token: "test-token".into(),
+            agents: 1,
+            deadline: Duration::from_secs(30),
+            ..Options::default()
+        })
+        .await
+        .unwrap();
+        let batches = server.await.unwrap();
+        let agent = &report.agents[0];
+        assert!(agent.busy == 1, "one refusal is counted: {agent:?}");
+        assert_eq!(agent.connections, 1, "the resend stays on the same socket");
+        assert_eq!(
+            agent.acked, agent.events,
+            "every event is acked after the resend"
+        );
+        assert!(batches.len() >= 2, "{batches:?}");
+        assert_eq!(batches[0][0], 1, "the first batch starts at seq 1");
+        assert_eq!(
+            batches[0], batches[1],
+            "the refused batch is resent from its first seq"
+        );
+        assert_eq!(
+            batches.last().and_then(|b| b.last()).copied(),
+            Some(agent.events),
+            "the stream ends at the last event"
+        );
+    }
+
     #[test]
     fn a_report_carries_the_scenario_and_the_viewers_latency() {
         let report = Report {
