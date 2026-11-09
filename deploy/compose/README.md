@@ -19,14 +19,14 @@ openssl rand -hex 32 > secrets/s3_secret_access_key
 printf 'GARAGE_DEFAULT_ACCESS_KEY=%s\nGARAGE_DEFAULT_SECRET_KEY=%s\n' "$(cat secrets/s3_access_key_id)" "$(cat secrets/s3_secret_access_key)" > secrets/garage.env
 chmod 600 secrets/garage.env
 chmod 400 secrets/garage_rpc_secret
-echo 'FLEET_IMAGE=fleet:source' >> .env   # until the next release: see below
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker compose ps               # fleet turns healthy once migrations ran and Postgres answers
 ```
 
-Each release tag publishes the server image to `ghcr.io/moyaver/fleet` (`latest` for stable releases only). The compose file uses `ghcr.io/moyaver/fleet:0.1.0-alpha.3` by default. To run another release instead of building, set `FLEET_IMAGE=ghcr.io/moyaver/fleet:<version>` in `.env`, then `docker compose pull && docker compose up -d` without `--build`.
+Each release tag publishes the server image to `ghcr.io/moyaver/fleet` (`latest` for stable releases only). The compose file uses `ghcr.io/moyaver/fleet:0.1.0-alpha.4` by default. To run another release, set `FLEET_IMAGE=ghcr.io/moyaver/fleet:<version>` in `.env`, then `docker compose pull && docker compose up -d`.
 
-Until the next release, that image predates the clean break in the [operator guide](../../docs/src/operator-guide.md#clean-break-from-the-alpha-releases) and cannot serve agents built from this repository. The `echo` line above keeps the local build under its own name, `fleet:source`, so it is not taken for the published image; `--build` then compiles the server from this checkout.
+To build the server from this checkout instead, set `FLEET_IMAGE=fleet:source` in `.env`, so the local build is not taken for the published image, then run `docker compose up -d --build`.
 
 ## Garage secrets
 

@@ -316,7 +316,7 @@ Before v1.0.0 the wire protocol and the schema have no compatibility promise (AD
 ### Before you upgrade
 
 1. **Back up** the database and the blob store, with the configuration and secrets ([Backup and restore](#backup-and-restore)). The backup is the only way back once the schema has moved; see [Rollback](#rollback).
-2. **Pin the image by tag.** Set `FLEET_IMAGE` in the Compose `.env` to the release (for example `ghcr.io/moyaver/fleet:0.1.0-alpha.3`); do not follow `latest` across upgrades.
+2. **Pin the image by tag.** Set `FLEET_IMAGE` in the Compose `.env` to the release (for example `ghcr.io/moyaver/fleet:0.1.0-alpha.4`); do not follow `latest` across upgrades.
 
 ### Upgrade the server
 

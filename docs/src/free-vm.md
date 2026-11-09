@@ -59,15 +59,15 @@ FLEET_USERCONTENT_DOMAIN=<uploads>.duckdns.org
 
 Keep `.env` and `secrets/`: a restore needs them.
 
-Until the next release, build the server from this clone. The published image (the default `FLEET_IMAGE`, `ghcr.io/moyaver/fleet:0.1.0-alpha.3`) predates the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases), so it cannot serve this branch's agents. Give the local build its own image name, so it is not mistaken for the published one, and build:
+Pull the server image, the default `FLEET_IMAGE` (`ghcr.io/moyaver/fleet:0.1.0-alpha.4`), and start the stack. It is the release that carries the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases), so its agents and server match:
 
 ```bash
-echo 'FLEET_IMAGE=fleet:source' >> .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker compose ps        # wait until fleet is healthy
 ```
 
-The build compiles the server and the dashboard inside Docker, so it takes a long time on two Arm cores. Once a release carries the clean break, the published image replaces it: set `FLEET_IMAGE` to that tag and leave out `--build`.
+To build the server from this clone instead, give the local build its own image name, so it is not mistaken for the published one: `echo 'FLEET_IMAGE=fleet:source' >> .env`, then `docker compose up -d --build`. The build compiles the server and the dashboard inside Docker, so it takes a long time on two Arm cores.
 
 Check that the server answers through the proxy:
 
@@ -113,7 +113,7 @@ docker compose run --rm fleet api-key create --project <project-slug> --name ci
 
 Set `FLEET_SERVER=https://<dashboard>.duckdns.org` in the job, then wrap the Maestro command with `fleet-agent run --` ([user guide](user-guide.md)).
 
-The agent needs the same clean break: the release installer and the composite action both install `v0.1.0-alpha.3`, which cannot report to a server built from this branch. Until the next release, build the agent from this repository (the [runner guide](runner-guide.md#install) has the installer command for the release):
+The agent is the matching `v0.1.0-alpha.4` release: the release installer and the composite action both install it (the [runner guide](runner-guide.md#install) has the installer command). To build the agent from this repository instead:
 
 ```bash
 cargo build --locked -p fleet-agent     # target/debug/fleet-agent, on the runner or your machine

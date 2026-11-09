@@ -2,12 +2,12 @@
 
 ## Install
 
-This installs the alpha pre-release `v0.1.0-alpha.3` (pinned, because `latest` skips pre-releases). That release predates the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases): its agent cannot report to a server built from this branch. Until the next release, build the agent from source with `cargo build --locked -p fleet-agent` and use `target/debug/fleet-agent` in place of the installed binary ([Try Fleet on a free VM](free-vm.md#7-connect-ci)).
+This installs the alpha pre-release `v0.1.0-alpha.4` (pinned, because `latest` skips pre-releases). It is the release that carries the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases), so its agent reports to the server of the same release. To build the agent from source instead, run `cargo build --locked -p fleet-agent` and use `target/debug/fleet-agent` in place of the installed binary ([Try Fleet on a free VM](free-vm.md#7-connect-ci)).
 
 The installer command for the release:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.3/fleet-agent-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.4/fleet-agent-installer.sh | sh
 ```
 
 Release archives are built for Linux x86_64 and aarch64 (static, musl) and macOS on Apple Silicon. Each comes with a SHA-256 checksum (also listed in `sha256.sum`), a GitHub artifact attestation, the license and the third-party notices. The checksum file is served from the same release as the archive, so a check against it proves only that the download was not corrupted. The attestation is what authenticates the archive. To verify a downloaded archive with the [GitHub CLI](https://cli.github.com/):
@@ -21,7 +21,7 @@ gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyave
 The [composite action](https://github.com/moyaver/fleet/blob/main/examples/github-actions/fleet-agent/action.yml) installs the agent, runs a Maestro command under it, and appends a job summary to the run page: the outcome counts, the flows that did not pass with their reason and provenance, each of them linked to its flow page when `FLEET_SERVER` is set, and a link to the dashboard. Maestro's output and exit status are unchanged. Before it runs anything, the action requires the release's build attestation to verify (`verify-attestation: true`, the default), and takes the archive's expected SHA-256 from that attestation. The check needs the `gh` and `jq` CLIs on the runner and a token with `attestations: read`. Set `verify-attestation: false` only where the archive cannot be authenticated anyway, and the action then warns. Give the job `permissions: id-token: write` and `attestations: read`:
 
 ```yaml
-- uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.3
+- uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.4
   with:
     command: maestro test .maestro/
 ```
