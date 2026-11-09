@@ -4,21 +4,32 @@ This document preserves the milestone checklist and acceptance evidence while th
 
 ## Roadmap
 
-Each milestone has exit criteria in [PLAN §12](PLAN.md#12-milestones). A milestone starts only when the previous one's criteria pass or the owner waives them.
-Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milestones).
+Milestones M0 to M6 built the agent, the server, the dashboard and the evidence. The hub waves turn that into a hub for mobile e2e tests ([ADR-0016](decisions/0016-fleet-is-a-hub.md)). Each wave's acceptance is in [research 16 §4](../research/16-hub-plan.md#4-waves-acceptance-effort-one-maintainer), and the wave list is in [PLAN §12](PLAN.md#12-milestones).
 
-| | Milestone | Scope | Exit criteria | Estimate |
-|---|---|---|---|---|
-| ✅ | [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | `cargo xtask ci` green locally and in CI; `fleet serve` shows the hello page; license files verbatim | 1–2 days |
-| ✅ | [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Capture real Maestro 2.12.x runs on emulators as fixtures; answer the 17 open questions | Every progress state classified observable / inferred / unavailable with fixture evidence; device-correlation rule confirmed | 1–2 weeks |
-| ✅ | [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor/observer, metrics, adb, spool, transport, signed releases, run a planner shard | Invariants I1, I2, I5, I6, I10 proven by tests; < 1% CPU overhead; a real CI run streams unchanged | 3–5 weeks |
-| ✅ | [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks/resume, live hub, REST, OpenAPI, agent auth, Compose, plan storage | Concurrent agents don't corrupt state; restarts lose no committed events; acceptance criteria 3, 10, 11, 15 | 4–6 weeks |
-| ✅ | [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser OIDC login, E2E | A developer can follow a full run without CI logs; acceptance criteria 2, 4, 5, 6, 14 | 4–6 weeks |
-| ✅ | [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, **Fleet Planner** (duration-aware CI sharding, [ADR-0013](decisions/0013-fleet-planner.md)) | A failed run can be diagnosed after the runner is gone; acceptance criteria 7, 8, 9 | 3–4 weeks |
-| 🚧 | [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, admin screen, security review, load tests, runbooks, guides, release | All 15 acceptance criteria pass; IT can deploy from the docs alone | 3–4 weeks |
-| ⬜ | [**M7+** Optional](https://github.com/moyaver/fleet/milestone/8) | Notifications, OTLP, GitLab/Buildkite, fork-PR relay, iOS, Leptos 0.9 | — | — |
+Each milestone has exit criteria in [PLAN §12](PLAN.md#12-milestones). A milestone starts only when the previous one's criteria pass or the owner waives them. Issues are grouped by [GitHub milestone](https://github.com/moyaver/fleet/milestones).
 
-✅ done · 🚧 in progress · ⏭️ next · ⬜ not started
+| Milestone | Scope | Status |
+| --- | --- | --- |
+| [**M0** Bootstrap](https://github.com/moyaver/fleet/milestone/1) | Repo, licensing, workspace skeleton, xtask, CI, hello page | Done |
+| [**M1** Phase 0: Maestro proof](https://github.com/moyaver/fleet/milestone/2) | Real Maestro 2.12.x runs captured as fixtures; the open questions answered | Done |
+| [**M2** Agent](https://github.com/moyaver/fleet/milestone/3) | Parsers, supervisor and observer, metrics, adb, spool, transport, releases | Done |
+| [**M3** Server core](https://github.com/moyaver/fleet/milestone/4) | Migrations, ingest, acks and resume, live hub, REST, OpenAPI, agent auth, Compose, plans | Done |
+| [**M4** Dashboard core](https://github.com/moyaver/fleet/milestone/5) | `fleet-ui` kit, screens A–D, browser sign-in, browser end-to-end tests | Done |
+| [**M5** Evidence and history](https://github.com/moyaver/fleet/milestone/6) | Artifacts, usercontent origin, screenshot and log viewers, fingerprints, flaky v1, screens E–F, Fleet Planner | Done |
+| [**M6** Hardening and v1.0.0](https://github.com/moyaver/fleet/milestone/7) | RBAC, security review, load tests, runbooks, guides | Closed at alpha.4; unchecked items stay open |
+| **W0** Alpha.4 and the hub | Docs pass 1: ADR-0016, README, PLAN §3, ROADMAP, milestones; alpha.4 tagged | In progress |
+| **W1** Build key | `build.detected`, `builds` table, release page | Planned |
+| **W2** Hosted private beta | Tenancy, GitHub App sign-in, token-only signup, metering, purge, hosted instance | Planned |
+| **W3** iOS publish | `publish` from a Mac, UDID serials | Planned |
+| **W4** Last night | Incidents, infra label, blind banner (#191–#201) | Planned |
+| **W5** Quarantine and selection | ADR-0018; `quarantines`; `--selection` | Planned |
+| **W6** Guarded rerun | ADR-0019; `reruns`; `rerun fetch` | Planned |
+| **W7** Other frameworks | ADR-0020; shallow JUnit ingest for XCUITest and Espresso | Planned |
+| **W8** Measured | Labelled runs, `accuracy.md`, in-hub verdicts, hub release gate | Planned |
+| **Billing** | Stripe Checkout and portal as redirects; signed webhook | Planned, built after #205 |
+| **Later** | Pilots on managed Postgres (#177), minimal profile (#178), webhook (#208), sponsors (#210) | Not scheduled |
+
+The GitHub milestones "M7: The step" and "M8: Measured" are replaced by the hub waves. [Research 16 §5](../research/16-hub-plan.md#5-remaining-work-and-issues) lists where their open issues go.
 
 ### M0 checklist
 
@@ -131,6 +142,8 @@ Browser tests against the real server and Postgres 18, in `crates/fleet-e2e/test
 
 ### M6 checklist
 
+Closed at alpha.4. The unchecked items were not finished at close; they stay open as issues on GitHub.
+
 Tracking: [#86](https://github.com/moyaver/fleet/issues/86). Items from the [2026-11-06 competitive review](../research/09-competitive-review-2026-11.md) are included.
 
 - [x] Correct results: nested steps and retry attempts (#134), the post-exit drain of a backed-up CI log (#128), per-run runner metrics (#129), Maestro version per run (migration 0013), infrastructure failures left out of flaky analysis (#72, merged as #97), and the runs a lost device excluded from it shown (#119)
@@ -153,16 +166,24 @@ Things only the owner can do. Each one has an issue labelled [`owner-action`](ht
 
 ---
 
-## Considered and not planned
+## Not planned
 
 Proposals that were looked at and set aside. Each row names the rule it conflicts with, so the reason survives. Competitor and feature review: [research 09 §7](../research/09-competitive-review-2026-11.md#7-not-opened-and-why).
 
 | Feature | Rule it conflicts with | Why | What would bring it back |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Quality gates (Fleet decides pass or fail) | [ADR-0009](decisions/0009-scope-focused-build.md) ("Don't build: quality gates"); invariant [I1](PLAN.md#3-invariants-non-negotiable); [spec §16 criterion 11](spec-v1.0.md#16-acceptance-criteria) (preserve the exit code and CI quality gate); I2 (fail open) | Fleet observes; Maestro's exit code is the gate. A Fleet bug or outage must never break or green a pipeline | Only as a separate, opt-in CI step that reads Fleet's data, never inside the agent. Needs a new ADR |
-| Quarantine (hide or skip flaky tests) | ADR-0009 ("test management"); [research 07](../research/07-prior-art-and-build-vs-buy.md) ("a flaky label never hides a failure"); [spec §16 criterion 15](spec-v1.0.md#16-acceptance-criteria) (failures must not look successful) | Quarantine turns a failure into something else, the opposite of Fleet's promise. Fleet labels flakiness; the status stays failed. Competitors such as BuildPulse already sell it (research 07 §3) | Not planned. It would need a change to the core promise |
 | AI root-cause assistant | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "AI-based autonomous debugging"; [PLAN M7+](PLAN.md#12-milestones) allows AI summaries only with approval; I3 and I4 (provenance) | A guessed root cause has no provenance and can be confidently wrong. The market is crowded ([research 09](../research/09-competitive-review-2026-11.md)) | Approved summaries, marked *inferred*, in M7+, after deterministic classification is solid ([research 10](../research/10-comparative-diagnosis-study.md)) |
-| Other test frameworks, or generic JUnit and CTRF import | [ADR-0011](decisions/0011-name-and-runner-scope.md) (v1 is Maestro only; a new runner is a new crate, built from captured fixtures, with its own ADR) | Fleet's edge is exact knowledge of Maestro's output. Generic JUnit import is what Allure does, and [research 10](../research/10-comparative-diagnosis-study.md) measured Allure misreading Maestro failures | A new runner crate, its captured fixtures, and its own ADR |
-| Dynamic scheduling, or test selection by code change | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "CI orchestration or job scheduling"; [ADR-0013](decisions/0013-fleet-planner.md) (static planning only) | Fleet computes assignments; CI launches the jobs. A work queue, or choosing tests, would make Fleet control execution | ADR-0013 allows a dynamic queue only if measurements show static sharding falls short. Test selection needs a spec change |
+| Generic JUnit or CTRF import beyond the XCUITest and Espresso ingest in W7 | [ADR-0011](decisions/0011-name-and-runner-scope.md) (v1 is Maestro only; a new runner is a new crate, built from captured fixtures, with its own ADR) | Fleet's edge is exact knowledge of Maestro's output. Generic JUnit import is what Allure does, and [research 10](../research/10-comparative-diagnosis-study.md) measured Allure misreading Maestro failures | A new runner crate, its captured fixtures, and its own ADR (W7 is ADR-0020) |
+| Dynamic scheduling, or test selection by code change | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "CI orchestration or job scheduling"; [ADR-0013](decisions/0013-fleet-planner.md) (static planning only) | Fleet computes assignments; CI launches the jobs. A work queue, or choosing tests from a code diff, would make Fleet control execution | ADR-0013 allows a dynamic queue only if measurements show static sharding falls short. Test selection needs a spec change |
+| Fleet runs tests or provides devices | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "A new test runner"; [ADR-0016](decisions/0016-fleet-is-a-hub.md) | The team's CI runs its tests on its own devices. Fleet holds the record of the runs | Not planned |
+| Fleet-owned schedules | [ADR-0016](decisions/0016-fleet-is-a-hub.md) decision 4 (owner, 2026-11-09); I2 | If Fleet is down, a schedule that Fleet owns could fail to start a run without anyone seeing it | Not planned. The team's CI cron decides when |
+| Per-seat, committer or device-hour pricing | [Research 16 §1 and §7](../research/16-hub-plan.md#1-product) (flat tiers by flow results are the hypothesis) | Seats and devices penalize the teams that run the most tests. Flow results match the value Fleet records | Owner decision after validation ([#205](https://github.com/moyaver/fleet/issues/205)) |
+| Pixel redaction | I6 (screenshots need authorized, expiring access under the artifact policy) | Pixels cannot be redacted with the same certainty as text. Access control carries that risk instead | Not planned |
+| Guessing at leftover test state | I3 (nothing is ever falsely successful); [ADR-0016](decisions/0016-fleet-is-a-hub.md) (Fleet never guesses a result) | A guess can look like evidence and turn a failure into a pass | Not planned |
+| Automatic retries | [Spec §17](spec-v1.0.md#17-non-goals-for-v1) non-goal "Automatic failure retries"; I1 | A retry changes the outcome the team sees | Not planned. A guarded rerun is a team decision, made from the page (W6) |
+| SOC 2 and EU residency within this horizon | [ADR-0016](decisions/0016-fleet-is-a-hub.md) consequences; [research 16 §7](../research/16-hub-plan.md#7-business-risks-and-owner-decisions) | One maintainer cannot run the controls or the data residency yet | Revisit when a second maintainer and a paying customer need them |
 
-The common rule: Fleet watches and explains; it never changes, hides, guesses or runs a result.
+Quarantine is not in this list. The hub plan reverses the earlier "not planned" decision for quarantine with an owner and an expiry, excluding infra failures and keeping I13. That is wave W5 (ADR-0018, written with the wave).
+
+The common rule: Fleet watches, organizes and explains. It never changes, hides or guesses at a result.
