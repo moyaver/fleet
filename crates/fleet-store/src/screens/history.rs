@@ -1026,6 +1026,8 @@ mod tests {
         serial: &'a str,
         provider: CiProvider,
         catalog: FlowCatalog,
+        /// The branch the run tested, as `main`; `None` when the CI didn't say.
+        branch: Option<&'a str>,
     }
 
     impl<'a> Seed<'a> {
@@ -1037,6 +1039,7 @@ mod tests {
                 serial: "emulator-5554",
                 provider: CiProvider::Generic,
                 catalog: FlowCatalog::default(),
+                branch: None,
             }
         }
     }
@@ -1051,6 +1054,7 @@ mod tests {
         let mut a = Agent::new(seed.run, seed.job);
         let mut hello = a.hello(None);
         hello.ci.sha = Some(seed.commit.into());
+        hello.ci.git_ref = seed.branch.map(|b| format!("refs/heads/{b}"));
         hello.ci.provider = seed.provider;
         hello.catalog = seed.catalog;
         let opened = store
@@ -1635,5 +1639,113 @@ mod tests {
             (none.passed, none.failed, none.flaky, none.days.len()),
             (0, 0, 0, 0)
         );
+    }
+
+    /// The shape of a reported set: eight settled runs on `main`, each on its own commit. Login and
+    /// search always pass; checkout fails in three of the eight with the same assertion. A ninth
+    /// run on `main` passes everything. Nothing is confirmed (no commit ran twice), so checkout is
+    /// suspected, and its verdict names all nine of its executions, passed ones included.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn one_flow_failing_in_three_of_nine_main_runs_is_suspected_and_all_nine_are_evidence(
+        pool: PgPool,
+    ) {
+        let store = Store {
+            pool: pool.clone(),
+            origin: Uuid::now_v7(),
+        };
+        let p = publisher(&store).await;
+        let pass = [
+            LOGIN,
+            Script {
+                name: "search",
+                failure: None,
+                failed_step: None,
+            },
+            CHECKOUT,
+        ];
+        let fail = [
+            LOGIN,
+            Script {
+                name: "search",
+                failure: None,
+                failed_step: None,
+            },
+            Script {
+                name: "checkout",
+                failure: Some(ASSERTION),
+                failed_step: None,
+            },
+        ];
+        let failing = [false, true, false, false, true, false, true, false, false];
+        for (i, fails) in failing.into_iter().enumerate() {
+            let run = (4101 + i).to_string();
+            let commit = format!("{:040x}", 0x1000 + i);
+            let flows = if fails { &fail } else { &pass };
+            seed_run(
+                &store,
+                &p,
+                Seed {
+                    branch: Some("main"),
+                    ..Seed::on(&run, &commit)
+                },
+                flows,
+            )
+            .await;
+        }
+        let now = OffsetDateTime::now_utc();
+        let (from, to) = (now - Duration::days(1), now + Duration::hours(1));
+        let history = store
+            .history(
+                p.project_id,
+                &HistoryQuery {
+                    filters: Filters::default(),
+                    from,
+                    to,
+                    after: None,
+                    limit: 50,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(history.items.len(), 27);
+
+        let verdicts = flaky::classify(&history.runs, &FlakyConfig::default());
+        let verdict = |flow: &str| {
+            verdicts
+                .iter()
+                .find(|v| v.flow == flow)
+                .unwrap_or_else(|| panic!("no verdict for {flow}"))
+        };
+        assert_eq!(verdict("flows/login.yaml").flakiness, Flakiness::NotFlaky);
+        assert_eq!(verdict("flows/search.yaml").flakiness, Flakiness::NotFlaky);
+        let checkout = verdict("flows/checkout.yaml");
+        assert_eq!(checkout.flakiness, Flakiness::Suspected);
+        // One flip verdict over the nine executions: six pass/fail switches in eight pairs.
+        let [flaky::Evidence::Flips { runs, flips, .. }] = checkout.evidence.as_slice() else {
+            panic!("expected one flip verdict, got {:?}", checkout.evidence);
+        };
+        assert_eq!((runs.len(), *flips), (9, 6));
+
+        // The trend's flaky figure is those nine executions: six passed and three failed.
+        let trend = store
+            .history_trend(p.project_id, &Filters::default(), from, to)
+            .await
+            .unwrap();
+        assert_eq!((trend.passed, trend.failed, trend.flaky), (24, 3, 9));
+
+        // Each checkout's flow page lists every earlier checkout, so the strip of the oldest has
+        // none and the newest has all eight before it.
+        let ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM flow_executions WHERE flow_name = 'checkout' ORDER BY started_at, id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut earlier = Vec::new();
+        for id in ids {
+            let page = store.flow_detail(p.project_id, id).await.unwrap().unwrap();
+            earlier.push(page.previous.len());
+        }
+        assert_eq!(earlier, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
     }
 }
