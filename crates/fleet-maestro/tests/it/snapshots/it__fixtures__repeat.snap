@@ -1,0 +1,73 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "repeat": {
+      "commands": "final(13)",
+      "failure_screenshots": 0,
+      "flow": "repeat",
+      "manifest": true,
+      "shard": null
+    }
+  },
+  "exit": 0,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "repeat",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "maestro_version": "2.12.1",
+    "orphan_lines": 0,
+    "other": {},
+    "records": 59,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5600",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 13,
+      "Pending": 6,
+      "Running": 13
+    },
+    "with_continuation": 0
+  },
+  "report": {
+    "status": "Complete",
+    "suites": [
+      {
+        "cases": [
+          {
+            "has_failure": false,
+            "name": "repeat",
+            "outcome": "Passed"
+          }
+        ],
+        "device": "fleet-anr-77"
+      }
+    ]
+  },
+  "stdout": {
+    "flow_results": [
+      {
+        "duration_ms": 13000,
+        "message": null,
+        "name": "repeat",
+        "passed": true,
+        "shard": null
+      }
+    ],
+    "other": [
+      "Summary { shard: None, count: 1, total: 1, all_passed: true }"
+    ],
+    "unrecognized": 0
+  }
+}

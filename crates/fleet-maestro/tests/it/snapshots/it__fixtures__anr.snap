@@ -1,0 +1,73 @@
+---
+source: crates/fleet-maestro/tests/it/fixtures.rs
+expression: summary
+---
+{
+  "bundles": {
+    "anr": {
+      "commands": "final(5)",
+      "failure_screenshots": 1,
+      "flow": "anr",
+      "manifest": true,
+      "shard": null
+    }
+  },
+  "exit": 1,
+  "log": {
+    "crashes": [],
+    "flows_started": [
+      {
+        "name": "anr",
+        "shard": null
+      }
+    ],
+    "machine_pattern": true,
+    "maestro_version": "2.12.1",
+    "orphan_lines": 0,
+    "other": {},
+    "records": 36,
+    "shards": [
+      {
+        "planned": 1,
+        "serial": "emulator-5600",
+        "shard": 1
+      }
+    ],
+    "steps": {
+      "Completed": 4,
+      "Failed": 1,
+      "Running": 5
+    },
+    "with_continuation": 0
+  },
+  "report": {
+    "status": "Complete",
+    "suites": [
+      {
+        "cases": [
+          {
+            "has_failure": true,
+            "name": "anr",
+            "outcome": "Failed"
+          }
+        ],
+        "device": "fleet-anr-77"
+      }
+    ]
+  },
+  "stdout": {
+    "flow_results": [
+      {
+        "duration_ms": 36000,
+        "message": "Assertion is false: \"isn't responding\" is visible",
+        "name": "anr",
+        "passed": false,
+        "shard": null
+      }
+    ],
+    "other": [
+      "Summary { shard: None, count: 1, total: 1, all_passed: false }"
+    ],
+    "unrecognized": 0
+  }
+}

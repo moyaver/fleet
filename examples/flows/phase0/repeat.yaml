@@ -1,0 +1,10 @@
+appId: com.fleet.anr
+name: repeat
+---
+- launchApp
+- repeat:
+    times: 3
+    commands:
+      - pressKey: Home
+      - launchApp
+      - assertVisible: "Block main thread"

@@ -1,0 +1,59 @@
+MFLT1|1794187192247|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug
+MFLT1|1794187192250|main|INFO|MAESTRO|---- System Info ----
+MFLT1|1794187192251|main|INFO|MAESTRO|Maestro Version: 2.12.1
+MFLT1|1794187192252|main|INFO|MAESTRO|CI: Undefined
+MFLT1|1794187192252|main|INFO|MAESTRO|OS Name: Mac OS X
+MFLT1|1794187192252|main|INFO|MAESTRO|OS Version: 26.7.1
+MFLT1|1794187192252|main|INFO|MAESTRO|Architecture: aarch64
+MFLT1|1794187192252|main|INFO|MAESTRO|Java Version: 27
+MFLT1|1794187192452|main|INFO|MAESTRO|Xcode Version: 27.1
+MFLT1|1794187192462|main|INFO|MAESTRO|Flutter Version: Undefined
+MFLT1|1794187192471|main|INFO|MAESTRO|Flutter Channel: Undefined
+MFLT1|1794187192472|main|INFO|MAESTRO|---------------------
+MFLT1|1794187194579|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 56738 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/repeat.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+MFLT1|1794187203942|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow repeat
+MFLT1|1794187203958|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info
+MFLT1|1794187204326|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2400, widthGrid=1080, heightGrid=2400)
+MFLT1|1794187204595|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING
+MFLT1|1794187204599|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED
+MFLT1|1794187204600|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING
+MFLT1|1794187204601|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED
+MFLT1|1794187204601|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" RUNNING
+MFLT1|1794187204703|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr
+MFLT1|1794187204703|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch
+MFLT1|1794187205324|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" COMPLETED
+MFLT1|1794187205333|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 3 times RUNNING
+MFLT1|1794187205336|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING
+MFLT1|1794187205337|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME
+MFLT1|1794187206764|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED
+MFLT1|1794187206769|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" RUNNING
+MFLT1|1794187206943|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr
+MFLT1|1794187206945|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch
+MFLT1|1794187207232|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" COMPLETED
+MFLT1|1794187207234|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible RUNNING
+MFLT1|1794187209151|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible COMPLETED
+MFLT1|1794187209154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key PENDING
+MFLT1|1794187209154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" PENDING
+MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible PENDING
+MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING
+MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME
+MFLT1|1794187210559|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED
+MFLT1|1794187210562|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" RUNNING
+MFLT1|1794187210725|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr
+MFLT1|1794187210725|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch
+MFLT1|1794187211040|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" COMPLETED
+MFLT1|1794187211043|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible RUNNING
+MFLT1|1794187212358|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible COMPLETED
+MFLT1|1794187212360|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key PENDING
+MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" PENDING
+MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible PENDING
+MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING
+MFLT1|1794187212362|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME
+MFLT1|1794187213794|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED
+MFLT1|1794187213806|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" RUNNING
+MFLT1|1794187214030|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr
+MFLT1|1794187214032|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch
+MFLT1|1794187214421|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app "com.fleet.anr" COMPLETED
+MFLT1|1794187214422|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible RUNNING
+MFLT1|1794187215250|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that "Block main thread" is visible COMPLETED
+MFLT1|1794187215253|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 3 times COMPLETED

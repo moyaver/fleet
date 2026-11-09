@@ -1,0 +1,8 @@
+appId: com.fleet.anr
+name: anr
+---
+- launchApp
+- tapOn: "Block main thread"
+- extendedWaitUntil:
+    visible: "isn't responding"
+    timeout: 20000

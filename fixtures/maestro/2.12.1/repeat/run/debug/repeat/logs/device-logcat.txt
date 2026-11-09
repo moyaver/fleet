@@ -1,0 +1,216 @@
+--------- beginning of system
+11-09 03:20:05.209 I/ActivityManager(  580): Force stopping com.fleet.anr appid=10099 user=0: from pid 5813
+11-09 03:20:05.212 I/ActivityManager(  580): Killing 5386:com.fleet.anr/u0a99 (adj 0): stop com.fleet.anr due to from pid 5813
+11-09 03:20:05.217 W/ActivityTaskManager(  580): Force removing ActivityRecord{c6ce763 u0 com.fleet.anr/.MainActivity} t12 f}}: app died, no saved state
+--------- beginning of main
+11-09 03:20:05.229 I/libprocessgroup(  580): Successfully killed process cgroup uid 10099 pid 5386 in 13ms
+11-09 03:20:05.240 W/InputManager-JNI(  580): Input channel object '6a09eb7 com.fleet.anr/com.fleet.anr.MainActivity (client)' was disposed without first being removed with the input manager!
+11-09 03:20:05.245 W/InputManager-JNI(  580): Input channel object 'Letterbox_left_ActivityRecord{c6ce763 u0 com.fleet.anr/.MainActivity} t12} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:05.247 W/InputManager-JNI(  580): Input channel object 'Letterbox_top_ActivityRecord{c6ce763 u0 com.fleet.anr/.MainActivity} t12} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:05.248 W/InputManager-JNI(  580): Input channel object 'Letterbox_right_ActivityRecord{c6ce763 u0 com.fleet.anr/.MainActivity} t12} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:05.248 W/InputManager-JNI(  580): Input channel object 'Letterbox_bottom_ActivityRecord{c6ce763 u0 com.fleet.anr/.MainActivity} t12} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:05.255 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922beb50
+11-09 03:20:05.255 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c55d0
+11-09 03:20:05.255 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c55d0
+11-09 03:20:05.274 V/WindowManager(  580): Unknown focus tokens, dropping reportFocusChanged
+11-09 03:20:05.288 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922befd0
+11-09 03:20:05.288 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c4730
+--------- beginning of kernel
+11-09 03:20:05.336 I/binder  (   42): undelivered transaction 351759, process died.
+11-09 03:20:05.348 W/ActivityManager(  580): setHasOverlayUi called on unknown pid: 5386
+11-09 03:20:05.358 W/WindowManager(  580): Cannot find window which accessibility connection is added to
+11-09 03:20:05.361 V/ActivityManager(  580): Got obituary of 5386:com.fleet.anr
+11-09 03:20:05.412 I/Zygote  (  379): Process 5386 exited due to signal 9 (Killed)
+11-09 03:20:05.422 D/CarrierSvcBindHelper(  969): onHandleForceStop: [com.fleet.anr]
+11-09 03:20:05.441 D/CarrierSvcBindHelper(  969): No carrier app for: 0
+11-09 03:20:05.748 I/ActivityTaskManager(  580): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.fleet.anr cmp=com.fleet.anr/.MainActivity} from uid 10110
+11-09 03:20:05.757 D/CompatibilityChangeReporter(  580): Compat change id reported: 194480991; UID 10099; state: ENABLED
+11-09 03:20:05.769 D/CompatibilityChangeReporter(  580): Compat change id reported: 174042980; UID 10099; state: DISABLED
+11-09 03:20:05.769 D/CompatibilityChangeReporter(  580): Compat change id reported: 184838306; UID 10099; state: DISABLED
+11-09 03:20:05.769 D/CompatibilityChangeReporter(  580): Compat change id reported: 185004937; UID 10099; state: DISABLED
+11-09 03:20:05.770 D/CompatibilityChangeReporter(  580): Compat change id reported: 197654537; UID 10099; state: ENABLED
+11-09 03:20:05.771 V/SplashScreenExceptionList(  580): SplashScreen checking exception for package com.fleet.anr (target sdk:33) -> false
+11-09 03:20:05.771 D/CompatibilityChangeReporter(  580): Compat change id reported: 205907456; UID 10099; state: ENABLED
+11-09 03:20:05.786 D/CompatibilityChangeReporter(  580): Compat change id reported: 194833441; UID 10099; state: ENABLED
+11-09 03:20:05.825 D/CompatibilityChangeReporter(  580): Compat change id reported: 135634846; UID 10099; state: DISABLED
+11-09 03:20:05.825 D/CompatibilityChangeReporter(  580): Compat change id reported: 177438394; UID 10099; state: DISABLED
+11-09 03:20:05.825 D/CompatibilityChangeReporter(  580): Compat change id reported: 135772972; UID 10099; state: DISABLED
+11-09 03:20:05.825 D/CompatibilityChangeReporter(  580): Compat change id reported: 135754954; UID 10099; state: ENABLED
+11-09 03:20:05.825 D/CompatibilityChangeReporter(  580): Compat change id reported: 143937733; UID 10099; state: ENABLED
+11-09 03:20:05.902 D/Zygote  (  379): Forked child process 5822
+11-09 03:20:05.905 W/ActivityManager(  580): Slow operation: 81ms so far, now at startProcess: returned from zygote!
+11-09 03:20:05.926 W/ActivityManager(  580): Slow operation: 101ms so far, now at startProcess: done updating battery stats
+11-09 03:20:05.926 W/ActivityManager(  580): Slow operation: 102ms so far, now at startProcess: building log message
+11-09 03:20:05.927 I/ActivityManager(  580): Start proc 5822:com.fleet.anr/u0a99 for next-top-activity {com.fleet.anr/com.fleet.anr.MainActivity}
+11-09 03:20:05.927 W/ActivityManager(  580): Slow operation: 102ms so far, now at startProcess: starting to update pids map
+11-09 03:20:05.927 W/ActivityManager(  580): Slow operation: 102ms so far, now at startProcess: done updating pids map
+11-09 03:20:06.014 D/AutofillManagerService(  580): Close system dialogs
+11-09 03:20:06.015 I/ActivityTaskManager(  580): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.fakesystemapp/.launcher.EmptyHomeActivity (has extras)} from uid 0
+11-09 03:20:06.026 I/adbd    (  440): jdwp connection from 5822
+11-09 03:20:06.061 D/CompatibilityChangeReporter(  580): Compat change id reported: 168419799; UID 10099; state: DISABLED
+11-09 03:20:06.080 D/CompatibilityChangeReporter( 5822): Compat change id reported: 171979766; UID 10099; state: ENABLED
+11-09 03:20:06.096 W/ziparchive( 5822): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:06.096 W/ziparchive( 5822): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:06.098 D/nativeloader( 5822): Configuring classloader-namespace for other apk /data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.apk. target_sdk_version=33, uses_libraries=, library_path=/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.fleet.anr
+11-09 03:20:06.270 V/GraphicsEnvironment( 5822): ANGLE Developer option for 'com.fleet.anr' set to: 'default'
+11-09 03:20:06.272 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922bf870
+11-09 03:20:06.275 V/GraphicsEnvironment( 5822): ANGLE GameManagerService for com.fleet.anr: false
+11-09 03:20:06.276 V/GraphicsEnvironment( 5822): Neither updatable production driver nor prerelease driver is supported.
+11-09 03:20:06.284 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922bf870
+11-09 03:20:06.296 D/NetworkSecurityConfig( 5822): No Network Security Config specified, using platform default
+11-09 03:20:06.296 D/NetworkSecurityConfig( 5822): No Network Security Config specified, using platform default
+11-09 03:20:06.850 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:06.916 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:06.919 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:07.015 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:07.018 D/Maestro ( 5775): View hierarchy received in 168 ms
+11-09 03:20:07.169 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:07.171 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:07.171 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:07.177 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:07.177 D/Maestro ( 5775): View hierarchy received in 8 ms
+11-09 03:20:07.477 I/ActivityManager(  580): Force stopping com.fleet.anr appid=10099 user=0: from pid 5853
+11-09 03:20:07.486 I/WindowManager(  580):   Force removing ActivityRecord{85d45ac u0 com.fleet.anr/.MainActivity} t13}
+11-09 03:20:07.496 W/UsageStatsService(  580): Unexpected activity event reported! (com.fleet.anr/com.fleet.anr.MainActivity event : 23 instanceId : 159713119)
+11-09 03:20:07.505 I/ActivityManager(  580): Killing 5822:com.fleet.anr/u0a99 (adj 905): stop com.fleet.anr due to from pid 5853
+11-09 03:20:07.508 I/libprocessgroup(  580): Successfully killed process cgroup uid 10099 pid 5822 in 1ms
+11-09 03:20:07.584 D/CarrierSvcBindHelper(  969): onHandleForceStop: [com.fleet.anr]
+11-09 03:20:07.631 D/CarrierSvcBindHelper(  969): No carrier app for: 0
+11-09 03:20:07.635 V/ActivityManager(  580): Got obituary of 5822:com.fleet.anr
+11-09 03:20:07.643 I/Zygote  (  379): Process 5822 exited due to signal 9 (Killed)
+11-09 03:20:07.672 D/CompatibilityChangeReporter(  580): Compat change id reported: 161252188; UID 10099; state: ENABLED
+11-09 03:20:07.673 I/ActivityTaskManager(  580): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.fleet.anr cmp=com.fleet.anr/.MainActivity} from uid 10110
+11-09 03:20:07.689 V/SplashScreenExceptionList(  580): SplashScreen checking exception for package com.fleet.anr (target sdk:33) -> false
+11-09 03:20:07.700 D/CompatibilityChangeReporter(  580): Compat change id reported: 135634846; UID 10099; state: DISABLED
+11-09 03:20:07.700 D/CompatibilityChangeReporter(  580): Compat change id reported: 177438394; UID 10099; state: DISABLED
+11-09 03:20:07.701 D/CompatibilityChangeReporter(  580): Compat change id reported: 135772972; UID 10099; state: DISABLED
+11-09 03:20:07.701 D/CompatibilityChangeReporter(  580): Compat change id reported: 135754954; UID 10099; state: ENABLED
+11-09 03:20:07.706 D/CompatibilityChangeReporter(  580): Compat change id reported: 143937733; UID 10099; state: ENABLED
+11-09 03:20:07.756 D/Zygote  (  379): Forked child process 5861
+11-09 03:20:07.757 W/ActivityManager(  580): Slow operation: 57ms so far, now at startProcess: returned from zygote!
+11-09 03:20:07.758 W/ActivityManager(  580): Slow operation: 58ms so far, now at startProcess: done updating battery stats
+11-09 03:20:07.758 W/ActivityManager(  580): Slow operation: 58ms so far, now at startProcess: building log message
+11-09 03:20:07.758 I/ActivityManager(  580): Start proc 5861:com.fleet.anr/u0a99 for next-top-activity {com.fleet.anr/com.fleet.anr.MainActivity}
+11-09 03:20:07.758 W/ActivityManager(  580): Slow operation: 58ms so far, now at startProcess: starting to update pids map
+11-09 03:20:07.758 W/ActivityManager(  580): Slow operation: 58ms so far, now at startProcess: done updating pids map
+11-09 03:20:07.762 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:07.768 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:07.768 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:07.777 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:07.777 D/Maestro ( 5775): View hierarchy received in 15 ms
+11-09 03:20:07.796 I/adbd    (  440): jdwp connection from 5861
+11-09 03:20:07.832 D/CompatibilityChangeReporter( 5861): Compat change id reported: 171979766; UID 10099; state: ENABLED
+11-09 03:20:07.862 W/ziparchive( 5861): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:07.862 W/ziparchive( 5861): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:07.862 D/nativeloader( 5861): Configuring classloader-namespace for other apk /data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.apk. target_sdk_version=33, uses_libraries=, library_path=/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.fleet.anr
+11-09 03:20:07.923 V/GraphicsEnvironment( 5861): ANGLE Developer option for 'com.fleet.anr' set to: 'default'
+11-09 03:20:07.924 V/GraphicsEnvironment( 5861): ANGLE GameManagerService for com.fleet.anr: false
+11-09 03:20:07.925 V/GraphicsEnvironment( 5861): Neither updatable production driver nor prerelease driver is supported.
+11-09 03:20:07.932 D/NetworkSecurityConfig( 5861): No Network Security Config specified, using platform default
+11-09 03:20:07.933 D/NetworkSecurityConfig( 5861): No Network Security Config specified, using platform default
+11-09 03:20:07.956 D/libEGL  ( 5861): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:20:07.957 D/libEGL  ( 5861): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:20:07.959 D/libEGL  ( 5861): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:20:07.976 D/CompatibilityChangeReporter( 5861): Compat change id reported: 210923482; UID 10099; state: ENABLED
+11-09 03:20:08.032 D/CoreBackPreview(  580): Window{6bd5bd1 u0 com.fleet.anr/com.fleet.anr.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d047937, mPriority=0}
+11-09 03:20:08.188 D/HostConnection( 5861): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_
+[... fleet fixtures import: 22913 bytes cut, 0 lines naming a crash or ANR kept ...]
+ windows changed immediately
+11-09 03:20:13.576 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c1550
+11-09 03:20:13.581 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922bcdb0
+11-09 03:20:13.621 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:13.627 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:13.711 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:13.713 D/Maestro ( 5775): View hierarchy received in 152 ms
+11-09 03:20:14.097 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:14.127 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:14.131 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:14.177 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:14.181 D/Maestro ( 5775): View hierarchy received in 84 ms
+11-09 03:20:14.582 I/ActivityManager(  580): Force stopping com.fleet.anr appid=10099 user=0: from pid 5950
+11-09 03:20:14.597 I/ActivityManager(  580): Killing 5909:com.fleet.anr/u0a99 (adj 700): stop com.fleet.anr due to from pid 5950
+11-09 03:20:14.663 W/ActivityTaskManager(  580): Force removing ActivityRecord{e6e4246 u0 com.fleet.anr/.MainActivity} t15 f}}: app died, no saved state
+11-09 03:20:14.673 W/UsageStatsService(  580): Unexpected activity event reported! (com.fleet.anr/com.fleet.anr.MainActivity event : 23 instanceId : 224661025)
+11-09 03:20:14.691 W/InputManager-JNI(  580): Input channel object 'd26942a com.fleet.anr/com.fleet.anr.MainActivity (client)' was disposed without first being removed with the input manager!
+11-09 03:20:14.712 W/InputManager-JNI(  580): Input channel object 'Letterbox_left_ActivityRecord{e6e4246 u0 com.fleet.anr/.MainActivity} t15} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:14.714 W/InputManager-JNI(  580): Input channel object 'Letterbox_top_ActivityRecord{e6e4246 u0 com.fleet.anr/.MainActivity} t15} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:14.715 W/InputManager-JNI(  580): Input channel object 'Letterbox_right_ActivityRecord{e6e4246 u0 com.fleet.anr/.MainActivity} t15} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:14.717 W/InputManager-JNI(  580): Input channel object 'Letterbox_bottom_ActivityRecord{e6e4246 u0 com.fleet.anr/.MainActivity} t15} (client)' was disposed without first being removed with the input manager!
+11-09 03:20:14.722 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c7370
+11-09 03:20:14.764 D/CarrierSvcBindHelper(  969): onHandleForceStop: [com.fleet.anr]
+11-09 03:20:14.776 V/ActivityManager(  580): Got obituary of 5909:com.fleet.anr
+11-09 03:20:14.781 I/libprocessgroup(  580): Successfully killed process cgroup uid 10099 pid 5909 in 154ms
+11-09 03:20:14.782 W/ActivityManager(  580): setHasOverlayUi called on unknown pid: 5909
+11-09 03:20:14.784 W/WindowManager(  580): Cannot find window which accessibility connection is added to
+11-09 03:20:14.785 I/Zygote  (  379): Process 5909 exited due to signal 9 (Killed)
+11-09 03:20:14.786 D/CarrierSvcBindHelper(  969): No carrier app for: 0
+11-09 03:20:14.843 D/CompatibilityChangeReporter(  580): Compat change id reported: 161252188; UID 10099; state: ENABLED
+11-09 03:20:14.844 I/ActivityTaskManager(  580): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.fleet.anr cmp=com.fleet.anr/.MainActivity} from uid 10110
+11-09 03:20:14.848 D/CompatibilityChangeReporter(  580): Compat change id reported: 194480991; UID 10099; state: ENABLED
+11-09 03:20:14.852 D/CompatibilityChangeReporter(  580): Compat change id reported: 174042980; UID 10099; state: DISABLED
+11-09 03:20:14.852 D/CompatibilityChangeReporter(  580): Compat change id reported: 184838306; UID 10099; state: DISABLED
+11-09 03:20:14.852 D/CompatibilityChangeReporter(  580): Compat change id reported: 185004937; UID 10099; state: DISABLED
+11-09 03:20:14.852 D/CompatibilityChangeReporter(  580): Compat change id reported: 197654537; UID 10099; state: ENABLED
+11-09 03:20:14.857 V/SplashScreenExceptionList(  580): SplashScreen checking exception for package com.fleet.anr (target sdk:33) -> false
+11-09 03:20:14.857 D/CompatibilityChangeReporter(  580): Compat change id reported: 205907456; UID 10099; state: ENABLED
+11-09 03:20:14.866 D/CompatibilityChangeReporter(  580): Compat change id reported: 194833441; UID 10099; state: ENABLED
+11-09 03:20:14.875 D/CompatibilityChangeReporter(  580): Compat change id reported: 135634846; UID 10099; state: DISABLED
+11-09 03:20:14.875 D/CompatibilityChangeReporter(  580): Compat change id reported: 177438394; UID 10099; state: DISABLED
+11-09 03:20:14.877 D/CompatibilityChangeReporter(  580): Compat change id reported: 135772972; UID 10099; state: DISABLED
+11-09 03:20:14.877 D/CompatibilityChangeReporter(  580): Compat change id reported: 135754954; UID 10099; state: ENABLED
+11-09 03:20:14.881 D/CompatibilityChangeReporter(  580): Compat change id reported: 143937733; UID 10099; state: ENABLED
+11-09 03:20:14.936 D/Zygote  (  379): Forked child process 5958
+11-09 03:20:14.937 W/ActivityManager(  580): Slow operation: 65ms so far, now at startProcess: returned from zygote!
+11-09 03:20:14.937 W/ActivityManager(  580): Slow operation: 66ms so far, now at startProcess: done updating battery stats
+11-09 03:20:14.938 W/ActivityManager(  580): Slow operation: 66ms so far, now at startProcess: building log message
+11-09 03:20:14.938 I/ActivityManager(  580): Start proc 5958:com.fleet.anr/u0a99 for next-top-activity {com.fleet.anr/com.fleet.anr.MainActivity}
+11-09 03:20:14.938 W/ActivityManager(  580): Slow operation: 66ms so far, now at startProcess: starting to update pids map
+11-09 03:20:14.938 W/ActivityManager(  580): Slow operation: 66ms so far, now at startProcess: done updating pids map
+11-09 03:20:14.946 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:14.952 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:14.955 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:14.961 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b08e; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:14.962 D/Maestro ( 5775): View hierarchy received in 16 ms
+11-09 03:20:14.993 I/adbd    (  440): jdwp connection from 5958
+11-09 03:20:15.015 D/CompatibilityChangeReporter(  580): Compat change id reported: 168419799; UID 10099; state: DISABLED
+11-09 03:20:15.027 D/CompatibilityChangeReporter( 5958): Compat change id reported: 171979766; UID 10099; state: ENABLED
+11-09 03:20:15.042 W/ziparchive( 5958): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:15.042 W/ziparchive( 5958): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:15.046 D/nativeloader( 5958): Configuring classloader-namespace for other apk /data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.apk. target_sdk_version=33, uses_libraries=, library_path=/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.fleet.anr
+11-09 03:20:15.085 V/GraphicsEnvironment( 5958): ANGLE Developer option for 'com.fleet.anr' set to: 'default'
+11-09 03:20:15.086 V/GraphicsEnvironment( 5958): ANGLE GameManagerService for com.fleet.anr: false
+11-09 03:20:15.087 V/GraphicsEnvironment( 5958): Neither updatable production driver nor prerelease driver is supported.
+11-09 03:20:15.095 D/NetworkSecurityConfig( 5958): No Network Security Config specified, using platform default
+11-09 03:20:15.096 D/NetworkSecurityConfig( 5958): No Network Security Config specified, using platform default
+11-09 03:20:15.111 D/libEGL  ( 5958): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:20:15.113 D/libEGL  ( 5958): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:20:15.115 D/libEGL  ( 5958): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:20:15.130 D/CompatibilityChangeReporter( 5958): Compat change id reported: 210923482; UID 10099; state: ENABLED
+11-09 03:20:15.184 D/CoreBackPreview(  580): Window{3a0a78d u0 com.fleet.anr/com.fleet.anr.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@6c5a153, mPriority=0}
+11-09 03:20:15.324 D/HostConnection( 5958): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:20:15.332 W/OpenGLRenderer( 5958): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-09 03:20:15.334 W/OpenGLRenderer( 5958): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-09 03:20:15.336 D/EGL_emulation( 5958): eglCreateContext: 0xb4000074c5b00dd0: maj 3 min 1 rcv 4
+11-09 03:20:15.340 D/EGL_emulation( 5958): eglMakeCurrent: 0xb4000074c5b00dd0: ver 3 1 (tinfo 0x76dd061080) (first time)
+11-09 03:20:15.384 I/hwservicemanager(  218): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-09 03:20:15.387 I/Gralloc4( 5958): mapper 4.x is not supported
+11-09 03:20:15.408 I/hwservicemanager(  218): getTransport: Cannot find entry android.hardware.graphics.allocator@4.0::IAllocator/default in either framework or device VINTF manifest.
+11-09 03:20:15.411 I/servicemanager(  217): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-09 03:20:15.413 W/Gralloc4( 5958): allocator 4.x is not supported
+11-09 03:20:15.462 D/HostConnection( 5958): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:20:15.478 W/Parcel  ( 5958): Expecting binder but got null!
+11-09 03:20:15.510 W/ziparchive(  580): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:20:15.522 I/ActivityTaskManager(  580): Displayed com.fleet.anr/.MainActivity: +665ms
+11-09 03:20:15.550 D/CompatibilityChangeReporter(  580): Compat change id reported: 214016041; UID 10099; state: ENABLED
+11-09 03:20:15.558 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:15.560 D/Maestro ( 5775): Requesting view hierarchy
+11-09 03:20:15.564 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:15.566 W/QueryController( 5775): Could not detect idle state.
+11-09 03:20:15.634 I/Maestro ( 5775): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9289; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(2203, 128 - 2203, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:20:15.635 D/Maestro ( 5775): View hierarchy received in 75 ms
+11-09 03:20:16.054 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c45b0
+11-09 03:20:16.054 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c6230
+11-09 03:20:16.121 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c2c30
+11-09 03:20:16.309 D/BoundBrokerSvc( 5042): onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+11-09 03:20:16.323 E/TaskPersister(  580): File error accessing recents directory (directory doesn't exist?).
+11-09 03:20:17.066 I/logd    (  224): logdr: UID=2000 GID=2000 PID=5982 n tail=0 logMask=99 pid=0 start=0ns deadline=0ns

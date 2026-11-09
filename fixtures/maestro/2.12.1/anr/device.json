@@ -1,0 +1,35 @@
+{
+  "maestro": "2.12.1",
+  "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
+  "device": {
+    "avd": "fleet-anr-77",
+    "serial": "emulator-5600",
+    "system_image": "system-images;android-33;google_atd;arm64-v8a",
+    "api_level": "33",
+    "build": "sdk_gslim_arm64-userdebug 13 TE1A.220922.033 10836537 dev-keys",
+    "fingerprint": "google/sdk_gslim_arm64/emulator64_arm64:13/TE1A.220922.033/10836537:userdebug/dev-keys",
+    "sdk_int": "33",
+    "release": "13",
+    "abi": "arm64-v8a",
+    "model": "Android ATD built for arm64",
+    "egl": "emulation"
+  },
+  "emulator": {
+    "version": "Android emulator version 37.2.13.0 (build_id 16740729) (CL:N/A)",
+    "launch": "emulator -avd fleet-anr-77 -port 5600 -no-window -no-audio -no-snapshot",
+    "config_ini": {
+      "hw.gpu.enabled": "no",
+      "hw.gpu.mode": "auto",
+      "hw.lcd.density": "420",
+      "hw.lcd.height": "2400",
+      "hw.lcd.width": "1080",
+      "hw.ramSize": "2G"
+    },
+    "avd_home": "temporary directory, deleted after capture"
+  },
+  "host": {
+    "os": "macOS 26.7.1 (Darwin 25.6.0)",
+    "arch": "arm64"
+  },
+  "notes": "Captured for the ANR fixture (issue #77). The image has no com.android.settings package, and no ANR dialog window appeared on it: the system logged the ANR (ActivityManager, InputDispatcher), and Maestro saw the blocked window as a null root node."
+}
