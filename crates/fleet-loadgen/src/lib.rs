@@ -11,6 +11,7 @@
 //! - `storm`: every agent drops its connection at its half-way point and reconnects at once;
 //! - `duplicates`: batches are resent and shuffled (the server sorts and skips duplicates);
 //! - `reorder`: batches go out in reverse, without resends (the server sorts them);
+//! - `gap_events`: a full agent buffer drops events, and one `journal.gap` covers them;
 //! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
@@ -78,6 +79,9 @@ pub struct Options {
     pub duplicates: bool,
     /// Send every batch in reverse order, without resends: the server must sort what arrives.
     pub reorder: bool,
+    /// Drop this many events half-way through the run, as an agent with a full buffer does. One
+    /// `journal.gap` covers them, so the run stays gap-free except for that hole (invariant I5).
+    pub gap_events: u32,
     /// Pause between batches, to stretch a run over time.
     pub pace: Duration,
     /// Give up on an agent after this long.
@@ -121,6 +125,7 @@ impl Default for Options {
             storm: false,
             duplicates: false,
             reorder: false,
+            gap_events: 0,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
             commit: None,
@@ -382,8 +387,36 @@ struct Script {
     /// The index of the process exit: everything before it is the live part.
     live_end: usize,
     events: Vec<EventEnvelope>,
+    /// Indices the agent dropped (see [`make_hole`]): never sent.
+    hole: std::ops::Range<usize>,
     failed: u32,
     serials: Vec<String>,
+}
+
+/// Drops `count` events half-way through the run, as an agent with a full buffer does, and keeps
+/// their slots: the last slot becomes a `journal.gap` covering the whole span (the agent's
+/// `spool_full`). Returns the indices the wire does not carry.
+fn make_hole(events: &mut [EventEnvelope], count: usize) -> std::ops::Range<usize> {
+    if count == 0 || events.len() < count + 2 {
+        return 0..0;
+    }
+    let start = (events.len() - count) / 2;
+    let end = start + count;
+    let (first, last) = (events[start].seq, events[end - 1].seq);
+    let body = EventBody::JournalGap(JournalGap {
+        from_seq: first,
+        to_seq: last,
+        reason: "spool_full".into(),
+    });
+    let slot = &mut events[end - 1];
+    *slot = EventEnvelope::new(
+        last,
+        slot.at,
+        Subject::default(),
+        Provenance::new(SourceKind::AgentObserved),
+        &body,
+    );
+    start..end - 1
 }
 
 #[expect(clippy::too_many_lines, reason = "one straight-line event script")]
@@ -642,10 +675,12 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
         }),
     );
     oversized_as_gaps(&mut events);
+    let hole = make_hole(&mut events, opts.gap_events as usize);
     Script {
         flow_ends,
         live_end,
         events,
+        hole,
         failed,
         serials,
     }
@@ -782,6 +817,7 @@ async fn agent(
             id,
             &job_key,
             &s.events,
+            &s.hole,
             &hold_at,
             &mut report,
             &mut stormed,
@@ -844,14 +880,22 @@ fn wire_batch(
     to: usize,
     opts: &Options,
     budget: usize,
+    hole: &std::ops::Range<usize>,
 ) -> Vec<EventEnvelope> {
-    let mut batch: Vec<EventEnvelope> = events.get(from..to).unwrap_or_default().to_vec();
+    let mut batch: Vec<EventEnvelope> = (from..to)
+        .filter(|i| !hole.contains(i))
+        .filter_map(|i| events.get(i).cloned())
+        .collect();
     if opts.duplicates && from > 0 {
         // Resend a few already-sent events, the nearest ones that the frame has room for.
         let back = from.saturating_sub(opts.batch / 2);
         let mut room = budget.saturating_sub(batch.iter().map(event_bytes).sum());
         let mut resend = Vec::new();
-        for e in events.get(back..from).unwrap_or_default().iter().rev() {
+        for e in (back..from)
+            .rev()
+            .filter(|i| !hole.contains(i))
+            .filter_map(|i| events.get(i))
+        {
             let size = event_bytes(e);
             if size > room {
                 break;
@@ -906,6 +950,7 @@ async fn stream(
     id: Uuid,
     job_key: &str,
     events: &[EventEnvelope],
+    hole: &std::ops::Range<usize>,
     hold_at: &[usize],
     report: &mut AgentReport,
     stormed: &mut bool,
@@ -957,10 +1002,16 @@ async fn stream(
                 to = to.min(stop);
             }
         }
-        let batch = wire_batch(events, from, to, opts, budget);
+        let batch = wire_batch(events, from, to, opts, budget, hole);
+        sent = u64::try_from(to).unwrap_or(u64::MAX);
+        // The server acks the last `seq` it applied: a batch that ends in the hole acks below `to`.
+        let want = batch.iter().map(|e| e.seq).max().unwrap_or(sent);
+        if batch.is_empty() && to < events.len() {
+            // Every event of this span is in the hole: nothing is sent for it.
+            continue;
+        }
         ws.send(frame(&ClientFrame::Events { events: batch }))
             .await?;
-        sent = u64::try_from(to).unwrap_or(u64::MAX);
         tseq += 1;
         ws.send(frame(&ClientFrame::Telemetry(Telemetry {
             tseq_from: tseq,
@@ -975,7 +1026,7 @@ async fn stream(
             match recv(&mut ws).await? {
                 Some(ServerFrame::Ack { through, .. }) => {
                     report.acked = report.acked.max(through);
-                    if through >= sent {
+                    if through >= want {
                         break;
                     }
                 }
@@ -1101,7 +1152,7 @@ mod tests {
     #[test]
     fn a_batch_goes_out_in_reverse_only_when_the_scenario_reorders_it() {
         let s = script(0, &Options::default(), Instant::now());
-        let plain = wire_batch(&s.events, 0, 4, &Options::default(), usize::MAX);
+        let plain = wire_batch(&s.events, 0, 4, &Options::default(), usize::MAX, &(0..0));
         assert_eq!(seqs(&plain), [1, 2, 3, 4]);
         let reordered = wire_batch(
             &s.events,
@@ -1112,6 +1163,7 @@ mod tests {
                 ..Options::default()
             },
             usize::MAX,
+            &(0..0),
         );
         assert_eq!(seqs(&reordered), [4, 3, 2, 1]);
     }
@@ -1125,8 +1177,37 @@ mod tests {
         };
         let s = script(0, &opts, Instant::now());
         // Events 5..=8 go out with 3 and 4 resent, all reversed.
-        let batch = wire_batch(&s.events, 4, 8, &opts, usize::MAX);
+        let batch = wire_batch(&s.events, 4, 8, &opts, usize::MAX, &(0..0));
         assert_eq!(seqs(&batch), [4, 3, 8, 7, 6, 5]);
+    }
+
+    #[test]
+    fn a_hole_is_one_journal_gap_in_the_last_slot_of_its_span() {
+        let opts = Options {
+            gap_events: 5,
+            ..Options::default()
+        };
+        let s = script(0, &opts, Instant::now());
+        let n = s.events.len();
+        // Five events starting half-way through the run: four are dropped, the fifth is the gap.
+        assert_eq!(s.hole.len(), 4);
+        let marker = s.hole.end;
+        assert_eq!(s.events[marker].kind, "journal.gap");
+        assert_eq!(s.events[marker].seq, marker as u64 + 1);
+        assert_eq!(s.events[marker].data["from_seq"], s.hole.start as u64 + 1);
+        assert_eq!(s.events[marker].data["to_seq"], marker as u64 + 1);
+        // Batch by batch, the wire carries every seq but the dropped ones, in order.
+        let mut wire = Vec::new();
+        let mut from = 0;
+        while from < n {
+            let to = batch_end(&s.events, from, &opts, usize::MAX);
+            wire.extend(wire_batch(&s.events, from, to, &opts, usize::MAX, &s.hole));
+            from = to;
+        }
+        let expected: Vec<u64> = (1..=n as u64)
+            .filter(|q| *q <= s.hole.start as u64 || *q > marker as u64)
+            .collect();
+        assert_eq!(seqs(&wire), expected);
     }
 
     /// A journal event whose exception is `bytes` long.
