@@ -33,6 +33,7 @@ It installs the toolchain, components and targets from `rust-toolchain.toml`. It
 | `cargo xtask lint` | Repository rules: SPDX headers, no JS/Node, crate dependency rules |
 | `cargo xtask web [--release]` | Build the dashboard into `crates/fleet-web/dist` |
 | `cargo run -p fleet-server -- serve` | Serve the dashboard and API on <http://127.0.0.1:8080> |
+| `cargo build --locked -p fleet-agent` | Build the agent alone into `target/debug/fleet-agent` |
 
 The browser tests (`fleet-e2e`) never leave Chrome running. Each test's chromedriver leads its own process group, and Chrome joins it. The test's `Browser` ends the session and that group when it drops, also when the test panics. Each Chrome runs on a profile under `$TMPDIR/fleet-e2e-chrome/` and removes it when the browser ends. A test process killed outright (no drop) is cleaned up by the next fleet-e2e run. That run ends the Chrome processes whose profile belongs to a test process that is no longer alive, and deletes those profiles. It never touches a Chrome whose profile is outside that directory.
 
