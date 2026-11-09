@@ -731,7 +731,7 @@ pub struct ArtifactView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step: Option<u32>,
     /// The class: `failure_screenshot`, `failure_hierarchy`, `commands`, `junit`, `runner_log`,
-    /// `html_report` or `device_logcat`.
+    /// `html_report`, `device_logcat`, `user_screenshot` or `user_recording`.
     pub class: String,
     /// File name.
     pub name: String,
@@ -748,7 +748,8 @@ pub struct ArtifactView {
     pub state: String,
     /// Why it was refused: an artifact `RejectReason` code.
     pub reject_reason: Option<String>,
-    /// The retention class (`failure_evidence`, `success_evidence`, `report`, `debug_log`, …).
+    /// The retention class (`failure_evidence`, `success_evidence`, `report`, `debug_log`,
+    /// `user_media`, …).
     pub retention_class: String,
     /// When the upload was requested.
     #[serde(with = "time::serde::rfc3339")]

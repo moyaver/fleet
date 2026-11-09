@@ -47,6 +47,8 @@ pub enum ArtifactClass {
     Log,
     /// A debug bundle: a zip, or a `tar.zst` (the agent's offline bundle).
     Bundle,
+    /// A screen recording: MP4 (issue #133).
+    Video,
 }
 
 impl ArtifactClass {
@@ -59,6 +61,7 @@ impl ArtifactClass {
             Self::HtmlReport => "html_report",
             Self::Log => "log",
             Self::Bundle => "bundle",
+            Self::Video => "video",
         }
     }
 
@@ -69,6 +72,7 @@ impl ArtifactClass {
             Self::HtmlReport => &[Kind::Html, Kind::Zip],
             Self::Log => &[Kind::Text],
             Self::Bundle => &[Kind::Zip, Kind::TarZst],
+            Self::Video => &[Kind::Mp4],
         }
     }
 }
@@ -92,6 +96,8 @@ pub enum Kind {
     TarZst,
     /// UTF-8 text.
     Text,
+    /// MP4 video (ISO base media file with an `ftyp` box).
+    Mp4,
 }
 
 impl Kind {
@@ -107,6 +113,7 @@ impl Kind {
             Self::Zip => "zip",
             Self::TarZst => "tar.zst",
             Self::Text => "text",
+            Self::Mp4 => "mp4",
         }
     }
 }
@@ -337,7 +344,7 @@ fn mentions_svg(head: &[u8]) -> bool {
 }
 
 fn detect(head: &[u8]) -> Option<Kind> {
-    use infer::{archive, image, text};
+    use infer::{archive, image, text, video};
     if image::is_png(head) {
         Some(Kind::Png)
     } else if image::is_jpeg(head) {
@@ -345,6 +352,8 @@ fn detect(head: &[u8]) -> Option<Kind> {
     } else if head.starts_with(b"RIFF") && image::is_webp(head) {
         // `infer` alone checks only the "WEBP" tag at offset 8.
         Some(Kind::Webp)
+    } else if video::is_mp4(head) {
+        Some(Kind::Mp4)
     } else if archive::is_zip(head) {
         Some(Kind::Zip)
     } else if archive::is_zst(head) {
