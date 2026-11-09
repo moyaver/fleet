@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Agent: a run takes a Maestro directory only on evidence that it is its own, the directory its own process holds its session log open in. A run whose process could not be asked (it had exited, or the system could not tell) no longer takes another run's lone directory, which two runs in one tree could trade under load (#148). A directory dated a few milliseconds before the run's start, as a coarse birth clock can date it, is still considered.
+
 ## [0.1.0-alpha.4] - 2026-11-09
 
 ### Breaking

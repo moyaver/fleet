@@ -37,6 +37,13 @@ const SESSION_LOG: &str = "maestro.log";
 /// known to be this run's.
 const PROBE_EVERY: Duration = Duration::from_millis(250);
 
+/// How much earlier than a run's start a directory's birth time may read and still count as made
+/// for the run. Linux stamps births from a coarse clock that lags the real time by up to a tick, so
+/// a directory Maestro makes a moment after the start can read a fraction of a millisecond before
+/// it. Admitting such a directory costs nothing: a candidate is taken only when the run's process
+/// holds its session log open ([`choose`]).
+const BIRTH_TIME_SLACK: Duration = Duration::from_millis(50);
+
 /// Whether `path` was created at or after `started`. A file system without birth times falls back
 /// to the modification time.
 fn created_since(path: &Path, started: SystemTime) -> bool {
@@ -65,8 +72,8 @@ pub(crate) fn holds_open(pid: u32, file: &Path) -> Option<bool> {
             .output()
             .ok()?;
         // A live process always lists at least its working directory. No listing (lsof fails, as it
-        // does for a process it cannot inspect at that moment) says nothing about the file, so it is
-        // unknown, not "not held": a candidate that is not known to be another run's is still taken.
+        // does for a process it cannot inspect at that moment) says nothing about the file, so it
+        // is unknown, not "not held". [`choose`] takes nothing on an unknown answer.
         if !out.status.success() || out.stdout.is_empty() {
             return None;
         }
@@ -81,33 +88,37 @@ pub(crate) fn holds_open(pid: u32, file: &Path) -> Option<bool> {
     None
 }
 
-/// The stamped directories in `base` that were created since `started` and hold a session log,
-/// oldest name first.
+/// The stamped directories in `base` that were created since `started` (within
+/// [`BIRTH_TIME_SLACK`]) and hold a session log, oldest name first.
 fn stamped_dirs(base: &Path, started: SystemTime) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(base) else {
         return Vec::new();
     };
+    let since = started.checked_sub(BIRTH_TIME_SLACK).unwrap_or(started);
     let mut dirs: Vec<PathBuf> = entries
         .flatten()
         .filter(|e| e.file_name().to_str().is_some_and(is_run_stamp))
         .map(|e| e.path())
-        .filter(|p| p.join(SESSION_LOG).is_file() && created_since(p, started))
+        .filter(|p| p.join(SESSION_LOG).is_file() && created_since(p, since))
         .collect();
     dirs.sort();
     dirs
 }
 
-/// The candidate that is this run's. With several, it is the one this run's process holds its
-/// session log open in. With one, it is taken unless the process is known not to hold it. With no
-/// way to ask (`pid` is `None`, or the system cannot tell), a lone candidate is taken and several
-/// are not: a guess between runs is never made (issue #148).
+/// The candidate that is this run's: the one this run's process holds its session log open in, and
+/// nothing else. A directory is taken only on that positive evidence, so a guess between runs is
+/// never made (issue #148).
+///
+/// A lone candidate is not taken for want of a rival: nothing shows that it is the only run's. A
+/// process that cannot be asked (`pid` is `None`, it has exited, or the system cannot tell) gives no
+/// evidence for any directory, so the question stays open and the look is repeated (see
+/// [`Located::log_dir`]).
 fn choose(candidates: &[PathBuf], pid: Option<u32>) -> Option<PathBuf> {
-    let held = |dir: &PathBuf| pid.and_then(|p| holds_open(p, &dir.join(SESSION_LOG)));
-    match candidates {
-        [] => None,
-        [only] => (held(only) != Some(false)).then(|| only.clone()),
-        many => many.iter().find(|d| held(d) == Some(true)).cloned(),
-    }
+    let pid = pid?;
+    candidates
+        .iter()
+        .find(|d| holds_open(pid, &d.join(SESSION_LOG)) == Some(true))
+        .cloned()
 }
 
 /// One of a run's output directories, found once Maestro has made it.
@@ -495,8 +506,9 @@ mod tests {
         }
     }
 
-    /// A process that cannot be listed says nothing about its files: the candidate is not
-    /// rejected for it. (`lsof` lists nothing for a process it cannot inspect, and exits 1.)
+    /// A process that cannot be listed says nothing about its files: the candidate is neither
+    /// rejected nor taken for it. (`lsof` lists nothing for a process it cannot inspect, and exits
+    /// 1.)
     #[test]
     fn a_process_that_cannot_be_listed_leaves_the_question_open() {
         let d = tmp("unlisted");
@@ -504,10 +516,54 @@ mod tests {
         std::fs::write(&file, b"x").unwrap();
         // No process has this id (pid_t is signed; this one is never allocated).
         assert_eq!(holds_open(u32::MAX, &file), None);
+        assert_eq!(choose(std::slice::from_ref(&d), Some(u32::MAX)), None);
+        assert_eq!(choose(std::slice::from_ref(&d), None), None);
+    }
+
+    /// The losing interleaving of issue #148, without sleeps. The run's own directory is dated a
+    /// moment before the run's start, as a coarse birth clock can date it, so the only candidate is
+    /// the other run's directory, made after the start. The run's process has exited, so it holds
+    /// nothing. The other run's directory must not be taken: it is not the run's on any evidence.
+    #[test]
+    fn a_run_whose_process_has_exited_does_not_take_the_lone_directory_of_another_run() {
+        let d = tmp("lone-gone");
+        let ours = d.join("2026-11-08_101112");
+        std::fs::create_dir_all(&ours).unwrap();
+        File::create(ours.join(SESSION_LOG)).unwrap();
+        let started = fs_started(&d);
+        let theirs = d.join("2026-11-08_101113");
+        std::fs::create_dir_all(&theirs).unwrap();
+        File::create(theirs.join(SESSION_LOG)).unwrap();
+        let mut l = Located::new(OutputRoot::Stamped(d.clone()), started);
+        // No process has this id, as for a run whose child was reaped.
         assert_eq!(
-            choose(std::slice::from_ref(&d), Some(u32::MAX)),
-            Some(d.clone())
+            l.log_dir(Some(u32::MAX), Instant::now()),
+            None,
+            "the other run's lone directory is not this run's"
         );
+        std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// The run's own directory is found although a coarse birth clock dates it a moment before the
+    /// run's start: the run's process holds its log, and that is the evidence (issue #148).
+    #[test]
+    fn a_run_finds_its_own_directory_when_its_birth_is_dated_before_the_start() {
+        let d = tmp("own-lag");
+        let ours = d.join("2026-11-08_101112");
+        std::fs::create_dir_all(&ours).unwrap();
+        let held = File::create(ours.join(SESSION_LOG)).unwrap();
+        let started = fs_started(&d);
+        let theirs = d.join("2026-11-08_101113");
+        std::fs::create_dir_all(&theirs).unwrap();
+        File::create(theirs.join(SESSION_LOG)).unwrap();
+        let mut l = Located::new(OutputRoot::Stamped(d.clone()), started);
+        assert_eq!(
+            l.log_dir(Some(std::process::id()), Instant::now()),
+            Some(ours.as_path()),
+            "the directory this process holds, though it is dated before the start"
+        );
+        drop(held);
+        std::fs::remove_dir_all(&d).ok();
     }
 
     #[test]
@@ -751,8 +807,8 @@ mod tests {
         std::fs::remove_dir_all(&d).ok();
     }
 
-    /// The run's directory is one created since the run started, never an older one. A lone
-    /// candidate that no process can be asked about is taken.
+    /// The run's directory is one created since the run started, never an older one, and it is
+    /// taken only when the run's process holds its log.
     #[test]
     fn the_run_directory_is_the_one_created_for_this_run() {
         let d = tmp("stamp");
@@ -765,9 +821,10 @@ mod tests {
         assert_eq!(l.log_dir(None, t), None, "an older run is not this one");
         let mine = d.join("2026-11-08_101112");
         std::fs::create_dir_all(&mine).unwrap();
-        File::create(mine.join(SESSION_LOG)).unwrap();
+        let held = File::create(mine.join(SESSION_LOG)).unwrap();
         let mut l = Located::new(OutputRoot::Stamped(d.clone()), started);
-        assert_eq!(l.log_dir(None, t), Some(mine.as_path()));
+        assert_eq!(l.log_dir(Some(std::process::id()), t), Some(mine.as_path()));
+        drop(held);
         let mut missing = Located::new(OutputRoot::Stamped(d.join("missing")), started);
         assert_eq!(missing.log_dir(None, t), None);
         std::fs::remove_dir_all(&d).ok();
@@ -890,11 +947,34 @@ mod tests {
                 workspace.as_deref(),
             )
             .unwrap_or_else(|| panic!("{scenario}: a layout"));
+            // The captured run's own process holds its session log open, as Maestro's JVM does, and
+            // a stamped directory is taken only on that evidence. The test process stands in for
+            // the JVM: it holds the one session log under the layout's base (a flat layout needs
+            // none).
+            let held_log = match &layout.log {
+                OutputRoot::Stamped(base) => {
+                    let logs: Vec<PathBuf> = std::fs::read_dir(base)
+                        .unwrap()
+                        .flatten()
+                        .map(|e| e.path().join(SESSION_LOG))
+                        .filter(|p| p.is_file())
+                        .collect();
+                    assert_eq!(
+                        logs.len(),
+                        1,
+                        "{scenario}: one session log in {}",
+                        base.display()
+                    );
+                    Some(File::open(&logs[0]).unwrap())
+                }
+                OutputRoot::Flat(_) => None,
+            };
             let mut log = Located::new(layout.log, UNIX_EPOCH);
             let log_dir = log
-                .log_dir(None, Instant::now())
+                .log_dir(Some(std::process::id()), Instant::now())
                 .unwrap_or_else(|| panic!("{scenario}: the log directory"))
                 .to_path_buf();
+            drop(held_log);
             assert!(
                 log_dir.join("maestro.log").is_file(),
                 "{scenario}: the session log is at {}",
