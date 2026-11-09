@@ -79,7 +79,13 @@ curl -f https://<dashboard>.duckdns.org/readyz
 The dashboard needs one of these:
 
 - **Browser sign-in** with your identity provider, set in the `[login]` section of `fleet.toml` ([browser sign-in](operator-guide.md#browser-sign-in)).
-- **Anonymous reads** for test data only. Under `[api]` in `fleet.toml`, set `anonymous_read = true` and restart with `docker compose restart fleet`. Anyone who can reach the dashboard can then read every run, and anonymous reads are not rate limited. Do not use it with real application data.
+- **Anonymous reads** for test data only. The `fleet.toml` in the repository has no `[api]` table: add these lines at the end of `deploy/compose/fleet.toml`, then restart with `docker compose restart fleet`:
+
+  ```toml
+  [api]
+  anonymous_read = true
+  ```
+ Anyone who can reach the dashboard can then read every run, and anonymous reads are not rate limited. Do not use it with real application data.
 
 Scripts can use the REST API with the viewer token in `secrets/viewer_token`:
 
