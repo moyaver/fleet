@@ -201,7 +201,7 @@ pub fn AdminRoute() -> impl IntoView {
                 view! {
                     <div class="space-y-6">
                         <div>
-                            <h4 class="pb-2 text-sm font-semibold">"Artifact classes"</h4>
+                            <h4 class="pb-2 text-sm font-semibold">"Retention classes"</h4>
                             <p class="pb-2 note">"A changed window applies to artifacts that become available afterwards"</p>
                             {grid_actions_or_empty(
                                 "Retention classes per project",

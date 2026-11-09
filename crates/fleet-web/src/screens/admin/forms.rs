@@ -427,7 +427,7 @@ pub fn retention_change(project: &str, class: &str, ttl_seconds: Option<i64>) ->
             format!("/api/v1/admin/retention/{project}/{class}/edit"),
             "Change the retention window",
             "Save window",
-            move || number("Days kept (0 keeps for ever)", "days", days, 0, 3650),
+            move || number("Days kept (0 keeps for ever)", "days", days, 0, 36_500),
         ),
     )
 }
