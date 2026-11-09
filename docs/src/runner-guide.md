@@ -66,6 +66,14 @@ Shorter runs spend more of their time on the fixed start-up and exit cost: the d
 
 **Throttling.** Host and process metrics are sampled every 5 seconds. When the host is under pressure, the agent samples every 15 seconds instead and skips the devices' guest CPU and memory reads, to take less from a busy runner. The host counts as under pressure when Linux's pressure stall information (`/proc/pressure`) shows CPU `some avg10` at 40 or more, or memory `some avg10` at 20 or more, or when host CPU usage is 95 % or more; macOS has no pressure information, so there host CPU alone decides. These thresholds are defaults and are not configurable. The agent leaves the throttled state after three consecutive samples that are not under pressure, so it does not flap. While throttled, a device's guest CPU and memory are unknown, not zero, and their reason is `throttled`.
 
+## Maestro's own screenshots and recordings
+
+A flow's `takeScreenshot` images and `startRecording` videos are Maestro's own files, and their pixels are never redacted. The agent does not upload them unless you ask: pass `--upload-user-media` to `fleet-agent run`, or set `FLEET_UPLOAD_USER_MEDIA=1` (the same switch; `publish` reads the variable too). With it on, a file is uploaded only when its flow failed, linked to the step that made it, and within the size cap the server sets for its class (`user_screenshot`, `user_recording`). A passing flow's files stay on the runner, and so does everything when `FLEET_UPLOAD_ARTIFACTS=off` is set. In an offline run the switch also puts a failed flow's media in `fleet-bundle.tar.zst`:
+
+```sh
+fleet-agent run --upload-user-media -- maestro test .maestro/
+```
+
 ## Signals and CI cancellation
 
 On the first INT or TERM the agent forwards the signal to Maestro's process group and starts a grace timer (`FLEET_GRACE`); when it expires, the group is killed. Maestro itself shuts down in under a second (research 08). If the agent's supervisor dies, the observer terminates Maestro so no orphan JVM is left behind.
