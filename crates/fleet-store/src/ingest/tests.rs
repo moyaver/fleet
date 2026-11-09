@@ -1066,6 +1066,72 @@ async fn concurrent_runs_in_one_job_and_attempt_stay_consistent(pool: PgPool) {
     assert_eq!(attempts, 1);
 }
 
+/// Two batches end the two runs of one job at the same time. The second must derive the job
+/// after the first commits: if both derive at once, each reads the other's run as still open,
+/// neither writes, and the job is left running for good.
+#[sqlx::test(migrations = "../../migrations")]
+async fn sibling_runs_ending_at_once_close_their_job(pool: PgPool) {
+    async fn end(tx: &mut sqlx::PgConnection, run: Uuid, job: Uuid) {
+        sqlx::query("UPDATE agent_runs SET state = 'ended' WHERE id = $1")
+            .bind(run)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        derive::job(tx, job).await.unwrap();
+    }
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut runs = Vec::new();
+    let mut job_id = Uuid::nil();
+    for passed in [true, false] {
+        let mut a = Agent::new("108", "job");
+        let h = store
+            .open_run(&p, &a.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let mut events = suite_run(&mut a, SuiteIds::new(), &[("a", passed)]);
+        events.pop(); // run.ended: the batches below end the runs.
+        store.apply_batch(&h, &events).await.unwrap();
+        job_id = h.job_id;
+        runs.push(a.id);
+    }
+
+    let mut first = store.pool().begin().await.unwrap();
+    end(&mut first, runs[0], job_id).await;
+    let second = {
+        let (pool, run) = (store.pool().clone(), runs[1]);
+        tokio::spawn(async move {
+            let mut tx = pool.begin().await.unwrap();
+            end(&mut tx, run, job_id).await;
+            tx.commit().await.unwrap();
+        })
+    };
+    // The second batch has derived (the bug) or waits for the job row (the fix).
+    while !second.is_finished() {
+        let waiting: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                             WHERE datname = current_database() AND wait_event_type = 'Lock')",
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        if waiting {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    first.commit().await.unwrap();
+    second.await.unwrap();
+    assert_eq!(
+        job(&store, job_id).await,
+        ("closed".into(), Some("failed".into()))
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_new_run_never_deadlocks_with_a_batch_in_its_job(pool: PgPool) {
     let store = Store {
