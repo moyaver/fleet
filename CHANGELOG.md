@@ -7,8 +7,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [0.1.0-alpha.4] - 2026-11-09
 
-The last release of the server edition; Fleet becomes a CI step after it (ADR-0016, coming).
-
 ### Breaking
 
 - Protocol, schema and configuration use runner-neutral names (ADR-0014, #153): the event `runner.detected { runner, version, profile_supported }` replaces `maestro.detected`; the artifact class `runner_log` replaces `maestro_log`; the agent-run and telemetry fields are `runner_exit_code`, `runner_exit_signal`, `runner_version`, `runner_profile_supported`, `runner_cpu_pct`, `runner_rss_bytes`, `runner_cpu_avg` and `runner_rss_max`; the exit class is `runner_error`; the metric scope is `runner`; the failure-fingerprint dimension is `runner`; the configuration key is `artifacts.max_bytes.runner_log`. The migrations carry these names from the start.
