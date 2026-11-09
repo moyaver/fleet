@@ -555,12 +555,12 @@ fn copy_tree(
         let data = fs::read(&path)?;
         let out = match std::str::from_utf8(&data) {
             Ok(text) => {
-                let max = if rel_text.ends_with("device-logcat.txt") {
-                    MAX_LOGCAT
+                let text = normalize_text(text, rules);
+                if rel_text.ends_with("device-logcat.txt") {
+                    truncate_logcat(&text, MAX_LOGCAT).into_bytes()
                 } else {
-                    MAX_TEXT
-                };
-                truncate(&normalize_text(text, rules), max).into_bytes()
+                    truncate(&text, MAX_TEXT).into_bytes()
+                }
             }
             Err(_) if data.len() as u64 > MAX_BINARY => {
                 skipped.push(format!("{rel_text} ({} bytes)", data.len()));
@@ -585,6 +585,56 @@ fn truncate(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();
     }
+    let (head_end, tail_start) = cut_points(text, max);
+    format!(
+        "{}\n[... fleet fixtures import: {} bytes cut ...]\n{}",
+        &text[..head_end],
+        tail_start - head_end,
+        &text[tail_start..]
+    )
+}
+
+/// Lines that name a crash or an ANR. A run's ANR can land in the middle of its logcat, so the
+/// logcat cut keeps these lines as well as the head and the tail (issue #77).
+const LOGCAT_MARKERS: [&str; 4] = [
+    "ANR in ",
+    "Input dispatching timed out",
+    "FATAL EXCEPTION",
+    "am_anr",
+];
+
+/// `truncate` for device logcat: the same head and tail, plus every whole line in the cut middle
+/// that names a crash or an ANR.
+fn truncate_logcat(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_owned();
+    }
+    let (head_end, tail_start) = cut_points(text, max);
+    let middle: Vec<&str> = text[head_end..tail_start].split('\n').collect();
+    // The first and last pieces of the middle are cut mid-line, so they are left out.
+    let whole: &[&str] = if middle.len() > 2 {
+        &middle[1..middle.len() - 1]
+    } else {
+        &[]
+    };
+    let marked: Vec<&str> = whole
+        .iter()
+        .copied()
+        .filter(|line| LOGCAT_MARKERS.iter().any(|m| line.contains(m)))
+        .collect();
+    format!(
+        "{}\n[... fleet fixtures import: {} bytes cut, {} lines naming a crash or ANR kept ...]\n{}{}{}",
+        &text[..head_end],
+        tail_start - head_end,
+        marked.len(),
+        marked.join("\n"),
+        if marked.is_empty() { "" } else { "\n" },
+        &text[tail_start..]
+    )
+}
+
+/// Where a `max`-byte cut keeps the head (`..head_end`) and the tail (`tail_start..`).
+fn cut_points(text: &str, max: usize) -> (usize, usize) {
     let half = max / 2;
     let head_end = (0..=half)
         .rev()
@@ -593,12 +643,7 @@ fn truncate(text: &str, max: usize) -> String {
     let tail_start = (text.len() - half..text.len())
         .find(|i| text.is_char_boundary(*i))
         .unwrap_or(text.len());
-    format!(
-        "{}\n[... fleet fixtures import: {} bytes cut ...]\n{}",
-        &text[..head_end],
-        tail_start - head_end,
-        &text[tail_start..]
-    )
+    (head_end, tail_start)
 }
 
 #[cfg(test)]
@@ -691,6 +736,26 @@ mod tests {
         assert!(cut.starts_with('é') && cut.ends_with('é'), "{cut}");
         assert!(cut.contains("bytes cut"));
         assert!(cut.len() < long.len());
+    }
+
+    #[test]
+    fn logcat_cut_keeps_the_lines_that_name_an_anr() {
+        let filler = format!("{}\n", "x".repeat(40));
+        let text = format!(
+            "{}11-09 E/ActivityManager: ANR in com.fleet.anr\n{}",
+            filler.repeat(100),
+            filler.repeat(100)
+        );
+        let cut = truncate_logcat(&text, 400);
+        assert!(
+            cut.contains("E/ActivityManager: ANR in com.fleet.anr\n"),
+            "{cut}"
+        );
+        assert!(cut.contains("1 lines naming a crash or ANR kept"), "{cut}");
+        assert!(cut.len() < text.len());
+        // Without a marker the cut is the plain head and tail.
+        let plain = truncate_logcat(&filler.repeat(200), 400);
+        assert!(plain.contains("bytes cut, 0 lines"), "{plain}");
     }
 
     #[test]
