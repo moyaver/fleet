@@ -706,6 +706,46 @@ async fn a_newer_connection_fences_the_old_one(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_batch_without_a_connection_is_busy_and_writes_nothing(pool: PgPool) {
+    let options = (*pool.connect_options()).clone();
+    let store = Store {
+        pool,
+        origin: uuid::Uuid::now_v7(),
+    };
+    let p = publisher(&store).await;
+    let mut a = Agent::new("104", "e2e");
+    let h = store
+        .open_run(&p, &a.hello(None), Transport::WebSocket)
+        .await
+        .unwrap()
+        .handle;
+    let events = suite_run(&mut a, SuiteIds::new(), &[("login", true)]);
+    // A pool of one connection, held here, so the batch waits out its acquire timeout.
+    let tight = Store {
+        pool: sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .acquire_timeout(std::time::Duration::from_millis(200))
+            .connect_lazy_with(options),
+        origin: store.origin,
+    };
+    let held = tight.pool().acquire().await.unwrap();
+    let out = tight.apply_batch(&h, &events).await;
+    assert!(matches!(out, Err(ApplyError::Busy)), "{out:?}");
+    drop(held);
+    let journal: i64 = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM agent_events WHERE agent_run_id = $1",
+        a.id
+    )
+    .fetch_one(store.pool())
+    .await
+    .unwrap();
+    assert_eq!(journal, 0, "a busy batch leaves nothing behind");
+    // The same batch, resent once a connection is free, applies in full.
+    let applied = store.apply_batch(&h, &events).await.unwrap();
+    assert_eq!(applied.through, a.seq);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn resume_rules(pool: PgPool) {
     let store = Store {
         pool,
