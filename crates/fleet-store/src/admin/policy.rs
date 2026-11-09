@@ -21,7 +21,7 @@ pub const ARTIFACT_CLASSES: [&str; 7] = [
     "failure_hierarchy",
     "commands",
     "junit",
-    "maestro_log",
+    "runner_log",
     "html_report",
     "device_logcat",
 ];

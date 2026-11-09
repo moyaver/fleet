@@ -638,7 +638,7 @@
       ]
     },
     "Sample": {
-      "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).\n\nEvery reading carries its unit in its field name (`_pct` percent, `_bytes` bytes, `_cores`\ncores; the load average is a plain number), and its scope in its prefix: `host_` is the\nmachine, `maestro_` the Maestro process of the run and `agent_` the agent itself (its\nsupervisor and observer). A reading that is `None` has its reason in `unavailable`.",
+      "description": "One metric sample. `None` means unavailable, never zero (research 05 §5.4).\n\nEvery reading carries its unit in its field name (`_pct` percent, `_bytes` bytes, `_cores`\ncores; the load average is a plain number), and its scope in its prefix: `host_` is the\nmachine, `runner_` the runner's process of the run (Maestro today) and `agent_` the agent itself (its\nsupervisor and observer). A reading that is `None` has its reason in `unavailable`.",
       "properties": {
         "agent_cpu_pct": {
           "description": "The agent itself (supervisor + observer): CPU percent of one core since the last sample\n(invariant I10).",
@@ -753,16 +753,16 @@
             "null"
           ]
         },
-        "maestro_cpu_pct": {
-          "description": "Maestro's JVM: CPU percent of one core.",
+        "runner_cpu_pct": {
+          "description": "The runner's process (Maestro's JVM): CPU percent of one core.",
           "format": "float",
           "type": [
             "number",
             "null"
           ]
         },
-        "maestro_rss_bytes": {
-          "description": "Maestro's JVM: resident memory, bytes.",
+        "runner_rss_bytes": {
+          "description": "The runner's process (Maestro's JVM): resident memory, bytes.",
           "format": "uint64",
           "minimum": 0,
           "type": [
@@ -915,7 +915,7 @@
           ],
           "description": "Why `host_swap_used_bytes` is unknown."
         },
-        "maestro_cpu_pct": {
+        "runner_cpu_pct": {
           "anyOf": [
             {
               "$ref": "#/$defs/Unavailable"
@@ -924,9 +924,9 @@
               "type": "null"
             }
           ],
-          "description": "Why `maestro_cpu_pct` is unknown."
+          "description": "Why `runner_cpu_pct` is unknown."
         },
-        "maestro_rss_bytes": {
+        "runner_rss_bytes": {
           "anyOf": [
             {
               "$ref": "#/$defs/Unavailable"
@@ -935,7 +935,7 @@
               "type": "null"
             }
           ],
-          "description": "Why `maestro_rss_bytes` is unknown."
+          "description": "Why `runner_rss_bytes` is unknown."
         }
       },
       "type": "object"

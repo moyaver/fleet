@@ -6,4 +6,4 @@
 ALTER TABLE artifacts DROP CONSTRAINT artifacts_class_check;
 ALTER TABLE artifacts ADD CONSTRAINT artifacts_class_check
   CHECK (class IN ('failure_screenshot', 'failure_hierarchy', 'commands', 'junit',
-                   'maestro_log', 'html_report', 'device_logcat'));
+                   'runner_log', 'html_report', 'device_logcat'));

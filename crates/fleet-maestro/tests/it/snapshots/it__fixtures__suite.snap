@@ -55,10 +55,10 @@ expression: summary
       }
     ],
     "machine_pattern": true,
-    "maestro_version": "2.12.1",
     "orphan_lines": 0,
     "other": {},
     "records": 91,
+    "runner_version": "2.12.1",
     "shards": [
       {
         "planned": 4,

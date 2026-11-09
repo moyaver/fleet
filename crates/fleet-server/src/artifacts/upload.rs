@@ -590,7 +590,7 @@ fn blob_class(class: ArtifactClass) -> BlobClass {
     match class {
         ArtifactClass::FailureScreenshot => BlobClass::Screenshot,
         ArtifactClass::Commands
-        | ArtifactClass::MaestroLog
+        | ArtifactClass::RunnerLog
         | ArtifactClass::FailureHierarchy
         | ArtifactClass::DeviceLogcat => BlobClass::Log,
         ArtifactClass::Junit => BlobClass::Junit,

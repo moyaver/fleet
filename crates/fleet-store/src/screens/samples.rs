@@ -55,9 +55,9 @@ pub struct ProcessRow {
     /// The agent run whose processes these are.
     pub run_id: Uuid,
     /// Maestro's CPU, percent of one core (the bucket's average when aggregated).
-    pub maestro_cpu_pct: Option<f64>,
+    pub runner_cpu_pct: Option<f64>,
     /// Maestro's resident memory, bytes (the bucket's maximum when aggregated).
-    pub maestro_rss_bytes: Option<f64>,
+    pub runner_rss_bytes: Option<f64>,
     /// The agent's CPU, percent of one core (raw samples only).
     pub agent_cpu_pct: Option<f64>,
     /// The agent's resident memory, bytes (raw samples only).
@@ -289,8 +289,8 @@ impl Store {
                 sqlx::query_as!(
                     ProcessRow,
                     "SELECT ts AS \"at!\", agent_run_id AS \"run_id!\",
-                            maestro_cpu_pct::float8 AS maestro_cpu_pct,
-                            maestro_rss_bytes::float8 AS maestro_rss_bytes,
+                            runner_cpu_pct::float8 AS runner_cpu_pct,
+                            runner_rss_bytes::float8 AS runner_rss_bytes,
                             agent_cpu_pct::float8 AS agent_cpu_pct,
                             agent_rss_bytes::float8 AS agent_rss_bytes
                        FROM host_samples
@@ -309,8 +309,8 @@ impl Store {
                 sqlx::query_as!(
                     ProcessRow,
                     "SELECT bucket AS \"at!\", agent_run_id AS \"run_id!\",
-                            maestro_cpu_avg::float8 AS maestro_cpu_pct,
-                            maestro_rss_max::float8 AS maestro_rss_bytes,
+                            runner_cpu_avg::float8 AS runner_cpu_pct,
+                            runner_rss_max::float8 AS runner_rss_bytes,
                             NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes
                        FROM host_rollup_1m
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4
@@ -328,8 +328,8 @@ impl Store {
                 sqlx::query_as!(
                     ProcessRow,
                     "SELECT bucket AS \"at!\", agent_run_id AS \"run_id!\",
-                            maestro_cpu_avg::float8 AS maestro_cpu_pct,
-                            maestro_rss_max::float8 AS maestro_rss_bytes,
+                            runner_cpu_avg::float8 AS runner_cpu_pct,
+                            runner_rss_max::float8 AS runner_rss_bytes,
                             NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes
                        FROM host_rollup_1h
                       WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4

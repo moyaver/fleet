@@ -96,9 +96,9 @@ pub enum SampleMetric {
     /// Host memory installed.
     HostMemTotal,
     /// Maestro's JVM CPU.
-    MaestroCpu,
+    RunnerCpu,
     /// Maestro's JVM resident memory.
-    MaestroRss,
+    RunnerRss,
     /// The agent's own CPU.
     AgentCpu,
     /// The agent's own resident memory.
@@ -111,8 +111,8 @@ impl SampleMetric {
         Self::HostCpu,
         Self::HostMemUsed,
         Self::HostMemTotal,
-        Self::MaestroCpu,
-        Self::MaestroRss,
+        Self::RunnerCpu,
+        Self::RunnerRss,
         Self::AgentCpu,
         Self::AgentRss,
     ];
@@ -124,8 +124,8 @@ impl SampleMetric {
             Self::HostCpu => ("Host CPU", Unit::Percent),
             Self::HostMemUsed => ("Host memory used", Unit::Bytes),
             Self::HostMemTotal => ("Host memory total", Unit::Bytes),
-            Self::MaestroCpu => ("Maestro CPU", Unit::PercentOfCore),
-            Self::MaestroRss => ("Maestro memory (RSS)", Unit::Bytes),
+            Self::RunnerCpu => ("Maestro CPU", Unit::PercentOfCore),
+            Self::RunnerRss => ("Maestro memory (RSS)", Unit::Bytes),
             Self::AgentCpu => ("Agent CPU", Unit::PercentOfCore),
             Self::AgentRss => ("Agent memory (RSS)", Unit::Bytes),
         };
@@ -165,8 +165,8 @@ impl SampleMetric {
             Self::HostCpu => pct(s.host_cpu_pct),
             Self::HostMemUsed => bytes(s.host_mem_used_bytes),
             Self::HostMemTotal => bytes(s.host_mem_total_bytes),
-            Self::MaestroCpu => pct(s.maestro_cpu_pct),
-            Self::MaestroRss => bytes(s.maestro_rss_bytes),
+            Self::RunnerCpu => pct(s.runner_cpu_pct),
+            Self::RunnerRss => bytes(s.runner_rss_bytes),
             Self::AgentCpu => pct(s.agent_cpu_pct),
             Self::AgentRss => bytes(s.agent_rss_bytes),
         }
@@ -189,8 +189,8 @@ mod tests {
             host_cpu_pct: cpu,
             host_mem_used_bytes: mem,
             host_mem_total_bytes: None,
-            maestro_cpu_pct: None,
-            maestro_rss_bytes: None,
+            runner_cpu_pct: None,
+            runner_rss_bytes: None,
             agent_cpu_pct: None,
             agent_rss_bytes: None,
             host_load_1m: None,

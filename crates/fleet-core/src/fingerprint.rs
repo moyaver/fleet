@@ -213,7 +213,7 @@ pub struct ConditionFacts {
     /// Android API level of the device.
     pub device_api_level: Option<u32>,
     /// Maestro CLI version; only `major.minor` counts.
-    pub maestro_version: Option<String>,
+    pub runner_version: Option<String>,
     /// Host operating system (`std::env::consts::OS`).
     pub os: Option<String>,
     /// Host architecture (`std::env::consts::ARCH`).
@@ -283,8 +283,8 @@ impl ConditionFacts {
                     .map_or_else(|| UNKNOWN.to_owned(), memory_class),
             ),
             (
-                "maestro",
-                self.maestro_version
+                "runner",
+                self.runner_version
                     .as_deref()
                     .and_then(major_minor)
                     .unwrap_or_else(|| UNKNOWN.to_owned()),
@@ -584,7 +584,7 @@ mod tests {
             ConditionFacts {
                 device_model: Some("Pixel_10a".into()),
                 device_api_level: Some(36),
-                maestro_version: Some("2.12.1".into()),
+                runner_version: Some("2.12.1".into()),
                 os: Some("Linux".into()),
                 arch: Some("x86_64".into()),
                 host_cores: Some(6),
@@ -608,8 +608,8 @@ mod tests {
                     ("device_model", "unknown"),
                     ("host_cores", "unknown"),
                     ("host_memory", "unknown"),
-                    ("maestro", "unknown"),
                     ("os", "unknown"),
+                    ("runner", "unknown"),
                 ]
                 .map(|(k, v)| (k, v.to_owned()))
             );
@@ -626,8 +626,8 @@ mod tests {
                     ("device_model", "Pixel_10a"),
                     ("host_cores", "8"),
                     ("host_memory", "16GiB"),
-                    ("maestro", "2.12"),
                     ("os", "linux"),
+                    ("runner", "2.12"),
                 ]
                 .map(|(k, v)| (k, v.to_owned()))
             );
@@ -639,14 +639,14 @@ mod tests {
             // above, in key order; computed outside this crate.
             assert_eq!(
                 full().fingerprint().to_string(),
-                "2dcb3466347848cc04b2f7a3252466d212eb93f94829a3c5740a981a659215b8"
+                "fcfe08f4380dead9e7bf296bea77728a8ee4c42da7f304d196c55ccd603fb2e3"
             );
         }
 
         #[test]
         fn facts_in_the_same_class_share_a_fingerprint() {
             let patch = ConditionFacts {
-                maestro_version: Some("v2.12.3".into()),
+                runner_version: Some("v2.12.3".into()),
                 host_cores: Some(7),
                 host_memory_bytes: Some(15 * GIB + GIB / 10),
                 ..full()
@@ -667,7 +667,7 @@ mod tests {
                     ..full()
                 },
                 ConditionFacts {
-                    maestro_version: Some("2.13.0".into()),
+                    runner_version: Some("2.13.0".into()),
                     ..full()
                 },
                 ConditionFacts {
@@ -713,12 +713,12 @@ mod tests {
         }
 
         #[test]
-        fn an_unparsable_maestro_version_is_unknown() {
+        fn an_unparsable_runner_version_is_unknown() {
             let f = ConditionFacts {
-                maestro_version: Some("snapshot".into()),
+                runner_version: Some("snapshot".into()),
                 ..full()
             };
-            assert_eq!(f.dims().get("maestro").map(String::as_str), Some("unknown"));
+            assert_eq!(f.dims().get("runner").map(String::as_str), Some("unknown"));
         }
     }
 }

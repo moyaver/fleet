@@ -81,9 +81,9 @@ pub enum ExitClass {
     Passed,
     /// Exit 1 with a report, or with a flow seen to fail (stdout, bundle or log): test failures.
     TestFailures,
-    /// Exit 1 with no failed flow seen and an expected report missing: Maestro or infrastructure
+    /// Exit 1 with no failed flow seen and an expected report missing: the runner or infrastructure
     /// error. With no report requested, exit 1 is `Other` instead.
-    MaestroError,
+    RunnerError,
     /// Exit 2: bad usage.
     UsageError,
     /// Killed by a signal, or 130/143.
@@ -122,11 +122,13 @@ pub enum MatchMethod {
     Unmatched,
 }
 
-/// The Maestro build the run's session log named: the payload of `maestro.detected`.
+/// The runner build the run's session log named: the payload of `runner.detected`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct MaestroBuild {
-    /// The version as Maestro logged it, for example `2.12.1`.
+pub struct RunnerBuild {
+    /// The runner that logged the build: `maestro` for Maestro.
+    pub runner: String,
+    /// The version as the runner logged it, for example `2.12.1`.
     pub version: String,
     /// Whether the agent's parsers were built for this version. `false` marks the run degraded.
     pub profile_supported: bool,
@@ -211,8 +213,8 @@ pub struct EvidenceSources {
     pub report: ReportSource,
     /// The debug output directory (session log and flow bundles), when it is known.
     pub debug_output: Option<String>,
-    /// Whether Maestro's log is made machine-readable by the agent.
-    pub maestro_log: bool,
+    /// Whether the runner's log is made machine-readable by the agent.
+    pub runner_log: bool,
 }
 
 /// `suite.started`: one Maestro invocation began.
@@ -601,9 +603,9 @@ pub enum EventBody {
     /// See [`ParserUnrecognized`].
     #[serde(rename = "parser.unrecognized")]
     ParserUnrecognized(ParserUnrecognized),
-    /// See [`MaestroBuild`].
-    #[serde(rename = "maestro.detected")]
-    MaestroDetected(MaestroBuild),
+    /// See [`RunnerBuild`].
+    #[serde(rename = "runner.detected")]
+    RunnerDetected(RunnerBuild),
 }
 
 /// Payload versions of the known types. Bump one when its payload changes incompatibly.
@@ -630,7 +632,7 @@ const VERSIONS: &[(&str, u16)] = &[
     ("app.crashed", 1),
     ("journal.gap", 1),
     ("parser.unrecognized", 1),
-    ("maestro.detected", 1),
+    ("runner.detected", 1),
 ];
 
 impl EventBody {
@@ -712,7 +714,7 @@ mod tests {
                         reason: ReportReason::SkippedSingleFlow,
                     },
                     debug_output: Some("/run/artifacts".into()),
-                    maestro_log: true,
+                    runner_log: true,
                 }),
             }),
             EventBody::SuiteStarted(SuiteStarted {
@@ -765,7 +767,7 @@ mod tests {
                 size: 1024,
             }),
             EventBody::ArtifactRejected(ArtifactRejected {
-                class: "maestro_log".into(),
+                class: "runner_log".into(),
                 path: "maestro.log".into(),
                 reason: "not_redactable".into(),
             }),
@@ -780,7 +782,8 @@ mod tests {
                 to_seq: 9,
                 reason: "spool_full".into(),
             }),
-            EventBody::MaestroDetected(MaestroBuild {
+            EventBody::RunnerDetected(RunnerBuild {
+                runner: "maestro".into(),
                 version: "2.12.1".into(),
                 profile_supported: true,
             }),

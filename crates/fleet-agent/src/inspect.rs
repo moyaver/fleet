@@ -430,7 +430,10 @@ impl Replay {
                 ))
             })
             .collect();
-        let redactor = Redactor::for_run(&argv, env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+        let redactor = fleet_maestro::redact::redactor_for_run(
+            &argv,
+            env.iter().map(|(k, v)| (k.as_str(), v.as_str())),
+        );
         let start_ms = meta["started_at_unix_ms"].as_u64().unwrap_or(0);
         let start = OffsetDateTime::from_unix_timestamp_nanos(i128::from(start_ms) * 1_000_000)
             .unwrap_or(OffsetDateTime::UNIX_EPOCH);

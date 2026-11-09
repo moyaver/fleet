@@ -427,7 +427,7 @@ fn saved_uploads(replayed: &mut Replayed, dir: &Path) -> Vec<Pending> {
         && log.is_file()
     {
         out.push(Pending::Upload(Item {
-            class: ArtifactClass::MaestroLog,
+            class: ArtifactClass::RunnerLog,
             path: "maestro.log".into(),
             content_type: "text/plain",
             flow: None,
@@ -719,7 +719,7 @@ mod tests {
             })
             .collect();
         classes.sort_unstable();
-        for want in ["commands", "failure_screenshot", "junit", "maestro_log"] {
+        for want in ["commands", "failure_screenshot", "junit", "runner_log"] {
             assert!(classes.contains(&want), "{want} in {classes:?}");
         }
     }

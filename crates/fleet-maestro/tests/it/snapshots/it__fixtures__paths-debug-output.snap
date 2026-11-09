@@ -9,10 +9,10 @@ expression: summary
     "crashes": [],
     "flows_started": [],
     "machine_pattern": false,
-    "maestro_version": "2.12.1",
     "orphan_lines": 0,
     "other": {},
     "records": 46,
+    "runner_version": "2.12.1",
     "shards": [
       {
         "planned": 1,

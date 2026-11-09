@@ -17,6 +17,7 @@ pub mod invocation;
 pub mod junit;
 pub mod log;
 pub mod logcat;
+pub mod redact;
 pub mod reproduce;
 pub mod stdout;
 pub mod workspace;
@@ -51,7 +52,7 @@ pub enum ReportState {
 ///
 /// Exit 1 is `TestFailures` when the report is present or a flow was seen to fail by direct
 /// observation (`flow_failed_observed`: stdout, bundle or log, not the report). Without either, it
-/// is `MaestroError` if a report was expected and is missing, else `Other`: with no report asked
+/// is `RunnerError` if a report was expected and is missing, else `Other`: with no report asked
 /// for, Fleet can't tell a failing test from an infrastructure error.
 #[must_use]
 pub fn exit_class(
@@ -66,7 +67,7 @@ pub fn exit_class(
         (Some(1), _) if report == ReportState::Present || flow_failed_observed => {
             ExitClass::TestFailures
         }
-        (Some(1), _) if report == ReportState::Absent => ExitClass::MaestroError,
+        (Some(1), _) if report == ReportState::Absent => ExitClass::RunnerError,
         (Some(2), _) => ExitClass::UsageError,
         _ => ExitClass::Other,
     }
@@ -115,7 +116,7 @@ mod tests {
         // No failure seen: a missing expected report is an error, no report by choice is unknown.
         assert_eq!(
             exit_class(Some(1), None, Absent, false),
-            ExitClass::MaestroError
+            ExitClass::RunnerError
         );
         assert_eq!(
             exit_class(Some(1), None, NotRequested, false),

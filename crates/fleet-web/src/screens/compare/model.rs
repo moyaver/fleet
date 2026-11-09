@@ -452,7 +452,7 @@ fn change_text(c: &DimChangeView) -> String {
         "device_api_level" => "Android API level",
         "host_memory" => "host memory",
         "host_cores" => "host cores",
-        "maestro" => "Maestro version",
+        "runner" => "Maestro version",
         "ci_provider" => "CI provider",
         other => other,
     };

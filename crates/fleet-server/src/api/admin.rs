@@ -140,7 +140,7 @@ pub(crate) fn artifact_policy(config: &Config) -> Vec<AdminSettingView> {
         ),
         setting("artifacts.max_bytes.commands", &c.commands),
         setting("artifacts.max_bytes.junit", &c.junit),
-        setting("artifacts.max_bytes.maestro_log", &c.maestro_log),
+        setting("artifacts.max_bytes.runner_log", &c.runner_log),
         setting("artifacts.max_bytes.html_report", &c.html_report),
         setting(
             "artifacts.max_bytes.device_logcat",

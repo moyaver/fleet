@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT bucket AS \"at!\", agent_run_id AS \"run_id!\",\n                            maestro_cpu_avg::float8 AS maestro_cpu_pct,\n                            maestro_rss_max::float8 AS maestro_rss_bytes,\n                            NULL::float8 AS agent_cpu_pct, NULL::float8 AS agent_rss_bytes\n                       FROM host_rollup_1h\n                      WHERE project_id = $1 AND worker_id = $2 AND bucket >= $3 AND bucket < $4\n                      ORDER BY bucket, agent_run_id LIMIT $5",
+  "query": "SELECT ts AS \"at!\", agent_run_id AS \"run_id!\",\n                            runner_cpu_pct::float8 AS runner_cpu_pct,\n                            runner_rss_bytes::float8 AS runner_rss_bytes,\n                            agent_cpu_pct::float8 AS agent_cpu_pct,\n                            agent_rss_bytes::float8 AS agent_rss_bytes\n                       FROM host_samples\n                      WHERE project_id = $1 AND worker_id = $2 AND ts >= $3 AND ts < $4\n                      ORDER BY ts, agent_run_id LIMIT $5",
   "describe": {
     "columns": [
       {
@@ -9,8 +9,8 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "host_rollup_1h",
-            "name": "bucket"
+            "table": "host_samples",
+            "name": "ts"
           }
         }
       },
@@ -20,20 +20,20 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "host_rollup_1h",
+            "table": "host_samples",
             "name": "agent_run_id"
           }
         }
       },
       {
         "ordinal": 2,
-        "name": "maestro_cpu_pct",
+        "name": "runner_cpu_pct",
         "type_info": "Float8",
         "origin": "Expression"
       },
       {
         "ordinal": 3,
-        "name": "maestro_rss_bytes",
+        "name": "runner_rss_bytes",
         "type_info": "Float8",
         "origin": "Expression"
       },
@@ -68,5 +68,5 @@
       null
     ]
   },
-  "hash": "c303624700d38ce037560337a2bfbcef1e48803b72e369de58bd056cd3a0e4f2"
+  "hash": "eb8aa6605b82ebb22616fdba772eae2151fe8b02d1101be5110babb7373ef275"
 }

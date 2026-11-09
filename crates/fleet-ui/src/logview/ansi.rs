@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn real_maestro_tty_output_has_no_escape_bytes_and_keeps_its_text() {
+    fn captured_tty_output_has_no_escape_bytes_and_keeps_its_text() {
         for name in ["tty-ansi", "verbose"] {
             let raw = fixture(name);
             assert!(raw.contains('\x1b'), "{name} should contain ANSI");

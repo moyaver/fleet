@@ -127,18 +127,18 @@ async fn a_metric_the_agent_never_reports_is_unavailable_with_a_reason_never_a_v
 async fn a_sample_without_a_reading_is_an_unavailable_point_not_a_zero() {
     let rig = rig().await;
     let mut samples: Vec<Sample> = (0..3).map(|i| sample(at(i), 10.0)).collect();
-    samples[1].maestro_cpu_pct = None;
+    samples[1].runner_cpu_pct = None;
     let worker = worker_with(&rig, samples).await;
 
     let view = rig
         .json(&format!(
             "/api/v1/projects/app/workers/{worker}/metrics{}",
-            range("&metrics=maestro_cpu_pct")
+            range("&metrics=runner_cpu_pct")
         ))
         .await;
 
-    let cpu = series(&view, "maestro_cpu_pct");
-    assert_eq!(cpu["scope"], "maestro");
+    let cpu = series(&view, "runner_cpu_pct");
+    assert_eq!(cpu["scope"], "runner");
     assert_eq!(cpu["available"], true, "two of three readings exist");
     let points = cpu["points"].as_array().unwrap();
     assert_eq!(points.len(), 3);
@@ -340,7 +340,7 @@ async fn a_gap_of_missing_readings_survives_downsampling_as_one_unavailable_mark
         .map(|i| {
             let mut s = sample(at(i), 10.0);
             if (20..30).contains(&i) {
-                s.maestro_cpu_pct = None;
+                s.runner_cpu_pct = None;
             }
             s
         })
@@ -350,11 +350,11 @@ async fn a_gap_of_missing_readings_survives_downsampling_as_one_unavailable_mark
     let view = rig
         .json(&format!(
             "/api/v1/projects/app/workers/{worker}/metrics{}",
-            range("&metrics=maestro_cpu_pct&points=12")
+            range("&metrics=runner_cpu_pct&points=12")
         ))
         .await;
 
-    let points = series(&view, "maestro_cpu_pct")["points"]
+    let points = series(&view, "runner_cpu_pct")["points"]
         .as_array()
         .unwrap()
         .clone();
@@ -694,17 +694,17 @@ fn run_series<'a>(view: &'a Value, metric: &str, run: uuid::Uuid) -> &'a Value {
 /// figures stay its own, one series per run, from raw samples and from the minute and hour
 /// rollups; the host's figures stay one series per worker.
 #[tokio::test]
-async fn concurrent_runs_on_one_worker_each_keep_their_own_maestro_series() {
+async fn concurrent_runs_on_one_worker_each_keep_their_own_runner_series() {
     let rig = rig().await;
     let now = OffsetDateTime::now_utc().replace_nanosecond(0).unwrap();
     // Twenty hours ago, on a whole minute: closed minute and hour buckets for the rollups.
     let m0 = (now - Duration::hours(20)).replace_second(0).unwrap();
-    let minute_of = |maestro_cpu: f32, maestro_rss: u64| -> Vec<Sample> {
+    let minute_of = |runner_cpu: f32, runner_rss: u64| -> Vec<Sample> {
         (0..12)
             .map(|i| {
                 let mut s = sample(m0 + Duration::seconds(5 * i), 10.0);
-                s.maestro_cpu_pct = Some(maestro_cpu);
-                s.maestro_rss_bytes = Some(maestro_rss);
+                s.runner_cpu_pct = Some(runner_cpu);
+                s.runner_rss_bytes = Some(runner_rss);
                 s
             })
             .collect()
@@ -730,23 +730,23 @@ async fn concurrent_runs_on_one_worker_each_keep_their_own_maestro_series() {
         .json(&path(
             m0 - Duration::minutes(1),
             m0 + Duration::minutes(2),
-            "maestro_cpu_pct,host_cpu_pct",
+            "runner_cpu_pct,host_cpu_pct",
         ))
         .await;
     assert_eq!(raw["resolution"], "raw");
     assert_eq!(
-        points(run_series(&raw, "maestro_cpu_pct", a.id)).len(),
+        points(run_series(&raw, "runner_cpu_pct", a.id)).len(),
         12,
         "run A's own readings"
     );
     assert!(
-        points(run_series(&raw, "maestro_cpu_pct", a.id))
+        points(run_series(&raw, "runner_cpu_pct", a.id))
             .iter()
             .all(|(_, v)| *v == Some(100.0)),
         "{raw}"
     );
     assert!(
-        points(run_series(&raw, "maestro_cpu_pct", b.id))
+        points(run_series(&raw, "runner_cpu_pct", b.id))
             .iter()
             .all(|(_, v)| *v == Some(300.0)),
         "{raw}"
@@ -763,35 +763,35 @@ async fn concurrent_runs_on_one_worker_each_keep_their_own_maestro_series() {
         .json(&path(
             now - Duration::days(3),
             now,
-            "maestro_cpu_pct,maestro_rss_bytes",
+            "runner_cpu_pct,runner_rss_bytes",
         ))
         .await;
     assert_eq!(minutes["resolution"], "1m");
     assert_eq!(
-        points(run_series(&minutes, "maestro_cpu_pct", a.id)),
+        points(run_series(&minutes, "runner_cpu_pct", a.id)),
         [(ms(m0), Some(100.0))]
     );
     assert_eq!(
-        points(run_series(&minutes, "maestro_cpu_pct", b.id)),
+        points(run_series(&minutes, "runner_cpu_pct", b.id)),
         [(ms(m0), Some(300.0))],
         "not averaged with run A"
     );
     assert_eq!(
-        points(run_series(&minutes, "maestro_rss_bytes", b.id)),
+        points(run_series(&minutes, "runner_rss_bytes", b.id)),
         [(ms(m0), Some(f64::from(400 << 20)))]
     );
 
     let hours = rig
-        .json(&path(now - Duration::days(40), now, "maestro_cpu_pct"))
+        .json(&path(now - Duration::days(40), now, "runner_cpu_pct"))
         .await;
     assert_eq!(hours["resolution"], "1h");
     let hour = m0.replace_minute(0).unwrap();
     assert_eq!(
-        points(run_series(&hours, "maestro_cpu_pct", a.id)),
+        points(run_series(&hours, "runner_cpu_pct", a.id)),
         [(ms(hour), Some(100.0))]
     );
     assert_eq!(
-        points(run_series(&hours, "maestro_cpu_pct", b.id)),
+        points(run_series(&hours, "runner_cpu_pct", b.id)),
         [(ms(hour), Some(300.0))]
     );
 }

@@ -76,30 +76,28 @@ pub(crate) struct Check {
 /// Runs every check.
 pub(crate) fn check() -> Vec<Check> {
     let mut out = Vec::new();
-    out.push(
-        match maestro_version(OsStr::new("maestro"), PROBE_TIMEOUT) {
-            Ok(v) => {
-                let supported = fleet_maestro::supports(&v);
-                Check {
-                    name: "maestro",
-                    ok: true,
-                    detail: if supported {
-                        format!("{v} (profile {})", fleet_maestro::PROFILE)
-                    } else {
-                        format!(
-                            "{v}: parsers target {}, results may degrade",
-                            fleet_maestro::PROFILE
-                        )
-                    },
-                }
-            }
-            Err(detail) => Check {
+    out.push(match runner_version(OsStr::new("maestro"), PROBE_TIMEOUT) {
+        Ok(v) => {
+            let supported = fleet_maestro::supports(&v);
+            Check {
                 name: "maestro",
-                ok: false,
-                detail,
-            },
+                ok: true,
+                detail: if supported {
+                    format!("{v} (profile {})", fleet_maestro::PROFILE)
+                } else {
+                    format!(
+                        "{v}: parsers target {}, results may degrade",
+                        fleet_maestro::PROFILE
+                    )
+                },
+            }
+        }
+        Err(detail) => Check {
+            name: "maestro",
+            ok: false,
+            detail,
         },
-    );
+    });
     out.push(tcp(
         "adb server",
         "127.0.0.1:5037",
@@ -156,7 +154,7 @@ pub(crate) const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Asks `program` for its version with `--version`: the binary a run would start. Its output is
 /// captured, never shown, and the probe is killed (with the group it started) past `timeout`.
 /// The error is the reason the version is unknown.
-pub(crate) fn maestro_version(program: &OsStr, timeout: Duration) -> Result<String, String> {
+pub(crate) fn runner_version(program: &OsStr, timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(program)
         .arg("--version")
         .env("MAESTRO_CLI_NO_ANALYTICS", "1")
@@ -257,7 +255,7 @@ mod tests {
         std::fs::write(&script, "#!/bin/sh\nsleep 30\n").unwrap();
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         let started = Instant::now();
-        let err = maestro_version(script.as_os_str(), Duration::from_millis(300)).unwrap_err();
+        let err = runner_version(script.as_os_str(), Duration::from_millis(300)).unwrap_err();
         let _ = std::fs::remove_dir_all(&dir);
         assert!(err.contains("did not finish within"), "{err}");
         assert!(

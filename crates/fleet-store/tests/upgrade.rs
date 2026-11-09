@@ -46,7 +46,7 @@ const FINGERPRINT: &[(&str, &str)] = &[
     ),
     (
         "agent_runs",
-        "SELECT agent_version || '|' || protocol_version || '|' || state || '|' || maestro_exit_code || '|' || committed_seq FROM agent_runs ORDER BY 1",
+        "SELECT agent_version || '|' || protocol_version || '|' || state || '|' || runner_exit_code || '|' || committed_seq FROM agent_runs ORDER BY 1",
     ),
     (
         "suite_executions",
@@ -251,7 +251,7 @@ async fn seed(pool: &PgPool, release: &str) {
     sqlx::query(
         "INSERT INTO agent_runs (id, project_id, job_id, trust_level, run_day, agent_version,
                                  protocol_version, state, end_reason, committed_seq, end_seq,
-                                 maestro_exit_code, ended_at)
+                                 runner_exit_code, ended_at)
          VALUES ('00000000-0000-4000-8000-0000000000a6', '00000000-0000-4000-8000-0000000000a1',
                  '00000000-0000-4000-8000-0000000000a5', 'trusted',
                  (now() AT TIME ZONE 'UTC')::date, $1, 1, 'ended', 'completed', 3, 3, 1, now())",
@@ -354,7 +354,7 @@ async fn seed_artifacts(pool: &PgPool) {
             'checkout-failure.png', 'failure_evidence', 'available', now(), now()),
            ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000a1',
             '00000000-0000-4000-8000-0000000000a6', '00000000-0000-4000-8000-0000000000a5',
-            NULL, NULL, 'maestro_log', 'text/plain', 'text/plain', 11,
+            NULL, NULL, 'runner_log', 'text/plain', 'text/plain', 11,
             sha256(convert_to('rehearsal-log', 'UTF8')), 'maestro.log', 'maestro.log',
             'failure_evidence', 'available', now(), now());",
     )

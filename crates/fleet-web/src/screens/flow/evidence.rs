@@ -302,7 +302,7 @@ fn file_into(
             });
         }
         Some(ArtifactClass::HtmlReport) => files.report = Some(open()),
-        Some(ArtifactClass::MaestroLog) => {
+        Some(ArtifactClass::RunnerLog) => {
             files.log = Some(if a.size_bytes > MAX_LOG_BYTES {
                 LogSource::TooLarge(open())
             } else {
@@ -368,7 +368,7 @@ fn kind(class: Option<ArtifactClass>) -> &'static str {
         Some(ArtifactClass::FailureHierarchy) => "UI hierarchy",
         Some(ArtifactClass::Commands) => "commands.json",
         Some(ArtifactClass::Junit) => "JUnit report",
-        Some(ArtifactClass::MaestroLog) => "Maestro log",
+        Some(ArtifactClass::RunnerLog) => "Maestro log",
         Some(ArtifactClass::HtmlReport) => "Maestro HTML report",
         Some(ArtifactClass::DeviceLogcat) => "Device logcat excerpt",
         None => "Other file",
@@ -644,7 +644,7 @@ mod tests {
                 ),
                 artifact(
                     3,
-                    "maestro_log",
+                    "runner_log",
                     "maestro.log",
                     "text/plain",
                     1_703,
@@ -919,7 +919,7 @@ mod tests {
         let l = list(
             &[artifact(
                 3,
-                "maestro_log",
+                "runner_log",
                 "maestro.log",
                 "text/plain",
                 10,

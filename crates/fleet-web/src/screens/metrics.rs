@@ -87,7 +87,7 @@ pub struct MetricsPanel {
 
 const SCOPES: [(MetricScope, &str); 6] = [
     (MetricScope::Host, "Host (the machine)"),
-    (MetricScope::Maestro, "Maestro process"),
+    (MetricScope::Runner, "Maestro process"),
     (MetricScope::Agent, "Fleet agent"),
     (
         MetricScope::Emulator,
@@ -104,10 +104,9 @@ pub(crate) fn unit_of(unit: MetricUnit, scope: MetricScope) -> Unit {
         (MetricUnit::Bytes, _) => Unit::Bytes,
         (MetricUnit::Celsius, _) => Unit::Celsius,
         (MetricUnit::Number, _) => Unit::Number,
-        (
-            MetricUnit::Percent,
-            MetricScope::Maestro | MetricScope::Agent | MetricScope::Emulator,
-        ) => Unit::PercentOfCore,
+        (MetricUnit::Percent, MetricScope::Runner | MetricScope::Agent | MetricScope::Emulator) => {
+            Unit::PercentOfCore
+        }
         (MetricUnit::Percent, MetricScope::Host | MetricScope::Guest | MetricScope::Device) => {
             Unit::Percent
         }
@@ -201,7 +200,7 @@ impl MetricsPanel {
         self
     }
 
-    /// The newest reading of the first chart named `id` that has one, such as `maestro_cpu_pct`.
+    /// The newest reading of the first chart named `id` that has one, such as `runner_cpu_pct`.
     #[must_use]
     pub fn newest(&self, id: &str) -> Option<&Latest> {
         self.sections
@@ -417,8 +416,8 @@ mod tests {
          "reason": "the agent does not report this metric yet",
          "points": [{"at_ms": 1767261600000, "value": null, "available": false,
                      "reason": "the agent does not report this metric yet"}]},
-        {"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
-         "scope": "maestro", "available": true,
+        {"metric": "runner_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+         "scope": "runner", "available": true,
          "points": [{"at_ms": 1767261600000, "value": 180.0, "available": true}]},
         {"metric": "host_cpu_pct", "label": "Host CPU", "unit": "percent",
          "scope": "host", "available": true,
@@ -470,9 +469,9 @@ mod tests {
             ChartBody::Series(s) => s.metric.unit,
             ChartBody::Unavailable { .. } => panic!("{id} has readings"),
         };
-        assert_eq!(unit("maestro_cpu_pct"), Unit::PercentOfCore);
+        assert_eq!(unit("runner_cpu_pct"), Unit::PercentOfCore);
         assert_eq!(unit("host_cpu_pct"), Unit::Percent);
-        assert_eq!(chart(&p, "maestro_cpu_pct").unit_symbol, "% of one core");
+        assert_eq!(chart(&p, "runner_cpu_pct").unit_symbol, "% of one core");
         assert_eq!(chart(&p, "host_cpu_pct").unit_symbol, "%");
     }
 
@@ -552,17 +551,17 @@ mod tests {
       "from": "2026-01-01T10:00:00Z", "to": "2026-01-01T11:00:00Z",
       "resolution": "raw", "truncated": false,
       "series": [
-        {"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
-         "scope": "maestro", "run_id": "3f2a9c1d-0000-4000-8000-000000000001", "available": true,
+        {"metric": "runner_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+         "scope": "runner", "run_id": "3f2a9c1d-0000-4000-8000-000000000001", "available": true,
          "points": [{"at_ms": 1767261600000, "value": 100.0, "available": true}]},
-        {"metric": "maestro_cpu_pct", "label": "Maestro CPU", "unit": "percent",
-         "scope": "maestro", "run_id": "9b7e0d4c-0000-4000-8000-000000000002", "available": true,
+        {"metric": "runner_cpu_pct", "label": "Maestro CPU", "unit": "percent",
+         "scope": "runner", "run_id": "9b7e0d4c-0000-4000-8000-000000000002", "available": true,
          "points": [{"at_ms": 1767261600000, "value": 300.0, "available": true}]}
       ]
     }"#;
 
     #[test]
-    fn each_run_on_a_worker_is_its_own_maestro_line_labelled_by_its_run() {
+    fn each_run_on_a_worker_is_its_own_runner_line_labelled_by_its_run() {
         let p = panel(TWO_RUNS);
         assert_eq!(p.sections.len(), 1);
         let charts = &p.sections[0].charts;
@@ -591,8 +590,8 @@ mod tests {
         {"metric": "host_cpu_pct", "label": "Host CPU", "unit": "percent", "scope": "host",
          "aggregate": "avg", "available": true,
          "points": [{"at_ms": 1767225600000, "value": 20.0, "available": true}]},
-        {"metric": "maestro_rss_bytes", "label": "Maestro memory", "unit": "bytes",
-         "scope": "maestro", "aggregate": "max", "available": true,
+        {"metric": "runner_rss_bytes", "label": "Maestro memory", "unit": "bytes",
+         "scope": "runner", "aggregate": "max", "available": true,
          "points": [{"at_ms": 1767225600000, "value": 1073741824.0, "available": true}]},
         {"metric": "agent_cpu_pct", "label": "Agent CPU", "unit": "percent", "scope": "agent",
          "available": false, "reason": "not kept in aggregates; use a range of 24 hours or less",
@@ -610,7 +609,7 @@ mod tests {
             Some("Average per bucket")
         );
         assert_eq!(
-            chart(&p, "maestro_rss_bytes").aggregate_note,
+            chart(&p, "runner_rss_bytes").aggregate_note,
             Some("Maximum per bucket")
         );
         assert_eq!(

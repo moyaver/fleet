@@ -87,8 +87,8 @@ enum HostCol {
 
 #[derive(Clone, Copy)]
 enum ProcessCol {
-    MaestroCpu,
-    MaestroRss,
+    RunnerCpu,
+    RunnerRss,
     AgentCpu,
     AgentRss,
 }
@@ -122,7 +122,7 @@ const fn def<C>(
 }
 
 use MetricAggregate::{Avg, Max};
-use MetricScope::{Agent, Device, Emulator, Guest, Host, Maestro};
+use MetricScope::{Agent, Device, Emulator, Guest, Host, Runner};
 use MetricUnit::{Bytes, Celsius, Number, Percent};
 
 const HOST: [Def<HostCol>; 11] = [
@@ -220,19 +220,19 @@ const HOST: [Def<HostCol>; 11] = [
 /// run for each of them: Maestro's, and the agent's own.
 const PROCESS: [Def<ProcessCol>; 4] = [
     def(
-        "maestro_cpu_pct",
+        "runner_cpu_pct",
         "Maestro CPU",
         Percent,
-        Maestro,
-        Some(ProcessCol::MaestroCpu),
+        Runner,
+        Some(ProcessCol::RunnerCpu),
         Some(Avg),
     ),
     def(
-        "maestro_rss_bytes",
+        "runner_rss_bytes",
         "Maestro memory",
         Bytes,
-        Maestro,
-        Some(ProcessCol::MaestroRss),
+        Runner,
+        Some(ProcessCol::RunnerRss),
         Some(Max),
     ),
     def(
@@ -329,8 +329,8 @@ fn host_value(c: HostCol, r: &HostRow) -> Option<f64> {
 
 fn process_value(c: ProcessCol, r: &ProcessRow) -> Option<f64> {
     match c {
-        ProcessCol::MaestroCpu => r.maestro_cpu_pct,
-        ProcessCol::MaestroRss => r.maestro_rss_bytes,
+        ProcessCol::RunnerCpu => r.runner_cpu_pct,
+        ProcessCol::RunnerRss => r.runner_rss_bytes,
         ProcessCol::AgentCpu => r.agent_cpu_pct,
         ProcessCol::AgentRss => r.agent_rss_bytes,
     }

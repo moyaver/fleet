@@ -315,12 +315,12 @@ pub struct SampleUnavailable {
     /// Why `host_mem_total_bytes` is unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_mem_total_bytes: Option<Unavailable>,
-    /// Why `maestro_cpu_pct` is unknown.
+    /// Why `runner_cpu_pct` is unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub maestro_cpu_pct: Option<Unavailable>,
-    /// Why `maestro_rss_bytes` is unknown.
+    pub runner_cpu_pct: Option<Unavailable>,
+    /// Why `runner_rss_bytes` is unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub maestro_rss_bytes: Option<Unavailable>,
+    pub runner_rss_bytes: Option<Unavailable>,
     /// Why `agent_cpu_pct` is unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_cpu_pct: Option<Unavailable>,
@@ -357,8 +357,8 @@ impl SampleUnavailable {
         self.host_cpu_pct.is_none()
             && self.host_mem_used_bytes.is_none()
             && self.host_mem_total_bytes.is_none()
-            && self.maestro_cpu_pct.is_none()
-            && self.maestro_rss_bytes.is_none()
+            && self.runner_cpu_pct.is_none()
+            && self.runner_rss_bytes.is_none()
             && self.agent_cpu_pct.is_none()
             && self.agent_rss_bytes.is_none()
             && self.host_load_1m.is_none()
@@ -375,7 +375,7 @@ impl SampleUnavailable {
 ///
 /// Every reading carries its unit in its field name (`_pct` percent, `_bytes` bytes, `_cores`
 /// cores; the load average is a plain number), and its scope in its prefix: `host_` is the
-/// machine, `maestro_` the Maestro process of the run and `agent_` the agent itself (its
+/// machine, `runner_` the runner's process of the run (Maestro today) and `agent_` the agent itself (its
 /// supervisor and observer). A reading that is `None` has its reason in `unavailable`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -388,10 +388,10 @@ pub struct Sample {
     pub host_mem_used_bytes: Option<u64>,
     /// Host memory total, bytes.
     pub host_mem_total_bytes: Option<u64>,
-    /// Maestro's JVM: CPU percent of one core.
-    pub maestro_cpu_pct: Option<f32>,
-    /// Maestro's JVM: resident memory, bytes.
-    pub maestro_rss_bytes: Option<u64>,
+    /// The runner's process (Maestro's JVM): CPU percent of one core.
+    pub runner_cpu_pct: Option<f32>,
+    /// The runner's process (Maestro's JVM): resident memory, bytes.
+    pub runner_rss_bytes: Option<u64>,
     /// The agent itself (supervisor + observer): CPU percent of one core since the last sample
     /// (invariant I10).
     pub agent_cpu_pct: Option<f32>,
@@ -795,8 +795,8 @@ mod tests {
         // A sample from an agent that predates load, cores, swap and PSI.
         let old: Sample = serde_json::from_str(
             r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},"host_cpu_pct":12.5,
-                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"maestro_cpu_pct":null,
-                "maestro_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
+                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"runner_cpu_pct":null,
+                "runner_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
         )
         .unwrap();
         assert_eq!(
@@ -828,8 +828,8 @@ mod tests {
         // A sample from an agent that predates reasons: none is invented, and none is sent.
         let old: Sample = serde_json::from_str(
             r#"{"at":{"wall":"2026-01-01T00:00:00Z","mono_ms":0},"host_cpu_pct":12.5,
-                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"maestro_cpu_pct":null,
-                "maestro_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
+                "host_mem_used_bytes":1,"host_mem_total_bytes":2,"runner_cpu_pct":null,
+                "runner_rss_bytes":null,"agent_cpu_pct":null,"agent_rss_bytes":null}"#,
         )
         .unwrap();
         assert!(old.unavailable.is_empty());
@@ -848,15 +848,15 @@ mod tests {
                 host_psi_cpu_pct: Some(Unavailable::NoPsi),
                 host_psi_memory_pct: Some(Unavailable::NoPsi),
                 host_psi_io_pct: Some(Unavailable::NoPsi),
-                maestro_cpu_pct: Some(Unavailable::NoProcess),
-                maestro_rss_bytes: Some(Unavailable::NoProcess),
+                runner_cpu_pct: Some(Unavailable::NoProcess),
+                runner_rss_bytes: Some(Unavailable::NoProcess),
                 ..SampleUnavailable::default()
             },
             ..old
         };
         let wire = serde_json::to_value(&mac).unwrap();
         assert_eq!(wire["unavailable"]["host_psi_cpu_pct"], "no_psi");
-        assert_eq!(wire["unavailable"]["maestro_rss_bytes"], "no_process");
+        assert_eq!(wire["unavailable"]["runner_rss_bytes"], "no_process");
         assert!(
             wire["unavailable"].get("host_cpu_pct").is_none(),
             "a reading that has a value has no reason"

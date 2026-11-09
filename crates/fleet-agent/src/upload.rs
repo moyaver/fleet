@@ -852,7 +852,7 @@ mod tests {
 
     fn item(bytes: &[u8]) -> Item {
         Item {
-            class: ArtifactClass::MaestroLog,
+            class: ArtifactClass::RunnerLog,
             path: "maestro.log".into(),
             content_type: "text/plain",
             flow: None,
@@ -963,7 +963,7 @@ mod tests {
         assert_eq!(
             done,
             [Done {
-                class: ArtifactClass::MaestroLog,
+                class: ArtifactClass::RunnerLog,
                 path: "maestro.log".into(),
                 flow: None,
                 outcome: Outcome::Uploaded {
@@ -976,7 +976,7 @@ mod tests {
         let request: UploadRequest = serde_json::from_slice(&seen[0].body).unwrap();
         assert_eq!(request.sha256, HELLO_SHA);
         assert_eq!(request.size, 5);
-        assert_eq!(request.class, "maestro_log");
+        assert_eq!(request.class, "runner_log");
         assert_eq!(request.path, "maestro.log");
         assert_eq!(request.content_type, "text/plain");
         assert_eq!(request.agent_run_id, RUN);

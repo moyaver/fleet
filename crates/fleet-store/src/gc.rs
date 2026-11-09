@@ -408,7 +408,7 @@ mod tests {
         let shot = run
             .upload(ArtifactClass::FailureScreenshot, Some(flow), "shot")
             .await;
-        let log = run.upload(ArtifactClass::MaestroLog, None, "log").await;
+        let log = run.upload(ArtifactClass::RunnerLog, None, "log").await;
         let report = run.upload(ArtifactClass::Junit, None, "junit").await;
         // While the flow runs nothing is known: the defaults of research 05 §12.3.
         assert_eq!(
@@ -453,7 +453,7 @@ mod tests {
         let shot = run
             .upload(ArtifactClass::FailureScreenshot, Some(flow), "shot")
             .await;
-        let log = run.upload(ArtifactClass::MaestroLog, None, "log").await;
+        let log = run.upload(ArtifactClass::RunnerLog, None, "log").await;
 
         run.apply(4..run.events.len()).await;
 
@@ -509,10 +509,10 @@ mod tests {
         second.apply(0..4).await;
         // The same bytes, uploaded by two runs of one project, are one blob.
         let a = first
-            .upload(ArtifactClass::MaestroLog, None, "same bytes")
+            .upload(ArtifactClass::RunnerLog, None, "same bytes")
             .await;
         let b = second
-            .upload(ArtifactClass::MaestroLog, None, "same bytes")
+            .upload(ArtifactClass::RunnerLog, None, "same bytes")
             .await;
         assert_ne!(a, b);
         let blobs = sqlx::query_scalar!("SELECT count(*) FROM blobs")
@@ -600,7 +600,7 @@ mod tests {
         let first = run(pool, "6", true).await;
         first.apply(0..4).await;
         first
-            .upload(ArtifactClass::MaestroLog, None, "precious")
+            .upload(ArtifactClass::RunnerLog, None, "precious")
             .await;
         let t = OffsetDateTime::now_utc() + Time::days(31);
         first.store.expire_artifacts(t, None).await.unwrap();
@@ -616,7 +616,7 @@ mod tests {
             agent_run_id: second.handle.agent_run_id,
             flow_execution_id: None,
             step: None,
-            class: ArtifactClass::MaestroLog,
+            class: ArtifactClass::RunnerLog,
             path: "out/file",
             name: "file",
             content_type: "text/plain",
@@ -652,7 +652,7 @@ mod tests {
     async fn a_blob_being_deleted_cannot_be_reserved_until_it_is_forgotten(pool: PgPool) {
         let run = run(pool, "8", true).await;
         run.apply(0..4).await;
-        run.upload(ArtifactClass::MaestroLog, None, "doomed").await;
+        run.upload(ArtifactClass::RunnerLog, None, "doomed").await;
         let t = OffsetDateTime::now_utc() + Time::days(31);
         run.store.expire_artifacts(t, None).await.unwrap();
         let due = run
@@ -690,7 +690,7 @@ mod tests {
             agent_run_id: run.handle.agent_run_id,
             flow_execution_id: None,
             step: None,
-            class: ArtifactClass::MaestroLog,
+            class: ArtifactClass::RunnerLog,
             path: "out/file",
             name: "file",
             content_type: "text/plain",

@@ -11,15 +11,15 @@ use std::collections::HashSet;
 use fleet_core::{
     claims::{self, Claim, Resolution},
     reconcile::{self, FlowKey},
-    redact::{Redactor, redact_argv},
+    redact::Redactor,
 };
 use fleet_maestro::{ReportState, bundle, crash, junit, log, logcat, stdout};
 use fleet_protocol::{
     artifact::ArtifactClass,
     event::{
         AgentWarning, AppCrashed, ArtifactRegistered, EventBody, EvidenceSources, FailureInfo,
-        FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted, MaestroBuild, ProcessExited,
-        ReportParsed, ReportStatus, RunEnded, RunSignal, RunStarted, ShardAssigned, ShardMode,
+        FlowEnded, FlowOutcome, FlowRef, FlowReported, FlowStarted, ProcessExited, ReportParsed,
+        ReportStatus, RunEnded, RunSignal, RunStarted, RunnerBuild, ShardAssigned, ShardMode,
         StepEnded, StepStarted, StepStatus, StepTiming, SuiteStarted,
     },
     journal::{ClockSample, EventEnvelope, Provenance, SourceKind, StepRef, Subject},
@@ -203,7 +203,7 @@ pub(crate) struct Session {
     closed: bool,
     signalled: bool,
     /// The Maestro build the session log named, once it has.
-    maestro: Option<MaestroBuild>,
+    maestro: Option<RunnerBuild>,
     pub(crate) unrecognized_stdout: u32,
     /// adb's latest device list; `None` until adb has pushed one (so no device is known absent).
     devices: Option<std::collections::BTreeMap<String, fleet_protocol::event::AdbState>>,
@@ -331,14 +331,10 @@ impl Session {
             single_flow: None,
         };
         // Values of flags nobody classified, and `-e`/`--env` values, never leave (research 06 T5).
-        let argv_redacted: Vec<String> = redact_argv(
-            argv,
-            fleet_maestro::invocation::is_safe_value_flag,
-            fleet_maestro::invocation::is_boolean_flag,
-        )
-        .iter()
-        .map(|a| s.redactor.redact(a).into_owned())
-        .collect();
+        let argv_redacted: Vec<String> = fleet_maestro::redact::redact_argv(argv)
+            .iter()
+            .map(|a| s.redactor.redact(a).into_owned())
+            .collect();
         let reproduction = fleet_maestro::reproduce::reproduction(&argv_redacted);
         s.emit(
             at,
@@ -372,7 +368,7 @@ impl Session {
     }
 
     /// The Maestro build the session log named, if it has.
-    pub(crate) fn maestro(&self) -> Option<&MaestroBuild> {
+    pub(crate) fn maestro(&self) -> Option<&RunnerBuild> {
         self.maestro.as_ref()
     }
 
@@ -571,7 +567,8 @@ impl Session {
             Some(log::Event::MaestroVersion { version }) => {
                 // Once per run: Maestro writes its version at the start of the session log.
                 if self.maestro.is_none() {
-                    let build = MaestroBuild {
+                    let build = RunnerBuild {
+                        runner: "maestro".to_owned(),
                         version: self.redactor.redact(&version).into_owned(),
                         profile_supported: fleet_maestro::supports(&version),
                     };
@@ -580,7 +577,7 @@ impl Session {
                         Subject::default(),
                         SourceKind::DebugLog,
                         Some(parser),
-                        &EventBody::MaestroDetected(build.clone()),
+                        &EventBody::RunnerDetected(build.clone()),
                     );
                     self.maestro = Some(build);
                 }
@@ -1888,7 +1885,7 @@ mod tests {
                 reason: ReportReason::UserJunit,
             },
             debug_output: None,
-            maestro_log: true,
+            runner_log: true,
         };
         let mut s = Session::new(
             &["maestro".into(), "test".into()],

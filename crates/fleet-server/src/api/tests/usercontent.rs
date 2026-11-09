@@ -161,7 +161,7 @@ async fn every_screenshot_and_report_read_through_a_link_is_audited() {
         PNG,
     )
     .await;
-    let log = store(&rig, &run, "maestro_log", "m.log", "text/plain", b"ok\n").await;
+    let log = store(&rig, &run, "runner_log", "m.log", "text/plain", b"ok\n").await;
     let project = rig.store.project_id("app").await.unwrap().unwrap();
     let audited = || async {
         rig.store
@@ -206,7 +206,7 @@ async fn html_is_shown_sandboxed_and_everything_else_is_a_download() {
             "application/xml; charset=utf-8",
         ),
         (
-            "maestro_log",
+            "runner_log",
             "maestro.log",
             "text/plain",
             b"MFLT1|1|t|INFO|x|hello\n",

@@ -166,18 +166,18 @@
             "null"
           ]
         },
-        "maestro_log": {
-          "description": "Whether Maestro's log is made machine-readable by the agent.",
-          "type": "boolean"
-        },
         "report": {
           "$ref": "#/$defs/ReportSource",
           "description": "The JUnit report."
+        },
+        "runner_log": {
+          "description": "Whether the runner's log is made machine-readable by the agent.",
+          "type": "boolean"
         }
       },
       "required": [
         "report",
-        "maestro_log"
+        "runner_log"
       ],
       "type": "object"
     },
@@ -195,8 +195,8 @@
           "type": "string"
         },
         {
-          "const": "maestro_error",
-          "description": "Exit 1 with no failed flow seen and an expected report missing: Maestro or infrastructure\nerror. With no report requested, exit 1 is `Other` instead.",
+          "const": "runner_error",
+          "description": "Exit 1 with no failed flow seen and an expected report missing: the runner or infrastructure\nerror. With no report requested, exit 1 is `Other` instead.",
           "type": "string"
         },
         {
@@ -480,24 +480,6 @@
       },
       "required": [
         "name"
-      ],
-      "type": "object"
-    },
-    "MaestroBuild": {
-      "description": "The Maestro build the run's session log named: the payload of `maestro.detected`.",
-      "properties": {
-        "profile_supported": {
-          "description": "Whether the agent's parsers were built for this version. `false` marks the run degraded.",
-          "type": "boolean"
-        },
-        "version": {
-          "description": "The version as Maestro logged it, for example `2.12.1`.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "version",
-        "profile_supported"
       ],
       "type": "object"
     },
@@ -828,6 +810,29 @@
       "required": [
         "argv",
         "agent_version"
+      ],
+      "type": "object"
+    },
+    "RunnerBuild": {
+      "description": "The runner build the run's session log named: the payload of `runner.detected`.",
+      "properties": {
+        "profile_supported": {
+          "description": "Whether the agent's parsers were built for this version. `false` marks the run degraded.",
+          "type": "boolean"
+        },
+        "runner": {
+          "description": "The runner that logged the build: `maestro` for Maestro.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version as the runner logged it, for example `2.12.1`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "runner",
+        "version",
+        "profile_supported"
       ],
       "type": "object"
     },
@@ -1411,13 +1416,13 @@
       "type": "object"
     },
     {
-      "description": "See [`MaestroBuild`].",
+      "description": "See [`RunnerBuild`].",
       "properties": {
         "data": {
-          "$ref": "#/$defs/MaestroBuild"
+          "$ref": "#/$defs/RunnerBuild"
         },
         "type": {
-          "const": "maestro.detected",
+          "const": "runner.detected",
           "type": "string"
         }
       },

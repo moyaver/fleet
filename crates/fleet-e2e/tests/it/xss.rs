@@ -316,7 +316,7 @@ async fn upload_evidence(stack: &Stack, run: &str, flow: &str) {
         stack,
         run,
         flow,
-        ("maestro_log", "logs/maestro.log", "text/plain"),
+        ("runner_log", "logs/maestro.log", "text/plain"),
         log.as_bytes(),
         None,
     )

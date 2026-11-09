@@ -83,7 +83,7 @@ async fn collect(rig: &Rig, dirs: &Dirs, now: OffsetDateTime) {
 async fn an_expired_artifact_leaves_the_flow_and_its_blob_is_deleted_after_the_grace_period() {
     let (rig, dirs) = artifact_rig(|_| {}).await;
     let run = passing_run(&rig, "700").await;
-    let mut req = run_level(&run, "maestro_log", "text/plain", b"log line\n");
+    let mut req = run_level(&run, "runner_log", "text/plain", b"log line\n");
     req.flow_execution_id = Some(run.flow);
     available(&rig, &req, b"log line\n").await;
     assert_eq!(
@@ -133,7 +133,7 @@ async fn a_blob_two_artifacts_share_survives_until_the_last_of_them_expires() {
     let (rig, dirs) = artifact_rig(|_| {}).await;
     let run = passing_run(&rig, "710").await;
     // The same bytes as a log (30 days) and as a report (1 year): one blob.
-    let log = run_level(&run, "maestro_log", "text/plain", XML);
+    let log = run_level(&run, "runner_log", "text/plain", XML);
     let report = run_level(&run, "junit", "application/xml", XML);
     available(&rig, &log, XML).await;
     available(&rig, &report, XML).await;
@@ -224,7 +224,7 @@ async fn the_leader_schedule_deletes_old_orphan_objects_and_nothing_still_refere
 
     // A referenced blob, a day and a bit old: an artifact still names it, so it stays.
     let run = passing_run(&rig, "730").await;
-    let referenced = run_level(&run, "maestro_log", "text/plain", b"kept log\n");
+    let referenced = run_level(&run, "runner_log", "text/plain", b"kept log\n");
     available(&rig, &referenced, b"kept log\n").await;
     let referenced_path = object_path(&dirs, project, &Sha256Digest::of(b"kept log\n").to_string());
     set_age(&referenced_path, Duration::from_hours(48));
@@ -296,12 +296,12 @@ async fn a_three_day_range_is_served_from_rollups_and_missing_readings_stay_miss
     // Minute two: Maestro reported nothing at all.
     samples.extend(minute_of_samples(m1, |s, _| {
         s.host_cpu_pct = Some(50.0);
-        s.maestro_cpu_pct = None;
+        s.runner_cpu_pct = None;
     }));
     // Minute three: Maestro reported in the last four samples only.
     samples.extend(minute_of_samples(m2, |s, i| {
         s.host_cpu_pct = Some(60.0);
-        s.maestro_cpu_pct = (i >= 8).then_some(40.0);
+        s.runner_cpu_pct = (i >= 8).then_some(40.0);
     }));
     let mut agent = Agent::new("720", "build", "runner-a");
     rig.publish(&mut agent, vec![telemetry(1, samples)]).await;
@@ -312,7 +312,7 @@ async fn a_three_day_range_is_served_from_rollups_and_missing_readings_stay_miss
     rig.store.roll_up(now).await.unwrap();
 
     let path = format!(
-        "/api/v1/projects/app/workers/{worker}/metrics?from={}&to={}&metrics=host_cpu_pct,maestro_cpu_pct",
+        "/api/v1/projects/app/workers/{worker}/metrics?from={}&to={}&metrics=host_cpu_pct,runner_cpu_pct",
         (now - Time::days(3)).format(&Rfc3339).unwrap(),
         now.format(&Rfc3339).unwrap()
     );
@@ -354,7 +354,7 @@ async fn a_three_day_range_is_served_from_rollups_and_missing_readings_stay_miss
     // Maestro CPU: 80 % in minute one; unavailable (not 0) in minute two; the average of the
     // four readings there are in minute three.
     assert_eq!(
-        series("maestro_cpu_pct"),
+        series("runner_cpu_pct"),
         [
             (ms(m0), Some(80.0), true),
             (ms(m1), None, false),
@@ -365,7 +365,7 @@ async fn a_three_day_range_is_served_from_rollups_and_missing_readings_stay_miss
         .as_array()
         .unwrap()
         .iter()
-        .find(|s| s["metric"] == "maestro_cpu_pct")
+        .find(|s| s["metric"] == "runner_cpu_pct")
         .unwrap();
     assert_eq!(cpu["aggregate"], "avg");
 }

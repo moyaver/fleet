@@ -59,7 +59,7 @@ fn an_offline_run_keeps_a_bundle_and_its_exit_status() {
         .iter()
         .map(|a| a["class"].as_str().unwrap())
         .collect();
-    for class in ["failure_screenshot", "commands", "maestro_log"] {
+    for class in ["failure_screenshot", "commands", "runner_log"] {
         assert!(classes.contains(&class), "{class} in {classes:?}");
     }
     // The journal is the run's events, in order, and it ends the run.
@@ -86,7 +86,7 @@ fn the_bundle_holds_no_planted_secret_and_shows_where_it_was_redacted() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|a| a["class"] == "maestro_log")
+        .find(|a| a["class"] == "runner_log")
         .expect("the maestro log");
     let text = String::from_utf8_lossy(&all[log["file"].as_str().unwrap()]).into_owned();
     assert!(

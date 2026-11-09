@@ -30,7 +30,7 @@ use crate::{Result, Store, auth::Credential};
 pub fn default_retention(class: ArtifactClass) -> &'static str {
     match class {
         ArtifactClass::Junit | ArtifactClass::HtmlReport => "report",
-        ArtifactClass::MaestroLog | ArtifactClass::DeviceLogcat => "debug_log",
+        ArtifactClass::RunnerLog | ArtifactClass::DeviceLogcat => "debug_log",
         ArtifactClass::FailureScreenshot
         | ArtifactClass::FailureHierarchy
         | ArtifactClass::Commands => "success_evidence",
