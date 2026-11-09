@@ -117,11 +117,41 @@ pub struct Hierarchy {
     pub link: EvidenceLink,
 }
 
+/// What Maestro's own screenshot or recording is (issue #133).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaKind {
+    /// A `takeScreenshot` image: shown inline.
+    Screenshot,
+    /// A `startRecording` video: played in the page's own player.
+    Recording,
+}
+
+/// A screenshot or recording the flow took on purpose, shown on the step that made it (issue #133).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnMedia {
+    /// The artifact (the page keys its player by it, so a renewed link updates it in place).
+    pub id: Uuid,
+    /// What it is.
+    pub kind: MediaKind,
+    /// The step that made it, in the step tree's ids. `None` when the upload names no step.
+    pub step: Option<String>,
+    /// The step's description, when the flow's steps have one.
+    pub step_label: Option<String>,
+    /// File name.
+    pub name: String,
+    /// Size, with its unit.
+    pub size: String,
+    /// The signed URL now.
+    pub url: String,
+}
+
 /// Everything there is to show for a flow whose evidence can be opened.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceFiles {
     /// Failure screenshots in capture order, each tied to the step it was taken at.
     pub screenshots: Vec<Shot>,
+    /// Maestro's own screenshots and recordings of a failed flow, in capture order (issue #133).
+    pub own_media: Vec<OwnMedia>,
     /// UI hierarchies of failing steps, in capture order.
     pub hierarchies: Vec<Hierarchy>,
     /// The Maestro log, when one was uploaded.
@@ -235,6 +265,7 @@ impl Evidence {
         }
         let mut files = EvidenceFiles {
             screenshots: Vec::new(),
+            own_media: Vec::new(),
             hierarchies: Vec::new(),
             log: None,
             logcat: None,
@@ -254,6 +285,13 @@ impl Evidence {
             }
             file_into(&mut files, a, failed_step, steps);
         }
+        // Maestro's own media reads in the order its steps ran; the list's order is the upload's.
+        files.own_media.sort_by_key(|m| {
+            m.step
+                .as_deref()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(u64::MAX)
+        });
         Self::Files(Box::new(files))
     }
 }
@@ -299,6 +337,29 @@ fn file_into(
                 failed: failed_step.is_some_and(|f| f.id == step),
                 step,
                 link: open(),
+            });
+        }
+        Some(ArtifactClass::UserScreenshot | ArtifactClass::UserRecording) => {
+            // Its step is the one `artifacts[]` named, and no other: a file no step names shows
+            // none (I3), rather than the failed step it might not belong to.
+            let step = a.step.map(|s| s.to_string());
+            files.own_media.push(OwnMedia {
+                id: a.id,
+                kind: if class == Some(ArtifactClass::UserRecording) {
+                    MediaKind::Recording
+                } else {
+                    MediaKind::Screenshot
+                },
+                step_label: step.as_ref().and_then(|id| {
+                    steps
+                        .iter()
+                        .find(|s| &s.id == id)
+                        .and_then(|s| s.label.clone())
+                }),
+                step,
+                name: a.name.clone(),
+                size: size.clone(),
+                url: link.url.clone(),
             });
         }
         Some(ArtifactClass::HtmlReport) => files.report = Some(open()),
@@ -371,6 +432,8 @@ fn kind(class: Option<ArtifactClass>) -> &'static str {
         Some(ArtifactClass::RunnerLog) => "Maestro log",
         Some(ArtifactClass::HtmlReport) => "Maestro HTML report",
         Some(ArtifactClass::DeviceLogcat) => "Device logcat excerpt",
+        Some(ArtifactClass::UserScreenshot) => "Maestro screenshot",
+        Some(ArtifactClass::UserRecording) => "Maestro recording",
         None => "Other file",
     }
 }
@@ -804,6 +867,129 @@ mod tests {
     }
 
     /// The device logcat excerpt of a failed flow is offered as a download with its own label
+    /// Maestro's own screenshot and recording of the flow, named the steps that made them, plus a
+    /// screenshot no step names (issue #133).
+    fn own_media_files() -> EvidenceFiles {
+        let mut shot = artifact(
+            7,
+            "user_screenshot",
+            "fleet-before-fail.png",
+            "image/png",
+            2_048,
+            Some("https://uc.example.net/u/p/7/1/s/fleet-before-fail.png"),
+        );
+        shot["flow_execution_id"] = serde_json::json!(FLOW);
+        shot["step"] = serde_json::json!(4);
+        let mut rec = artifact(
+            8,
+            "user_recording",
+            "fleet-fail-recording.mp4",
+            "video/mp4",
+            4_096,
+            Some("https://uc.example.net/u/p/8/1/s/fleet-fail-recording.mp4"),
+        );
+        rec["flow_execution_id"] = serde_json::json!(FLOW);
+        rec["step"] = serde_json::json!(5);
+        let mut loose = artifact(
+            9,
+            "user_screenshot",
+            "loose.png",
+            "image/png",
+            2_048,
+            Some("https://uc.example.net/u/p/9/1/s/loose.png"),
+        );
+        loose["flow_execution_id"] = serde_json::json!(FLOW);
+        let steps = vec![
+            step("4", "Take screenshot fleet-before-fail"),
+            step("5", "Start recording fleet-fail-recording"),
+            step("8", "Assert condition"),
+        ];
+        // The recording is listed first: the page reads the media in step order anyway.
+        files(Evidence::build(
+            &list(&[rec, shot, loose], Some(UC)),
+            FLOW,
+            steps.last(),
+            &steps,
+        ))
+    }
+
+    /// A screenshot or recording the flow made on purpose is shown on the step that made it, as its
+    /// own kind (issue #133): an image for the screenshot, a video for the recording. It is not a
+    /// failure screenshot, and no step is guessed for a file no step names.
+    #[test]
+    fn a_users_screenshot_and_recording_are_shown_on_the_step_that_made_them() {
+        let f = own_media_files();
+        assert_eq!(
+            f.own_media[..2],
+            [
+                OwnMedia {
+                    id: Uuid::from_u128(7),
+                    kind: MediaKind::Screenshot,
+                    step: Some("4".to_owned()),
+                    step_label: Some("Take screenshot fleet-before-fail".to_owned()),
+                    name: "fleet-before-fail.png".to_owned(),
+                    size: "2 KiB".to_owned(),
+                    url: "https://uc.example.net/u/p/7/1/s/fleet-before-fail.png".to_owned(),
+                },
+                OwnMedia {
+                    id: Uuid::from_u128(8),
+                    kind: MediaKind::Recording,
+                    step: Some("5".to_owned()),
+                    step_label: Some("Start recording fleet-fail-recording".to_owned()),
+                    name: "fleet-fail-recording.mp4".to_owned(),
+                    size: "4 KiB".to_owned(),
+                    url: "https://uc.example.net/u/p/8/1/s/fleet-fail-recording.mp4".to_owned(),
+                },
+            ]
+        );
+        assert_eq!(
+            f.own_media[2].step, None,
+            "no step names it, so none is shown"
+        );
+        assert_eq!(f.own_media[2].step_label, None);
+        assert!(f.screenshots.is_empty(), "not a failure screenshot");
+        assert!(
+            f.downloads.is_empty(),
+            "shown inline, not offered as a download"
+        );
+        assert!(
+            !f.mounts().screenshots,
+            "the failure screenshots' viewer is unaffected by Maestro's own media"
+        );
+    }
+
+    /// A refused recording is listed with its reason and no player (issue #133).
+    #[test]
+    fn a_refused_recording_is_listed_with_its_reason_and_no_player() {
+        let mut rec = artifact(
+            10,
+            "user_recording",
+            "fleet-rec.mp4",
+            "video/mp4",
+            4_096,
+            None,
+        );
+        rec["flow_execution_id"] = serde_json::json!(FLOW);
+        rec["state"] = serde_json::json!("rejected");
+        rec["reject_reason"] = serde_json::json!("type_not_allowed");
+        let steps = steps();
+        let f = files(Evidence::build(
+            &list(&[rec], Some(UC)),
+            FLOW,
+            steps.last(),
+            &steps,
+        ));
+        assert_eq!(f.own_media, Vec::<OwnMedia>::new());
+        assert_eq!(
+            f.refused,
+            [Refused {
+                name: "fleet-rec.mp4".to_owned(),
+                kind: "Maestro recording",
+                reason: "the content is not a type this kind of file may have".to_owned(),
+            }]
+        );
+    }
+
     /// (issue #75): the link opens the excerpt, and the failure's step tree is unchanged.
     #[test]
     fn a_device_logcat_excerpt_is_a_download_labelled_as_such() {

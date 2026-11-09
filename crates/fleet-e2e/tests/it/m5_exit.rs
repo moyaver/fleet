@@ -64,17 +64,25 @@ async fn evidence_stack_with_link_ttl(link_ttl_seconds: u64) -> (Stack, u16) {
 /// Runs the real agent to the end on `fixture` (Maestro exits 1: a flow fails); when this returns
 /// the agent process is gone, its uploads are done, and the server has stored the run's end.
 async fn run_agent_to_the_end(stack: &Stack, fixture: &str) {
+    run_agent_to_the_end_with(stack, fixture, &[]).await;
+}
+
+/// [`run_agent_to_the_end`] with `extra` in the agent's environment.
+async fn run_agent_to_the_end_with(stack: &Stack, fixture: &str, extra: &[(&str, &str)]) {
     let (ws, key) = (stack.ws_url(), stack.key.clone());
     let fixture = fixture.to_owned();
+    let extra: Vec<(String, String)> = extra
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .collect();
     let out = tokio::task::spawn_blocking(move || {
-        support::run_agent(
-            &fixture,
-            &[
-                ("FLEET_SERVER", &ws),
-                ("FLEET_TOKEN", &key),
-                ("FLEET_UPLOAD_TIMEOUT", "30"),
-            ],
-        )
+        let mut env: Vec<(&str, &str)> = vec![
+            ("FLEET_SERVER", &ws),
+            ("FLEET_TOKEN", &key),
+            ("FLEET_UPLOAD_TIMEOUT", "30"),
+        ];
+        env.extend(extra.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+        support::run_agent(&fixture, &env)
     })
     .await
     .unwrap();
@@ -280,16 +288,16 @@ async fn check_screenshot(page: &Page<'_>, stack: &Stack, port: u16) {
         status, 404,
         "the dashboard's origin does not serve artifacts"
     );
-    // The dashboard's policy names that origin, and only in the two directives that need it.
+    // The dashboard's policy names that origin, and only in the three directives that need it.
     let (status, head, _) = get_as(stack.addr(), &format!("127.0.0.1:{port}"), "/").await;
     assert_eq!(status, 200);
     assert!(
         head.contains(&format!(
-            "img-src 'self' blob: {usercontent}; connect-src 'self' {usercontent}; frame-ancestors 'none'"
+            "img-src 'self' blob: {usercontent}; connect-src 'self' {usercontent}; media-src {usercontent}; frame-ancestors 'none'"
         )),
         "{head}"
     );
-    assert_eq!(head.matches(&usercontent).count(), 2, "{head}");
+    assert_eq!(head.matches(&usercontent).count(), 3, "{head}");
 }
 
 /// The log opens on the failing step of this flow, follows the step tree, and jumps back.
@@ -512,6 +520,132 @@ async fn an_app_crash_is_shown_above_maestros_failure_with_its_logcat() {
 
     assert!(page.never_reloaded().await);
     assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// Issue #133: Maestro's own screenshot and recording of a failed flow are shown on the step that
+/// made them: the image inline, the recording in the browser's own player, which loads it from the
+/// usercontent origin with no script and no violation of the dashboard's policy.
+#[tokio::test]
+async fn a_failed_flows_own_screenshot_and_recording_are_shown_on_their_step() {
+    let (stack, port) = evidence_stack().await;
+    run_agent_to_the_end_with(
+        &stack,
+        "user-media-fail",
+        &[("FLEET_UPLOAD_USER_MEDIA", "1")],
+    )
+    .await;
+    let flow = flow_id(&stack, "user-media-fail").await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    page.wait(
+        "the flow's name",
+        &has_text(&q("flow-title"), "user-media-fail"),
+    )
+    .await;
+    page.wait(
+        "Maestro's own image and recording",
+        &format!(
+            "{} === 1 && {} === 1",
+            count_of(&q("own-media-image")),
+            count_of(&q("own-media-video"))
+        ),
+    )
+    .await;
+
+    // Each sits under the step that made it: the screenshot is step 4, the recording step 5.
+    let items = page.texts(&q("own-media-item")).await;
+    assert_eq!(items.len(), 2, "{items:?}");
+    assert!(
+        items[0].contains("fleet-before-fail.png") && items[0].starts_with("Take screenshot"),
+        "the screenshot is on its step: {items:?}"
+    );
+    assert!(
+        items[1].contains("fleet-fail-recording.mp4") && items[1].starts_with("Start recording"),
+        "the recording is on its step: {items:?}"
+    );
+
+    // The image decodes from the usercontent origin, and the video's metadata loads from there.
+    page.wait(
+        "the image decodes",
+        &format!(
+            "document.querySelector('{}').complete && document.querySelector('{}').naturalWidth > 0",
+            q("own-media-image"),
+            q("own-media-image")
+        ),
+    )
+    .await;
+    page.wait(
+        "the recording's metadata loads",
+        &format!(
+            "document.querySelector('{}').readyState >= 1",
+            q("own-media-video")
+        ),
+    )
+    .await;
+    let shape = page
+        .eval(
+            &format!(
+                "const v = document.querySelector('{}'), i = document.querySelector('{}');\
+                 return {{ video: v.tagName, controls: v.controls, src: v.currentSrc,\
+                           image: i.getAttribute('src') }};",
+                q("own-media-video"),
+                q("own-media-image")
+            ),
+            vec![],
+        )
+        .await;
+    let video_src = shape["src"].as_str().unwrap();
+    assert_eq!(shape["video"], "VIDEO", "{shape}");
+    assert_eq!(shape["controls"], true, "{shape}");
+    assert!(
+        video_src.starts_with(&format!("http://localhost:{port}/u/")),
+        "the recording comes from the usercontent origin: {video_src}"
+    );
+    assert!(
+        shape["image"]
+            .as_str()
+            .unwrap()
+            .starts_with(&format!("http://localhost:{port}/u/")),
+        "{shape}"
+    );
+    assert_eq!(browser.csp_violations().await, Vec::<String>::new());
+    browser.quit().await;
+}
+
+/// Without the switch, a failed flow's own screenshot and recording are never uploaded, so screen D
+/// shows no Maestro media and says nothing about it (issue #133).
+#[tokio::test]
+async fn without_the_switch_a_failed_flow_shows_no_own_media() {
+    let (stack, port) = evidence_stack().await;
+    run_agent_to_the_end(&stack, "user-media-fail").await;
+    let flow = flow_id(&stack, "user-media-fail").await;
+    let browser = Browser::launch().await;
+    let page = Page {
+        client: &browser.client,
+    };
+    browser
+        .client
+        .goto(&format!("http://127.0.0.1:{port}/flows/{flow}?project=app"))
+        .await
+        .unwrap();
+    page.mark_loaded().await;
+    // The evidence has loaded once the failure screenshot is mounted.
+    page.wait(
+        "the failure screenshot",
+        &format!("{} === 1", count_of(&q("screenshots"))),
+    )
+    .await;
+    assert_eq!(page.count(&q("own-media")).await, 0);
+    assert_eq!(page.count(&q("own-media-item")).await, 0);
     browser.quit().await;
 }
 

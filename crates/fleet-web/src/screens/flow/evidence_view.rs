@@ -33,7 +33,7 @@ use crate::screens::{
     flow::{
         evidence::{
             CommandRow, Evidence, EvidenceFiles, EvidenceLink, Hierarchy, Load, LogEvidence,
-            LogMount, LogSource, Refused, command_rows,
+            LogMount, LogSource, MediaKind, OwnMedia, Refused, command_rows,
         },
         model::evidence_steps,
     },
@@ -184,7 +184,100 @@ pub fn EvidencePane(
                         })
                 }}
             </div>
+            <OwnMediaList feed />
         </section>
+    }
+}
+
+/// Maestro's own screenshots and recordings of the flow, each on the step that made it (issue #133):
+/// an image inline, a recording in the page's own player. Both come from the usercontent origin
+/// through their signed links, and carry no mark: they are evidence, as the failure screenshots are.
+#[component]
+fn OwnMediaList(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+) -> impl IntoView {
+    let media = move || feed.files_with(|f| f.own_media.clone()).unwrap_or_default();
+    move || {
+        let items = media();
+        (!items.is_empty()).then(|| {
+            view! {
+                <section class="card-b space-y-4 border-t border-line" aria-labelledby="own-media-h" data-testid="own-media">
+                    <h3 id="own-media-h" class="text-sm font-medium">"Maestro's own screenshots and recordings"</h3>
+                    <ul class="space-y-6">
+                        <For
+                            each=move || media()
+                            key=|m| m.id
+                            children=move |m| view! { <OwnMediaItem feed item=m /> }
+                        />
+                    </ul>
+                </section>
+            }
+        })
+    }
+}
+
+/// One of Maestro's own files. Its link is read from the feed, so a renewal changes the `src` of the
+/// element it mounted, and nothing else is rebuilt.
+#[component]
+fn OwnMediaItem(
+    /// What the route fetched.
+    feed: EvidenceFeed,
+    /// The file, as the list had it when it appeared.
+    item: OwnMedia,
+) -> impl IntoView {
+    let url = move || {
+        feed.files_with(|f| {
+            f.own_media
+                .iter()
+                .find(|m| m.id == item.id)
+                .map(|m| m.url.clone())
+        })
+        .flatten()
+        .unwrap_or_default()
+    };
+    // The step's description, as the hierarchies name a step; without one, its id as they do.
+    let caption = match (&item.step_label, &item.step) {
+        (Some(label), _) => label.clone(),
+        (None, Some(step)) => format!("step {step}"),
+        (None, None) => "Not tied to a step".to_owned(),
+    };
+    let meta = format!("{} · {}", item.name, item.size);
+    let player = match item.kind {
+        MediaKind::Screenshot => view! {
+            <img
+                class="max-w-full h-auto border border-border"
+                src=url
+                alt=item.name.clone()
+                loading="lazy"
+                data-testid="own-media-image"
+            />
+        }
+        .into_any(),
+        // No script: the browser's own controls play the file, which the usercontent origin serves
+        // inline with its sandbox headers (invariant I7).
+        MediaKind::Recording => view! {
+            <video
+                class="max-w-full h-auto border border-border"
+                controls=true
+                preload="metadata"
+                src=url
+                aria-label=item.name.clone()
+                data-testid="own-media-video"
+            >
+                <a class="underline" href=url>{item.name.clone()}</a>
+            </video>
+        }
+        .into_any(),
+    };
+    view! {
+        <li class="space-y-2" data-testid="own-media-item">
+            <p class="text-sm">
+                <span class="font-medium">{caption}</span>
+                <span class="ml-2 text-muted">{meta}</span>
+            </p>
+            {player}
+        </li>
     }
 }
 
