@@ -804,16 +804,7 @@ impl<'a> Ctx<'a> {
             .filter(relative)
             .or_else(|| b.junit.file.as_deref().filter(relative));
         if let Some(file) = identity {
-            let def = sqlx::query_scalar!(
-                "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)
-                 ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name
-                 RETURNING id",
-                self.run.project_id,
-                file,
-                b.junit.name
-            )
-            .fetch_one(&mut *tx)
-            .await?;
+            let def = flow_definition(tx, self.run.project_id, file, &b.junit.name).await?;
             sqlx::query!(
                 "UPDATE flow_executions SET flow_definition_id = $2 WHERE id = $1",
                 flow,
@@ -1163,4 +1154,109 @@ fn settled_span(t: &StepTiming) -> Option<(OffsetDateTime, OffsetDateTime)> {
         OffsetDateTime::from_unix_timestamp_nanos(i128::from(t.started_ms) * 1_000_000).ok()?;
     let length = time::Duration::milliseconds(i64::try_from(t.duration_ms).ok()?);
     Some((started, started.checked_add(length)?))
+}
+
+/// The definition row of a flow's repository path, renamed to `name` when that changed. A known
+/// name is read rather than upserted: an upsert locks the row until the batch commits, and every
+/// batch of a run that names the same flow would queue behind that lock (#141).
+async fn flow_definition(
+    tx: &mut PgConnection,
+    project: Uuid,
+    path: &str,
+    name: &str,
+) -> Result<Uuid, sqlx::Error> {
+    let known = sqlx::query!(
+        "SELECT id, last_name FROM flow_definitions WHERE project_id = $1 AND repo_path = $2",
+        project,
+        path
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(row) = known
+        && row.last_name.as_deref() == Some(name)
+    {
+        return Ok(row.id);
+    }
+    sqlx::query_scalar!(
+        "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)
+         ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name
+         RETURNING id",
+        project,
+        path,
+        name
+    )
+    .fetch_one(&mut *tx)
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use sqlx::PgPool;
+    use uuid::Uuid;
+
+    use super::flow_definition;
+
+    async fn seed_project(pool: &PgPool) -> Uuid {
+        sqlx::query_scalar(
+            "INSERT INTO projects (slug, name) VALUES ('mobile-app', 'Mobile') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Another batch's open transaction holds the flow's row: a batch that names the flow as
+    /// it already is must not wait for that row (#141: the fleet queued behind it).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_known_flow_name_does_not_wait_for_the_row(pool: PgPool) {
+        let project = seed_project(&pool).await;
+        let mut tx = pool.begin().await.unwrap();
+        let first = flow_definition(&mut tx, project, "flows/a.yaml", "A")
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut holder = pool.begin().await.unwrap();
+        sqlx::query("SELECT id FROM flow_definitions WHERE id = $1 FOR UPDATE")
+            .bind(first)
+            .execute(&mut *holder)
+            .await
+            .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        let again = tokio::time::timeout(
+            Duration::from_secs(5),
+            flow_definition(&mut tx, project, "flows/a.yaml", "A"),
+        )
+        .await
+        .expect("a batch naming a known flow waited for another transaction's row lock")
+        .unwrap();
+        assert_eq!(again, first);
+        tx.commit().await.unwrap();
+        holder.rollback().await.unwrap();
+    }
+
+    /// A new name still renames the flow: the read path only skips the write when nothing changed.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_new_name_renames_the_flow(pool: PgPool) {
+        let project = seed_project(&pool).await;
+        let mut tx = pool.begin().await.unwrap();
+        let id = flow_definition(&mut tx, project, "flows/a.yaml", "A")
+            .await
+            .unwrap();
+        let renamed = flow_definition(&mut tx, project, "flows/a.yaml", "Renamed")
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(renamed, id);
+        let last: Option<String> =
+            sqlx::query_scalar("SELECT last_name FROM flow_definitions WHERE id = $1")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(last.as_deref(), Some("Renamed"));
+    }
 }

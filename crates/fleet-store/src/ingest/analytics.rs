@@ -110,16 +110,12 @@ async fn load(tx: &mut PgConnection, flows: &[Uuid]) -> Result<Vec<Flow>, sqlx::
 
 async fn store_condition(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx::Error> {
     let fingerprint = flow.conditions.fingerprint();
-    let condition = sqlx::query_scalar!(
-        "INSERT INTO condition_fingerprints (project_id, fingerprint, dims)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (project_id, fingerprint) DO UPDATE SET dims = condition_fingerprints.dims
-         RETURNING id",
+    let condition = condition_id(
+        tx,
         flow.project_id,
         fingerprint.as_bytes().as_slice(),
-        serde_json::to_value(flow.conditions.dims()).unwrap_or_default()
+        serde_json::to_value(flow.conditions.dims()).unwrap_or_default(),
     )
-    .fetch_one(&mut *tx)
     .await?;
     sqlx::query!(
         "UPDATE flow_executions SET condition_fingerprint_id = $2
@@ -130,6 +126,38 @@ async fn store_condition(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx:
     .execute(&mut *tx)
     .await?;
     Ok(())
+}
+
+/// The row of a condition fingerprint, read first. An upsert locks the row until the batch
+/// commits, so the batches of a fleet that share conditions would queue on it (#141); a known
+/// fingerprint needs no write, as its `dims` never change.
+async fn condition_id(
+    tx: &mut PgConnection,
+    project: Uuid,
+    fingerprint: &[u8],
+    dims: serde_json::Value,
+) -> Result<Uuid, sqlx::Error> {
+    if let Some(id) = sqlx::query_scalar!(
+        "SELECT id FROM condition_fingerprints WHERE project_id = $1 AND fingerprint = $2",
+        project,
+        fingerprint
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    {
+        return Ok(id);
+    }
+    sqlx::query_scalar!(
+        "INSERT INTO condition_fingerprints (project_id, fingerprint, dims)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (project_id, fingerprint) DO UPDATE SET dims = condition_fingerprints.dims
+         RETURNING id",
+        project,
+        fingerprint,
+        dims
+    )
+    .fetch_one(&mut *tx)
+    .await
 }
 
 async fn store_failure(tx: &mut PgConnection, flow: &Flow) -> Result<(), sqlx::Error> {
@@ -631,5 +659,43 @@ mod tests {
         assert!(rows.iter().all(|r| !r.default));
         assert_eq!(rows[0].condition, rows[1].condition);
         assert_eq!(rows[0].condition.len(), 32);
+    }
+
+    /// A condition that another batch's open transaction holds is read without waiting: the
+    /// batches of a fleet that share conditions must not queue on one row (#141).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_known_condition_does_not_wait_for_the_row(pool: PgPool) {
+        let project: uuid::Uuid = sqlx::query_scalar(
+            "INSERT INTO projects (slug, name) VALUES ('mobile-app', 'Mobile') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fingerprint = [7u8; 32];
+        let dims = serde_json::json!({ "device_model": "pixel" });
+        let mut tx = pool.begin().await.unwrap();
+        let first = super::condition_id(&mut tx, project, &fingerprint, dims.clone())
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut holder = pool.begin().await.unwrap();
+        sqlx::query("SELECT id FROM condition_fingerprints WHERE id = $1 FOR UPDATE")
+            .bind(first)
+            .execute(&mut *holder)
+            .await
+            .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        let again = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            super::condition_id(&mut tx, project, &fingerprint, dims),
+        )
+        .await
+        .expect("a known condition waited for another transaction's row lock")
+        .unwrap();
+        assert_eq!(again, first);
+        tx.commit().await.unwrap();
+        holder.rollback().await.unwrap();
     }
 }

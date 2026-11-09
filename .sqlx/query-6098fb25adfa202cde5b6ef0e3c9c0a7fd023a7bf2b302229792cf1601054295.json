@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)\n                 ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name\n                 RETURNING id",
+  "query": "INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3)\n         ON CONFLICT (project_id, repo_path) DO UPDATE SET last_name = EXCLUDED.last_name\n         RETURNING id",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "d32343b4fb48887659ec9794e4da711710411d3fa230525eb604c64078a4c611"
+  "hash": "6098fb25adfa202cde5b6ef0e3c9c0a7fd023a7bf2b302229792cf1601054295"
 }
