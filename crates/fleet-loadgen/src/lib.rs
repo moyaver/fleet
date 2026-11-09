@@ -10,6 +10,7 @@
 //! - `job_keys`: agents share job keys (overlapping job names in one pipeline attempt);
 //! - `storm`: every agent drops its connection at its half-way point and reconnects at once;
 //! - `duplicates`: batches are resent and shuffled (the server sorts and skips duplicates);
+//! - `reorder`: batches go out in reverse, without resends (the server sorts them);
 //! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
@@ -75,6 +76,8 @@ pub struct Options {
     pub storm: bool,
     /// Resend and shuffle batches.
     pub duplicates: bool,
+    /// Send every batch in reverse order, without resends: the server must sort what arrives.
+    pub reorder: bool,
     /// Pause between batches, to stretch a run over time.
     pub pace: Duration,
     /// Give up on an agent after this long.
@@ -117,6 +120,7 @@ impl Default for Options {
             batch: 32,
             storm: false,
             duplicates: false,
+            reorder: false,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
             commit: None,
@@ -796,6 +800,27 @@ async fn agent(
     Ok(report)
 }
 
+/// The events one batch puts on the wire: `events[from..to]`, with the resends and the reordering
+/// the scenario asks for.
+fn wire_batch(
+    events: &[EventEnvelope],
+    from: usize,
+    to: usize,
+    opts: &Options,
+) -> Vec<EventEnvelope> {
+    let mut batch: Vec<EventEnvelope> = events.get(from..to).unwrap_or_default().to_vec();
+    if opts.duplicates && from > 0 {
+        // Resend a few already-sent events.
+        let back = from.saturating_sub(opts.batch / 2);
+        batch.extend(events.get(back..from).unwrap_or_default().iter().cloned());
+    }
+    if opts.duplicates || opts.reorder {
+        // The batch goes out in reverse: the server sorts it by `seq` before it applies it.
+        batch.reverse();
+    }
+    batch
+}
+
 /// A reconnect's jitter: a fraction in `[0, 1)` from OS randomness. The clock's sub-second bits
 /// are no source: macOS clocks have microsecond resolution, so their nanoseconds are multiples of
 /// 1000 and `nanos % 1000` was always zero, which retried a refused reconnect at once (issue #138;
@@ -860,13 +885,7 @@ async fn stream(
                 to = to.min(stop);
             }
         }
-        let mut batch: Vec<EventEnvelope> = events.get(from..to).unwrap_or_default().to_vec();
-        if opts.duplicates && from > 0 {
-            // Resend a few already-sent events and shuffle the batch.
-            let back = from.saturating_sub(opts.batch / 2);
-            batch.extend(events.get(back..from).unwrap_or_default().iter().cloned());
-            batch.reverse();
-        }
+        let batch = wire_batch(events, from, to, opts);
         ws.send(frame(&ClientFrame::Events { events: batch }))
             .await?;
         sent = u64::try_from(to).unwrap_or(u64::MAX);
@@ -1001,6 +1020,40 @@ mod tests {
             fractions.iter().any(|f| *f > 0.0),
             "the jitter never left zero"
         );
+    }
+
+    fn seqs(events: &[EventEnvelope]) -> Vec<u64> {
+        events.iter().map(|e| e.seq).collect()
+    }
+
+    #[test]
+    fn a_batch_goes_out_in_reverse_only_when_the_scenario_reorders_it() {
+        let s = script(0, &Options::default(), Instant::now());
+        let plain = wire_batch(&s.events, 0, 4, &Options::default());
+        assert_eq!(seqs(&plain), [1, 2, 3, 4]);
+        let reordered = wire_batch(
+            &s.events,
+            0,
+            4,
+            &Options {
+                reorder: true,
+                ..Options::default()
+            },
+        );
+        assert_eq!(seqs(&reordered), [4, 3, 2, 1]);
+    }
+
+    #[test]
+    fn duplicates_resend_the_half_batch_before_it_and_shuffle_all() {
+        let opts = Options {
+            batch: 4,
+            duplicates: true,
+            ..Options::default()
+        };
+        let s = script(0, &opts, Instant::now());
+        // Events 5..=8 go out with 3 and 4 resent, all reversed.
+        let batch = wire_batch(&s.events, 4, 8, &opts);
+        assert_eq!(seqs(&batch), [4, 3, 8, 7, 6, 5]);
     }
 
     #[test]
