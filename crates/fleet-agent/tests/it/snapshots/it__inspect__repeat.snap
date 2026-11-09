@@ -1,0 +1,35 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "repeat",
+      "path": "<REPO>/examples/flows/phase0/repeat.yaml",
+      "outcome": "passed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 13,
+      "failure": null
+    }
+  ],
+  "events": 50,
+  "event_types": {
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 26,
+    "step.started": 13,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}

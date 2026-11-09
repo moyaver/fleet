@@ -1,0 +1,8 @@
+appId: com.fleet.anr
+name: app-crash
+---
+- launchApp
+- tapOn: "Crash app"
+- extendedWaitUntil:
+    visible: "Fleet never shows this"
+    timeout: 20000

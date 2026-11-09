@@ -1,0 +1,17 @@
+11-09 03:49:52.165 E/AndroidRuntime( 3789): Process: com.fleet.anr, PID: 3789
+11-09 03:49:52.165 E/AndroidRuntime( 3789): java.lang.RuntimeException: Fleet app crash
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.fleet.anr.MainActivity.lambda$onCreate$1(MainActivity.java:36)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.fleet.anr.MainActivity$$ExternalSyntheticLambda1.onClick(D8$$SyntheticClass:0)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.performClick(View.java:7506)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.performClickInternal(View.java:7483)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.-$$Nest$mperformClickInternal(Unknown Source:0)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View$PerformClick.run(View.java:29334)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Handler.handleCallback(Handler.java:942)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Looper.loopOnce(Looper.java:201)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Looper.loop(Looper.java:288)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.app.ActivityThread.main(ActivityThread.java:7872)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at java.lang.reflect.Method.invoke(Native Method)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:936)
+

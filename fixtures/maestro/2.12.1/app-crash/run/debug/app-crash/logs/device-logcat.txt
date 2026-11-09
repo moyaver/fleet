@@ -1,0 +1,197 @@
+--------- beginning of system
+11-09 03:49:49.674 I/ActivityManager(  602): Force stopping com.fleet.anr appid=10098 user=0: from pid 3781
+11-09 03:49:49.674 D/OomAdjuster(  602): Not killing cached processes
+--------- beginning of main
+11-09 03:49:49.703 D/CarrierSvcBindHelper(  997): onHandleForceStop: [com.fleet.anr]
+11-09 03:49:49.707 D/CarrierSvcBindHelper(  997): No carrier app for: 0
+11-09 03:49:49.773 I/ActivityTaskManager(  602): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.fleet.anr cmp=com.fleet.anr/.MainActivity} from uid 10101
+11-09 03:49:49.781 D/CompatibilityChangeReporter(  602): Compat change id reported: 194480991; UID 10098; state: ENABLED
+11-09 03:49:49.799 V/SplashScreenExceptionList(  602): SplashScreen checking exception for package com.fleet.anr (target sdk:33) -> false
+11-09 03:49:49.800 D/CompatibilityChangeReporter(  602): Compat change id reported: 205907456; UID 10098; state: ENABLED
+11-09 03:49:49.819 D/CompatibilityChangeReporter(  602): Compat change id reported: 194833441; UID 10098; state: ENABLED
+11-09 03:49:49.825 D/CompatibilityChangeReporter(  602): Compat change id reported: 135634846; UID 10098; state: DISABLED
+11-09 03:49:49.825 D/CompatibilityChangeReporter(  602): Compat change id reported: 177438394; UID 10098; state: DISABLED
+11-09 03:49:49.826 D/CompatibilityChangeReporter(  602): Compat change id reported: 135772972; UID 10098; state: DISABLED
+11-09 03:49:49.826 D/CompatibilityChangeReporter(  602): Compat change id reported: 135754954; UID 10098; state: ENABLED
+11-09 03:49:49.828 D/CompatibilityChangeReporter(  602): Compat change id reported: 143937733; UID 10098; state: ENABLED
+11-09 03:49:49.936 D/Zygote  (  380): Forked child process 3789
+11-09 03:49:49.937 W/ActivityManager(  602): Slow operation: 113ms so far, now at startProcess: returned from zygote!
+11-09 03:49:49.937 W/ActivityManager(  602): Slow operation: 114ms so far, now at startProcess: done updating battery stats
+11-09 03:49:49.938 W/ActivityManager(  602): Slow operation: 114ms so far, now at startProcess: building log message
+11-09 03:49:49.938 I/ActivityManager(  602): Start proc 3789:com.fleet.anr/u0a98 for next-top-activity {com.fleet.anr/com.fleet.anr.MainActivity}
+11-09 03:49:49.938 W/ActivityManager(  602): Slow operation: 114ms so far, now at startProcess: starting to update pids map
+11-09 03:49:49.938 W/ActivityManager(  602): Slow operation: 114ms so far, now at startProcess: done updating pids map
+11-09 03:49:50.008 I/adbd    (  466): jdwp connection from 3789
+11-09 03:49:50.031 D/CompatibilityChangeReporter( 3789): Compat change id reported: 171979766; UID 10098; state: ENABLED
+11-09 03:49:50.052 W/ziparchive( 3789): Unable to open '/data/app/~~LlkIwFGXhE340HQErr6nqg==/com.fleet.anr-s44HJZnQCHJTsJBkmTpAPg==/base.dm': No such file or directory
+11-09 03:49:50.052 W/ziparchive( 3789): Unable to open '/data/app/~~LlkIwFGXhE340HQErr6nqg==/com.fleet.anr-s44HJZnQCHJTsJBkmTpAPg==/base.dm': No such file or directory
+11-09 03:49:50.054 D/nativeloader( 3789): Configuring classloader-namespace for other apk /data/app/~~LlkIwFGXhE340HQErr6nqg==/com.fleet.anr-s44HJZnQCHJTsJBkmTpAPg==/base.apk. target_sdk_version=33, uses_libraries=, library_path=/data/app/~~LlkIwFGXhE340HQErr6nqg==/com.fleet.anr-s44HJZnQCHJTsJBkmTpAPg==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.fleet.anr
+11-09 03:49:50.110 V/GraphicsEnvironment( 3789): ANGLE Developer option for 'com.fleet.anr' set to: 'default'
+11-09 03:49:50.111 V/GraphicsEnvironment( 3789): ANGLE GameManagerService for com.fleet.anr: false
+11-09 03:49:50.112 V/GraphicsEnvironment( 3789): Neither updatable production driver nor prerelease driver is supported.
+11-09 03:49:50.117 D/NetworkSecurityConfig( 3789): No Network Security Config specified, using platform default
+11-09 03:49:50.118 D/NetworkSecurityConfig( 3789): No Network Security Config specified, using platform default
+11-09 03:49:50.146 D/libEGL  ( 3789): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:49:50.151 D/libEGL  ( 3789): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:49:50.159 D/CompatibilityChangeReporter( 3789): Compat change id reported: 210923482; UID 10098; state: ENABLED
+11-09 03:49:50.159 D/libEGL  ( 3789): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:49:50.232 D/CoreBackPreview(  602): Window{9c59cad u0 com.fleet.anr/com.fleet.anr.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@5a36b73, mPriority=0}
+11-09 03:49:50.305 D/HostConnection( 3789): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:49:50.320 W/OpenGLRenderer( 3789): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-09 03:49:50.322 W/OpenGLRenderer( 3789): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-09 03:49:50.325 D/EGL_emulation( 3789): eglCreateContext: 0xb400007ca8471d10: maj 3 min 1 rcv 4
+11-09 03:49:50.337 D/EGL_emulation( 3789): eglMakeCurrent: 0xb400007ca8471d10: ver 3 1 (tinfo 0x7ebb8bb080) (first time)
+11-09 03:49:50.364 I/hwservicemanager(  220): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-09 03:49:50.364 I/Gralloc4( 3789): mapper 4.x is not supported
+11-09 03:49:50.369 I/hwservicemanager(  220): getTransport: Cannot find entry android.hardware.graphics.allocator@4.0::IAllocator/default in either framework or device VINTF manifest.
+11-09 03:49:50.371 I/servicemanager(  219): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-09 03:49:50.371 W/Gralloc4( 3789): allocator 4.x is not supported
+11-09 03:49:50.381 D/HostConnection( 3789): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:49:50.391 W/Parcel  ( 3789): Expecting binder but got null!
+11-09 03:49:50.400 W/ziparchive(  602): Unable to open '/data/app/~~LlkIwFGXhE340HQErr6nqg==/com.fleet.anr-s44HJZnQCHJTsJBkmTpAPg==/base.dm': No such file or directory
+11-09 03:49:50.402 I/ActivityTaskManager(  602): Displayed com.fleet.anr/.MainActivity: +627ms
+11-09 03:49:50.416 D/CompatibilityChangeReporter(  602): Compat change id reported: 214016041; UID 10098; state: ENABLED
+11-09 03:49:50.498 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:50.500 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:49:50.506 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:50.507 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:50.539 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@960f; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(2214, 128 - 2214, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:49:50.539 D/Maestro ( 3743): View hierarchy received in 39 ms
+11-09 03:49:50.631 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:50.635 D/UiDevice( 3743): Waiting 500ms for window update of package com.fleet.anr.
+11-09 03:49:50.910 W/TransactionTracing(  431): Could not find layer handle 0xb4000071fd117390
+11-09 03:49:50.911 W/TransactionTracing(  431): Could not find layer handle 0xb4000071fd116b50
+11-09 03:49:50.911 W/TransactionTracing(  431): Could not find layer handle 0xb4000071fd116b50
+11-09 03:49:50.911 W/TransactionTracing(  431): Could not find layer handle 0xb4000071fd117390
+11-09 03:49:50.960 W/TransactionTracing(  431): Could not find layer handle 0xb4000071fd1172d0
+11-09 03:49:51.140 W/UiDevice( 3743): Timed out waiting 500ms on window update.
+11-09 03:49:51.140 W/UiDevice( 3743): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: [EventType: TYPE_WINDOWS_CHANGED; EventTime: 254805; PackageName: null; MovementGranularity: 0; Action: 0; ContentChangeTypes: []; WindowChangeTypes: [WINDOWS_CHANGE_BOUNDS] [ ClassName: null; Text: []; ContentDescription: null; ItemCount: -1; CurrentItemIndex: -1; Enabled: false; Password: false; Checked: false; FullScreen: false; Scrollable: false; BeforeText: null; FromIndex: -1; ToIndex: -1; ScrollX: 0; ScrollY: 0; MaxScrollX: 0; MaxScrollY: 0; ScrollDeltaX: -1; ScrollDeltaY: -1; AddedCount: -1; RemovedCount: -1; ParcelableData: null ]; recordCount: 0]
+11-09 03:49:51.140 W/UiDevice( 3743): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:950)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1137)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:637)
+11-09 03:49:51.140 W/UiDevice( 3743): 	at java.lang.Thread.run(Thread.java:1012)
+11-09 03:49:51.200 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:51.202 D/UiDevice( 3743): Waiting 500ms for window update of package com.fleet.anr.
+11-09 03:49:51.704 W/UiDevice( 3743): Timed out waiting 500ms on window update.
+11-09 03:49:51.704 W/UiDevice( 3743): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: []
+11-09 03:49:51.704 W/UiDevice( 3743): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:950)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1137)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:637)
+11-09 03:49:51.704 W/UiDevice( 3743): 	at java.lang.Thread.run(Thread.java:1012)
+11-09 03:49:51.775 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:49:51.776 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:51.776 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:51.782 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@960f; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:49:51.783 D/Maestro ( 3743): View hierarchy received in 8 ms
+11-09 03:49:52.006 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:49:52.009 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:52.009 W/QueryController( 3743): Could not detect idle state.
+11-09 03:49:52.014 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@960f; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:49:52.014 D/Maestro ( 3743): View hierarchy received in 8 ms
+11-09 03:49:52.161 D/AndroidRuntime( 3789): Shutting down VM
+------
+[... fleet fixtures import: 967312 bytes cut, 17 lines naming a crash or ANR kept ...]
+11-09 03:49:52.165 E/AndroidRuntime( 3789): FATAL EXCEPTION: main
+11-09 03:49:52.165 E/AndroidRuntime( 3789): Process: com.fleet.anr, PID: 3789
+11-09 03:49:52.165 E/AndroidRuntime( 3789): java.lang.RuntimeException: Fleet app crash
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.fleet.anr.MainActivity.lambda$onCreate$1(MainActivity.java:36)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.fleet.anr.MainActivity$$ExternalSyntheticLambda1.onClick(D8$$SyntheticClass:0)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.performClick(View.java:7506)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.performClickInternal(View.java:7483)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View.-$$Nest$mperformClickInternal(Unknown Source:0)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.view.View$PerformClick.run(View.java:29334)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Handler.handleCallback(Handler.java:942)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Looper.loopOnce(Looper.java:201)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.os.Looper.loop(Looper.java:288)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at android.app.ActivityThread.main(ActivityThread.java:7872)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at java.lang.reflect.Method.invoke(Native Method)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+11-09 03:49:52.165 E/AndroidRuntime( 3789): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:936)
+]; isTextSelectable: false
+11-09 03:50:17.056 D/Maestro ( 3743): View hierarchy received in 10 ms
+11-09 03:50:17.064 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.066 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.066 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.072 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.074 D/Maestro ( 3743): View hierarchy received in 10 ms
+11-09 03:50:17.098 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.100 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.101 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.105 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.105 D/Maestro ( 3743): View hierarchy received in 7 ms
+11-09 03:50:17.159 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.162 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.162 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.169 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.170 D/Maestro ( 3743): View hierarchy received in 11 ms
+11-09 03:50:17.182 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.185 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.186 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.192 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.194 D/Maestro ( 3743): View hierarchy received in 12 ms
+11-09 03:50:17.203 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.205 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.206 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.210 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.210 D/Maestro ( 3743): View hierarchy received in 7 ms
+11-09 03:50:17.220 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.221 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.222 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.234 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.238 D/Maestro ( 3743): View hierarchy received in 18 ms
+11-09 03:50:17.257 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.258 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.258 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.267 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.268 D/Maestro ( 3743): View hierarchy received in 11 ms
+11-09 03:50:17.280 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.282 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.283 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.289 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.290 D/Maestro ( 3743): View hierarchy received in 10 ms
+11-09 03:50:17.346 I/netd    (  379): tetherGetStats() -> {[]} <3.40ms>
+11-09 03:50:17.365 I/netd    (  379): bandwidthSetGlobalAlert(2097152) <0.67ms>
+11-09 03:50:17.374 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.380 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.382 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.388 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.388 D/Maestro ( 3743): View hierarchy received in 14 ms
+11-09 03:50:17.403 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.406 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.406 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.414 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.416 D/Maestro ( 3743): View hierarchy received in 13 ms
+11-09 03:50:17.458 D/Maestro ( 3743): Requesting view hierarchy
+11-09 03:50:17.460 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.460 W/QueryController( 3743): Could not detect idle state.
+11-09 03:50:17.466 I/Maestro ( 3743): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@b055; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.android.fakesystemapp; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:50:17.466 D/Maestro ( 3743): View hierarchy received in 8 ms
+11-09 03:50:17.718 I/hwservicemanager(  220): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-09 03:50:17.718 I/Gralloc4( 3726): mapper 4.x is not supported
+11-09 03:50:17.759 D/HostConnection( 3726): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:50:17.775 D/libEGL  ( 3726): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:50:17.779 D/libEGL  ( 3726): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:50:17.781 D/libEGL  ( 3726): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:50:17.792 D/HostConnection( 3726): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:50:17.795 W/OpenGLRenderer( 3726): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-09 03:50:17.795 W/OpenGLRenderer( 3726): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-09 03:50:17.796 D/EGL_emulation( 3726): eglCreateContext: 0xb40000709f097a50: maj 3 min 1 rcv 4
+11-09 03:50:17.798 D/EGL_emulation( 3726): eglMakeCurrent: 0xb40000709f097a50: ver 3 1 (tinfo 0x72c8022080) (first time)
+11-09 03:50:18.302 I/logd    (  226): logdr: UID=2000 GID=2000 PID=3824 n tail=0 logMask=99 pid=0 start=0ns deadline=0ns

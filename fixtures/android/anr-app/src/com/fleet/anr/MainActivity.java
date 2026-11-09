@@ -7,7 +7,10 @@ import android.view.Gravity;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
-/** One button that blocks the main thread on tap, so the system raises an ANR (issue #77). */
+/**
+ * Two buttons for the fixtures (issue #77). "Block main thread" blocks the main thread on tap, so
+ * the system raises an ANR. "Crash app" throws on tap, so the app dies with a FATAL EXCEPTION.
+ */
 public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
@@ -26,6 +29,13 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(block);
+        Button crash = new Button(this);
+        crash.setText("Crash app");
+        crash.setAllCaps(false);
+        crash.setOnClickListener(v -> {
+            throw new RuntimeException("Fleet app crash");
+        });
+        root.addView(crash);
         setContentView(root);
     }
 }

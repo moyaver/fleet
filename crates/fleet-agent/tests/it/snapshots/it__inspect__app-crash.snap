@@ -1,0 +1,37 @@
+---
+source: crates/fleet-agent/tests/it/inspect.rs
+expression: result
+---
+{
+  "flows": [
+    {
+      "shard": 1,
+      "name": "app-crash",
+      "path": "<REPO>/examples/flows/phase0/app-crash.yaml",
+      "outcome": "failed",
+      "finality": "verified",
+      "source": "junit_final",
+      "conflict": false,
+      "steps": 5,
+      "failure": "Assertion is false: \"Fleet never shows this\" is visible"
+    }
+  ],
+  "events": 29,
+  "event_types": {
+    "app.crashed": 1,
+    "artifact.registered": 2,
+    "flow.ended": 2,
+    "flow.reported": 1,
+    "flow.started": 1,
+    "maestro.detected": 1,
+    "process.exited": 1,
+    "report.parsed": 1,
+    "run.ended": 1,
+    "run.started": 1,
+    "shard.assigned": 1,
+    "step.ended": 10,
+    "step.started": 5,
+    "suite.started": 1
+  },
+  "unrecognized_stdout": 0
+}
