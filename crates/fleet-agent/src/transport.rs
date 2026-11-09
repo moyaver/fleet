@@ -1186,6 +1186,110 @@ mod tests {
         );
     }
 
+    /// A batch response carrying `committed` as the welcome and `frames` after it.
+    fn batch_response(committed: u64, frames: Vec<serde_json::Value>) -> serde_json::Value {
+        let mut all = vec![serde_json::json!({ "op": "welcome", "protocol": 1,
+            "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
+            "committed_through": committed, "resume": "new", "limits": { "max_inflight_events": 512,
+            "max_frame_bytes": 1_048_576, "heartbeat_interval_ms": 10_000 } })];
+        all.extend(frames);
+        serde_json::json!({ "frames": all })
+    }
+
+    #[tokio::test]
+    async fn a_busy_batch_round_is_resent_and_is_not_a_link_failure() {
+        // Five busy answers in a row would end the batch transport (its failure limit is five),
+        // so the batch only gets acked if busy rounds do not count as failures.
+        const REFUSALS: usize = 5;
+        let server = wiremock::MockServer::start().await;
+        let seen: Arc<std::sync::Mutex<Vec<Vec<u64>>>> = Arc::default();
+        let rounds = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (log, count) = (Arc::clone(&seen), Arc::clone(&rounds));
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/api/v1/agent/batch"))
+            .respond_with(move |req: &wiremock::Request| {
+                let body: serde_json::Value = req.body_json().unwrap_or_default();
+                let seqs: Vec<u64> = body["events"]
+                    .as_array()
+                    .map(|events| events.iter().filter_map(|e| e["seq"].as_u64()).collect())
+                    .unwrap_or_default();
+                if !seqs.is_empty() {
+                    log.lock().unwrap().push(seqs.clone());
+                }
+                let round = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let response = match (round, seqs.first(), seqs.last()) {
+                    // Nothing to send yet: the welcome only.
+                    (0, _, _) => batch_response(0, vec![]),
+                    // Busy: nothing committed, resend from the batch's first seq.
+                    (r, Some(&first), _) if r <= REFUSALS => batch_response(
+                        0,
+                        vec![serde_json::json!({ "op": "error", "code": "overloaded",
+                            "fatal": false, "message": "busy", "expected_seq": first })],
+                    ),
+                    // The resend commits.
+                    (_, _, Some(&last)) if !seqs.is_empty() => batch_response(
+                        last,
+                        vec![
+                            serde_json::json!({ "op": "ack", "through": last, "epoch": 1,
+                            "duplicates": 0 }),
+                        ],
+                    ),
+                    _ => batch_response(3, vec![]),
+                };
+                wiremock::ResponseTemplate::new(200).set_body_json(response)
+            })
+            .mount(&server)
+            .await;
+        let cfg = Config::from_env(
+            format!("ws://{}", server.address()),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        let shared = Arc::new(Shared::default());
+        shared
+            .outbox
+            .lock()
+            .unwrap()
+            .push(vec![ev(1), ev(2), ev(3)]);
+        let (_tx, mut rx) = mpsc::channel::<Telemetry>(1);
+        let task = {
+            let shared = Arc::clone(&shared);
+            tokio::spawn(async move {
+                let clock = || ClockSample {
+                    wall: OffsetDateTime::UNIX_EPOCH,
+                    mono_ms: 0,
+                };
+                batch(&cfg, &shared, &mut rx, &clock).await
+            })
+        };
+        let acked = tokio::time::timeout(Duration::from_secs(30), async {
+            while shared.outbox.lock().unwrap().acked_through() < 3 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        let still_running = !task.is_finished();
+        task.abort();
+        assert!(acked.is_ok(), "the resent batch was not acked");
+        assert!(still_running, "the batch transport gave up on busy rounds");
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(
+            seen.len(),
+            REFUSALS + 1,
+            "each refused round was resent: {seen:?}"
+        );
+        assert!(
+            seen.iter().all(|seqs| seqs == &[1, 2, 3]),
+            "every round resends from seq 1: {seen:?}"
+        );
+        assert_eq!(
+            shared.overloads.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "the ack ended the busy streak"
+        );
+    }
+
     #[tokio::test]
     async fn refused_reconnects_are_backed_off() {
         // Accepts every connection and drops it at once: each one is a failed attempt.
