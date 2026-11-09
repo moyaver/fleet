@@ -12,6 +12,7 @@
 //! - `duplicates`: batches are resent and shuffled (the server sorts and skips duplicates);
 //! - `reorder`: batches go out in reverse, without resends (the server sorts them);
 //! - `gap_events`: a full agent buffer drops events, and one `journal.gap` covers them;
+//! - `clock_skew_ms`: the agents' clock reads ahead of (or behind) the server's, wall times and ids;
 //! - `commit`, `git_ref`, `arch`: what the CI run tests and the runner it runs on, which history
 //!   and comparisons group by;
 //! - `first_agent`: the index of the first simulated agent. Which scripted flows fail depends on
@@ -82,6 +83,9 @@ pub struct Options {
     /// Drop this many events half-way through the run, as an agent with a full buffer does. One
     /// `journal.gap` covers them, so the run stays gap-free except for that hole (invariant I5).
     pub gap_events: u32,
+    /// The agents' clock reads this many milliseconds ahead of the server's (behind when negative):
+    /// every wall time they send and every id they make carries the offset (clock skew, PLAN §13).
+    pub clock_skew_ms: i64,
     /// Pause between batches, to stretch a run over time.
     pub pace: Duration,
     /// Give up on an agent after this long.
@@ -126,6 +130,7 @@ impl Default for Options {
             duplicates: false,
             reorder: false,
             gap_events: 0,
+            clock_skew_ms: 0,
             pace: Duration::ZERO,
             deadline: Duration::from_secs(120),
             commit: None,
@@ -300,9 +305,26 @@ fn failure_message(n: usize, opts: &Options) -> String {
     }
 }
 
-fn clock(t0: Instant) -> ClockSample {
+/// The agents' clock offset from the server's (`clock_skew_ms`).
+fn clock_skew(opts: &Options) -> time::Duration {
+    time::Duration::milliseconds(opts.clock_skew_ms)
+}
+
+/// A UUIDv7 stamped by the agent's clock. The server checks an agent run's id to be within seven
+/// days of its own clock, so a skewed agent makes skewed ids.
+fn new_id(skew: time::Duration) -> Uuid {
+    let at = OffsetDateTime::now_utc() + skew;
+    let secs = u64::try_from(at.unix_timestamp()).unwrap_or(0);
+    Uuid::new_v7(uuid::Timestamp::from_unix(
+        uuid::NoContext,
+        secs,
+        at.nanosecond(),
+    ))
+}
+
+fn clock(t0: Instant, skew: time::Duration) -> ClockSample {
     ClockSample {
-        wall: OffsetDateTime::now_utc(),
+        wall: OffsetDateTime::now_utc() + skew,
         mono_ms: u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX),
     }
 }
@@ -322,7 +344,7 @@ fn device_samples(events: &[EventEnvelope], t0: Instant, opts: &Options) -> Vec<
             // The corpus names a device's model and OS version too, when the run has one.
             model: corpus_item(opts, n).map(str::to_owned),
             os_version: corpus_item(opts, n + 1).map(str::to_owned),
-            at: clock(t0),
+            at: clock(t0, clock_skew(opts)),
             device_session_id,
             adb_state: Some(AdbState::Device),
             boot_completed: None,
@@ -350,9 +372,9 @@ fn device_samples(events: &[EventEnvelope], t0: Instant, opts: &Options) -> Vec<
         .collect()
 }
 
-fn host_sample(t0: Instant) -> Sample {
+fn host_sample(t0: Instant, skew: time::Duration) -> Sample {
     Sample {
-        at: clock(t0),
+        at: clock(t0, skew),
         host_cpu_pct: Some(25.0),
         host_mem_used_bytes: Some(4 << 30),
         host_mem_total_bytes: Some(16 << 30),
@@ -421,6 +443,7 @@ fn make_hole(events: &mut [EventEnvelope], count: usize) -> std::ops::Range<usiz
 
 #[expect(clippy::too_many_lines, reason = "one straight-line event script")]
 fn script(i: usize, opts: &Options, t0: Instant) -> Script {
+    let skew = clock_skew(opts);
     let mut events = Vec::new();
     // How many events were pushed, readable while `push` holds `events`.
     let pushed = std::cell::Cell::new(0usize);
@@ -429,7 +452,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
         let seq = u64::try_from(events.len()).unwrap_or(u64::MAX) + 1;
         events.push(EventEnvelope::new(
             seq,
-            clock(t0),
+            clock(t0, skew),
             subject,
             Provenance::new(src),
             body,
@@ -446,7 +469,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
         }),
     );
     let suite = Subject {
-        suite_execution_id: Some(Uuid::now_v7()),
+        suite_execution_id: Some(new_id(skew)),
         ..Subject::default()
     };
     push(
@@ -465,8 +488,8 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     let mut serials = Vec::new();
     for d in 0..opts.devices {
         let shard = Subject {
-            shard_id: Some(Uuid::now_v7()),
-            device_session_id: Some(Uuid::now_v7()),
+            shard_id: Some(new_id(skew)),
+            device_session_id: Some(new_id(skew)),
             ..suite.clone()
         };
         let serial = format!("emulator-{}", 5554 + 2 * d);
@@ -497,7 +520,7 @@ fn script(i: usize, opts: &Options, t0: Instant) -> Script {
     for f in 0..opts.flows {
         for (d, shard) in (0u32..).zip(&shards) {
             let flow = Subject {
-                flow_execution_id: Some(Uuid::now_v7()),
+                flow_execution_id: Some(new_id(skew)),
                 ..shard.clone()
             };
             let name = flow_name(d, f, opts);
@@ -765,7 +788,7 @@ fn hello(
             next_seq,
             oldest_unacked_seq: Some(oldest),
         },
-        clock: clock(t0),
+        clock: clock(t0, clock_skew(opts)),
         origin: RunOrigin::Live,
         started_at: None,
     }
@@ -783,7 +806,7 @@ async fn agent(
     storm: &tokio::sync::Barrier,
 ) -> anyhow::Result<AgentReport> {
     let t0 = Instant::now();
-    let id = Uuid::now_v7();
+    let id = new_id(clock_skew(opts));
     let job_key = format!("job-{}", i % opts.job_keys.max(1));
     let s = script(opts.first_agent + i, opts, t0);
     let hold_at = opts
@@ -1018,7 +1041,7 @@ async fn stream(
             tseq_to: tseq,
             dropped_since_last: 0,
             devices: device_samples(events, t0, opts),
-            samples: vec![host_sample(t0)],
+            samples: vec![host_sample(t0, clock_skew(opts))],
         })))
         .await?;
         // Stop-and-wait for the cumulative ack of this batch.
@@ -1074,7 +1097,7 @@ impl QuietAgent {
 /// then stops talking. `opts.agents` and `opts.pace` are ignored.
 pub async fn quiet(opts: &Options, events: usize) -> anyhow::Result<QuietAgent> {
     let t0 = Instant::now();
-    let id = Uuid::now_v7();
+    let id = new_id(clock_skew(opts));
     let job_key = "job-0".to_owned();
     let s = script(0, opts, t0);
     let total = u64::try_from(s.events.len()).unwrap_or(u64::MAX);
@@ -1182,6 +1205,22 @@ mod tests {
     }
 
     #[test]
+    fn clock_skew_moves_every_wall_time_and_every_agent_id() {
+        let opts = Options {
+            clock_skew_ms: 600_000,
+            ..Options::default()
+        };
+        let s = script(0, &opts, Instant::now());
+        let now = OffsetDateTime::now_utc().unix_timestamp();
+        // Ten minutes ahead, to within a few seconds of this test's clock reading.
+        let ahead = |secs: i64| (secs - now - 600).abs() <= 5;
+        assert!(ahead(s.events[0].at.wall.unix_timestamp()));
+        let suite = s.events[1].subject.suite_execution_id.expect("a suite id");
+        let stamped = suite.get_timestamp().expect("a v7 id").to_unix().0;
+        assert!(ahead(i64::try_from(stamped).unwrap_or(0)));
+    }
+
+    #[test]
     fn a_hole_is_one_journal_gap_in_the_last_slot_of_its_span() {
         let opts = Options {
             gap_events: 5,
@@ -1214,7 +1253,7 @@ mod tests {
     fn big_event(seq: u64, bytes: usize) -> EventEnvelope {
         EventEnvelope::new(
             seq,
-            clock(Instant::now()),
+            clock(Instant::now(), time::Duration::ZERO),
             Subject::default(),
             Provenance::new(SourceKind::AgentObserved),
             &EventBody::AppCrashed(AppCrashed {
