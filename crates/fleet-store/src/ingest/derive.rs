@@ -229,7 +229,18 @@ fn job_outcome_name(o: JobOutcome) -> &'static str {
 }
 
 /// Re-derives a job's lifecycle and outcome from its runs and suites. Returns whether it changed.
+///
+/// The job row is locked first. Two batches that end sibling runs of one job otherwise derive
+/// concurrently, each reads the other's run as still open, neither writes, and the job never
+/// closes. After the lock, the reads below see the other batch's committed run (read committed
+/// takes a snapshot per statement). The lock is held only from here to the batch's commit.
 pub(crate) async fn job(tx: &mut PgConnection, job_id: Uuid) -> Result<bool, sqlx::Error> {
+    sqlx::query!(
+        "SELECT id FROM jobs WHERE id = $1 FOR NO KEY UPDATE",
+        job_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
     let runs: Vec<RunFacts> = sqlx::query!(
         "SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS \"cancelled!\",
                 EXISTS (SELECT 1 FROM suite_executions s
