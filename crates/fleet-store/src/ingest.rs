@@ -146,6 +146,10 @@ pub enum ApplyError {
         /// The `seq` the server expects next.
         expected: u64,
     },
+    /// No database connection came free within the pool's acquire timeout. Nothing was
+    /// committed, so the agent can resend the same batch unchanged.
+    #[error("no database connection was free in time")]
+    Busy,
     /// The database failed.
     #[error(transparent)]
     Store(#[from] Error),
@@ -153,7 +157,12 @@ pub enum ApplyError {
 
 impl From<sqlx::Error> for ApplyError {
     fn from(e: sqlx::Error) -> Self {
-        Self::Store(e.into())
+        match e {
+            // Only the pool's acquire returns this, and the batch's transaction is dropped
+            // uncommitted on every error path, so `Busy` never follows a partial write.
+            sqlx::Error::PoolTimedOut => Self::Busy,
+            e => Self::Store(e.into()),
+        }
     }
 }
 
