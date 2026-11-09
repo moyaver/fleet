@@ -4,5 +4,6 @@ name: anr
 - launchApp
 - tapOn: "Block main thread"
 - extendedWaitUntil:
-    visible: "isn't responding"
+    visible: "Fleet ANR isn't responding"
     timeout: 20000
+- takeScreenshot: fleet-anr-dialog

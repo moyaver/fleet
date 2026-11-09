@@ -1,15 +1,6 @@
 
 Waiting for flows to complete...
-[Failed] anr (36s) (Assertion is false: "isn't responding" is visible)
+[Passed] anr (14s)
 
-1/1 Flow Failed
-
-╭────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                │
-│   Debug tests faster by easy access to test recordings, maestro logs, screenshots, and more.   │
-│                                                                                                │
-│   Run your flows on Maestro Cloud:                                                             │
-│   maestro cloud app_file flows_folder/                                                         │
-│                                                                                                │
-╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+1/1 Flow Passed in 14s
 

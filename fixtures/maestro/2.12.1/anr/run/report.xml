@@ -1,8 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <testsuites>
-  <testsuite name="Test Suite" device="fleet-anr-77" tests="1" failures="1" time="35.996" timestamp="2026-11-09T03:14:30">
-    <testcase id="anr" name="anr" classname="anr" file="examples/flows/phase0/anr.yaml" time="35.979" timestamp="2026-11-09T03:14:30" status="ERROR">
-      <failure>Assertion is false: "isn't responding" is visible</failure>
-    </testcase>
+  <testsuite name="Test Suite" device="fleet-anr-77c" tests="1" failures="0" time="14.184" timestamp="2026-11-09T03:55:03">
+    <testcase id="anr" name="anr" classname="anr" file="examples/flows/phase0/anr.yaml" time="14.174" timestamp="2026-11-09T03:55:03" status="SUCCESS"/>
   </testsuite>
 </testsuites>

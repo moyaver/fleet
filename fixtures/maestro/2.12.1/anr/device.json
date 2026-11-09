@@ -2,7 +2,7 @@
   "maestro": "2.12.1",
   "maestro_install": "Homebrew formula maestro 2.12.1 (/opt/homebrew/Cellar/maestro/2.12.1)",
   "device": {
-    "avd": "fleet-anr-77",
+    "avd": "fleet-anr-77c",
     "serial": "emulator-5600",
     "system_image": "system-images;android-33;google_atd;arm64-v8a",
     "api_level": "33",
@@ -16,8 +16,9 @@
   },
   "emulator": {
     "version": "Android emulator version 37.2.13.0 (build_id 16740729) (CL:N/A)",
-    "launch": "emulator -avd fleet-anr-77 -port 5600 -no-window -no-audio -no-snapshot",
+    "launch": "emulator -avd fleet-anr-77c -port 5600 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect",
     "config_ini": {
+      "hw.cpu.arch": "arm64",
       "hw.gpu.enabled": "no",
       "hw.gpu.mode": "auto",
       "hw.lcd.density": "420",
@@ -28,8 +29,8 @@
     "avd_home": "temporary directory, deleted after capture"
   },
   "host": {
-    "os": "macOS 26.7.1 (Darwin 25.6.0)",
+    "os": "macOS 26.7.1",
     "arch": "arm64"
   },
-  "notes": "Captured for the ANR fixture (issue #77). The image has no com.android.settings package, and no ANR dialog window appeared on it: the system logged the ANR (ActivityManager, InputDispatcher), and Maestro saw the blocked window as a null root node."
+  "notes": "Captured on the API 33 google_atd image with -gpu swiftshader_indirect. The trigger is Maestro's tapOn on Block main thread plus a background adb tap (input tap 540 1274) 4 s after the app's pid appears. The dialog shows on this image: its hierarchy has Fleet ANR isn't responding with the Close app and Wait buttons, and the flow asserts that title and passes. Maestro's takeScreenshot is black on this image even with swiftshader. On the API 37 Play Store image no ANR was raised by any trigger tried, and avdmanager refused that image's package path."
 }
