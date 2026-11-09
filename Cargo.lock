@@ -1337,6 +1337,7 @@ dependencies = [
  "clap",
  "fleet-protocol",
  "futures-util",
+ "getrandom 0.4.3",
  "rustls",
  "serde_json",
  "time",
