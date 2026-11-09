@@ -1,0 +1,19 @@
+03:49:49.396 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+03:49:49.400 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+03:49:49.400 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+03:49:49.401 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+03:49:49.401 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.fleet.anr" RUNNING
+03:49:49.450 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr
+03:49:49.451 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch
+03:49:49.672 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.fleet.anr" COMPLETED
+03:49:49.675 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Crash app" RUNNING
+03:49:50.410 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Crash app, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=, clickable=true, bounds=[0,0][0,0], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.Button, important-for-accessibility=true, error=}, children=[], clickable=true, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=0, y=0, width=0, height=0))
+03:49:51.819 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+03:49:51.823 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (540, 1400) using hierarchy based logic for wait
+03:49:57.133 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+03:49:57.135 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Crash app" COMPLETED
+03:49:57.137 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Fleet never shows this" is visible RUNNING
+03:50:17.230 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Fleet never shows this" is visible
+03:50:17.456 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+03:50:17.457 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+03:50:17.757 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Fleet never shows this" is visible FAILED

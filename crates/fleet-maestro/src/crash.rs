@@ -88,6 +88,22 @@ mod tests {
         );
     }
 
+    /// The app-crash fixture's report: the test app's own button threw this (issue #77).
+    const APP_CRASH: &str = include_str!(
+        "../../../fixtures/maestro/2.12.1/app-crash/run/debug/app-crash/logs/crash-report.txt"
+    );
+
+    #[test]
+    fn the_app_crash_fixture_names_the_package_and_the_exception() {
+        assert_eq!(
+            parse_crash_report(APP_CRASH),
+            Some(AppCrash {
+                package: "com.fleet.anr".into(),
+                exception: "java.lang.RuntimeException: Fleet app crash".into(),
+            })
+        );
+    }
+
     #[test]
     fn a_report_without_a_process_names_no_crash() {
         assert_eq!(parse_crash_report(""), None);
