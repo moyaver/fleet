@@ -1,0 +1,19 @@
+03:14:31.221 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+03:14:31.225 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+03:14:31.227 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+03:14:31.227 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+03:14:31.228 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "com.fleet.anr" RUNNING
+03:14:31.301 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr
+03:14:31.302 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch
+03:14:31.437 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "com.fleet.anr" COMPLETED
+03:14:31.441 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Block main thread" RUNNING
+03:14:32.375 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=Block main thread, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=, clickable=true, bounds=[38,1274][1080,1400], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.Button, important-for-accessibility=true, error=}, children=[], clickable=true, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=38, y=1274, width=1042, height=126))
+03:14:34.013 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+03:14:34.021 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (540, 1337) using hierarchy based logic for wait
+03:14:44.614 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+03:14:44.616 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Block main thread" COMPLETED
+03:14:44.620 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "isn't responding" is visible RUNNING
+03:15:04.717 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "isn't responding" is visible
+03:15:05.193 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+03:15:05.194 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+03:15:06.087 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "isn't responding" is visible FAILED

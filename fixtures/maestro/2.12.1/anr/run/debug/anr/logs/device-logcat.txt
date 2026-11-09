@@ -1,0 +1,318 @@
+--------- beginning of system
+11-09 03:14:31.804 I/ActivityManager(  580): Force stopping com.fleet.anr appid=10099 user=0: from pid 4796
+--------- beginning of main
+11-09 03:14:31.814 D/CarrierSvcBindHelper(  969): onHandleForceStop: [com.fleet.anr]
+11-09 03:14:31.818 D/CarrierSvcBindHelper(  969): No carrier app for: 0
+11-09 03:14:31.868 I/ActivityTaskManager(  580): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.fleet.anr cmp=com.fleet.anr/.MainActivity} from uid 10104
+11-09 03:14:31.869 D/CompatibilityChangeReporter(  580): Compat change id reported: 194480991; UID 10099; state: ENABLED
+11-09 03:14:31.875 D/CompatibilityChangeReporter(  580): Compat change id reported: 174042980; UID 10099; state: DISABLED
+11-09 03:14:31.876 D/CompatibilityChangeReporter(  580): Compat change id reported: 184838306; UID 10099; state: DISABLED
+11-09 03:14:31.876 D/CompatibilityChangeReporter(  580): Compat change id reported: 185004937; UID 10099; state: DISABLED
+11-09 03:14:31.878 D/CompatibilityChangeReporter(  580): Compat change id reported: 197654537; UID 10099; state: ENABLED
+11-09 03:14:31.884 V/SplashScreenExceptionList(  580): SplashScreen checking exception for package com.fleet.anr (target sdk:33) -> false
+11-09 03:14:31.884 D/CompatibilityChangeReporter(  580): Compat change id reported: 205907456; UID 10099; state: ENABLED
+11-09 03:14:31.902 D/CompatibilityChangeReporter(  580): Compat change id reported: 194833441; UID 10099; state: ENABLED
+11-09 03:14:31.934 D/CompatibilityChangeReporter(  580): Compat change id reported: 135634846; UID 10099; state: DISABLED
+11-09 03:14:31.935 D/CompatibilityChangeReporter(  580): Compat change id reported: 177438394; UID 10099; state: DISABLED
+11-09 03:14:31.935 D/CompatibilityChangeReporter(  580): Compat change id reported: 135772972; UID 10099; state: DISABLED
+11-09 03:14:31.935 D/CompatibilityChangeReporter(  580): Compat change id reported: 135754954; UID 10099; state: ENABLED
+11-09 03:14:31.936 D/CompatibilityChangeReporter(  580): Compat change id reported: 143937733; UID 10099; state: ENABLED
+11-09 03:14:31.981 D/Zygote  (  379): Forked child process 4804
+11-09 03:14:31.981 W/ActivityManager(  580): Slow operation: 74ms so far, now at startProcess: returned from zygote!
+11-09 03:14:31.982 W/ActivityManager(  580): Slow operation: 74ms so far, now at startProcess: done updating battery stats
+11-09 03:14:31.982 W/ActivityManager(  580): Slow operation: 75ms so far, now at startProcess: building log message
+11-09 03:14:31.982 I/ActivityManager(  580): Start proc 4804:com.fleet.anr/u0a99 for next-top-activity {com.fleet.anr/com.fleet.anr.MainActivity}
+11-09 03:14:31.982 W/ActivityManager(  580): Slow operation: 75ms so far, now at startProcess: starting to update pids map
+11-09 03:14:31.983 W/ActivityManager(  580): Slow operation: 75ms so far, now at startProcess: done updating pids map
+11-09 03:14:32.025 I/adbd    (  440): jdwp connection from 4804
+11-09 03:14:32.047 D/CompatibilityChangeReporter(  580): Compat change id reported: 168419799; UID 10099; state: DISABLED
+11-09 03:14:32.059 D/CompatibilityChangeReporter( 4804): Compat change id reported: 171979766; UID 10099; state: ENABLED
+11-09 03:14:32.074 W/ziparchive( 4804): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:14:32.074 W/ziparchive( 4804): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:14:32.075 D/nativeloader( 4804): Configuring classloader-namespace for other apk /data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.apk. target_sdk_version=33, uses_libraries=, library_path=/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.fleet.anr
+11-09 03:14:32.113 V/GraphicsEnvironment( 4804): ANGLE Developer option for 'com.fleet.anr' set to: 'default'
+11-09 03:14:32.114 V/GraphicsEnvironment( 4804): ANGLE GameManagerService for com.fleet.anr: false
+11-09 03:14:32.115 V/GraphicsEnvironment( 4804): Neither updatable production driver nor prerelease driver is supported.
+11-09 03:14:32.117 D/NetworkSecurityConfig( 4804): No Network Security Config specified, using platform default
+11-09 03:14:32.118 D/NetworkSecurityConfig( 4804): No Network Security Config specified, using platform default
+11-09 03:14:32.130 D/libEGL  ( 4804): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:14:32.131 D/libEGL  ( 4804): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:14:32.132 D/libEGL  ( 4804): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:14:32.145 D/CompatibilityChangeReporter( 4804): Compat change id reported: 210923482; UID 10099; state: ENABLED
+11-09 03:14:32.169 D/CoreBackPreview(  580): Window{4aa8326 u0 com.fleet.anr/com.fleet.anr.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@abcbd14, mPriority=0}
+11-09 03:14:32.204 D/HostConnection( 4804): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:14:32.207 W/OpenGLRenderer( 4804): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-09 03:14:32.209 W/OpenGLRenderer( 4804): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-09 03:14:32.211 D/EGL_emulation( 4804): eglCreateContext: 0xb4000074c5afd290: maj 3 min 1 rcv 4
+11-09 03:14:32.216 D/EGL_emulation( 4804): eglMakeCurrent: 0xb4000074c5afd290: ver 3 1 (tinfo 0x76dd060080) (first time)
+11-09 03:14:32.237 I/hwservicemanager(  218): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-09 03:14:32.238 I/Gralloc4( 4804): mapper 4.x is not supported
+11-09 03:14:32.244 I/hwservicemanager(  218): getTransport: Cannot find entry android.hardware.graphics.allocator@4.0::IAllocator/default in either framework or device VINTF manifest.
+11-09 03:14:32.246 I/servicemanager(  217): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-09 03:14:32.247 W/Gralloc4( 4804): allocator 4.x is not supported
+11-09 03:14:32.253 D/HostConnection( 4804): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:14:32.272 W/Parcel  ( 4804): Expecting binder but got null!
+11-09 03:14:32.281 W/ziparchive(  580): Unable to open '/data/app/~~NFnxb2uK4R3J0CmXmJtkJQ==/com.fleet.anr-wLU9aAYd1UC5MoT0VzbzDA==/base.dm': No such file or directory
+11-09 03:14:32.293 I/ActivityTaskManager(  580): Displayed com.fleet.anr/.MainActivity: +410ms
+11-09 03:14:32.319 D/CompatibilityChangeReporter(  580): Compat change id reported: 214016041; UID 10099; state: ENABLED
+11-09 03:14:32.585 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:32.587 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:14:32.652 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:32.660 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:32.743 I/Maestro ( 4752): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@927d; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1118, 128 - 1118, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:14:32.758 D/Maestro ( 4752): View hierarchy received in 171 ms
+11-09 03:14:32.818 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922bf4b0
+11-09 03:14:32.818 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922b9f90
+11-09 03:14:32.819 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922bf4b0
+11-09 03:14:32.819 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922b9f90
+11-09 03:14:32.835 W/TransactionTracing(  419): Could not find layer handle 0xb4000075922c1f10
+11-09 03:14:32.869 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:32.875 D/UiDevice( 4752): Waiting 500ms for window update of package com.fleet.anr.
+11-09 03:14:33.384 W/UiDevice( 4752): Timed out waiting 500ms on window update.
+11-09 03:14:33.384 W/UiDevice( 4752): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: []
+11-09 03:14:33.384 W/UiDevice( 4752): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:950)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1137)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:637)
+11-09 03:14:33.384 W/UiDevice( 4752): 	at java.lang.Thread.run(Thread.java:1012)
+11-09 03:14:33.463 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:33.473 D/UiDevice( 4752): Waiting 500ms for window update of package com.fleet.anr.
+11-09 03:14:33.978 W/UiDevice( 4752): Timed out waiting 500ms on window update.
+11-09 03:14:33.978 W/UiDevice( 4752): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: []
+11-09 03:14:33.978 W/UiDevice( 4752): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:950)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1137)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:637)
+11-09 03:14:33.978 W/UiDevice( 4752): 	at java.lang.Thread.run(Thread.java:1012)
+11-09 03:14:34.104 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:14:34.115 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:34.116 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:34.123 I/Maestro ( 4752): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@927d; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:14:34.125 D/Maestro ( 4752): View hierarchy received in 21 ms
+11-09 03:14:34.419 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:14:34.422 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:34.422 W/QueryController( 4752): Could not detect idle state.
+11-09 03:14:34.434 I/Maestro ( 4752): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@927d; boundsInParent: Rect(0, 0 - 0, 147); boundsInScreen: Rect(1080, 128 - 1080, 275); packageName: com.fleet.anr; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-09 03:14:34.435 D/Maestro ( 4752): View hierarchy received in 16 ms
+11-09 03:14:34.739 W/AS.SfxHelper(  580): MediaPlayer IOException: java.io.FileNotFoundExc
+[... fleet fixtures import: 284932 bytes cut, 3 lines naming a crash or ANR kept ...]
+11-09 03:14:41.280 I/WindowManager(  580): ANR in Window{4aa8326 u0 com.fleet.anr/com.fleet.anr.MainActivity}. Reason:4aa8326 com.fleet.anr/com.fleet.anr.MainActivity (server) is not responding. Waited 5007ms for MotionEvent(deviceId=-1, eventTime=588105000000, source=TOUCHSCREEN, displayId=0, action=DOWN, actionButton=0x00000000, flags=0x00000000, metaState=0x00000000, buttonState=0x00000000, classification=NONE, edgeFlags=0x00000000, xPrecision=1.0, yPrecision=1.0, xCursorPosition=nan, yCursorPosition=nan, pointers=[0: (540.0, 1337.0)]), policyFlags=0x6b000000
+11-09 03:14:42.946 E/ActivityManager(  580): ANR in com.fleet.anr (com.fleet.anr/.MainActivity)
+11-09 03:14:42.946 E/ActivityManager(  580): Reason: Input dispatching timed out (4aa8326 com.fleet.anr/com.fleet.anr.MainActivity (server) is not responding. Waited 5007ms for MotionEvent(deviceId=-1, eventTime=588105000000, source=TOUCHSCREEN, displayId=0, action=DOWN, actionButton=0x00000000, flags=0x00000000, metaState=0x00000000, buttonState=0x00000000, classification=NONE, edgeFlags=0x00000000, xPrecision=1.0, yPrecision=1.0, xCursorPosition=nan, yCursorPosition=nan, pointers=[0: (540.0, 1337.0)]), policyFlags=0x6b000000)
+ng view hierarchy
+11-09 03:15:04.008 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.008 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.013 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:04.021 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.022 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.023 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.025 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.077 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.078 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.079 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.081 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.090 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.091 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.092 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.095 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.105 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.107 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.107 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.112 D/Maestro ( 4752): View hierarchy received in 7 ms
+11-09 03:15:04.163 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.164 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.164 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.167 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.176 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.177 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.178 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.181 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.189 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.190 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.191 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.193 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.248 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.249 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.250 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.252 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.262 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.263 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.263 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.266 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.277 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.278 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.279 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.282 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.288 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.289 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.290 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.293 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.301 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.302 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.303 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.307 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:04.316 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.317 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.318 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.320 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.328 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.329 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.330 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.333 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.407 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.411 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.412 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.418 D/Maestro ( 4752): View hierarchy received in 12 ms
+11-09 03:15:04.430 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.431 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.431 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.435 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.453 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.455 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.456 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.458 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.470 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.470 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.471 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.473 D/Maestro ( 4752): View hierarchy received in 3 ms
+11-09 03:15:04.486 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.489 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.489 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.494 D/Maestro ( 4752): View hierarchy received in 8 ms
+11-09 03:15:04.504 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.505 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.505 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.508 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.564 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.565 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.566 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.569 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.577 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.579 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.579 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.582 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.592 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.594 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.594 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.598 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:04.607 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.609 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.609 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.613 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:04.621 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.622 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.622 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.626 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.635 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.637 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.637 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.644 D/Maestro ( 4752): View hierarchy received in 9 ms
+11-09 03:15:04.701 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.701 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.702 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.706 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.716 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.717 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.717 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.719 D/Maestro ( 4752): View hierarchy received in 3 ms
+11-09 03:15:04.730 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.731 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.732 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.735 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.745 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.746 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.746 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.750 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.764 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.766 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.766 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.772 D/Maestro ( 4752): View hierarchy received in 8 ms
+11-09 03:15:04.784 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.786 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.787 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.789 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:04.799 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.801 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.801 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.808 D/Maestro ( 4752): View hierarchy received in 9 ms
+11-09 03:15:04.818 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.819 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.820 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.822 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.834 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.836 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.836 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.840 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:04.852 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.853 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.854 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.864 D/Maestro ( 4752): View hierarchy received in 12 ms
+11-09 03:15:04.877 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.878 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.880 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.888 D/Maestro ( 4752): View hierarchy received in 11 ms
+11-09 03:15:04.941 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.942 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.943 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.948 D/Maestro ( 4752): View hierarchy received in 7 ms
+11-09 03:15:04.964 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.965 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.966 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.968 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:04.976 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:04.978 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.978 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:04.983 D/Maestro ( 4752): View hierarchy received in 7 ms
+11-09 03:15:05.015 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.019 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.020 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.026 D/Maestro ( 4752): View hierarchy received in 11 ms
+11-09 03:15:05.078 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.079 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.080 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.082 D/Maestro ( 4752): View hierarchy received in 4 ms
+11-09 03:15:05.090 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.091 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.092 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.096 D/Maestro ( 4752): View hierarchy received in 6 ms
+11-09 03:15:05.115 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.119 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.123 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.142 D/Maestro ( 4752): View hierarchy received in 27 ms
+11-09 03:15:05.182 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.184 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.185 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.187 D/Maestro ( 4752): View hierarchy received in 5 ms
+11-09 03:15:05.253 D/Maestro ( 4752): Requesting view hierarchy
+11-09 03:15:05.255 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.256 W/QueryController( 4752): Could not detect idle state.
+11-09 03:15:05.263 D/Maestro ( 4752): View hierarchy received in 10 ms
+11-09 03:15:05.821 I/hwservicemanager(  218): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-09 03:15:05.822 I/Gralloc4( 4734): mapper 4.x is not supported
+11-09 03:15:05.919 D/HostConnection( 4734): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:15:06.031 D/libEGL  ( 4734): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-09 03:15:06.034 D/libEGL  ( 4734): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-09 03:15:06.037 D/libEGL  ( 4734): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-09 03:15:06.072 D/HostConnection( 4734): HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_multi_configs ANDROID_EMU_hwc_color_transform GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_1 
+11-09 03:15:06.075 W/OpenGLRenderer( 4734): Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+11-09 03:15:06.076 W/OpenGLRenderer( 4734): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-09 03:15:06.078 D/EGL_emulation( 4734): eglCreateContext: 0xb400007b47ed2190: maj 3 min 1 rcv 4
+11-09 03:15:06.090 D/EGL_emulation( 4734): eglMakeCurrent: 0xb400007b47ed2190: ver 3 1 (tinfo 0x7d6c483080) (first time)
+11-09 03:15:06.268 W/InputManager(  580): Input event injection from pid 4830 timed out.
+11-09 03:15:06.281 I/InputDispatcher(  580): Dropped event because it is stale.
+11-09 03:15:06.285 W/InputManager(  580): Input event injection from pid 4830 failed.
+11-09 03:15:07.059 I/logd    (  224): logdr: UID=2000 GID=2000 PID=4904 n tail=0 logMask=99 pid=0 start=0ns deadline=0ns

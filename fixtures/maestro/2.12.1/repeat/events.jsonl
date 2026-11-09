@@ -1,0 +1,175 @@
+{"src":"proc","t_ms":486,"tree":[{"command":"java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"0.0","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"1904"}]}
+{"event":"dir","path":"state/maestro","src":"fs","t_ms":2771}
+{"event":"created","path":"state/maestro/analytics.json","size":466,"src":"fs","t_ms":2771}
+{"bytes":248,"line":"WARNING: Final field parent in class maestro.cli.command.TestCommand has been mutated reflectively by class picocli.CommandLine$Model$FieldBinding in unnamed module @184cf7cf (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/picocli-4.6.3.jar)\n","src":"stderr","t_ms":2856}
+{"bytes":74,"line":"WARNING: Use --enable-final-field-mutation=ALL-UNNAMED to avoid a warning\n","src":"stderr","t_ms":2856}
+{"bytes":106,"line":"WARNING: Mutating final fields will be blocked in a future release unless final field mutation is enabled\n","src":"stderr","t_ms":2856}
+{"src":"proc","t_ms":2866,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"92.1","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"114832"}]}
+{"event":"dir","path":"run/debug","src":"fs","t_ms":3528}
+{"event":"created","path":"run/debug/maestro.log","size":629,"src":"fs","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192247|main|INFO|maestro.cli.report.TestDebugReporter|Debug output path: <CAPTURE>/run/debug\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192250|main|INFO|MAESTRO|---- System Info ----\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192251|main|INFO|MAESTRO|Maestro Version: 2.12.1\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192252|main|INFO|MAESTRO|CI: Undefined\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192252|main|INFO|MAESTRO|OS Name: Mac OS X\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192252|main|INFO|MAESTRO|OS Version: 26.7.1\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192252|main|INFO|MAESTRO|Architecture: aarch64\n","src":"log","t_ms":3587}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192252|main|INFO|MAESTRO|Java Version: 27\n","src":"log","t_ms":3587}
+{"event":"size","path":"run/debug/maestro.log","size":877,"src":"fs","t_ms":3808}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192452|main|INFO|MAESTRO|Xcode Version: 27.1\n","src":"log","t_ms":3808}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192462|main|INFO|MAESTRO|Flutter Version: Undefined\n","src":"log","t_ms":3808}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192471|main|INFO|MAESTRO|Flutter Channel: Undefined\n","src":"log","t_ms":3808}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187192472|main|INFO|MAESTRO|---------------------\n","src":"log","t_ms":3808}
+{"src":"proc","t_ms":5269,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"170.9","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"185248"},{"command":"(simctl)","cpu":"27.6","pgid":"10507","pid":10805,"ppid":10575,"rss_kib":"10144"}]}
+{"event":"size","path":"run/debug/maestro.log","size":1568,"src":"fs","t_ms":5897}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187194579|DefaultDispatcher-worker-3|INFO|maestro.cli.command.TestCommand|[shard 1] Selected device emulator-5600 using port 56738 with execution plan ExecutionPlan(flowsToRun=[<REPO>/examples/flows/phase0/repeat.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))\n","src":"log","t_ms":5897}
+{"src":"proc","t_ms":7703,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"10.0","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"90000"}]}
+{"src":"proc","t_ms":10321,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"2.1","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"51856"}]}
+{"src":"proc","t_ms":12945,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"0.9","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"46784"}]}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":15226}
+{"bytes":33,"line":"Waiting for flows to complete...\n","src":"stdout","t_ms":15226}
+{"event":"dir","path":"run/debug/repeat","src":"fs","t_ms":15253}
+{"event":"size","path":"run/debug/maestro.log","size":1680,"src":"fs","t_ms":15253}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187203942|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.TestSuiteInteractor| Running flow repeat\n","src":"log","t_ms":15253}
+{"event":"size","path":"run/debug/maestro.log","size":1768,"src":"fs","t_ms":15306}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187203958|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Getting device info\n","src":"log","t_ms":15306}
+{"src":"proc","t_ms":15411,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"3.3","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"54480"}]}
+{"bytes":75,"line":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\n","src":"stderr","t_ms":15535}
+{"bytes":187,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/protobuf-java-3.21.9.jar)\n","src":"stderr","t_ms":15535}
+{"bytes":114,"line":"WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\n","src":"stderr","t_ms":15535}
+{"bytes":78,"line":"WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n","src":"stderr","t_ms":15535}
+{"event":"size","path":"run/debug/maestro.log","size":1952,"src":"fs","t_ms":15651}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204326|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=2400, widthGrid=1080, heightGrid=2400)\n","src":"log","t_ms":15651}
+{"event":"dir","path":"run/debug/repeat/logs","src":"fs","t_ms":15874}
+{"event":"created","path":"run/debug/repeat/logs/maestro.log","size":0,"src":"fs","t_ms":15874}
+{"event":"size","path":"run/debug/maestro.log","size":2547,"src":"fs","t_ms":15929}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204595|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables RUNNING\n","src":"log","t_ms":15929}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204599|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Define variables COMPLETED\n","src":"log","t_ms":15929}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204600|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration RUNNING\n","src":"log","t_ms":15929}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204601|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Apply configuration COMPLETED\n","src":"log","t_ms":15929}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204601|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":15929}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":526,"src":"fs","t_ms":15929}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.595 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING\n","src":"log","t_ms":15929}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.599 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED\n","src":"log","t_ms":15929}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.600 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING\n","src":"log","t_ms":15929}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.601 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED\n","src":"log","t_ms":15929}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.601 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":15929}
+{"event":"size","path":"run/debug/maestro.log","size":2752,"src":"fs","t_ms":16045}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204703|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr\n","src":"log","t_ms":16045}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187204703|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch\n","src":"log","t_ms":16045}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":709,"src":"fs","t_ms":16045}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.703 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr\n","src":"log","t_ms":16045}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:04.703 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch\n","src":"log","t_ms":16045}
+{"event":"size","path":"run/debug/maestro.log","size":3191,"src":"fs","t_ms":16674}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187205324|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":16674}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187205333|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 3 times RUNNING\n","src":"log","t_ms":16674}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187205336|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING\n","src":"log","t_ms":16674}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187205337|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME\n","src":"log","t_ms":16674}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":1085,"src":"fs","t_ms":16674}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:05.324 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":16674}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:05.333 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Repeat 3 times RUNNING\n","src":"log","t_ms":16674}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:05.336 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press Home key RUNNING\n","src":"log","t_ms":16674}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:05.337 [ INFO] maestro.Maestro.pressKey: Pressing key HOME\n","src":"log","t_ms":16674}
+{"src":"proc","t_ms":17797,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"4.1","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"77792"}]}
+{"event":"size","path":"run/debug/maestro.log","size":3431,"src":"fs","t_ms":18108}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187206764|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED\n","src":"log","t_ms":18108}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187206769|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":18108}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":1298,"src":"fs","t_ms":18108}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:06.764 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press Home key COMPLETED\n","src":"log","t_ms":18108}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:06.769 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":18108}
+{"event":"size","path":"run/debug/maestro.log","size":3636,"src":"fs","t_ms":18278}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187206943|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr\n","src":"log","t_ms":18278}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187206945|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch\n","src":"log","t_ms":18278}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":1481,"src":"fs","t_ms":18278}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:06.943 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr\n","src":"log","t_ms":18278}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:06.945 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch\n","src":"log","t_ms":18278}
+{"event":"size","path":"run/debug/maestro.log","size":3904,"src":"fs","t_ms":18558}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187207232|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":18558}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187207234|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":18558}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":1722,"src":"fs","t_ms":18558}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:07.232 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":18558}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:07.234 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":18558}
+{"src":"proc","t_ms":20155,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"3.1","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"49792"}]}
+{"event":"size","path":"run/debug/maestro.log","size":4625,"src":"fs","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209151|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209154|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING\n","src":"log","t_ms":20491}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187209155|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME\n","src":"log","t_ms":20491}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":2350,"src":"fs","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.151 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.154 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press Home key PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.154 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Launch app \"com.fleet.anr\" PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that \"Block main thread\" is visible PENDING\n","src":"log","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.155 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press Home key RUNNING\n","src":"log","t_ms":20491}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:09.155 [ INFO] maestro.Maestro.pressKey: Pressing key HOME\n","src":"log","t_ms":20491}
+{"event":"size","path":"run/debug/maestro.log","size":4865,"src":"fs","t_ms":21908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187210559|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED\n","src":"log","t_ms":21908}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187210562|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":21908}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":2563,"src":"fs","t_ms":21908}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:10.559 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press Home key COMPLETED\n","src":"log","t_ms":21908}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:10.562 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":21908}
+{"event":"size","path":"run/debug/maestro.log","size":5070,"src":"fs","t_ms":22081}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187210725|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr\n","src":"log","t_ms":22081}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187210725|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch\n","src":"log","t_ms":22081}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":2746,"src":"fs","t_ms":22081}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:10.725 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr\n","src":"log","t_ms":22081}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:10.725 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch\n","src":"log","t_ms":22081}
+{"event":"size","path":"run/debug/maestro.log","size":5338,"src":"fs","t_ms":22364}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187211040|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":22364}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187211043|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":22364}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":2987,"src":"fs","t_ms":22364}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:11.040 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":22364}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:11.043 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":22364}
+{"src":"proc","t_ms":22618,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"5.4","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"78224"}]}
+{"event":"size","path":"run/debug/maestro.log","size":6059,"src":"fs","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212358|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212360|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212361|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key RUNNING\n","src":"log","t_ms":23658}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187212362|DefaultDispatcher-worker-3|INFO|maestro.Maestro|Pressing key HOME\n","src":"log","t_ms":23658}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":3615,"src":"fs","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.358 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.360 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Press Home key PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.361 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Launch app \"com.fleet.anr\" PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.361 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandReset: Assert that \"Block main thread\" is visible PENDING\n","src":"log","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.361 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Press Home key RUNNING\n","src":"log","t_ms":23658}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:12.362 [ INFO] maestro.Maestro.pressKey: Pressing key HOME\n","src":"log","t_ms":23658}
+{"event":"size","path":"run/debug/maestro.log","size":6299,"src":"fs","t_ms":25121}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187213794|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Press Home key COMPLETED\n","src":"log","t_ms":25121}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187213806|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":25121}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":3828,"src":"fs","t_ms":25121}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:13.794 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Press Home key COMPLETED\n","src":"log","t_ms":25121}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:13.806 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app \"com.fleet.anr\" RUNNING\n","src":"log","t_ms":25121}
+{"src":"proc","t_ms":25271,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"1.9","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"61056"}]}
+{"event":"size","path":"run/debug/maestro.log","size":6504,"src":"fs","t_ms":25349}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187214030|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Launching app com.fleet.anr\n","src":"log","t_ms":25349}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187214032|DefaultDispatcher-worker-1|INFO|maestro.Maestro|Stopping com.fleet.anr app during launch\n","src":"log","t_ms":25349}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":4011,"src":"fs","t_ms":25349}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:14.030 [ INFO] maestro.Maestro.launchApp$lambda$6: Launching app com.fleet.anr\n","src":"log","t_ms":25349}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:14.032 [ INFO] maestro.Maestro.launchApp$lambda$6: Stopping com.fleet.anr app during launch\n","src":"log","t_ms":25349}
+{"event":"size","path":"run/debug/maestro.log","size":6772,"src":"fs","t_ms":25751}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187214421|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":25751}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187214422|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":25751}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":4252,"src":"fs","t_ms":25751}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:14.421 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app \"com.fleet.anr\" COMPLETED\n","src":"log","t_ms":25751}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:14.422 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that \"Block main thread\" is visible RUNNING\n","src":"log","t_ms":25751}
+{"event":"size","path":"run/debug/maestro.log","size":7030,"src":"fs","t_ms":26598}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187215250|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":26598}
+{"file":"run/debug/maestro.log","line":"MFLT1|1794187215253|DefaultDispatcher-worker-3|INFO|maestro.cli.runner.CliConsoleListener|Repeat 3 times COMPLETED\n","src":"log","t_ms":26598}
+{"event":"size","path":"run/debug/repeat/logs/maestro.log","size":4486,"src":"fs","t_ms":26598}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:15.250 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that \"Block main thread\" is visible COMPLETED\n","src":"log","t_ms":26598}
+{"file":"run/debug/repeat/logs/maestro.log","line":"03:20:15.253 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Repeat 3 times COMPLETED\n","src":"log","t_ms":26598}
+{"event":"created","path":"run/debug/repeat/commands.json","size":0,"src":"fs","t_ms":26660}
+{"event":"size","path":"run/debug/repeat/commands.json","size":7763,"src":"fs","t_ms":27773}
+{"src":"proc","t_ms":27855,"tree":[{"command":"/usr/bin/java --enable-native-access=ALL-UNNAMED -classpath /opt/homebrew/Cellar/maestro/2.12.1/libexec/lib/* maestro.cli.AppKt --device emulator-5600 test --format junit --output <CAPTURE>/run/report.xml --flatten-debug-output --debug-output <CAPTURE>/run/debug <REPO>/examples/flows/phase0/repeat.yaml","cpu":"87.6","pgid":"10507","pid":10575,"ppid":10509,"rss_kib":"170656"}]}
+{"event":"created","path":"run/debug/repeat/logs/device-logcat.txt","size":55681,"src":"fs","t_ms":27946}
+{"bytes":22,"line":"[Passed] repeat (13s)\n","src":"stdout","t_ms":28210}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":28218}
+{"bytes":23,"line":"1/1 Flow Passed in 13s\n","src":"stdout","t_ms":28218}
+{"bytes":1,"line":"\n","src":"stdout","t_ms":28218}
+{"event":"created","path":"run/debug/repeat/manifest.json","size":543,"src":"fs","t_ms":28228}
+{"event":"created","path":"run/report.xml","size":0,"src":"fs","t_ms":28282}
+{"event":"size","path":"run/report.xml","size":369,"src":"fs","t_ms":28341}
