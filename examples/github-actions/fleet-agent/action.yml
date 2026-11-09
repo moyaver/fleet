@@ -22,7 +22,7 @@ inputs:
   version:
     description: fleet-agent release tag to install, when `install` is true.
     required: false
-    default: v0.1.0-alpha.3
+    default: v0.1.0-alpha.4
   server:
     description: >-
       Fleet server URL (FLEET_SERVER). Empty keeps the job's own setting; unset means offline.

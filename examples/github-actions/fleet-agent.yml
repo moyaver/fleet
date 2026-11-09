@@ -24,7 +24,7 @@ jobs:
       # Installs the agent release named by the action's `version` input (checksum-verified, build
       # attestation checked) and runs the command under it. The job summary goes to the run page.
       # Pinned to the release that ships this action; move the tag with each release.
-      - uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.3
+      - uses: moyaver/fleet/examples/github-actions/fleet-agent@v0.1.0-alpha.4
         with:
           command: maestro test .maestro/
       - name: Send anything the agent couldn't deliver

@@ -15,7 +15,7 @@ Fleet is **self-hosted, live observability for mobile UI tests in CI**. It watch
 [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](#roadmap) · [Documentation](#documentation)
 
 > [!IMPORTANT]
-> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is in progress.** The latest pre-release is [`v0.1.0-alpha.3`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.3); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
+> **Alpha pre-release.** The agent, server and browser dashboard work end to end: **M2–M5 complete**. **M6 (hardening and v1.0) is in progress.** The latest pre-release is [`v0.1.0-alpha.4`](https://github.com/moyaver/fleet/releases/tag/v0.1.0-alpha.4); interfaces may still change before 1.0.0. See the [full roadmap](docs/ROADMAP.md).
 
 ## Why Fleet?
 
@@ -38,10 +38,10 @@ The agent, server, and web dashboard are written in **Rust** (the dashboard is L
 
 ### Install the agent (alpha pre-release)
 
-Install `fleet-agent` from the `v0.1.0-alpha.3` release. It ships for Apple Silicon macOS and for Linux on x86_64 and aarch64 (static musl binaries):
+Install `fleet-agent` from the `v0.1.0-alpha.4` release. It ships for Apple Silicon macOS and for Linux on x86_64 and aarch64 (static musl binaries):
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.3/fleet-agent-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/moyaver/fleet/releases/download/v0.1.0-alpha.4/fleet-agent-installer.sh | sh
 ```
 
 Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build attestation. To verify an archive you downloaded, with the [GitHub CLI](https://cli.github.com/):
@@ -50,7 +50,7 @@ Each archive has a SHA-256 checksum (listed in `sha256.sum`) and a GitHub build 
 gh attestation verify fleet-agent-x86_64-unknown-linux-musl.tar.xz --repo moyaver/fleet
 ```
 
-The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.3`; the [Compose guide](deploy/compose/README.md) uses it by default. That image predates the clean break, so until the next release the server is built from source too: the Compose guide's Start section has the commands. To build the agent from source instead, follow step 1.
+The server image is `ghcr.io/moyaver/fleet:0.1.0-alpha.4`; the [Compose guide](deploy/compose/README.md) uses it by default. To build the agent from source instead, follow step 1.
 
 ### 1. Observe a Maestro run locally
 
@@ -82,7 +82,7 @@ The working server receives agent events over WebSocket (with an HTTPS batch fal
 2. Set `FLEET_SERVER` on your CI runner. Use GitHub Actions OIDC with an approved trust policy or a project API key (`FLEET_TOKEN`).
 3. Wrap your existing command with `fleet-agent run --`. Add `fleet-agent flush` as an always-run cleanup step if desired.
 
-The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.3` agent from its checksum-verified release and runs the Maestro command under it. The job summary (failing flows, each linked to its flow page, and a dashboard link) is included from `v0.1.0-alpha.2`. Until the next release, that default cannot report to a server built from this branch: the Compose guide and the free VM guide give the source-build steps.
+The [GitHub Actions example](examples/github-actions/fleet-agent.yml) uses the composite action in [`examples/github-actions/fleet-agent`](examples/github-actions/fleet-agent/action.yml). It installs the `v0.1.0-alpha.4` agent from its checksum-verified release and runs the Maestro command under it. The job summary (failing flows, each linked to its flow page, and a dashboard link) is included from `v0.1.0-alpha.2`.
 
 Setup time was measured once on a Mac, following only the docs, with a source build of the server and a throwaway Android emulator: the server stack built and came up in 8 min 17 s (its build cache state was not logged), and a local Maestro run reached the dashboard within a second of the agent starting. A VM, DNS and public TLS were not timed, and no GitHub-hosted run reached this server. Details and limits: [research/15](research/15-setup-cost.md).
 
