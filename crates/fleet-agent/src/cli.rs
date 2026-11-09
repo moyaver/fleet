@@ -40,6 +40,11 @@ enum Cmd {
         /// The agent's directory for this run (spool, journal).
         #[arg(long, env = "FLEET_RUN_DIR")]
         run_dir: Option<std::path::PathBuf>,
+        /// Upload Maestro's own screenshots (`takeScreenshot`) and recordings (`startRecording`) of
+        /// failed flows, with their pixels unredacted. Off by default; the same as setting
+        /// `FLEET_UPLOAD_USER_MEDIA=1` (issue #133).
+        #[arg(long)]
+        upload_user_media: bool,
         /// Most bytes `journal.jsonl` may take. Past it the file stops, ending in a
         /// `journal.truncated` line; the events still reach the server (issue #37).
         #[arg(long, env = "FLEET_JOURNAL_MAX_BYTES", default_value_t = crate::journal::DEFAULT_MAX_BYTES)]
@@ -98,12 +103,19 @@ pub fn main() -> ! {
             no_observer,
             fleet_rewrite,
             run_dir,
+            upload_user_media,
             journal_max_bytes,
             plan,
             shard,
             command,
         } => {
             let opts = supervisor::Options {
+                user_media: upload_user_media
+                    || crate::observer::user_media_switch(
+                        std::env::var(crate::observer::USER_MEDIA_ENV)
+                            .ok()
+                            .as_deref(),
+                    ) == crate::session::UserMedia::On,
                 grace: Duration::from_secs(grace),
                 finalize_timeout: Duration::from_secs(finalize_timeout),
                 no_observer,

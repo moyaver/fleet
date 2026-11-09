@@ -40,7 +40,7 @@ use crate::{
     layout,
     metrics::{Pressure, SAMPLE_TICK, Sampler, Throttle},
     outbox::{Budget, Outbox},
-    session::{Candidate, DrivenDevice, Observation, Session},
+    session::{Candidate, DrivenDevice, Observation, Session, UserMedia},
     transport::{self, Shared},
     upload::{self, Outcome, Source, Uploader},
     watch::{self, BundleScanner, Located, LogTailer},
@@ -53,6 +53,19 @@ const FAULT_ENV: &str = "FLEET_FAULT";
 pub(crate) const SUPERVISOR_PID_ENV: &str = "FLEET_SUPERVISOR_PID";
 /// Where the supervisor asks the observer to write its own log.
 pub(crate) const LOG_ENV: &str = "FLEET_OBSERVER_LOG";
+
+/// The switch that uploads Maestro's own screenshots and recordings of failed flows (issue #133).
+/// `fleet-agent run --upload-user-media` sets it for the observer; `publish` reads it too.
+pub(crate) const USER_MEDIA_ENV: &str = "FLEET_UPLOAD_USER_MEDIA";
+
+/// What a [`USER_MEDIA_ENV`] value says: `1`, `true`, `yes` or `on`, in any case, turns the switch
+/// on. Anything else, or no value, leaves Maestro's screenshots and recordings on the runner.
+pub(crate) fn user_media_switch(value: Option<&str>) -> UserMedia {
+    match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+        Some("1" | "true" | "yes" | "on") => UserMedia::On,
+        _ => UserMedia::Off,
+    }
+}
 
 const POLL: Duration = Duration::from_millis(250);
 const MAX_LINE: usize = 64 * 1024;
@@ -466,6 +479,9 @@ fn start(
     let layout = watched_layout(argv, evidence.is_some(), started);
     let cwd = std::env::current_dir().ok();
     let mut session = Session::new(argv, evidence, redactor, Box::new(Uuid::now_v7), at);
+    session.set_user_media(user_media_switch(
+        std::env::var(USER_MEDIA_ENV).ok().as_deref(),
+    ));
     configure_workspace(&mut session, argv);
     let outbox = run_dir.map_or_else(Outbox::default, |d| {
         Outbox::with_spool(&d.join("spool.bin"), agent_run_id, Budget::default())
@@ -649,6 +665,9 @@ pub(crate) fn candidate_item(
             };
             (ct, Source::File(file))
         }
+        // Maestro's own screenshot and recording: binary, so they are streamed as they are (I6).
+        ArtifactClass::UserScreenshot => ("image/png", Source::File(file)),
+        ArtifactClass::UserRecording => ("video/mp4", Source::File(file)),
         // The window of the device log around the failed step (issue #75).
         ArtifactClass::DeviceLogcat => {
             let failure = c.failure?;
@@ -1131,6 +1150,52 @@ mod tests {
 
     use super::*;
     use crate::device::{API_LEVEL, PROBE};
+
+    /// Maestro's own screenshot and recording are uploaded as their classes, streamed from the
+    /// file as Maestro wrote it, with the content type the server accepts for each (issue #133).
+    #[test]
+    fn a_users_media_is_an_item_of_its_own_class_streamed_as_it_is() {
+        let session = Session::new(
+            &["maestro".to_owned(), "test".to_owned()],
+            None,
+            fleet_maestro::redact::redactor_for_run(&[], std::iter::empty()),
+            Box::new(Uuid::now_v7),
+            ClockSample {
+                wall: OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            },
+        );
+        let bundles = Path::new("/runs/debug");
+        for (class, rel, content_type) in [
+            (
+                ArtifactClass::UserScreenshot,
+                "fail/takeScreenshot/fleet-main.png",
+                "image/png",
+            ),
+            (
+                ArtifactClass::UserRecording,
+                "fail/startRecording/fleet-rec.mp4",
+                "video/mp4",
+            ),
+        ] {
+            let c = Candidate {
+                class,
+                rel: rel.to_owned(),
+                flow: None,
+                step: Some(4),
+                failure: None,
+            };
+            let item = candidate_item(&session, Some(bundles), &c).expect("an item");
+            assert_eq!(item.class, class);
+            assert_eq!(item.content_type, content_type);
+            assert_eq!(item.step, Some(4));
+            assert!(
+                matches!(&item.source, Source::File(p) if p == &bundles.join(rel)),
+                "{:?}",
+                item.source
+            );
+        }
+    }
 
     fn report_with_age(dir: &Path, age: Duration) -> PathBuf {
         let p = dir.join("report.xml");

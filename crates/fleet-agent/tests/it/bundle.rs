@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use std::process::{Command, Stdio};
 
-use super::stream::{Mode, fixture, run_agent, server, types};
+use super::stream::{Mode, fixture, run_agent, run_agent_with_agent_flags, server, types};
 
 /// The secret the `fail` fixture's log, commands and JUnit report all show.
 const PLANTED: &str = "Fleet never shows this";
@@ -219,4 +219,120 @@ fn a_maestro_output_directory_publishes_its_run_end_last() {
     assert_eq!(last["type"], "run.ended");
     // The agent run is new: it is not the one a live run of this directory would have had.
     assert_ne!(s.hellos[0]["agent_run_id"], Value::Null);
+}
+
+/// The bundle's artifacts whose class is one of Maestro's own screenshots or recordings.
+fn user_media(manifest: &Value) -> Vec<Value> {
+    manifest["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|a| a["class"].as_str().is_some_and(|c| c.starts_with("user_")))
+        .cloned()
+        .collect()
+}
+
+/// The user-media switch (`FLEET_UPLOAD_USER_MEDIA`, issue #133): a failed flow's `takeScreenshot`
+/// image and `startRecording` video are bundled under their own classes, each on the step that made
+/// it, with the bytes Maestro wrote.
+#[test]
+fn with_the_switch_a_failed_flows_own_media_is_bundled_on_its_step() {
+    let (out, _, run_dir) = run_agent(
+        "user-media-fail",
+        None,
+        &[],
+        &[("FLEET_UPLOAD_USER_MEDIA", "1")],
+    );
+    assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+    let all = entries(&run_dir.join("fleet-bundle.tar.zst"));
+    let manifest: Value = serde_json::from_slice(&all["manifest.json"]).unwrap();
+    let media = user_media(&manifest);
+    assert_eq!(media.len(), 2, "{media:?}");
+    let by_class = |class: &str| {
+        media
+            .iter()
+            .find(|a| a["class"] == class)
+            .unwrap_or_else(|| panic!("no {class} in {media:?}"))
+            .clone()
+    };
+    let shot = by_class("user_screenshot");
+    assert_eq!(
+        (shot["step"].as_u64(), shot["content_type"].as_str()),
+        (Some(4), Some("image/png"))
+    );
+    assert_eq!(
+        all[shot["file"].as_str().unwrap()],
+        fs::read(fixture(
+            "user-media-fail/run/debug/user-media-fail/takeScreenshot/fleet-before-fail.png"
+        ))
+        .unwrap(),
+        "the bytes Maestro wrote, unredacted"
+    );
+    let recording = by_class("user_recording");
+    assert_eq!(
+        (
+            recording["step"].as_u64(),
+            recording["content_type"].as_str()
+        ),
+        (Some(5), Some("video/mp4"))
+    );
+    assert_eq!(
+        all[recording["file"].as_str().unwrap()],
+        fs::read(fixture(
+            "user-media-fail/run/debug/user-media-fail/startRecording/fleet-fail-recording.mp4"
+        ))
+        .unwrap(),
+    );
+}
+
+/// Without the switch the bundle is what it was before #133: no Maestro screenshot or recording,
+/// failed flow or not (the rest of the failure evidence is still there).
+#[test]
+fn without_the_switch_no_own_media_is_bundled() {
+    let (out, _, run_dir) = run_agent("user-media-fail", None, &[], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    let all = entries(&run_dir.join("fleet-bundle.tar.zst"));
+    let manifest: Value = serde_json::from_slice(&all["manifest.json"]).unwrap();
+    assert!(user_media(&manifest).is_empty(), "{manifest}");
+    let classes: Vec<&str> = manifest["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["class"].as_str().unwrap())
+        .collect();
+    assert!(classes.contains(&"failure_screenshot"), "{classes:?}");
+    assert!(classes.contains(&"commands"), "{classes:?}");
+    assert!(
+        !all.keys()
+            .any(|k| k.contains("artifacts/") && all[k].is_empty()),
+        "no empty artifact was written"
+    );
+}
+
+/// A passing flow's media never leaves the runner, even with the switch on (issue #133, I6).
+#[test]
+fn with_the_switch_a_passing_flows_media_is_not_bundled() {
+    for fixture_name in ["screenshot", "recording", "anr"] {
+        let (out, _, run_dir) =
+            run_agent(fixture_name, None, &[], &[("FLEET_UPLOAD_USER_MEDIA", "1")]);
+        let all = entries(&run_dir.join("fleet-bundle.tar.zst"));
+        let manifest: Value = serde_json::from_slice(&all["manifest.json"]).unwrap();
+        assert!(
+            user_media(&manifest).is_empty(),
+            "{fixture_name} passed ({:?}): {manifest}",
+            out.status.code()
+        );
+    }
+}
+
+/// `fleet-agent run --upload-user-media` is the same switch as `FLEET_UPLOAD_USER_MEDIA=1` (issue
+/// #133): the failed flow's own media is bundled.
+#[test]
+fn the_agent_flag_turns_the_switch_on_like_the_variable() {
+    let (out, _, run_dir) =
+        run_agent_with_agent_flags("user-media-fail", &["--upload-user-media"], &[]);
+    assert_eq!(out.status.code(), Some(1), "Maestro's own exit status (I1)");
+    let all = entries(&run_dir.join("fleet-bundle.tar.zst"));
+    let manifest: Value = serde_json::from_slice(&all["manifest.json"]).unwrap();
+    assert_eq!(user_media(&manifest).len(), 2, "{manifest}");
 }

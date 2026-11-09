@@ -190,7 +190,16 @@ async fn publish_saved(
 ) -> anyhow::Result<Published> {
     let dir = input.to_owned();
     let mut replayed = tokio::task::spawn_blocking(move || {
-        inspect::replay(&dir, Box::new(Uuid::now_v7)).map(|r| (r, dir))
+        inspect::replay(
+            &dir,
+            Box::new(Uuid::now_v7),
+            crate::observer::user_media_switch(
+                std::env::var(crate::observer::USER_MEDIA_ENV)
+                    .ok()
+                    .as_deref(),
+            ),
+        )
+        .map(|r| (r, dir))
     })
     .await
     .context("reading the run")??;
@@ -687,7 +696,12 @@ mod tests {
         // at 1793751906337 (Unix ms): the run started then, not at the epoch.
         let debug = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/maestro/2.12.1/fail/run/debug");
-        let mut replayed = inspect::replay(&debug, Box::new(Uuid::now_v7)).unwrap();
+        let mut replayed = inspect::replay(
+            &debug,
+            Box::new(Uuid::now_v7),
+            crate::session::UserMedia::Off,
+        )
+        .unwrap();
         let events = replayed.session.drain();
         let first = events.first().expect("the run started");
         let started =
@@ -710,7 +724,8 @@ mod tests {
     #[test]
     fn a_captured_run_publishes_its_screenshot_commands_log_and_report() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/maestro/2.12.1/fail");
-        let mut replayed = inspect::replay(&dir, Box::new(Uuid::now_v7)).unwrap();
+        let mut replayed =
+            inspect::replay(&dir, Box::new(Uuid::now_v7), crate::session::UserMedia::Off).unwrap();
         let mut classes: Vec<&str> = saved_uploads(&mut replayed, &dir)
             .iter()
             .map(|p| match p {

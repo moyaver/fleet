@@ -232,14 +232,16 @@ const MAX_LOOK_INTERVAL: Duration = Duration::from_secs(1);
 /// Shortest wait between two looks, while new flow files keep appearing.
 const MIN_LOOK_INTERVAL: Duration = Duration::from_millis(50);
 
-/// Whether `dir` holds Maestro's flow files: its `manifest.json` or `commands.json`, or its `logs`
-/// or `screenshots` folder. A directory with none of them is not a flow, whatever its name.
+/// Whether `dir` holds Maestro's flow files: its `manifest.json` or `commands.json`, or its `logs`,
+/// `screenshots`, `takeScreenshot` or `startRecording` folder. A directory with none of them is not
+/// a flow, whatever its name.
 fn is_flow_dir(dir: &Path) -> bool {
     ["manifest.json", "commands.json"]
         .iter()
         .any(|f| dir.join(f).is_file())
-        || dir.join("logs").is_dir()
-        || dir.join("screenshots").is_dir()
+        || ["logs", "screenshots", "takeScreenshot", "startRecording"]
+            .iter()
+            .any(|f| dir.join(f).is_dir())
 }
 
 /// Reports flow bundle files as they appear, in one root Maestro writes flow folders into.
@@ -309,7 +311,14 @@ impl BundleScanner {
             .collect();
         for (name, path) in flows {
             self.report(&name, None, &mut out);
-            for sub in ["screenshots", "screen-hierarchy"] {
+            // Maestro's own `takeScreenshot` and `startRecording` files (issue #133) are reported with
+            // the failure files: the session decides whether they are uploaded.
+            for sub in [
+                "screenshots",
+                "screen-hierarchy",
+                "takeScreenshot",
+                "startRecording",
+            ] {
                 let Ok(files) = std::fs::read_dir(path.join(sub)) else {
                     continue;
                 };
@@ -562,6 +571,44 @@ mod tests {
                 "login/screenshots/step-003-x.png",
                 "login/commands.json",
                 "login/manifest.json"
+            ]
+        );
+        assert!(s.scan_at(at(t, 3), true).is_empty(), "nothing twice");
+        std::fs::remove_dir_all(&d).ok();
+    }
+
+    /// Maestro's own screenshots and recordings are reported as they appear, once each, and a file
+    /// still named `.tmp` is not yet a file (issue #133).
+    #[test]
+    fn the_scanner_reports_maestros_own_screenshots_and_recordings_once_their_names_are_final() {
+        let d = tmp("own-media");
+        let flow = d.join("login");
+        std::fs::create_dir_all(flow.join("takeScreenshot")).unwrap();
+        std::fs::create_dir_all(flow.join("startRecording")).unwrap();
+        let mut s = BundleScanner::new(d.clone(), UNIX_EPOCH);
+        let t = Instant::now();
+        let rels = |obs: Vec<Observation>| {
+            obs.into_iter()
+                .filter_map(|o| match o {
+                    Observation::File { rel, .. } => Some(rel),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(rels(s.scan_at(at(t, 0), false)), ["login"]);
+        std::fs::write(flow.join("takeScreenshot/fleet-main.png.tmp"), b"").unwrap();
+        std::fs::write(flow.join("startRecording/fleet-rec.mp4.tmp"), b"").unwrap();
+        assert!(
+            s.scan_at(at(t, 1), false).is_empty(),
+            "nothing is final yet"
+        );
+        std::fs::write(flow.join("takeScreenshot/fleet-main.png"), b"").unwrap();
+        std::fs::write(flow.join("startRecording/fleet-rec.mp4"), b"").unwrap();
+        assert_eq!(
+            rels(s.scan_at(at(t, 2), false)),
+            [
+                "login/takeScreenshot/fleet-main.png",
+                "login/startRecording/fleet-rec.mp4"
             ]
         );
         assert!(s.scan_at(at(t, 3), true).is_empty(), "nothing twice");
