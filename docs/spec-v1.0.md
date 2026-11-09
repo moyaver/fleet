@@ -1,6 +1,8 @@
 # Maestro Fleet
 ## Technical Product & Architecture Specification — v1.0
 
+> **Superseded in part (2026-11-09).** Sections 1 (vision), 11 (hosting-independent deployment) and 17 (non-goals) no longer describe the product. [ADR-0016](decisions/0016-fleet-is-a-hub.md) makes Fleet a hub for mobile e2e tests, and the hub plan is [research 16](../research/16-hub-plan.md). Hosting in §11 is also superseded by the hub plan's hosted tier, which ADR-0017 records when its wave starts. Read the other sections as written.
+>
 > Original specification as supplied, preserved verbatim for reference.
 > Research findings and proposed revisions (including the move to an all-Rust
 > implementation) live in [`../research/`](../research/) and [`./decisions/`](./decisions/).

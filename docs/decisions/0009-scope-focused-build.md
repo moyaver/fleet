@@ -1,6 +1,6 @@
 # ADR-0009: Scope: focused build
 
-**Status:** Accepted (shipped in M5, 2026-11-06) · **Date:** 2026-11-03 · **Research:** [07 §6](../../research/07-prior-art-and-build-vs-buy.md)
+**Status:** Superseded for scope by [ADR-0016](0016-fleet-is-a-hub.md) (2026-11-09) · **Shipped:** M5, 2026-11-06 · **Date:** 2026-11-03 · **Research:** [07 §6](../../research/07-prior-art-and-build-vs-buy.md)
 
 ## Decision
 **Build** what nobody offers for company-run CI emulators:
