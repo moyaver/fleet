@@ -150,6 +150,18 @@ The Compose reference deployment fixes its network to `10.77.0.0/24` and trusts 
 | `rate_limits.events_per_second`, `rate_limits.event_burst` | `1000`, `5000` | Events per second one agent socket may send on average, and at once. Beyond it the server reads that socket more slowly; no event is dropped |
 | `rate_limits.max_tracked_keys` | `100000` | Clients tracked per limiter; memory stays bounded. A new client beyond this is told to retry in one second until an idle one ages out |
 
+## A busy database
+
+The server stores a batch in one transaction, on a pool of `database.max_connections` connections (20 by default). A batch that waits longer than the pool's 5-second acquire timeout is not stored: the agent gets a retryable `overloaded` error, keeps its connection, waits, and resends the batch (see [the protocol](protocol.md#session)). Nothing is lost and no run fails over it, but every refusal is a batch the agents must send again, so a steady stream of these warnings means the database cannot keep up with the agents.
+
+The server writes one line for these refusals, at most once every 10 seconds, with the number refused since the last line:
+
+```
+WARN the database is busy: refusing batches for the agents to resend refused=<n>
+```
+
+What to do: if Postgres has connections to spare (its `max_connections`), raise `database.max_connections`. Otherwise give the database more CPU, memory or disk, or run fewer agents against it. Other database failures are not retried this way: the agent's connection closes and the server logs an `error` line.
+
 ## Artifact storage
 
 Screenshots, JUnit reports, logs, HTML reports and debug bundles are stored as **content-addressed blobs**: a blob's key is its project and the SHA-256 of its bytes. Uploading the same bytes twice to one project stores them once, and one project can never read or delete another project's blobs. A blob is only stored if its size and SHA-256 match what was declared; a mismatch stores nothing. The backend is chosen once, with `storage.backend`. Agents upload through the server by default (relayed: the store never needs to be reachable from runners or browsers). With `s3`, an agent that can reach the store may upload directly instead; see [Direct upload](#direct-upload) and [Artifact uploads](#artifact-uploads). The blob store is opened on first use, and the server logs a warning at start-up if it can't be opened.

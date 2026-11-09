@@ -90,6 +90,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Runner guide: a "Hardening a runner" section for the steps the repository can document (research 06 T18, T19, #140). The immutable-releases setting and ephemeral runners for `fleet-mac` are the owner's to set.
 
 ### Fixed
+- Server: a batch the database cannot start in time (the pool's 5 s acquire timeout) is refused with a non-fatal `overloaded` error that names the batch's first `seq`, instead of a fatal internal error that closed the agent's socket. The socket stays open and nothing of the batch is stored. The refusals are logged at `warn`, at most once every 10 seconds. Every other store error is still fatal (research 14, F1).
+- Agent: a busy server is waited out (200 ms to 5 s, jittered, reset by the next ack) and the batch resent on the same connection from the refusal's `expected_seq`. The run does not fail over it.
+- Loadgen: the same wait and resend, and the results JSON counts the refusals as `busy`.
 - Dashboard: a flow the log started whose run ended with no verdict for it is Unknown with the Missing provenance, not Running. The run's end re-resolves its started flows, and an ended agent run counts as the end of its evidence, as a closed suite does (`fleet-core` `resolve`, `flow_provenance`).
 - Agent: `fleet-agent inspect` and `publish` read a flow's bundles where the layout model says Maestro writes them: `--test-output-dir`, `--debug-output` apart from the session log, and a workspace config's `testOutputDir`. The captured `paths-debug-and-test-output-apart`, `paths-debug-and-test-output-same`, `paths-test-output-dir` and `paths-config-*` runs now settle their flows as a live run does, and a command that runs Maestro from a shell script (`exec maestro …`) is read as its command.
 
