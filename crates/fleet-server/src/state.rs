@@ -43,6 +43,8 @@ pub(crate) struct Inner {
     blobs_override: std::sync::OnceLock<Arc<dyn BlobStore>>,
     /// Readiness: false until start-up finished, and again while draining.
     ready: AtomicBool,
+    /// Busy refusals of the ingest path, counted so their warning is rate-limited.
+    pub(crate) busy: std::sync::Mutex<crate::ingest::BusyLog>,
 }
 
 impl std::ops::Deref for AppState {
@@ -76,6 +78,7 @@ impl AppState {
             telemetry: TelemetryBuffer::default(),
             limits,
             ready: AtomicBool::new(false),
+            busy: std::sync::Mutex::default(),
         })))
     }
 

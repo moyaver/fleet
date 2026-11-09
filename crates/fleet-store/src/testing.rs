@@ -72,6 +72,23 @@ impl Drop for TestDatabase {
     }
 }
 
+/// A pooled connection, held until the guard is dropped: the pool has one connection fewer while
+/// it lives, so a store with a pool of one makes its next operation wait for the acquire timeout.
+#[must_use = "dropping the guard returns the connection to the pool"]
+#[derive(Debug)]
+pub struct HeldConnection(
+    #[expect(dead_code, reason = "held for its drop, never read")]
+    sqlx::pool::PoolConnection<sqlx::Postgres>,
+);
+
+/// Takes a connection from `store`'s pool and holds it (see [`HeldConnection`]).
+///
+/// # Errors
+/// Fails when the pool cannot hand a connection out within its acquire timeout.
+pub async fn hold_connection(store: &Store) -> Result<HeldConnection> {
+    Ok(HeldConnection(store.pool().acquire().await?))
+}
+
 /// A fresh, migrated database. Keep the guard until the test is done with the database.
 ///
 /// # Panics
