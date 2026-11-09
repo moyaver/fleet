@@ -776,7 +776,7 @@ async fn declare(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use sha2::{Digest, Sha256};
     use sqlx::PgPool;
 
@@ -801,7 +801,7 @@ mod tests {
     }
 
     /// Uploads a failure screenshot of `flow` at `step` and returns its artifact.
-    async fn upload_shot(
+    pub(crate) async fn upload_shot(
         store: &Store,
         publisher: &Publisher,
         handle: &RunHandle,
