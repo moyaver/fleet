@@ -172,6 +172,14 @@ async fn an_administrator_sees_every_section_with_seeded_data_and_a_viewer_is_re
         0,
         "a viewer is shown no form to change Screen G"
     );
+    assert_eq!(
+        page.count(
+            "form[action*=\"/api/v1/admin/retention/\"], form[action*=\"/api/v1/admin/artifact-classes/\"], form[action*=\"/api/v1/admin/artifact-quota/\"], form[action*=\"/api/v1/admin/metric-policy/\"]"
+        )
+        .await,
+        0,
+        "a viewer is shown no form to change the retention, artifact or metric policy"
+    );
     browser
         .client
         .goto(&format!("{origin}/admin/audit"))
@@ -389,6 +397,88 @@ async fn act_on_row(client: &fantoccini::Client, row_text: &str, action: &str) {
     run(client, &script).await;
 }
 
+/// Fills the form that posts to `action` (its path, which names the project and class) and sends
+/// it. A field named in `unticked` is unticked, which a form does not send: how a class is turned
+/// off. The form is opened first, since a disclosure hides it until it is.
+async fn send_at(
+    client: &fantoccini::Client,
+    action: &str,
+    fields: &[(&str, &str)],
+    unticked: &[&str],
+) {
+    until(
+        client,
+        &format!("the form to {action}"),
+        &format!("document.querySelector('form[action=\"{action}\"]') !== null"),
+    )
+    .await;
+    let mut set = String::new();
+    for (name, value) in fields {
+        let value = serde_json::to_string(value).unwrap();
+        let _ = write!(set, "f.querySelector('[name=\"{name}\"]').value = {value};");
+    }
+    for name in unticked {
+        let _ = write!(set, "f.querySelector('[name=\"{name}\"]').checked = false;");
+    }
+    let script = format!(
+        "const f = document.querySelector('form[action=\"{action}\"]'); \
+         const disclosure = f.closest('details'); if (disclosure) disclosure.open = true; {set} \
+         const csrf = f.querySelector('input[name=csrf]'); \
+         if (!csrf || csrf.value !== 'e2e-csrf-token') {{ return 'csrf is missing'; }} \
+         f.querySelector('button[type=submit]').click(); return 'sent';"
+    );
+    assert_eq!(
+        run(client, &script).await,
+        json!("sent"),
+        "the form to {action} carries the session's token"
+    );
+}
+
+/// Opens the audit history and checks its newest event of `action`: the before and the after
+/// texts each contain every fragment given. Then returns to the administration page.
+async fn audited(
+    client: &fantoccini::Client,
+    origin: &str,
+    action: &str,
+    before: &[&str],
+    after: &[&str],
+) {
+    client.goto(&format!("{origin}/admin/audit")).await.unwrap();
+    until(
+        client,
+        &format!("the {action} event"),
+        &format!(
+            "Array.from(document.querySelectorAll('td[data-label=What]')).some(td => td.textContent.trim() === '{action}')"
+        ),
+    )
+    .await;
+    let row = run(
+        client,
+        &format!(
+            "const row = Array.from(document.querySelectorAll('tr')).find(r => r.querySelector('td[data-label=What]')?.textContent.trim() === '{action}'); \
+             return {{before: row.querySelector('td[data-label=Before]').textContent, after: row.querySelector('td[data-label=After]').textContent}};"
+        ),
+    )
+    .await;
+    let (shown_before, shown_after) = (
+        row["before"].as_str().unwrap(),
+        row["after"].as_str().unwrap(),
+    );
+    for fragment in before {
+        assert!(
+            shown_before.contains(fragment),
+            "{action}: before {shown_before} lacks {fragment}"
+        );
+    }
+    for fragment in after {
+        assert!(
+            shown_after.contains(fragment),
+            "{action}: after {shown_after} lacks {fragment}"
+        );
+    }
+    client.goto(&format!("{origin}/admin")).await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 #[expect(
     clippy::too_many_lines,
@@ -492,6 +582,129 @@ async fn an_administrator_changes_administration_through_its_forms_and_each_chan
     // Revoke the key: its row says so.
     act_on_row(client, "deploy-bot", "Revoke the API key").await;
     until(client, "the key revoked", "Array.from(document.querySelectorAll('tr')).some(r => r.textContent.includes('deploy-bot') && r.textContent.includes('revoked'))").await;
+
+    // Retention: the configured project keeps its report artifacts for 45 days, not a year.
+    send_at(
+        client,
+        "/api/v1/admin/retention/app/report/edit",
+        &[("days", "45")],
+        &[],
+    )
+    .await;
+    until(
+        client,
+        "the new retention window",
+        "Array.from(document.querySelectorAll('tr')).some(r => r.querySelector('td[data-label=Project]')?.textContent.trim() === 'app' && r.querySelector('td[data-label=Class]')?.textContent.trim() === 'report' && r.querySelector('td[data-label=Kept]')?.textContent.trim() === '45 days')",
+    )
+    .await;
+    audited(
+        client,
+        &origin,
+        "retention.set",
+        &["\"ttl_days\":365}"],
+        &["\"ttl_days\":45}"],
+    )
+    .await;
+
+    // Artifact policy: the configured project turns the junit class off and caps its largest file.
+    send_at(
+        client,
+        "/api/v1/admin/artifact-classes/app/junit/edit",
+        &[("max_bytes", "1048576")],
+        &["accepted"],
+    )
+    .await;
+    until(
+        client,
+        "junit turned off with its largest file",
+        "Array.from(document.querySelectorAll('tr')).some(r => r.querySelector('td[data-label=Project]')?.textContent.trim() === 'app' && r.querySelector('td[data-label=Class]')?.textContent.trim() === 'junit' && r.querySelector('td[data-label=Accepted]')?.textContent.trim() === 'no' && r.querySelector('td[data-label=\"Largest file (bytes)\"]')?.textContent.trim() === '1048576')",
+    )
+    .await;
+    audited(
+        client,
+        &origin,
+        "artifact_class.set",
+        &["\"accepted\":true", "\"max_bytes\":null"],
+        &["\"accepted\":false", "\"max_bytes\":1048576"],
+    )
+    .await;
+
+    // Daily quota: the configured project may declare 1 GiB and 500 files a day.
+    send_at(
+        client,
+        "/api/v1/admin/artifact-quota/app/edit",
+        &[("bytes_per_day", "1073741824"), ("files_per_day", "500")],
+        &[],
+    )
+    .await;
+    until(
+        client,
+        "the new quota",
+        "Array.from(document.querySelectorAll('tr')).some(r => r.querySelector('td[data-label=Project]')?.textContent.trim() === 'app' && r.querySelector('td[data-label=\"Bytes per day\"]')?.textContent.includes('1073741824 bytes (dashboard)'))",
+    )
+    .await;
+    audited(
+        client,
+        &origin,
+        "artifact_quota.set",
+        &["\"bytes_per_day\":null", "\"files_per_day\":null"],
+        &["\"bytes_per_day\":1073741824", "\"files_per_day\":500"],
+    )
+    .await;
+
+    // Metric collection: the configured project samples every 10 s when calm and every 30 s under
+    // pressure.
+    send_at(
+        client,
+        "/api/v1/admin/metric-policy/app/edit",
+        &[
+            ("sample_interval_seconds", "10"),
+            ("pressure_sample_interval_seconds", "30"),
+        ],
+        &[],
+    )
+    .await;
+    until(
+        client,
+        "the new metric intervals",
+        "Array.from(document.querySelectorAll('tr')).some(r => r.querySelector('td[data-label=Project]')?.textContent.trim() === 'app' && r.querySelector('td[data-label=\"Calm sampling\"]')?.textContent.includes('10 s (dashboard)') && r.querySelector('td[data-label=\"Under pressure\"]')?.textContent.includes('30 s (dashboard)'))",
+    )
+    .await;
+    audited(
+        client,
+        &origin,
+        "metric_policy.set",
+        &[
+            "\"sample_interval_ms\":null",
+            "\"pressure_sample_interval_ms\":null",
+        ],
+        &[
+            "\"sample_interval_ms\":10000",
+            "\"pressure_sample_interval_ms\":30000",
+        ],
+    )
+    .await;
+
+    // The configured project is locked: its row says so and offers no rename form. A project the
+    // dashboard made keeps its rename form.
+    until(
+        client,
+        "the projects section",
+        "Array.from(document.querySelectorAll('[data-testid=admin-projects] tr')).some(r => r.querySelector('td[data-label=Slug]')?.textContent.trim() === 'app')",
+    )
+    .await;
+    let rename = run(
+        client,
+        "const rows = Array.from(document.querySelectorAll('[data-testid=admin-projects] tr')); \
+         const row = (slug) => rows.find(r => r.querySelector('td[data-label=Slug]')?.textContent.trim() === slug); \
+         return {app_note: row('app').textContent.includes('from config'), \
+                 app_rename: row('app').querySelector('form[action=\"/api/v1/admin/projects/app/rename\"]') !== null, \
+                 mobile_rename: row('mobile').querySelector('form[action=\"/api/v1/admin/projects/mobile/rename\"]') !== null};",
+    )
+    .await;
+    assert_eq!(rename["app_note"], json!(true), "{rename}");
+    assert_eq!(rename["app_rename"], json!(false), "{rename}");
+    assert_eq!(rename["mobile_rename"], json!(true), "{rename}");
 
     // The audit history shows each change, with the values it changed.
     client.goto(&format!("{origin}/admin/audit")).await.unwrap();
