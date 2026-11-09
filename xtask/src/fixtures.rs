@@ -594,12 +594,15 @@ fn truncate(text: &str, max: usize) -> String {
     )
 }
 
-/// Lines that name a crash or an ANR. A run's ANR can land in the middle of its logcat, so the
-/// logcat cut keeps these lines as well as the head and the tail (issue #77).
-const LOGCAT_MARKERS: [&str; 4] = [
+/// Lines that name a crash or an ANR. A run's ANR or crash can land in the middle of its logcat,
+/// so the logcat cut keeps these lines as well as the head and the tail (issue #77). The
+/// `AndroidRuntime` tag carries a crash's whole stack (`FATAL EXCEPTION`, `Process:`, the
+/// exception and its `at` frames), so every line with that tag is kept.
+const LOGCAT_MARKERS: [&str; 5] = [
     "ANR in ",
     "Input dispatching timed out",
     "FATAL EXCEPTION",
+    "AndroidRuntime",
     "am_anr",
 ];
 
@@ -756,6 +759,25 @@ mod tests {
         // Without a marker the cut is the plain head and tail.
         let plain = truncate_logcat(&filler.repeat(200), 400);
         assert!(plain.contains("bytes cut, 0 lines"), "{plain}");
+    }
+
+    #[test]
+    fn logcat_cut_keeps_a_crash_stack_in_the_middle() {
+        let filler = format!("{}\n", "x".repeat(40));
+        let stack = [
+            "11-09 E/AndroidRuntime( 1): FATAL EXCEPTION: main",
+            "11-09 E/AndroidRuntime( 1): Process: com.fleet.anr, PID: 1",
+            "11-09 E/AndroidRuntime( 1): java.lang.RuntimeException: Fleet app crash",
+            "11-09 E/AndroidRuntime( 1): \tat com.fleet.anr.MainActivity.lambda$onCreate$1(MainActivity.java:37)",
+        ]
+        .join("\n");
+        let text = format!("{}{stack}\n{}", filler.repeat(100), filler.repeat(100));
+        let cut = truncate_logcat(&text, 400);
+        assert!(
+            cut.contains("MainActivity.lambda$onCreate$1(MainActivity.java:37)"),
+            "{cut}"
+        );
+        assert!(cut.contains("4 lines naming a crash or ANR kept"), "{cut}");
     }
 
     #[test]
