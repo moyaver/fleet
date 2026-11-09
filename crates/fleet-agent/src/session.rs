@@ -88,6 +88,9 @@ pub(crate) struct Flow {
     produced: Produced,
     /// Step-bound files seen before `produced` was known: their step waits for it.
     pending_files: Vec<PendingFile>,
+    /// Maestro's own screenshots and recordings of this flow (issue #133). They wait for the flow's
+    /// verdict: they are uploaded only if it failed.
+    pending_media: Vec<PendingMedia>,
 }
 
 /// The one flow file a command runs alone (issue #148): the flow it names and its path.
@@ -157,6 +160,15 @@ impl Produced {
     }
 }
 
+/// A screenshot or recording the flow took on purpose, waiting for the flow's verdict (issue #133).
+#[derive(Debug, Clone)]
+struct PendingMedia {
+    at: ClockSample,
+    class: ArtifactClass,
+    /// Path relative to the debug output directory.
+    rel: String,
+}
+
 /// A failure screenshot or hierarchy waiting for its flow's `commands.json`.
 #[derive(Debug, Clone)]
 struct PendingFile {
@@ -219,6 +231,19 @@ pub(crate) struct Session {
     plan_shard: Option<u32>,
     /// The one flow file the command runs alone, when it names exactly one (issue #148).
     single_flow: Option<SingleFlow>,
+    /// Whether the user-media switch is on: Maestro's own screenshots and recordings of a failed
+    /// flow are uploaded (issue #133). Off by default; nothing about those files is journaled then.
+    user_media: UserMedia,
+}
+
+/// Whether Maestro's own screenshots and recordings are uploaded (issue #133).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum UserMedia {
+    /// Not uploaded, and not journaled: the default.
+    #[default]
+    Off,
+    /// A failed flow's screenshots and recordings are uploaded, linked to their steps.
+    On,
 }
 
 /// A device Maestro selected for a shard: what the observer probes and names in its samples.
@@ -329,6 +354,7 @@ impl Session {
             out: Vec::new(),
             uploads: Vec::new(),
             single_flow: None,
+            user_media: UserMedia::Off,
         };
         // Values of flags nobody classified, and `-e`/`--env` values, never leave (research 06 T5).
         let argv_redacted: Vec<String> = fleet_maestro::redact::redact_argv(argv)
@@ -380,6 +406,12 @@ impl Session {
     /// Files that appeared and are worth uploading, removed from the session.
     pub(crate) fn take_uploads(&mut self) -> Vec<Candidate> {
         std::mem::take(&mut self.uploads)
+    }
+
+    /// Turns the user-media switch on or off (issue #133). It applies to the files seen from now
+    /// on, so it is set before the run's output is read.
+    pub(crate) fn set_user_media(&mut self, media: UserMedia) {
+        self.user_media = media;
     }
 
     /// The redactor every outgoing text goes through.
@@ -451,6 +483,9 @@ impl Session {
             for p in pending {
                 self.register_file(p.at, idx, p.class, &p.rel, p.named);
             }
+            // The flow is over: a failed flow's own media goes without a step it cannot be shown to
+            // have (I3), rather than waiting forever for a `commands.json` that never came.
+            self.flush_user_media(idx, true);
         }
         self.closed = true;
         self.emit(
@@ -909,6 +944,12 @@ impl Session {
                     }
                 }
             }
+            bundle::Entry::UserScreenshot { flow_dir } => {
+                self.on_user_media(at, &flow_dir, rel, ArtifactClass::UserScreenshot);
+            }
+            bundle::Entry::UserRecording { flow_dir } => {
+                self.on_user_media(at, &flow_dir, rel, ArtifactClass::UserRecording);
+            }
             bundle::Entry::CrashReport { flow_dir } => {
                 let (name, shard) = bundle::split_shard_suffix(&flow_dir);
                 let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
@@ -1172,6 +1213,76 @@ impl Session {
                 .get(idx)
                 .and_then(|f| f.produced.step_of(&p.rel, p.named));
             self.register_file(p.at, idx, p.class, &p.rel, step);
+        }
+        self.flush_user_media(idx, false);
+    }
+
+    /// A screenshot or recording the flow made on purpose (issue #133). With the switch off it is
+    /// not looked at. Otherwise it waits for the flow's verdict, and is uploaded only if the flow
+    /// failed (see [`Self::flush_user_media`]).
+    fn on_user_media(&mut self, at: ClockSample, flow_dir: &str, rel: &str, class: ArtifactClass) {
+        if self.user_media == UserMedia::Off {
+            return;
+        }
+        let (name, shard) = bundle::split_shard_suffix(flow_dir);
+        let Some(idx) = self.find_flow(shard.unwrap_or(1), name) else {
+            return;
+        };
+        if let Some(f) = self.flows.get_mut(idx) {
+            f.pending_media.push(PendingMedia {
+                at,
+                class,
+                rel: rel.to_owned(),
+            });
+        }
+        self.flush_user_media(idx, false);
+    }
+
+    /// Queues flow `idx`'s waiting screenshots and recordings for upload, once the flow has failed
+    /// (any failure seen directly, as [`Self::on_exit`] counts them). A file is linked to the step
+    /// `commands.json`'s `artifacts[]` names for it. Before that list is known, the files keep
+    /// waiting, unless the flow is over (`last`): then they go without a step, since nothing names
+    /// one. A passing flow's files are never queued (I6: they stay on the runner).
+    fn flush_user_media(&mut self, idx: usize, last: bool) {
+        let Some(f) = self.flows.get(idx) else {
+            return;
+        };
+        let failed = f
+            .claims
+            .iter()
+            .any(|c| c.outcome() == FlowOutcome::Failed && c.source() != SourceKind::JunitFinal);
+        if f.pending_media.is_empty()
+            || !failed
+            || (!last && matches!(f.produced, Produced::Unknown))
+        {
+            return;
+        }
+        let flow = f.id;
+        let pending = std::mem::take(&mut self.flows[idx].pending_media);
+        for p in pending {
+            let step = self
+                .flows
+                .get(idx)
+                .and_then(|f| f.produced.step_of(&p.rel, None));
+            let mut subject = self.flow_subject_at(idx);
+            subject.step = step.map(|index| StepRef { index });
+            self.emit(
+                p.at,
+                subject,
+                SourceKind::AgentObserved,
+                None,
+                &EventBody::ArtifactRegistered(ArtifactRegistered {
+                    class: p.class.as_str().into(),
+                    path: p.rel.clone(),
+                }),
+            );
+            self.uploads.push(Candidate {
+                class: p.class,
+                rel: p.rel,
+                flow: Some(flow),
+                step,
+                failure: None,
+            });
         }
     }
 
@@ -1458,6 +1569,7 @@ impl Session {
                 flow,
             }),
         );
+        self.flush_user_media(idx, false);
     }
 
     /// Remembers the device of flow `idx`'s shard as failed, once per serial until taken.
@@ -1587,6 +1699,7 @@ impl Session {
             cut_short: None,
             produced: Produced::Unknown,
             pending_files: Vec::new(),
+            pending_media: Vec::new(),
         });
         self.flows.len() - 1
     }
@@ -2492,6 +2605,202 @@ mod tests {
     }
 
     /// A captured run: its session `maestro.log`, its stdout and each flow folder's `commands.json`.
+    /// Replays a captured run the way the observer sees it: its log and stdout, then its media
+    /// files as they appear (`media`: debug-relative paths, read by the name only), then its
+    /// `commands.json` files.
+    fn replay_run(s: &mut Session, run: &Captured, media: &[&str]) {
+        replay_log(s, &run.log);
+        for line in run.stdout.lines() {
+            s.observe(at(), Observation::Stdout(line.to_owned()));
+        }
+        for rel in media {
+            file(s, rel, None);
+        }
+        for (folder, bytes) in &run.commands {
+            file(
+                s,
+                &format!("{folder}/commands.json"),
+                Some(bytes.as_slice()),
+            );
+        }
+    }
+
+    /// The queued uploads of `class`.
+    fn of_class(uploads: &[Candidate], class: ArtifactClass) -> Vec<Candidate> {
+        uploads
+            .iter()
+            .filter(|c| c.class == class)
+            .cloned()
+            .collect()
+    }
+
+    /// Maestro's own screenshot and recording of the failed flow `user-media-fail` (issue #133).
+    const USER_SHOT: &str = "user-media-fail/takeScreenshot/fleet-before-fail.png";
+    const USER_RECORDING: &str = "user-media-fail/startRecording/fleet-fail-recording.mp4";
+
+    #[test]
+    fn a_failed_flows_own_media_is_queued_on_the_step_that_made_it() {
+        let run = captured("user-media-fail");
+        let mut s = session_for(&run.argv);
+        s.set_user_media(UserMedia::On);
+        replay_run(&mut s, &run, &[USER_SHOT, USER_RECORDING]);
+        let up = s.take_uploads();
+        let flow = s.flows[0].id;
+        let shots = of_class(&up, ArtifactClass::UserScreenshot);
+        let [shot] = shots.as_slice() else {
+            panic!("one screenshot: {shots:?}");
+        };
+        // `artifacts[]` names the producing command: the screenshot is step 4, the recording step 5.
+        assert_eq!(shot.rel, USER_SHOT);
+        assert_eq!((shot.step, shot.flow), (Some(4), Some(flow)));
+        let recordings = of_class(&up, ArtifactClass::UserRecording);
+        let [recording] = recordings.as_slice() else {
+            panic!("one recording: {recordings:?}");
+        };
+        assert_eq!(recording.rel, USER_RECORDING);
+        assert_eq!((recording.step, recording.flow), (Some(5), Some(flow)));
+        assert_eq!(
+            recording.failure, None,
+            "a recording needs no logcat window"
+        );
+    }
+
+    #[test]
+    fn a_failed_flows_media_is_journaled_against_its_step_when_it_is_queued() {
+        let run = captured("user-media-fail");
+        let mut s = session_for(&run.argv);
+        s.set_user_media(UserMedia::On);
+        replay_run(&mut s, &run, &[USER_SHOT, USER_RECORDING]);
+        let registered: Vec<(String, String, Option<u32>)> = s
+            .drain()
+            .into_iter()
+            .filter(|e| e.kind == "artifact.registered")
+            .map(|e| {
+                (
+                    e.data["class"].as_str().unwrap_or_default().to_owned(),
+                    e.data["path"].as_str().unwrap_or_default().to_owned(),
+                    e.subject.step.map(|st| st.index),
+                )
+            })
+            .filter(|(class, _, _)| class.starts_with("user_"))
+            .collect();
+        assert_eq!(
+            registered,
+            [
+                ("user_screenshot".to_owned(), USER_SHOT.to_owned(), Some(4)),
+                (
+                    "user_recording".to_owned(),
+                    USER_RECORDING.to_owned(),
+                    Some(5)
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn with_the_switch_off_nothing_about_a_failed_flows_media_is_kept_or_journaled() {
+        let run = captured("user-media-fail");
+        let mut s = session_for(&run.argv);
+        replay_run(&mut s, &run, &[USER_SHOT, USER_RECORDING]);
+        let up = s.take_uploads();
+        assert_eq!(of_class(&up, ArtifactClass::UserScreenshot).len(), 0);
+        assert_eq!(of_class(&up, ArtifactClass::UserRecording).len(), 0);
+        assert!(
+            s.drain()
+                .iter()
+                .all(|e| e.kind != "artifact.registered" || !e.data.to_string().contains("user_")),
+            "the switch is off, so the files are not journaled either"
+        );
+        // The rest of the run is what it was: its commands file is still queued for upload.
+        assert!(
+            up.iter().any(|c| c.class == ArtifactClass::Commands),
+            "the commands file is uploaded as before"
+        );
+    }
+
+    #[test]
+    fn a_passing_flows_media_is_never_queued_even_with_the_switch_on() {
+        // Captured passing runs with Maestro's own screenshots and a recording (issue #133).
+        let cases = [
+            (
+                "screenshot",
+                &[
+                    "screenshot/takeScreenshot/fleet-main.png",
+                    "screenshot/takeScreenshot/fleet-network.png",
+                ][..],
+            ),
+            (
+                "recording",
+                &["recording/startRecording/fleet-recording.mp4"][..],
+            ),
+            ("anr", &["anr/takeScreenshot/fleet-anr-dialog.png"][..]),
+        ];
+        for (name, media) in cases {
+            let run = captured(name);
+            let mut s = session_for(&run.argv);
+            s.set_user_media(UserMedia::On);
+            replay_run(&mut s, &run, media);
+            let up = s.take_uploads();
+            assert!(
+                of_class(&up, ArtifactClass::UserScreenshot).is_empty()
+                    && of_class(&up, ArtifactClass::UserRecording).is_empty(),
+                "{name} passed, so its media stays on the runner"
+            );
+            assert!(
+                s.drain()
+                    .iter()
+                    .all(|e| !e.data.to_string().contains("user_")),
+                "{name}: no user media is journaled for a passing flow"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_flows_media_waits_for_the_commands_file_that_names_its_step() {
+        let run = captured("user-media-fail");
+        let mut s = session_for(&run.argv);
+        s.set_user_media(UserMedia::On);
+        // The log and stdout already say the flow failed, but no commands file has named the
+        // producing step yet: the file waits rather than going without its link.
+        replay_log(&mut s, &run.log);
+        for line in run.stdout.lines() {
+            s.observe(at(), Observation::Stdout(line.to_owned()));
+        }
+        file(&mut s, USER_SHOT, None);
+        let before = s.take_uploads();
+        assert_eq!(of_class(&before, ArtifactClass::UserScreenshot).len(), 0);
+        let (folder, bytes) = &run.commands[0];
+        file(
+            &mut s,
+            &format!("{folder}/commands.json"),
+            Some(bytes.as_slice()),
+        );
+        let up = s.take_uploads();
+        let shots = of_class(&up, ArtifactClass::UserScreenshot);
+        assert_eq!(shots.len(), 1);
+        assert_eq!(shots[0].step, Some(4), "linked once the commands file came");
+    }
+
+    #[test]
+    fn a_failed_flows_media_goes_without_a_step_when_its_flow_ends_with_no_commands_file() {
+        let run = captured("user-media-fail");
+        let mut s = session_for(&run.argv);
+        s.set_user_media(UserMedia::On);
+        replay_log(&mut s, &run.log);
+        for line in run.stdout.lines() {
+            s.observe(at(), Observation::Stdout(line.to_owned()));
+        }
+        file(&mut s, USER_SHOT, None);
+        s.end(at(), 0);
+        let up = s.take_uploads();
+        let shots = of_class(&up, ArtifactClass::UserScreenshot);
+        assert_eq!(shots.len(), 1, "the failed flow's screenshot is not lost");
+        assert_eq!(
+            shots[0].step, None,
+            "nothing names its step, so none is guessed (I3)"
+        );
+    }
+
     struct Captured {
         name: String,
         /// The Maestro command the run was started with, from its `meta.json`: from `maestro` on,

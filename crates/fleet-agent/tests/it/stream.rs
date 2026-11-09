@@ -278,9 +278,43 @@ pub(super) fn run_agent_in(
     )
 }
 
+/// [`run_agent`] with `agent_flags` on the agent's own command line, before the command (for
+/// example `--upload-user-media`), rather than on Maestro's.
+pub(super) fn run_agent_with_agent_flags(
+    fixture_name: &str,
+    agent_flags: &[&str],
+    env: &[(&str, &str)],
+) -> (Output, Duration, PathBuf) {
+    let bin_dir = fake_maestro_dir();
+    let flows = bin_dir.join("flows");
+    std::fs::create_dir_all(&flows).unwrap();
+    run_agent_on_with(
+        fixture_name,
+        None,
+        agent_flags,
+        &[],
+        &[flows.as_os_str()],
+        env,
+        None,
+    )
+}
+
 fn run_agent_on(
     fixture_name: &str,
     server: Option<&str>,
+    extra_args: &[&str],
+    flow_args: &[&std::ffi::OsStr],
+    env: &[(&str, &str)],
+    cwd: Option<&Path>,
+) -> (Output, Duration, PathBuf) {
+    run_agent_on_with(fixture_name, server, &[], extra_args, flow_args, env, cwd)
+}
+
+/// [`run_agent_on`] with `agent_flags` before the command (`fleet-agent run <agent_flags> -- …`).
+fn run_agent_on_with(
+    fixture_name: &str,
+    server: Option<&str>,
+    agent_flags: &[&str],
     extra_args: &[&str],
     flow_args: &[&std::ffi::OsStr],
     env: &[(&str, &str)],
@@ -302,6 +336,7 @@ fn run_agent_on(
     }
     cmd.args(["run", "--finalize-timeout", "30", "--run-dir"])
         .arg(&run_dir)
+        .args(agent_flags)
         .arg("--")
         .arg(bin_dir.join("maestro"))
         .args(["test"])

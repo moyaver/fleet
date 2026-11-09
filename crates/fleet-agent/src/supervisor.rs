@@ -58,6 +58,9 @@ pub(crate) struct Options {
     pub(crate) plan: Option<(std::path::PathBuf, u32)>,
     /// Most bytes the observer writes to `journal.jsonl` (issue #37).
     pub(crate) journal_max_bytes: u64,
+    /// Upload Maestro's own screenshots and recordings of failed flows (issue #133), for the
+    /// observer, which reads the switch from its environment.
+    pub(crate) user_media: bool,
 }
 
 const CHUNK: usize = 64 * 1024;
@@ -98,7 +101,7 @@ pub(crate) fn run(command: &[OsString], opts: &Options) -> Outcome {
     let mut observer = if opts.no_observer {
         None
     } else {
-        Observer::spawn(&warnings, prepared.run_dir.as_deref())
+        Observer::spawn(&warnings, prepared.run_dir.as_deref(), opts.user_media)
     };
 
     let own_group = !io::stdin().is_terminal();
@@ -547,7 +550,11 @@ struct Observer {
 }
 
 impl Observer {
-    fn spawn(warnings: &Warnings, run_dir: Option<&std::path::Path>) -> Option<Self> {
+    fn spawn(
+        warnings: &Warnings,
+        run_dir: Option<&std::path::Path>,
+        user_media: bool,
+    ) -> Option<Self> {
         let exe = match std::env::current_exe() {
             Ok(e) => e,
             Err(e) => {
@@ -558,6 +565,9 @@ impl Observer {
         let mut cmd = Command::new(exe);
         if let Some(d) = run_dir {
             cmd.env(crate::observer::LOG_ENV, d.join("observer.log"));
+        }
+        if user_media {
+            cmd.env(crate::observer::USER_MEDIA_ENV, "1");
         }
         let mut child = match cmd
             .env(

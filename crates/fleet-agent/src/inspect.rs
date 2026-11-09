@@ -33,7 +33,7 @@ use uuid::Uuid;
 
 use crate::{
     journal::{self, Truncation},
-    session::{IdGen, Observation, Session},
+    session::{IdGen, Observation, Session, UserMedia},
 };
 
 /// One flow in the result.
@@ -110,7 +110,7 @@ pub fn inspect(dir: &Path) -> anyhow::Result<(Inspection, Vec<EventEnvelope>)> {
         counter += 1;
         Uuid::from_u128(counter)
     });
-    let mut replayed = replay(dir, ids)?;
+    let mut replayed = replay(dir, ids, UserMedia::Off)?;
     let end = replayed.at(replayed.last_ms);
     replayed.session.end(end, 0);
     let mut session = replayed.session;
@@ -160,7 +160,7 @@ fn clock_at(start: OffsetDateTime, ms: u64) -> ClockSample {
 ///
 /// # Errors
 /// As [`inspect`]: the directory has no run to read, or a file it should read cannot be read.
-pub(crate) fn replay(dir: &Path, ids: IdGen) -> anyhow::Result<Replayed> {
+pub(crate) fn replay(dir: &Path, ids: IdGen, user_media: UserMedia) -> anyhow::Result<Replayed> {
     let source = if dir.join("events.jsonl").exists() {
         Replay::from_capture(dir)?
     } else {
@@ -168,6 +168,7 @@ pub(crate) fn replay(dir: &Path, ids: IdGen) -> anyhow::Result<Replayed> {
     };
     let start = source.start;
     let mut session = Session::new(&source.argv, None, source.redactor, ids, clock_at(start, 0));
+    session.set_user_media(user_media);
     let mut last_ms = 0;
     for (ms, obs) in source.timeline {
         last_ms = ms;
