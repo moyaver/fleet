@@ -1748,4 +1748,44 @@ mod tests {
         }
         assert_eq!(earlier, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
     }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_pull_request_failure_is_left_out_of_a_flows_history_strip(pool: PgPool) {
+        let store = Store {
+            pool: pool.clone(),
+            origin: uuid::Uuid::now_v7(),
+        };
+        let p = publisher(&store).await;
+        let pr = Publisher {
+            trust: TrustLevel::Pr,
+            ..p.clone()
+        };
+        let checkout = |failure: Option<&'static str>| {
+            [Script {
+                name: "checkout",
+                failure,
+                failed_step: None,
+            }]
+        };
+        // A trusted pass, the same flow failing in a pull request, then a trusted pass.
+        run(&store, &p, "510", "abc", &checkout(None)).await;
+        run(&store, &pr, "511", "abc", &checkout(Some(ASSERTION))).await;
+        run(&store, &p, "512", "abc", &checkout(None)).await;
+        let newest: Uuid = sqlx::query_scalar(
+            "SELECT id FROM flow_executions WHERE flow_name = 'checkout'
+              ORDER BY started_at DESC, id DESC LIMIT 1",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // The strip of the newest trusted execution holds the earlier trusted pass only: the pull
+        // request's failure moves neither the stats nor the strip (research 06 T2).
+        let page = store
+            .flow_detail(p.project_id, newest)
+            .await
+            .unwrap()
+            .unwrap();
+        let states: Vec<&str> = page.previous.iter().map(|e| e.state.as_str()).collect();
+        assert_eq!(states, ["passed"]);
+    }
 }

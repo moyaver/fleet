@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS flow_id, pipeline_attempt_id, state, outcome_source::text AS outcome_source,\n                    finality::text AS \"finality!\", started_at AS \"started_at!\", duration_ms\n               FROM flow_executions\n              WHERE project_id = $1 AND id <> $2 AND started_at IS NOT NULL\n                AND ($3::timestamptz IS NULL OR started_at < $3)\n                AND CASE WHEN $4::text IS NOT NULL THEN flow_path = $4 ELSE flow_name = $5 END\n              ORDER BY started_at DESC, id DESC\n              LIMIT 10",
+  "query": "SELECT id AS flow_id, pipeline_attempt_id, state, outcome_source::text AS outcome_source,\n                    finality::text AS \"finality!\", started_at AS \"started_at!\", duration_ms\n               FROM flow_executions\n              WHERE project_id = $1 AND id <> $2 AND started_at IS NOT NULL\n                AND ($3::timestamptz IS NULL OR started_at < $3)\n                AND CASE WHEN $4::text IS NOT NULL THEN flow_path = $4 ELSE flow_name = $5 END\n                AND EXISTS (SELECT 1 FROM agent_runs r\n                             WHERE r.id = flow_executions.agent_run_id AND r.trust_level = 'trusted')\n              ORDER BY started_at DESC, id DESC\n              LIMIT 10",
   "describe": {
     "columns": [
       {
@@ -90,5 +90,5 @@
       true
     ]
   },
-  "hash": "a47ca479d0fba4b91aa45e1a414fab66b4679c21988db12491e71f38f545ae8d"
+  "hash": "0815e6e8589418cc75a2024bec8b24d88c8814dfd43b1d4c618512d023a1fcc5"
 }
