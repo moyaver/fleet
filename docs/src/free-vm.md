@@ -91,14 +91,14 @@ Give the agent the same file with `FLEET_CA_FILE=caddy-root.crt` (step 7).
 The dashboard needs one of these:
 
 - Set up **browser sign-in** with your identity provider in the `[login]` section of `fleet.toml` ([browser sign-in](operator-guide.md#browser-sign-in)).
-- Turn on **anonymous reads** for test data only. The `fleet.toml` in the repository has no `[api]` table. Add these lines to the end of `deploy/compose/fleet.toml`, then run `docker compose restart fleet`:
+- Turn on **anonymous reads** only if your flows are synthetic. Without an identity provider, the dashboard has no other sign-in: a viewer token works for the REST API and scripts, not for the dashboard. The server's own configuration comment says anonymous reads are for local development. The `fleet.toml` in the repository has no `[api]` table. Add these lines to the end of `deploy/compose/fleet.toml`, then run `docker compose restart fleet`:
 
   ```toml
   [api]
   anonymous_read = true
   ```
 
-  Anyone who can reach the dashboard can then read every run. Anonymous reads are not rate limited. Do not use them with real application data.
+  Anyone with the URL can then read every run on the server, in every project. Anonymous reads are not rate limited. Use them with synthetic flows only, never with real application data, and turn them off once an identity provider is set up.
 
 Scripts can use the REST API with the viewer token in `secrets/viewer_token`:
 

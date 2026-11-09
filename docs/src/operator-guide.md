@@ -25,7 +25,7 @@ Pin a version with `FLEET_IMAGE` in the Compose `.env`. For a single free cloud 
 
 ## Configuration
 
-Fleet reads its settings in four layers. Defaults come first. Then a TOML file (`--config` or `FLEET_CONFIG`). Then `FLEET_*` variables, where `__` separates sections (`FLEET_DATABASE__URL`). Last, `FLEET_*_FILE` variables name a file that holds the value, as Docker and Kubernetes secrets do. Errors name the variable or key at fault.
+Fleet reads its settings in three layers. Defaults come first. Then a TOML file (`--config` or `FLEET_CONFIG`). Then environment variables, which override the file. `FLEET_<key>` sets a value, where `__` separates sections (`FLEET_DATABASE__URL`). `FLEET_<key>_FILE` reads the value from a file, as Docker and Kubernetes secrets do. Both forms are read in the same environment layer. If you set `FLEET_<key>` and `FLEET_<key>_FILE` for the same key, the code does not define which one applies: it depends on the order in which the process lists its variables. Set only one of them. Errors name the variable or key at fault.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -52,7 +52,7 @@ Fleet reads its settings in four layers. Defaults come first. Then a TOML file (
 | `storage.path` | `/var/lib/fleet/blobs` | Blob directory for `local_fs` |
 | `storage.s3.*` | — | Endpoint, region, bucket and credentials for `s3` |
 | `storage.s3.public_endpoint` | — | Base URL that agents reach the bucket at, for direct uploads. Unset uses `endpoint`. See [Direct upload](#direct-upload) |
-| `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification. A local disk, and one server instance per spool |
+| `artifacts.spool_dir` | `/var/lib/fleet/spool` | Where uploaded bytes wait for verification. A local disk: give each server instance its own directory |
 | `artifacts.grant_ttl_seconds` | `600` | How long an upload grant lasts |
 | `artifacts.max_run_bytes`, `artifacts.max_run_files` | 2 GiB, 2000 | What one agent run may store |
 | `artifacts.max_project_bytes_per_day`, `artifacts.max_project_files_per_day` | 20 GiB, 20000 | What one project may declare in any 24 hours, across all its runs. A refused upload says `project_quota_exceeded` |
@@ -280,7 +280,7 @@ Retention is recorded per artifact, and the retention jobs enforce it (see [Rete
 
 With `s3`, the agent asks for a direct upload first. It falls back to the relayed `PUT` described above when the store cannot be used (see [Direct upload](#direct-upload)). The protocol steps are in [the protocol reference](protocol.md#artifact-uploads).
 
-The spool is local. With several server instances, send a given upload's `PUT` and `complete` to the same instance, or share the spool directory. A direct upload needs no spool entry before `complete`, so this does not affect it.
+The spool is local to one server instance. With several instances, send a given upload's `PUT` and `complete` to the same instance. Sharing one spool directory between instances is not tested. A direct upload needs no spool entry before `complete`, so this does not affect it.
 
 ## Retention
 
@@ -508,7 +508,7 @@ docker compose exec -T postgres pg_dump -Fc -U fleet -d fleet > "$BACKUP/fleet.d
 docker run --rm --network container:"$(docker compose ps -q garage)" \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
   -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
-  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:latest \
+  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:2.39.6 \
   --endpoint-url http://127.0.0.1:3900 s3 sync s3://fleet-artifacts /backup/blobs
 ```
 
@@ -529,7 +529,7 @@ docker compose -p fleet-restore exec -T postgres \
 docker run --rm --network container:"$(docker compose -p fleet-restore ps -q garage)" \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
   -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
-  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:latest \
+  -v "$BACKUP/blobs:/backup/blobs" amazon/aws-cli:2.39.6 \
   --endpoint-url http://127.0.0.1:3900 s3 sync /backup/blobs s3://fleet-artifacts
 docker compose -p fleet-restore up -d --wait fleet
 ```
