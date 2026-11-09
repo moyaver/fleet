@@ -105,6 +105,8 @@ pub(crate) struct Shared {
     pub(crate) sample_interval_ms: std::sync::atomic::AtomicU64,
     /// The server's sampling interval under pressure in ms, clamped; 0 when absent.
     pub(crate) pressure_sample_interval_ms: std::sync::atomic::AtomicU64,
+    /// Busy refusals in a row: each one lengthens the next wait, and an ack ends the streak.
+    pub(crate) overloads: std::sync::atomic::AtomicU32,
 }
 
 impl Shared {
@@ -168,6 +170,9 @@ const BATCH: usize = 64;
 const FRAME_RESERVE: usize = 1024;
 const BACKOFF_BASE: Duration = Duration::from_millis(250);
 const BACKOFF_CAP: Duration = Duration::from_secs(30);
+/// The wait after a busy refusal: 200 ms, doubling, to 5 s (see [`overload_ceiling`]).
+const OVERLOAD_BASE: Duration = Duration::from_millis(200);
+const OVERLOAD_CAP: Duration = Duration::from_secs(5);
 
 /// Serialized event bytes one frame may carry under the server's `max_frame_bytes`, less the
 /// batch's other parts (`fixed`, such as the hello and telemetry of a batch request).
@@ -391,6 +396,7 @@ async fn batch(
         let mut seen_welcome = false;
         let mut sent = cursor.unwrap_or(0);
         let mut failed = false;
+        let mut overloaded = false;
         for frame in response.frames {
             match frame {
                 ServerFrame::Welcome(welcome) => {
@@ -421,11 +427,23 @@ async fn batch(
                 ServerFrame::TelemetryAck { through } => {
                     samples.retain(|sample| sample.tseq_to > through);
                 }
-                other => match on_frame(Some(other), shared, &mut sent).await {
-                    Ok(Some(end)) => return Ok(end),
-                    Err(_) => failed = true,
-                    Ok(None) => {}
-                },
+                other => {
+                    // Busy is the server's answer, not a broken link: it is not counted towards
+                    // giving up on the batch transport.
+                    overloaded |= matches!(
+                        other,
+                        ServerFrame::Error {
+                            code: ErrorCode::Overloaded,
+                            fatal: false,
+                            ..
+                        }
+                    );
+                    match on_frame(Some(other), shared, &mut sent).await {
+                        Ok(Some(end)) => return Ok(end),
+                        Err(_) => failed = true,
+                        Ok(None) => {}
+                    }
+                }
             }
         }
         if failed {
@@ -439,7 +457,10 @@ async fn batch(
             continue;
         }
         cursor = Some(sent.max(shared.outbox.lock().map_or(0, |o| o.acked_through())));
-        if sent_events && shared.outbox.lock().map_or(0, |o| o.acked_through()) <= before_ack {
+        if sent_events
+            && !overloaded
+            && shared.outbox.lock().map_or(0, |o| o.acked_through()) <= before_ack
+        {
             failures = failures.saturating_add(1);
             tokio::time::sleep(backoff(failures)).await;
         } else {
@@ -478,15 +499,38 @@ fn share(shared: &Shared, token: Option<&String>) {
     }
 }
 
-/// Exponential backoff with full jitter: uniform in `0..ceiling`. The draw is OS randomness; clock
-/// bits are not (on macOS the nanoseconds are always a multiple of 1000, so the delay was zero).
+/// Exponential backoff with full jitter: uniform in `0..ceiling`.
 fn backoff(attempt: u32) -> Duration {
-    let ceiling = BACKOFF_BASE
-        .saturating_mul(1u32 << attempt.min(8))
-        .min(BACKOFF_CAP);
+    jitter_below(
+        BACKOFF_BASE
+            .saturating_mul(1u32 << attempt.min(8))
+            .min(BACKOFF_CAP),
+    )
+}
+
+/// The wait after `attempt` busy refusals in a row: uniform in `0..overload_ceiling(attempt)`.
+fn overload_pause(attempt: u32) -> Duration {
+    jitter_below(overload_ceiling(attempt))
+}
+
+/// The longest wait after `attempt` busy refusals in a row: 200 ms, doubling, to 5 s.
+fn overload_ceiling(attempt: u32) -> Duration {
+    OVERLOAD_BASE
+        .saturating_mul(1u32 << attempt.min(5))
+        .min(OVERLOAD_CAP)
+}
+
+/// A uniform draw in `0..ceiling`. The draw is OS randomness; clock bits are not (on macOS the
+/// nanoseconds are always a multiple of 1000, so the delay was zero).
+fn jitter_below(ceiling: Duration) -> Duration {
     let ceiling_ns = u64::try_from(ceiling.as_nanos()).unwrap_or(u64::MAX);
     // No randomness from the OS means no delay: the reconnect loop must not panic over it.
-    Duration::from_nanos(getrandom::u64().unwrap_or(0) % ceiling_ns)
+    Duration::from_nanos(
+        getrandom::u64()
+            .unwrap_or(0)
+            .checked_rem(ceiling_ns)
+            .unwrap_or(0),
+    )
 }
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -665,11 +709,16 @@ async fn on_frame(
     sent: &mut u64,
 ) -> Result<Option<End>, Error> {
     match frame {
-        Some(ServerFrame::Ack { through, .. }) => shared
-            .outbox
-            .lock()
-            .map_err(|_| "outbox lock")?
-            .ack(through),
+        Some(ServerFrame::Ack { through, .. }) => {
+            shared
+                .overloads
+                .store(0, std::sync::atomic::Ordering::SeqCst);
+            shared
+                .outbox
+                .lock()
+                .map_err(|_| "outbox lock")?
+                .ack(through);
+        }
         Some(ServerFrame::EventRejected { seq, code, .. }) => {
             tracing::warn!(seq, ?code, "event rejected");
             shared.outbox.lock().map_err(|_| "outbox lock")?.ack(seq);
@@ -679,6 +728,23 @@ async fn on_frame(
             expected_seq: Some(e),
             ..
         }) => *sent = e.saturating_sub(1),
+        // The server is busy and committed none of the batch. It keeps the socket, so wait, then
+        // resend from its first seq on this connection. The run does not fail over this (I2).
+        Some(ServerFrame::Error {
+            code: ErrorCode::Overloaded,
+            fatal: false,
+            expected_seq,
+            ..
+        }) => {
+            let attempt = shared
+                .overloads
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            tracing::warn!(attempt, "server busy; resending after a pause");
+            tokio::time::sleep(overload_pause(attempt)).await;
+            if let Some(seq) = expected_seq {
+                *sent = seq.saturating_sub(1);
+            }
+        }
         Some(ServerFrame::Error {
             fatal: true,
             code: code @ (ErrorCode::Superseded | ErrorCode::Unauthorized),
@@ -769,6 +835,10 @@ fn decode(msg: &Message) -> Option<ServerFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fleet_protocol::{
+        event::EventBody,
+        journal::{EventEnvelope, Provenance, SourceKind, Subject},
+    };
 
     #[tokio::test]
     async fn remote_cleartext_token_is_refused_without_retrying() {
@@ -953,6 +1023,167 @@ mod tests {
     fn backoff_is_jittered() {
         let draws: std::collections::HashSet<Duration> = (0..64).map(|_| backoff(6)).collect();
         assert!(draws.len() > 1, "backoff never varies: {draws:?}");
+    }
+
+    /// An event with `seq`, for the outbox.
+    fn ev(seq: u64) -> EventEnvelope {
+        EventEnvelope::new(
+            seq,
+            ClockSample {
+                wall: OffsetDateTime::UNIX_EPOCH,
+                mono_ms: 0,
+            },
+            Subject::default(),
+            Provenance::new(SourceKind::AgentObserved),
+            &EventBody::RunFinalizing,
+        )
+    }
+
+    #[test]
+    fn overload_waits_grow_from_200_ms_to_5_s_and_are_jittered() {
+        let ceilings: Vec<Duration> = (0..8).map(overload_ceiling).collect();
+        assert_eq!(ceilings[0], Duration::from_millis(200));
+        assert_eq!(ceilings[1], Duration::from_millis(400));
+        assert_eq!(ceilings[4], Duration::from_millis(3_200));
+        assert_eq!(ceilings[5], OVERLOAD_CAP, "5 s is the cap");
+        assert_eq!(overload_ceiling(u32::MAX), OVERLOAD_CAP);
+        assert!((0..64).all(|_| overload_pause(3) < overload_ceiling(3)));
+        let draws: std::collections::HashSet<Duration> =
+            (0..64).map(|_| overload_pause(6)).collect();
+        assert!(draws.len() > 1, "overload waits never vary: {draws:?}");
+    }
+
+    #[tokio::test]
+    async fn busy_refusals_rewind_to_their_seq_and_an_ack_ends_the_streak() {
+        let shared = Shared::default();
+        let mut sent = 10;
+        let busy = |expected_seq| ServerFrame::Error {
+            code: ErrorCode::Overloaded,
+            fatal: false,
+            message: "busy".into(),
+            expected_seq,
+        };
+        let end = on_frame(Some(busy(Some(7))), &shared, &mut sent)
+            .await
+            .unwrap();
+        assert_eq!(end, None, "a busy refusal never ends the connection");
+        assert_eq!(sent, 6, "the batch from seq 7 is resent");
+        assert_eq!(
+            shared.overloads.load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        on_frame(Some(busy(None)), &shared, &mut sent)
+            .await
+            .unwrap();
+        assert_eq!(sent, 6, "without a seq nothing is rewound");
+        assert_eq!(
+            shared.overloads.load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+        on_frame(
+            Some(ServerFrame::Ack {
+                through: 0,
+                epoch: 1,
+                duplicates: 0,
+            }),
+            &shared,
+            &mut sent,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            shared.overloads.load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+    }
+
+    /// The `seq`s of the next `events` frame on `ws`, skipping the frames that are not events.
+    async fn next_event_seqs(
+        ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    ) -> Vec<u64> {
+        loop {
+            let Message::Text(text) = ws.next().await.unwrap().unwrap() else {
+                continue;
+            };
+            if let Ok(ClientFrame::Events { events }) = serde_json::from_str(text.as_str()) {
+                return events.iter().map(|e| e.seq).collect();
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_busy_batch_is_resent_on_the_same_socket_and_acked() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            #[expect(clippy::result_large_err, reason = "tungstenite callback signature")]
+            let callback = |_req: &tokio_tungstenite::tungstenite::handshake::server::Request, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                response.headers_mut().insert("Sec-WebSocket-Protocol", HeaderValue::from_static(WS_SUBPROTOCOL));
+                Ok(response)
+            };
+            let mut ws = tokio_tungstenite::accept_hdr_async(socket, callback)
+                .await
+                .unwrap();
+            let _hello = ws.next().await.unwrap().unwrap();
+            ws.send(Message::text(
+                serde_json::json!({ "op": "welcome", "protocol": 1,
+                "connection_id": "00000000-0000-0000-0000-000000000001", "epoch": 1,
+                "committed_through": 0, "resume": "new", "limits": { "max_inflight_events": 512,
+                "max_frame_bytes": 1_048_576, "heartbeat_interval_ms": 10_000 } })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            assert_eq!(next_event_seqs(&mut ws).await, vec![1, 2, 3]);
+            // Busy: nothing is committed, and the socket stays open.
+            ws.send(Message::text(
+                serde_json::json!({ "op": "error", "code": "overloaded", "fatal": false,
+                "message": "the server is busy; resend from seq 1", "expected_seq": 1 })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            // The agent resends from seq 1 on this same socket, and the server commits it.
+            assert_eq!(next_event_seqs(&mut ws).await, vec![1, 2, 3]);
+            ws.send(Message::text(
+                serde_json::json!({ "op": "ack", "through": 3, "epoch": 1, "duplicates": 0 })
+                    .to_string(),
+            ))
+            .await
+            .unwrap();
+        });
+        let cfg = Config::from_env(
+            format!("ws://{addr}"),
+            Uuid::now_v7(),
+            crate::ci::context(|_| None),
+            |key| (key == "FLEET_TOKEN").then(|| "test-token".into()),
+        );
+        let shared = Arc::new(Shared::default());
+        shared
+            .outbox
+            .lock()
+            .unwrap()
+            .push(vec![ev(1), ev(2), ev(3)]);
+        let (_tx, rx) = mpsc::channel(1);
+        let agent = tokio::spawn(run(cfg, Arc::clone(&shared), rx, || ClockSample {
+            wall: time::OffsetDateTime::UNIX_EPOCH,
+            mono_ms: 0,
+        }));
+        server.await.unwrap();
+        let acked = tokio::time::timeout(Duration::from_secs(5), async {
+            while shared.outbox.lock().unwrap().acked_through() < 3 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        agent.abort();
+        assert!(acked.is_ok(), "the resent batch was not acked");
+        assert_eq!(
+            shared.overloads.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "the ack ended the busy streak"
+        );
     }
 
     #[tokio::test]
