@@ -16,7 +16,7 @@ use super::write::{Change, Refusal, WriteResult, record, refused};
 use crate::{Result, Store, auth::AuditActor};
 
 /// The artifact classes a project may override, as the configuration names them.
-pub const ARTIFACT_CLASSES: [&str; 7] = [
+pub const ARTIFACT_CLASSES: [&str; 9] = [
     "failure_screenshot",
     "failure_hierarchy",
     "commands",
@@ -24,16 +24,19 @@ pub const ARTIFACT_CLASSES: [&str; 7] = [
     "runner_log",
     "html_report",
     "device_logcat",
+    "user_screenshot",
+    "user_recording",
 ];
 
 /// The retention classes (`retention_classes`).
-pub const RETENTION_CLASSES: [&str; 6] = [
+pub const RETENTION_CLASSES: [&str; 7] = [
     "report",
     "failure_evidence",
     "success_evidence",
     "debug_log",
     "video",
     "bundle",
+    "user_media",
 ];
 
 /// Longest retention window a person may set, in days (about a century).
@@ -615,6 +618,55 @@ mod tests {
             Some(36_500 * 86_400)
         );
         assert_eq!(audit_count(&store).await, before + 1);
+    }
+
+    /// Maestro's own media (issue #133) has a per-project switch like any class, and its own
+    /// `user_media` retention window (migration 0033).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_user_media_classes_and_their_retention_are_set_per_project(pool: PgPool) {
+        let store = store(pool);
+        let app = dashboard_project(&store, "app").await;
+        store
+            .set_artifact_class(AuditActor::System, app, "user_recording", false, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .project_overrides(app)
+                .await
+                .unwrap()
+                .class("user_recording"),
+            Some(&ClassOverride {
+                class: "user_recording".into(),
+                accepted: false,
+                max_bytes: None,
+            })
+        );
+        store
+            .set_artifact_class(
+                AuditActor::System,
+                app,
+                "user_screenshot",
+                true,
+                Some(1_024),
+            )
+            .await
+            .unwrap();
+        assert!(
+            store
+                .set_artifact_class(AuditActor::System, app, "user_media", true, None)
+                .await
+                .is_err(),
+            "a retention class is not an artifact class"
+        );
+        store
+            .set_retention(AuditActor::System, app, "user_media", Some(3))
+            .await
+            .unwrap();
+        assert_eq!(
+            ttl_seconds(&store, app, "user_media").await,
+            Some(3 * 86_400)
+        );
     }
 
     #[sqlx::test(migrations = "../../migrations")]

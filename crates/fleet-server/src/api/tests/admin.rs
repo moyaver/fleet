@@ -206,12 +206,12 @@ async fn a_global_admin_reads_every_area_with_the_seeded_data() {
     assert_eq!(roles["groups"][0]["group"], "fleet-admins");
     assert_eq!(roles["groups"][0]["role"], "admin");
 
-    // Retention: six classes per project, and the configured windows.
+    // Retention: seven classes per project, and the configured windows.
     let retention = get("/api/v1/admin/retention").await;
     assert_eq!(
         retention["classes"].as_array().unwrap().len(),
-        12,
-        "two projects, six classes"
+        14,
+        "two projects, seven classes"
     );
     let windows = settings(&retention["windows"]);
     assert!(windows.contains(&(
@@ -398,7 +398,7 @@ async fn the_project_policy_shows_each_override_and_the_configured_value_it_repl
             .clone()
     };
     // Every project shows every artifact class.
-    assert_eq!(view["classes"].as_array().unwrap().len(), 2 * 7);
+    assert_eq!(view["classes"].as_array().unwrap().len(), 2 * 9);
 
     let commands = class("app", "commands");
     assert_eq!(commands["accepted"], false);

@@ -31,6 +31,7 @@ pub fn default_retention(class: ArtifactClass) -> &'static str {
     match class {
         ArtifactClass::Junit | ArtifactClass::HtmlReport => "report",
         ArtifactClass::RunnerLog | ArtifactClass::DeviceLogcat => "debug_log",
+        ArtifactClass::UserScreenshot | ArtifactClass::UserRecording => "user_media",
         ArtifactClass::FailureScreenshot
         | ArtifactClass::FailureHierarchy
         | ArtifactClass::Commands => "success_evidence",
@@ -889,6 +890,98 @@ pub(crate) mod tests {
         let step_of = |id: Uuid| rows.iter().find(|r| r.id == id).map(|r| r.step);
         assert_eq!(step_of(at_step), Some(Some(2)));
         assert_eq!(step_of(unlinked), Some(None));
+    }
+
+    /// Maestro's own screenshots and recordings (issue #133, migration 0033) are storable classes,
+    /// and each keeps the `user_media` retention class, which every project has from its creation.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_user_media_classes_are_storable_under_their_own_retention(pool: PgPool) {
+        let store = Store {
+            pool,
+            origin: uuid::Uuid::now_v7(),
+        };
+        let publisher = publisher(&store).await;
+        let mut agent = Agent::new("1", "e2e");
+        let handle = store
+            .open_run(&publisher, &agent.hello(None), Transport::WebSocket)
+            .await
+            .unwrap()
+            .handle;
+        let events = suite_run(&mut agent, SuiteIds::new(), &[("login", false)]);
+        store.apply_batch(&handle, &events[..4]).await.unwrap();
+        let flow = sqlx::query_scalar!(
+            "SELECT id FROM flow_executions WHERE agent_run_id = $1",
+            handle.agent_run_id
+        )
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        let quota = Quota {
+            max_bytes: 1 << 30,
+            max_files: 100,
+            project_max_bytes: 1 << 40,
+            project_max_files: 1_000_000,
+        };
+        let media = [
+            (
+                ArtifactClass::UserScreenshot,
+                "login/takeScreenshot/fleet-main.png",
+                "image/png",
+                "png bytes",
+            ),
+            (
+                ArtifactClass::UserRecording,
+                "login/startRecording/fleet-rec.mp4",
+                "video/mp4",
+                "mp4 bytes",
+            ),
+        ];
+        for (class, path, content_type, content) in media {
+            let sha = hex_of(content);
+            let ask = UploadAsk {
+                project_id: publisher.project_id,
+                credential: publisher.credential,
+                agent_run_id: handle.agent_run_id,
+                flow_execution_id: Some(flow),
+                class,
+                path,
+                name: path.rsplit('/').next().unwrap_or(path),
+                content_type,
+                size: content.len() as u64,
+                sha256: &sha,
+                step: Some(4),
+            };
+            let granted = store
+                .request_upload(&ask, Duration::from_mins(15), quota)
+                .await;
+            let Ok(Requested::Grant { artifact_id, .. }) = granted else {
+                panic!("{class:?} was refused: {granted:?}");
+            };
+            let retention: String =
+                sqlx::query_scalar("SELECT retention_class FROM artifacts WHERE id = $1")
+                    .bind(artifact_id)
+                    .fetch_one(store.pool())
+                    .await
+                    .unwrap();
+            assert_eq!(retention, "user_media", "{class:?}");
+        }
+        assert_eq!(
+            default_retention(ArtifactClass::UserScreenshot),
+            "user_media"
+        );
+        assert_eq!(
+            default_retention(ArtifactClass::UserRecording),
+            "user_media"
+        );
+        // Every project has the class's retention window, from its creation (the seeding trigger).
+        let seeded: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM retention_classes WHERE class = 'user_media' AND project_id = $1",
+        )
+        .bind(publisher.project_id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap();
+        assert_eq!(seeded, 1);
     }
 
     /// After every migration, the class CHECK allows both `failure_hierarchy` (0015) and

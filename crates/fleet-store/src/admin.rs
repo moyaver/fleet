@@ -674,7 +674,7 @@ mod tests {
         .await
         .unwrap();
         let classes = store.admin_retention_classes().await.unwrap();
-        assert_eq!(classes.len(), 6, "the six seeded classes");
+        assert_eq!(classes.len(), 7, "the seven seeded classes");
         let get = |class: &str| {
             classes
                 .iter()
