@@ -68,11 +68,13 @@ Shorter runs spend more of their time on the fixed start-up and exit cost: the d
 
 ## Maestro's own screenshots and recordings
 
-A flow's `takeScreenshot` images and `startRecording` videos are Maestro's own files, and their pixels are never redacted. The agent does not upload them unless you ask: pass `--upload-user-media` to `fleet-agent run`, or set `FLEET_UPLOAD_USER_MEDIA=1` (the same switch; `publish` reads the variable too). With it on, a file is uploaded only when its flow failed, linked to the step that made it, and within the size cap the server sets for its class (`user_screenshot`, `user_recording`). A passing flow's files stay on the runner, and so does everything when `FLEET_UPLOAD_ARTIFACTS=off` is set. In an offline run the switch also puts a failed flow's media in `fleet-bundle.tar.zst`:
+A flow's `takeScreenshot` images and `startRecording` videos are Maestro's own files, and their pixels are never redacted. The agent does not upload them unless you ask: pass `--upload-user-media` to `fleet-agent run`, or set `FLEET_UPLOAD_USER_MEDIA=1` (the same switch, for `run` and `publish` alike). With it on, a file is uploaded only when its flow failed, linked to the step that made it, and within the size cap the server sets for its class (`user_screenshot`, `user_recording`). A passing flow's files stay on the runner, and so does everything when `FLEET_UPLOAD_ARTIFACTS=off` is set. In an offline run the switch also puts a failed flow's media in `fleet-bundle.tar.zst`:
 
 ```sh
 fleet-agent run --upload-user-media -- maestro test .maestro/
 ```
+
+`fleet-agent publish --upload-user-media <output directory>` takes the same flag for a Maestro output directory, which it replays before uploading. A bundle already holds what its run decided, so the flag does not change a bundle.
 
 ## Signals and CI cancellation
 

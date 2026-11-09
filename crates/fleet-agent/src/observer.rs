@@ -58,6 +58,16 @@ pub(crate) const LOG_ENV: &str = "FLEET_OBSERVER_LOG";
 /// `fleet-agent run --upload-user-media` sets it for the observer; `publish` reads it too.
 pub(crate) const USER_MEDIA_ENV: &str = "FLEET_UPLOAD_USER_MEDIA";
 
+/// The user-media switch of a command: on when its `--upload-user-media` flag is given, or when the
+/// variable says so (issue #133).
+pub(crate) fn user_media_for(flag: bool) -> UserMedia {
+    if flag || user_media_switch(std::env::var(USER_MEDIA_ENV).ok().as_deref()) == UserMedia::On {
+        UserMedia::On
+    } else {
+        UserMedia::Off
+    }
+}
+
 /// What a [`USER_MEDIA_ENV`] value says: `1`, `true`, `yes` or `on`, in any case, turns the switch
 /// on. Anything else, or no value, leaves Maestro's screenshots and recordings on the runner.
 pub(crate) fn user_media_switch(value: Option<&str>) -> UserMedia {
