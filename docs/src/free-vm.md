@@ -59,14 +59,15 @@ FLEET_USERCONTENT_DOMAIN=<uploads>.duckdns.org
 
 Keep `.env` and `secrets/`: a restore needs them.
 
-Start the stack from the published image:
+Until the next release, build the server from this clone. The published image (the default `FLEET_IMAGE`, `ghcr.io/moyaver/fleet:0.1.0-alpha.3`) predates the clean break in the [operator guide](operator-guide.md#clean-break-from-the-alpha-releases), so it cannot serve this branch's agents. Give the local build its own image name, so it is not mistaken for the published one, and build:
 
 ```bash
-docker compose up -d
+echo 'FLEET_IMAGE=fleet:source' >> .env
+docker compose up -d --build
 docker compose ps        # wait until fleet is healthy
 ```
 
-Leave out `--build`. The default image (`FLEET_IMAGE`, `ghcr.io/moyaver/fleet:0.1.0-alpha.3`) is published for linux/amd64 and linux/arm64, so the VM pulls it. Building from source on two Arm cores takes a long time; build only when you have changed the code.
+The build compiles the server and the dashboard inside Docker, so it takes a long time on two Arm cores. Once a release carries the clean break, the published image replaces it: set `FLEET_IMAGE` to that tag and leave out `--build`.
 
 Check that the server answers through the proxy:
 
