@@ -14,7 +14,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use crate::config::Config;
 
 /// The CSP of PLAN §10.1 for the embedded `index.html`, with the usercontent origin (if any)
-/// allowed in `img-src` and `connect-src`.
+/// allowed in `img-src`, `connect-src` and `media-src`.
 fn csp_header(usercontent: Option<&str>) -> HeaderValue {
     let index = Dist::get("index.html").map(|f| String::from_utf8_lossy(&f.data).into_owned());
     HeaderValue::try_from(csp(index.as_deref().unwrap_or_default(), usercontent))
@@ -32,18 +32,22 @@ pub(crate) fn usercontent_origin(config: &Config) -> Option<String> {
 /// Allowing exactly that script by hash keeps `script-src` free of `'unsafe-inline'`.
 ///
 /// Evidence comes from the usercontent origin and only from there (invariant I7): screenshots
-/// are images, the maestro log and `commands.json` are fetched as text. No directive allows
-/// scripts, frames or styles from it.
+/// are images, a recording is a `<video>` the browser plays, and the maestro log and
+/// `commands.json` are fetched as text. No directive allows scripts, frames or styles from it.
 fn csp(index_html: &str, usercontent: Option<&str>) -> String {
     let hashes: String = inline_scripts(index_html)
         .map(|body| BASE64_STANDARD.encode(Sha256::digest(body)))
         .map(|hash| " 'sha256-".to_owned() + &hash + "'")
         .collect();
     let origin = usercontent.map(|o| format!(" {o}")).unwrap_or_default();
+    // `media-src` names the origin only when there is one: without it, the default applies.
+    let media = usercontent
+        .map(|o| format!("; media-src {o}"))
+        .unwrap_or_default();
     format!(
         "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'{hashes}; style-src 'self'; \
          object-src 'none'; base-uri 'none'; img-src 'self' blob:{origin}; \
-         connect-src 'self'{origin}; frame-ancestors 'none'"
+         connect-src 'self'{origin}{media}; frame-ancestors 'none'"
     )
 }
 
@@ -143,17 +147,17 @@ mod tests {
     }
 
     #[test]
-    fn the_usercontent_origin_may_serve_images_and_text_to_the_dashboard_and_nothing_else() {
+    fn the_usercontent_origin_may_serve_images_recordings_and_text_and_nothing_else() {
         let origin = "https://fleet-usercontent.example.net";
         let csp = csp("", Some(origin));
         assert!(
             csp.contains(&format!(
-                "img-src 'self' blob: {origin}; connect-src 'self' {origin}; "
+                "img-src 'self' blob: {origin}; connect-src 'self' {origin}; media-src {origin}; "
             )),
             "{csp}"
         );
-        // Exactly those two directives name it: no scripts, styles, frames or default from there.
-        assert_eq!(csp.matches(origin).count(), 2, "{csp}");
+        // Exactly those three directives name it: no scripts, styles, frames or default from there.
+        assert_eq!(csp.matches(origin).count(), 3, "{csp}");
         assert!(!csp.contains('*'), "no wildcard sources: {csp}");
         assert!(csp.contains("frame-ancestors 'none'"), "{csp}");
     }

@@ -350,13 +350,18 @@ async fn audit_read(
 const fn is_audited(class: ArtifactClass) -> bool {
     matches!(
         class,
-        ArtifactClass::FailureScreenshot | ArtifactClass::Junit | ArtifactClass::HtmlReport
+        ArtifactClass::FailureScreenshot
+            | ArtifactClass::UserScreenshot
+            | ArtifactClass::UserRecording
+            | ArtifactClass::Junit
+            | ArtifactClass::HtmlReport
     )
 }
 
-/// Images and HTML (which is sandboxed) are shown; everything else is saved.
+/// Images, videos and HTML (which is sandboxed) are shown; everything else is saved.
 fn disposition(class: ArtifactClass, content_type: &str, name: &str) -> String {
     let inline = content_type.starts_with("image/")
+        || content_type.starts_with("video/")
         || (class == ArtifactClass::HtmlReport && content_type == "text/html");
     let kind = if inline { "inline" } else { "attachment" };
     // An ASCII fallback, plus the exact name for browsers that read `filename*` (RFC 6266).

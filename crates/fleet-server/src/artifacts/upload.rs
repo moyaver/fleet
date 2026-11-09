@@ -588,7 +588,8 @@ async fn delete_staged(state: &AppState, artifact: Uuid) {
 
 fn blob_class(class: ArtifactClass) -> BlobClass {
     match class {
-        ArtifactClass::FailureScreenshot => BlobClass::Screenshot,
+        ArtifactClass::FailureScreenshot | ArtifactClass::UserScreenshot => BlobClass::Screenshot,
+        ArtifactClass::UserRecording => BlobClass::Video,
         ArtifactClass::Commands
         | ArtifactClass::RunnerLog
         | ArtifactClass::FailureHierarchy
@@ -609,6 +610,7 @@ fn served_type(kind: Kind) -> &'static str {
         Kind::Zip => "application/zip",
         Kind::TarZst => "application/zstd",
         Kind::Text => "text/plain",
+        Kind::Mp4 => "video/mp4",
     }
 }
 
