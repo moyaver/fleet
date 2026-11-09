@@ -117,6 +117,26 @@ fn percentile(sorted: &[Duration], percent: usize) -> Duration {
     sorted[rank.clamp(1, sorted.len()) - 1]
 }
 
+impl ViewerReport {
+    /// The viewers' numbers as JSON; latencies are in milliseconds.
+    #[must_use]
+    pub fn to_json(&self) -> serde_json::Value {
+        let latency = self.latency_ms.map(|[p50, p95, p99, max]| {
+            serde_json::json!({ "p50": p50, "p95": p95, "p99": p99, "max": max })
+        });
+        serde_json::json!({
+            "viewers": self.viewers,
+            "failed": self.failed,
+            "frames": self.frames,
+            "resyncs": self.resyncs,
+            "errors": self.errors,
+            "flows_sent": self.flows_sent,
+            "samples": self.samples,
+            "latency_ms": latency,
+        })
+    }
+}
+
 /// Summarises a run's viewers.
 pub(crate) fn report(viewers: usize, probe: &Probe, stats: &Stats) -> ViewerReport {
     let (flows_sent, mut samples) = probe.summary();
