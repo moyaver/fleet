@@ -1490,7 +1490,7 @@ mod tests {
         assert_eq!(caps.of(ArtifactClass::UserRecording), 100 * MIB);
         let guide = include_str!("../../../docs/src/operator-guide.md");
         assert!(
-            guide.contains("20 MiB user_screenshot, 100 MiB user_recording"),
+            guide.contains("`user_screenshot` 20 MiB, `user_recording` 100 MiB"),
             "the operator guide's artifacts.max_bytes row names the defaults"
         );
     }
