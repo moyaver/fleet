@@ -98,7 +98,7 @@ jobs:
           persist-credentials: false
       - uses: ./examples/github-actions/fleet-agent
         with:
-          version: v0.1.0-alpha.3
+          version: v0.1.0-alpha.4
       - run: fleet-agent version
       - name: Build the repository's agent
         run: cargo build --locked -p fleet-agent
