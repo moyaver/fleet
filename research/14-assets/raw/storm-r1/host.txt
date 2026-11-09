@@ -1,0 +1,4 @@
+host_load_1m_before=7.10
+cores=10
+loadgen_exit=0
+host_load_1m_after=8.69

@@ -1,0 +1,6 @@
+06:42:35|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE agent_runs SET state = 'ended', end_seq = $2, ended_at = now(), end_reason = CASE W
+06:42:35|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE agent_runs SET state = 'ended', end_seq = $2, ended_at = now(), end_reason = CASE W
+06:42:35|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE agent_runs SET state = 'ended', end_seq = $2, ended_at = now(), end_reason = CASE W
+06:42:35|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE agent_runs SET state = 'ended', end_seq = $2, ended_at = now(), end_reason = CASE W
+06:42:35|WAIT|INSERT INTO flow_definitions (project_id, repo_path, last_name) VALUES ($1, $2, $3) ON CON|<-|UPDATE agent_runs SET state = 'ended', end_seq = $2, ended_at = now(), end_reason = CASE W
+06:42:35|IDLE_IN_TX|UPDATE flow_executions SET flow_definition_id = $2 WHERE id = $1

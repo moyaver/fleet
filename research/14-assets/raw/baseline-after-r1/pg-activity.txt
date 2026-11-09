@@ -1,0 +1,69 @@
+S|07:40:38|Client/ClientRead|idle|7
+S|07:40:38|-/-|active|2
+S|07:40:40|Lock/transactionid|active|16
+S|07:40:40|Client/ClientRead|idle|2
+S|07:40:40|Lock/tuple|active|2
+S|07:40:40|-/-|active|1
+S|07:40:40|-/-|idle in transaction|1
+S|07:40:41|Lock/transactionid|active|11
+S|07:40:41|-/-|active|8
+S|07:40:41|Client/ClientRead|idle|2
+S|07:40:41|IO/WalSync|active|1
+S|07:40:44|IO/AioIoCompletion|active|17
+S|07:40:44|-/-|active|3
+S|07:40:44|Client/ClientRead|idle|2
+S|07:40:46|Client/ClientRead|idle in transaction|6
+S|07:40:46|-/-|active|5
+S|07:40:46|Lock/extend|active|2
+S|07:40:46|Client/ClientRead|idle|2
+S|07:40:46|-/-||1
+S|07:40:46|IO/DataFileRead|idle in transaction|1
+S|07:40:46|LWLock/BufferContent|active|1
+S|07:40:46|IO/DataFileExtend|idle in transaction|1
+S|07:40:46|-/-|idle in transaction|1
+S|07:40:48|Client/ClientRead|idle in transaction|7
+S|07:40:48|-/-|active|5
+S|07:40:48|Client/ClientRead|idle|2
+S|07:40:48|Lock/transactionid|active|2
+S|07:40:48|-/-|idle in transaction|2
+S|07:40:48|IO/DataFileRead|idle in transaction|2
+S|07:40:48|-/-|idle|1
+S|07:40:48|Client/ClientRead|active|1
+S|07:40:51|Lock/transactionid|active|8
+S|07:40:51|Client/ClientRead|idle in transaction|4
+S|07:40:51|-/-|idle in transaction|3
+S|07:40:51|Client/ClientRead|idle|2
+S|07:40:51|-/-|active|2
+S|07:40:51|Client/ClientRead|active|1
+S|07:40:51|IO/WalWrite|idle in transaction|1
+S|07:40:51|-/-|idle|1
+S|07:40:53|Lock/transactionid|active|11
+S|07:40:53|Client/ClientRead|idle in transaction|5
+S|07:40:53|-/-|active|3
+S|07:40:53|Client/ClientRead|idle|3
+S|07:40:53|-/-|idle|1
+S|07:40:55|-/-|active|7
+S|07:40:55|Client/ClientRead|idle in transaction|7
+S|07:40:55|-/-|idle|3
+S|07:40:55|Client/ClientRead|idle|2
+S|07:40:55|Client/ClientRead|active|1
+S|07:40:55|-/-|idle in transaction|1
+S|07:40:55|IO/DataFileRead|active|1
+S|07:40:55|IO/WalSync|active|1
+S|07:40:57|-/-|active|6
+S|07:40:57|Client/ClientRead|idle in transaction|5
+S|07:40:57|-/-|idle in transaction|4
+S|07:40:57|Lock/transactionid|active|4
+S|07:40:57|Client/ClientRead|idle|2
+S|07:40:57|IO/DataFileRead|idle in transaction|1
+S|07:40:57|IO/WalSync|active|1
+S|07:41:00|Lock/transactionid|active|15
+S|07:41:00|-/-|active|3
+S|07:41:00|Client/ClientRead|active|2
+S|07:41:00|Client/ClientRead|idle|2
+S|07:41:02|Client/ClientRead|idle|21
+S|07:41:02|-/-|active|1
+S|07:41:04|Client/ClientRead|idle|21
+S|07:41:04|-/-|active|1
+S|07:41:06|Client/ClientRead|idle|21
+S|07:41:06|-/-|active|1

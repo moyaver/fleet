@@ -1,0 +1,61 @@
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,
+07:41:08|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|SELECT fleet_ensure_partitions('agent_events'::regclass, $1, $1), fleet_ensure_partitions(
+07:41:09|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:09|IDLE_IN_TX|SELECT outcome FROM suite_executions WHERE job_id = $1
+07:41:09|IDLE_IN_TX|INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status, source
+07:41:09|IDLE_IN_TX|INSERT INTO shards (id, project_id, agent_run_id, suite_execution_id, shard_index, device_
+07:41:09|IDLE_IN_TX|INSERT INTO device_sessions (id, project_id, agent_run_id, serial, state, first_seen_at, l
+07:41:09|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:09|IDLE_IN_TX|UPDATE suite_executions SET planned_count = (SELECT sum(planned_count)::int FROM shards WH
+07:41:09|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:09|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+07:41:11|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:11|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:41:12|IDLE_IN_TX|UPDATE step_executions SET status = $4, source = $5, started_at = coalesce($6::timestamptz
+07:41:12|IDLE_IN_TX|SELECT agent_run_id FROM shards WHERE id = $1
+07:41:12|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:12|IDLE_IN_TX|SELECT agent_run_id FROM shards WHERE id = $1
+07:41:12|IDLE_IN_TX|INSERT INTO step_executions (run_day, flow_execution_id, step_index, label, status, source
+07:41:12|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:14|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:14|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+07:41:14|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+07:41:14|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+07:41:15|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+07:41:15|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:15|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:15|IDLE_IN_TX|INSERT INTO flow_executions (id, project_id, agent_run_id, suite_execution_id, shard_id, d
+07:41:15|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:15|IDLE_IN_TX|SELECT agent_run_id FROM shards WHERE id = $1
+07:41:15|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:15|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:18|IDLE_IN_TX|SELECT agent_run_id FROM device_sessions WHERE id = $1
+07:41:18|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:18|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:18|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+07:41:18|IDLE_IN_TX|SELECT agent_run_id FROM device_sessions WHERE id = $1
+07:41:18|IDLE_IN_TX|INSERT INTO flow_executions (id, project_id, agent_run_id, suite_execution_id, shard_id, d
+07:41:18|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:18|IDLE_IN_TX|SELECT id FROM condition_fingerprints WHERE project_id = $1 AND fingerprint = $2
+07:41:18|IDLE_IN_TX|UPDATE device_sessions SET state = 'released', rev = rev + 1 WHERE agent_run_id = $1 AND s
+07:41:18|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:18|IDLE_IN_TX|UPDATE flow_executions SET flow_definition_id = $2 WHERE id = $1

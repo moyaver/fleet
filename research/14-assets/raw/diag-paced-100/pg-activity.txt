@@ -1,0 +1,160 @@
+S|06:39:15|Client/ClientRead|idle|21
+S|06:39:15|-/-|active|1
+S|06:39:15|IO/DataFileRead|active|1
+S|06:39:16|Client/ClientRead|idle|9
+S|06:39:16|-/-|active|6
+S|06:39:16|Lock/transactionid|active|4
+S|06:39:16|Client/ClientRead|idle in transaction|2
+S|06:39:16|IO/WalSync|active|1
+S|06:39:20|-/-|active|13
+S|06:39:20|Client/ClientRead|idle in transaction|4
+S|06:39:20|Lock/transactionid|active|4
+S|06:39:20|Client/ClientRead|idle|2
+S|06:39:20|-/-|idle in transaction|1
+S|06:39:23|Lock/transactionid|active|9
+S|06:39:23|-/-|active|6
+S|06:39:23|-/-|idle in transaction|3
+S|06:39:23|Client/ClientRead|idle|2
+S|06:39:23|Client/ClientRead|idle in transaction|2
+S|06:39:23|IO/WalSync|active|1
+S|06:39:23|Client/ClientRead|active|1
+S|06:39:25|Lock/transactionid|active|9
+S|06:39:25|-/-|active|3
+S|06:39:25|Client/ClientRead|idle|3
+S|06:39:25|LWLock/BufferContent|active|3
+S|06:39:25|Client/ClientRead|idle in transaction|1
+S|06:39:25|IO/WalWrite|active|1
+S|06:39:25|Client/ClientRead|active|1
+S|06:39:25|-/-|idle in transaction|1
+S|06:39:27|-/-|active|13
+S|06:39:27|Lock/transactionid|active|6
+S|06:39:27|Client/ClientRead|idle|3
+S|06:39:27|-/-|idle in transaction|2
+S|06:39:27|Client/ClientRead|idle in transaction|1
+S|06:39:29|-/-|active|10
+S|06:39:29|Client/ClientRead|idle in transaction|4
+S|06:39:29|Lock/transactionid|active|4
+S|06:39:29|Client/ClientRead|idle|3
+S|06:39:29|-/-|idle in transaction|1
+S|06:39:29|LWLock/BufferContent|active|1
+S|06:39:32|-/-|active|12
+S|06:39:32|Lock/transactionid|active|6
+S|06:39:32|Client/ClientRead|idle|4
+S|06:39:32|Client/ClientRead|idle in transaction|2
+S|06:39:32|-/-|idle in transaction|1
+S|06:39:34|Lock/transactionid|active|15
+S|06:39:34|-/-|active|6
+S|06:39:34|-/-|idle in transaction|2
+S|06:39:34|Client/ClientRead|idle|2
+S|06:39:37|Lock/transactionid|active|13
+S|06:39:37|-/-|active|4
+S|06:39:37|Client/ClientRead|idle|2
+S|06:39:37|Client/ClientRead|idle in transaction|2
+S|06:39:37|IO/WalSync|active|1
+S|06:39:39|Lock/transactionid|active|10
+S|06:39:39|-/-|active|9
+S|06:39:39|Client/ClientRead|idle|2
+S|06:39:39|-/-|idle|1
+S|06:39:39|-/-|idle in transaction|1
+S|06:39:39|IO/WalSync|active|1
+S|06:39:41|-/-|active|8
+S|06:39:41|Lock/transactionid|active|4
+S|06:39:41|Client/ClientRead|active|4
+S|06:39:41|Client/ClientRead|idle in transaction|3
+S|06:39:41|Client/ClientRead|idle|2
+S|06:39:41|-/-|idle in transaction|2
+S|06:39:41|IO/WalSync|active|1
+S|06:39:43|-/-|active|8
+S|06:39:43|Client/ClientRead|idle in transaction|5
+S|06:39:43|Lock/transactionid|active|4
+S|06:39:43|Client/ClientRead|idle|3
+S|06:39:43|-/-|idle in transaction|1
+S|06:39:43|IO/WalSync|active|1
+S|06:39:45|-/-|active|9
+S|06:39:45|Lock/transactionid|active|5
+S|06:39:45|Client/ClientRead|idle|3
+S|06:39:45|Client/ClientRead|idle in transaction|2
+S|06:39:45|Client/ClientRead|active|1
+S|06:39:45|IO/WalSync|active|1
+S|06:39:45|-/-|idle in transaction|1
+S|06:39:47|Client/ClientRead|idle in transaction|10
+S|06:39:47|Client/ClientRead|idle|6
+S|06:39:47|-/-|active|5
+S|06:39:47|-/-|idle in transaction|1
+S|06:39:48|-/-|active|8
+S|06:39:48|Lock/transactionid|active|5
+S|06:39:48|Client/ClientRead|idle in transaction|4
+S|06:39:48|Client/ClientRead|idle|2
+S|06:39:48|LWLock/WALInsert|active|1
+S|06:39:48|-/-|idle in transaction|1
+S|06:39:48|IO/WalSync|active|1
+S|06:39:48|LWLock/BufferContent|active|1
+S|06:39:50|Client/ClientRead|idle|17
+S|06:39:50|-/-|active|4
+S|06:39:50|Client/ClientRead|active|1
+S|06:39:52|-/-|active|14
+S|06:39:52|Client/ClientRead|idle in transaction|6
+S|06:39:52|Client/ClientRead|idle|2
+S|06:39:52|-/-|idle|1
+S|06:39:54|LWLock/BufferContent|active|8
+S|06:39:54|-/-|active|6
+S|06:39:54|Lock/transactionid|active|4
+S|06:39:54|Client/ClientRead|idle|2
+S|06:39:54|IO/WalSync|active|1
+S|06:39:54|Client/ClientRead|active|1
+S|06:39:54|-/-|idle in transaction|1
+S|06:39:56|Lock/transactionid|active|9
+S|06:39:56|-/-|active|5
+S|06:39:56|-/-|idle in transaction|3
+S|06:39:56|Client/ClientRead|idle|3
+S|06:39:56|-/-|idle|1
+S|06:39:56|Client/ClientRead|idle in transaction|1
+S|06:39:57|Lock/transactionid|active|16
+S|06:39:57|-/-|idle in transaction|2
+S|06:39:57|Client/ClientRead|idle|2
+S|06:39:57|-/-|active|1
+S|06:39:57|Lock/tuple|active|1
+S|06:39:59|Lock/transactionid|active|16
+S|06:39:59|-/-|active|6
+S|06:39:59|Client/ClientRead|idle|2
+S|06:39:59|Timeout/SpinDelay|active|1
+S|06:40:00|Lock/transactionid|active|15
+S|06:40:00|-/-|active|4
+S|06:40:00|Lock/tuple|active|3
+S|06:40:00|Client/ClientRead|idle|2
+S|06:40:01|Lock/transactionid|active|16
+S|06:40:01|-/-|active|4
+S|06:40:01|Client/ClientRead|idle|2
+S|06:40:01|Client/ClientRead|idle in transaction|1
+S|06:40:01|Lock/tuple|active|1
+S|06:40:03|Lock/transactionid|active|17
+S|06:40:03|-/-|active|6
+S|06:40:03|Client/ClientRead|idle|2
+S|06:40:04|Lock/transactionid|active|17
+S|06:40:04|-/-|active|3
+S|06:40:04|Client/ClientRead|idle|2
+S|06:40:06|Lock/transactionid|active|17
+S|06:40:06|-/-|active|4
+S|06:40:06|Client/ClientRead|idle|2
+S|06:40:06|Client/ClientRead|active|1
+S|06:40:08|Lock/transactionid|active|16
+S|06:40:08|-/-|active|5
+S|06:40:08|Client/ClientRead|idle|2
+S|06:40:08|Lock/tuple|active|1
+S|06:40:09|Lock/transactionid|active|18
+S|06:40:09|-/-|active|3
+S|06:40:09|Client/ClientRead|idle|2
+S|06:40:09|Lock/tuple|active|1
+S|06:40:12|Lock/transactionid|active|13
+S|06:40:12|Client/ClientRead|idle|7
+S|06:40:12|-/-|active|4
+S|06:40:13|Client/ClientRead|idle|19
+S|06:40:13|-/-|active|3
+S|06:40:13|-/-|idle|1
+S|06:40:13|Client/ClientRead|idle in transaction|1
+S|06:40:15|Client/ClientRead|idle|21
+S|06:40:15|-/-|active|3
+S|06:40:16|Client/ClientRead|idle|21
+S|06:40:16|-/-|active|3
+S|06:40:17|Client/ClientRead|idle|21
+S|06:40:17|-/-|active|2

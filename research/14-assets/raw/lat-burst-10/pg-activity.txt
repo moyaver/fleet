@@ -1,0 +1,13 @@
+S|06:42:33|Client/ClientRead|idle|21
+S|06:42:33|-/-|active|1
+S|06:42:35|Client/ClientRead|idle|15
+S|06:42:35|Lock/transactionid|active|4
+S|06:42:35|-/-|active|2
+S|06:42:35|Lock/tuple|active|2
+S|06:42:35|Client/ClientRead|idle in transaction|1
+S|06:42:36|Client/ClientRead|idle|21
+S|06:42:36|-/-|active|4
+S|06:42:37|Client/ClientRead|idle|21
+S|06:42:37|-/-|active|1
+S|06:42:39|Client/ClientRead|idle|21
+S|06:42:39|-/-|active|1

@@ -1,0 +1,143 @@
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|WAIT|INSERT INTO pipeline_runs (project_id, provider, provider_run_key, repository, commit_sha,|<-|INSERT INTO agent_runs (id, project_id, job_id, worker_id, token_id, api_key_id, previous_
+07:41:25|IDLE_IN_TX|INSERT INTO shards (id, project_id, agent_run_id, suite_execution_id, shard_index, device_
+07:41:25|IDLE_IN_TX|SAVEPOINT _sqlx_savepoint_1
+07:41:27|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+07:41:27|IDLE_IN_TX|INSERT INTO shards (id, project_id, agent_run_id, suite_execution_id, shard_index, device_
+07:41:27|IDLE_IN_TX|SELECT outcome FROM suite_executions WHERE job_id = $1
+07:41:27|IDLE_IN_TX|UPDATE flow_executions f SET state = u.state, outcome_source = u.source, finality = u.fina
+07:41:29|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT pg_notify($1, $2)
+07:41:29|IDLE_IN_TX|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE
+07:41:29|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+07:41:29|IDLE_IN_TX|UPDATE flow_executions f SET state = u.state, outcome_source = u.source, finality = u.fina
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:33|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:41:35|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:35|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:35|IDLE_IN_TX|BEGIN
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:37|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:38|IDLE_IN_TX|SELECT flow_execution_id, source AS "source!", outcome AS "outcome!", claim_order FROM flo
+07:41:38|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:38|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:41|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:41|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:41|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:41|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+07:41:41|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+07:41:41|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:41|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+07:41:41|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+07:41:41|IDLE_IN_TX|BEGIN
+07:41:41|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+07:41:41|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+07:41:44|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:44|IDLE_IN_TX|BEGIN
+07:41:44|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:44|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:45|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:46|IDLE_IN_TX|UPDATE step_executions SET status = $4, source = $5, started_at = coalesce($6::timestamptz
+07:41:49|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+07:41:49|IDLE_IN_TX|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+07:41:51|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:51|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:51|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:51|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:51|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:51|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:52|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:53|IDLE_IN_TX|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+07:41:53|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:41:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:54|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:55|IDLE_IN_TX|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL
+07:41:58|IDLE_IN_TX|SELECT s.id, s.exit_code, s.exit_class, s.report_status, coalesce(array_agg(f.state) FILTE
+07:41:58|IDLE_IN_TX|WITH next AS ( SELECT d.id, CASE WHEN EXISTS (SELECT 1 FROM flow_executions f WHERE f.devi
+07:41:58|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:41:58|IDLE_IN_TX|INSERT INTO flow_executions (id, project_id, agent_run_id, suite_execution_id, shard_id, d
+07:41:58|IDLE_IN_TX|SELECT f.id, f.project_id, f.state, f.finality::text AS "finality!", f.failure_message, co
+07:41:58|IDLE_IN_TX|UPDATE flow_executions SET rev = rev + 1 WHERE id = $1
+07:41:58|IDLE_IN_TX|UPDATE artifacts a SET retention_class = 'failure_evidence', expires_at = CASE WHEN rc.ttl
+07:41:58|IDLE_IN_TX|UPDATE step_executions SET status = $4, source = $5, started_at = coalesce($6::timestamptz
+07:42:01|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser, occur
+07:42:01|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:02|IDLE_IN_TX|BEGIN
+07:42:04|WAIT|SELECT r.state, coalesce(r.signal_received IN (2, 15), false) AS "cancelled!", EXISTS (SEL|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:42:04|WAIT|UPDATE jobs SET lifecycle = $2, outcome = $3, outcome_source = $4, closed_at = CASE WHEN $|<-|SELECT outcome FROM suite_executions WHERE job_id = $1
+07:42:04|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|SELECT outcome FROM suite_executions WHERE job_id = $1
+07:42:05|IDLE_IN_TX|SELECT agent_run_id FROM flow_executions WHERE id = $1
+07:42:05|IDLE_IN_TX|SELECT id FROM condition_fingerprints WHERE project_id = $1 AND fingerprint = $2
+07:42:05|IDLE_IN_TX|UPDATE flow_executions SET condition_fingerprint_id = $2 WHERE id = $1 AND condition_finge
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|SELECT outcome FROM suite_executions WHERE job_id = $1|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:07|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|COMMIT
+07:42:08|IDLE_IN_TX|SELECT f.id, f.started, (s.lifecycle = 'closed' OR r.state = 'ended') AS "run_ended!" FROM
+07:42:11|IDLE_IN_TX|INSERT INTO flow_claims (flow_execution_id, source, origin, outcome, claim_order, observed
+07:42:11|IDLE_IN_TX|SELECT agent_run_id FROM device_sessions WHERE id = $1
+07:42:11|IDLE_IN_TX|UPDATE flow_executions SET flow_definition_id = $2 WHERE id = $1
+07:42:11|IDLE_IN_TX|SELECT agent_run_id FROM device_sessions WHERE id = $1
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO|<-|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:42:13|WAIT|UPDATE agent_runs SET telemetry_committed = greatest(telemetry_committed, $2) WHERE id = $|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:13|WAIT|SELECT epoch, committed_seq, state, end_seq FROM agent_runs WHERE id = $1 FOR UPDATE|<-|WITH runs AS ( UPDATE agent_runs r SET last_frame_at = greatest(r.last_frame_at, u.at) FRO
+07:42:14|IDLE_IN_TX|INSERT INTO agent_events (run_day, agent_run_id, seq, type, v, src_kind, src_parser, occur
+07:42:14|IDLE_IN_TX|UPDATE artifacts a SET retention_class = 'failure_evidence', expires_at = CASE WHEN rc.ttl
+07:42:14|IDLE_IN_TX|UPDATE agent_runs SET committed_seq = $4, last_frame_at = now() WHERE id = $1 AND epoch = 
+07:42:14|IDLE_IN_TX|UPDATE pipeline_attempts SET version = version + 1 WHERE id = $1 RETURNING version
+07:42:14|IDLE_IN_TX|SELECT outcome FROM suite_executions WHERE job_id = $1

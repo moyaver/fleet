@@ -1,0 +1,2 @@
+pg_database_size_before=13055679
+pg_database_size_after=27137727

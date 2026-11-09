@@ -1,0 +1,10 @@
+</script><script>window.__xss = 1</script>
+<img src=x onerror="window.__xss = 1">
+<svg onload="window.__xss = 1"></svg>
+"><script>window.__xss = 1</script>
+' onmouseover='window.__xss = 1' x='
+&lt;b&gt;bold&lt;/b&gt; &amp; &#60;i&#62;
+{{ 7*7 }} ${7*7} {{constructor.constructor('window.__xss = 1')()}}
+<iframe srcdoc="<script>window.__xss = 1</script>"></iframe>
+\u{1b}[31mred\u{1b}[0m \u{1b}]8;;javascript:window.__xss = 1\u{7}link\u{1b}]8;;\u{7} \u{1b}]0;title\u{7}
+\u{1b}[2J\u{1b}[H\u{1b}[?25l\u{1b}P1$t\u{1b}\ dcs
