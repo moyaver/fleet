@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 - Direction: Fleet is a hub for mobile e2e tests, and the build key and release record are its core entity ([ADR-0016](docs/decisions/0016-fleet-is-a-hub.md)).
+- Dashboard: the history trend's flaky figure is labelled **Flaky evidence** (the figure is unchanged): it counts every execution a flaky verdict names as evidence, passed ones too, so one suspected flow with nine executions reads 9. The flow page's history line says its count ends at the execution shown ("of the last 4 executions up to this one").
 
 ## [0.1.0-alpha.4] - 2026-11-09
 

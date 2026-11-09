@@ -1167,7 +1167,7 @@ impl TrendPanel {
         let tiles = vec![
             tile("Passed", Some(count(view.passed)), "passed"),
             tile("Failed", Some(count(view.failed)), "failed"),
-            tile("Flaky", Some(count(view.flaky)), "flaky"),
+            tile("Flaky evidence", Some(count(view.flaky)), "flaky"),
             tile(
                 "Median duration",
                 view.duration_p50_ms.map(format_duration),
@@ -1323,6 +1323,31 @@ mod catalog_and_trend_tests {
             other => panic!("a finished run is shown as one: {other:?}"),
         }
         assert_eq!(table.rows[0].tags, ["smoke"]);
+    }
+
+    #[test]
+    fn the_trend_names_its_flaky_figure_as_evidence_not_as_flaky_runs() {
+        // One suspected flow whose nine executions are all evidence: six passed, three failed.
+        // The figure counts evidence, passes included, so its label must not call it flaky runs.
+        let view = HistoryTrendView {
+            from: OffsetDateTime::from_unix_timestamp(1_767_225_600).unwrap(),
+            to: OffsetDateTime::from_unix_timestamp(1_767_571_200).unwrap(),
+            days: Vec::new(),
+            passed: 24,
+            failed: 3,
+            flaky: 9,
+            duration_samples: 27,
+            duration_p50_ms: Some(3000),
+            duration_p95_ms: Some(6000),
+        };
+        let panel = TrendPanel::build(&view, &ctx());
+        let flaky = panel
+            .tiles
+            .iter()
+            .find(|t| t.id == "flaky")
+            .expect("a flaky tile");
+        assert_eq!(flaky.label, "Flaky evidence");
+        assert_eq!(flaky.value.as_deref(), Some("9"));
     }
 
     #[test]

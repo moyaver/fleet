@@ -303,7 +303,7 @@ pub fn TrendView(
                 <span class="note">{window}</span>
             </div>
             <ProvenanceStatement provenance=Provenance::Derived>
-                "Settled runs on trusted pipelines, by UTC day. Flaky counts the runs the verdicts above name."
+                "Settled runs on trusted pipelines, by UTC day. Flaky evidence counts every execution a flaky verdict above names, passed ones too: a suspected flow adds its whole verdict window, so one flow can account for many."
             </ProvenanceStatement>
             <div class="mt-3">
                 <ReadoutStrip>
@@ -358,7 +358,7 @@ pub fn TrendView(
                                         <th scope="col">"Day (UTC)"</th>
                                         <th scope="col" class="num">"Passed"</th>
                                         <th scope="col" class="num">"Failed"</th>
-                                        <th scope="col" class="num">"Flaky"</th>
+                                        <th scope="col" class="num">"Flaky evidence"</th>
                                         <th scope="col" class="num">"Median"</th>
                                         <th scope="col" class="num">"95th percentile"</th>
                                     </tr>
@@ -372,7 +372,7 @@ pub fn TrendView(
                                                     <td data-label="Day (UTC)" class="num">{d.day.clone()}</td>
                                                     <td data-label="Passed" class="num">{d.passed}</td>
                                                     <td data-label="Failed" class="num">{d.failed}</td>
-                                                    <td data-label="Flaky" class="num">{d.flaky}</td>
+                                                    <td data-label="Flaky evidence" class="num">{d.flaky}</td>
                                                     <td data-label="Median" class="num">{d.p50}</td>
                                                     <td data-label="95th percentile" class="num">{d.p95}</td>
                                                 </tr>
