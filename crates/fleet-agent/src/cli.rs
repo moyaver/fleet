@@ -75,6 +75,10 @@ enum Cmd {
     Publish {
         /// The bundle or the output directory.
         path: std::path::PathBuf,
+        /// Upload a failed flow's own screenshots and recordings from an output directory, as `run`
+        /// does with the same flag (issue #133). A bundle already holds what its run decided.
+        #[arg(long)]
+        upload_user_media: bool,
     },
     /// Send the events a crashed run left in its spool (use as an `if: always()` step).
     Flush {
@@ -110,12 +114,8 @@ pub fn main() -> ! {
             command,
         } => {
             let opts = supervisor::Options {
-                user_media: upload_user_media
-                    || crate::observer::user_media_switch(
-                        std::env::var(crate::observer::USER_MEDIA_ENV)
-                            .ok()
-                            .as_deref(),
-                    ) == crate::session::UserMedia::On,
+                user_media: crate::observer::user_media_for(upload_user_media)
+                    == crate::session::UserMedia::On,
                 grace: Duration::from_secs(grace),
                 finalize_timeout: Duration::from_secs(finalize_timeout),
                 no_observer,
@@ -127,8 +127,12 @@ pub fn main() -> ! {
             exit(supervisor::run(&command, &opts))
         }
         Cmd::Inspect { dir, json, events } => exit(Outcome::Code(inspect(&dir, json, events))),
-        Cmd::Publish { path } => exit(Outcome::Code(report(
-            crate::publish::run(&path).map(|p| p.describe()),
+        Cmd::Publish {
+            path,
+            upload_user_media,
+        } => exit(Outcome::Code(report(
+            crate::publish::run(&path, crate::observer::user_media_for(upload_user_media))
+                .map(|p| p.describe()),
         ))),
         Cmd::Flush { spool, timeout } => exit(Outcome::Code(report(crate::commands::flush(
             &spool,

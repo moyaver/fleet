@@ -101,6 +101,17 @@ const TOKEN: &str = "fleet-test-token";
 /// `fleet-agent publish <path>` against the fake server, in a cleared environment, with `token`
 /// as its `FLEET_TOKEN` when given.
 fn publish(path: &Path, ws: &str, token: Option<&str>) -> std::process::Output {
+    publish_with(path, ws, token, &[], &[])
+}
+
+/// [`publish`] with `flags` before the path and `env` in the environment.
+fn publish_with(
+    path: &Path,
+    ws: &str,
+    token: Option<&str>,
+    flags: &[&str],
+    env: &[(&str, &str)],
+) -> std::process::Output {
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("fleet-agent"));
     cmd.env_clear()
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
@@ -113,7 +124,11 @@ fn publish(path: &Path, ws: &str, token: Option<&str>) -> std::process::Output {
     if let Some(token) = token {
         cmd.env("FLEET_TOKEN", token);
     }
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
     cmd.arg("publish")
+        .args(flags)
         .arg(path)
         .stdin(Stdio::null())
         .output()
@@ -335,4 +350,67 @@ fn the_agent_flag_turns_the_switch_on_like_the_variable() {
     let all = entries(&run_dir.join("fleet-bundle.tar.zst"));
     let manifest: Value = serde_json::from_slice(&all["manifest.json"]).unwrap();
     assert_eq!(user_media(&manifest).len(), 2, "{manifest}");
+}
+
+/// The classes of Maestro's own media the published run journals (`artifact.registered`), in order.
+fn published_user_media(state: &super::stream::State) -> Vec<String> {
+    state
+        .committed
+        .values()
+        .filter(|e| e["type"] == "artifact.registered")
+        .filter_map(|e| e["data"]["class"].as_str())
+        .filter(|c| c.starts_with("user_"))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// `fleet-agent publish` takes the user-media switch the way `run` does (issue #133): the flag, or
+/// `FLEET_UPLOAD_USER_MEDIA`, turns on a failed flow's own media in a saved output directory, and
+/// without either nothing about it is journaled.
+#[test]
+fn publish_takes_the_user_media_switch_as_run_does() {
+    let dir = fixture("user-media-fail");
+    let media = ["user_screenshot", "user_recording"];
+
+    let srv = server(Mode::Normal);
+    let out = publish_with(&dir, &format!("ws://{}", srv.addr), Some(TOKEN), &[], &[]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(published_user_media(&srv.state.lock().unwrap()).is_empty());
+
+    let srv = server(Mode::Normal);
+    let out = publish_with(
+        &dir,
+        &format!("ws://{}", srv.addr),
+        Some(TOKEN),
+        &["--upload-user-media"],
+        &[],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(published_user_media(&srv.state.lock().unwrap()), media);
+
+    let srv = server(Mode::Normal);
+    let out = publish_with(
+        &dir,
+        &format!("ws://{}", srv.addr),
+        Some(TOKEN),
+        &[],
+        &[("FLEET_UPLOAD_USER_MEDIA", "1")],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(published_user_media(&srv.state.lock().unwrap()), media);
 }

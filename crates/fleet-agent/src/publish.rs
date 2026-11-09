@@ -42,6 +42,7 @@ use crate::{
     journal,
     observer::{self, candidate_item},
     outbox::{Budget, Outbox},
+    session::UserMedia,
     transport::{self, Shared},
     upload::{self, Done, Item, Outcome, Source, Uploader},
 };
@@ -70,7 +71,10 @@ pub(crate) struct Published {
 /// Returns why the run could not be published: no server configured, no credential, an input
 /// that is neither a bundle nor a Maestro output directory, or a server that refused or did not
 /// take the run.
-pub(crate) fn run(input: &Path) -> anyhow::Result<Published> {
+///
+/// `user_media` is the user-media switch (issue #133): it decides what a Maestro output directory
+/// uploads, and a bundle keeps the decision its run made.
+pub(crate) fn run(input: &Path, user_media: UserMedia) -> anyhow::Result<Published> {
     // Installed like the observer does: TLS to the server needs a crypto provider.
     let _ = rustls::crypto::ring::default_provider().install_default();
     let url = observer::server_url()
@@ -89,17 +93,22 @@ pub(crate) fn run(input: &Path) -> anyhow::Result<Published> {
         .context("starting the runtime")?;
     let work = std::env::temp_dir().join(format!("fleet-publish-{}", Uuid::now_v7()));
     fs::create_dir_all(&work).with_context(|| format!("creating {}", work.display()))?;
-    let result = rt.block_on(publish(input, &url, &work));
+    let result = rt.block_on(publish(input, &url, &work, user_media));
     let _ = fs::remove_dir_all(&work);
     result
 }
 
-async fn publish(input: &Path, url: &str, work: &Path) -> anyhow::Result<Published> {
+async fn publish(
+    input: &Path,
+    url: &str,
+    work: &Path,
+    user_media: UserMedia,
+) -> anyhow::Result<Published> {
     let start = Instant::now();
     if is_bundle_dir(input) || is_bundle_file(input) {
         publish_bundle(input, url, work, start).await
     } else if input.is_dir() {
-        publish_saved(input, url, work, start).await
+        publish_saved(input, url, work, start, user_media).await
     } else {
         bail!(
             "{} is neither an offline bundle nor a Maestro output directory",
@@ -187,19 +196,11 @@ async fn publish_saved(
     url: &str,
     work: &Path,
     start: Instant,
+    user_media: UserMedia,
 ) -> anyhow::Result<Published> {
     let dir = input.to_owned();
     let mut replayed = tokio::task::spawn_blocking(move || {
-        inspect::replay(
-            &dir,
-            Box::new(Uuid::now_v7),
-            crate::observer::user_media_switch(
-                std::env::var(crate::observer::USER_MEDIA_ENV)
-                    .ok()
-                    .as_deref(),
-            ),
-        )
-        .map(|r| (r, dir))
+        inspect::replay(&dir, Box::new(Uuid::now_v7), user_media).map(|r| (r, dir))
     })
     .await
     .context("reading the run")??;
