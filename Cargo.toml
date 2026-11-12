@@ -107,7 +107,7 @@ nix = { version = "0.31.3", features = ["signal", "process", "resource"] }
 object_store = { version = "0.14.2", default-features = false, features = ["aws-base", "reqwest", "ring"] }
 predicates = "3.1.4"
 # Validates golden frames against the generated schema (dev-dependency only).
-jsonschema = { version = "0.60.2", default-features = false }
+jsonschema = { version = "0.61.0", default-features = false }
 proptest = "1.12.0"
 quick-xml = "0.42.0"
 regex = "1.13.1"
