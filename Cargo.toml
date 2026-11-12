@@ -129,7 +129,7 @@ sha2 = "0.11.1"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "time", "json", "tls-rustls-ring-native-roots"] }
 signal-hook = "0.4.6"
 # The verifier trait jsonwebtoken's pluggable crypto uses.
-signature = "2.2.0"
+signature = "3.0.0"
 # Streaming tar reader for artifact bundles; no xattr, nothing is ever unpacked to disk.
 tar = { version = "0.4.46", default-features = false }
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
