@@ -1424,7 +1424,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sha2 0.11.1",
- "signature",
+ "signature 3.0.0",
  "sqlx",
  "thiserror 2.0.21",
  "time",
@@ -2480,7 +2480,7 @@ dependencies = [
  "js-sys",
  "serde",
  "serde_json",
- "signature",
+ "signature 2.2.0",
  "zeroize",
 ]
 
@@ -4158,6 +4158,12 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "rand_core 0.6.4",
 ]
+
+[[package]]
+name = "signature"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
 
 [[package]]
 name = "simd_cesu8"
