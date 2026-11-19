@@ -4,6 +4,9 @@
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/moyaver/fleet?include_prereleases&label=release)](https://github.com/moyaver/fleet/releases)
 
+> [!WARNING]
+> **Development is paused (2026-11-20).** Fleet works end to end as a self-hosted alpha, but it has not yet been validated with real teams, so the roadmap is on hold and the "Coming" items below are not being built. The code, releases and docs stay available under AGPL-3.0. If you run Maestro in your own CI and want this, [open an issue](https://github.com/moyaver/fleet/issues): real interest is what would restart it.
+
 Fleet is the home for your mobile end-to-end tests. Run them in your own CI, watch them live, and keep every failure's evidence and history in one place. Next, it groups results by app build and lets you choose what runs.
 
 > **Self-hosted alpha today; no hosted tier yet. Android today; iOS next.**
